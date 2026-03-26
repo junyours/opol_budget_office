@@ -19,13 +19,13 @@ class Department extends Model
         'logo',];
 
    public function category()
-{
-    return $this->belongsTo(
-        DepartmentCategory::class,
-        'dept_category_id',
-        'dept_category_id'
-    );
-}
+    {
+        return $this->belongsTo(
+            DepartmentCategory::class,
+            'dept_category_id',
+            'dept_category_id'
+        );
+    }
 
     public function users()
     {

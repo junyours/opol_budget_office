@@ -27,7 +27,9 @@ use Illuminate\Http\Request;
 use ZipArchive;
 use App\Models\Form6Template;
 use App\Models\Form6Item;
+use App\Models\LdrrmfipItem;
 use App\Models\MdfCategory;
+use App\Models\DepartmentCategory;
 /**
  * UnifiedReportController
  * ═══════════════════════════════════════════════════════════════════════════
@@ -160,25 +162,25 @@ public function summary(Request $request)
 }
 private function buildSummaryData(int $budgetPlanId): array
 {
-    $plan = \App\Models\BudgetPlan::findOrFail($budgetPlanId);
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
     $year = (int) $plan->year;
 
     // ── Departments & categories ──────────────────────────────────────────
     // $departments = \App\Models\Department::with('category')
     //     ->orderBy('dept_name')
     //     ->get();
-    $departments = \App\Models\Department::with('category')
+    $departments = Department::with('category')
     ->orderBy('dept_id')  // ← change from orderBy('dept_name')
     ->get();
-    $categories  = \App\Models\DepartmentCategory::all()->keyBy('dept_category_id');
+    $categories  = DepartmentCategory::all()->keyBy('dept_category_id');
 
     $SPECIAL_ACCOUNTS_CATEGORY_ID = 4;
     $gfDepts   = $departments->filter(fn ($d) => $d->dept_category_id !== $SPECIAL_ACCOUNTS_CATEGORY_ID);
     $gfDeptIds = $gfDepts->pluck('dept_id')->toArray();
 
     // ── Expense classifications ───────────────────────────────────────────
-    $rawClasses    = \App\Models\ExpenseClassification::all();
-    $rawClassItems = \App\Models\ExpenseClassItem::all();
+    $rawClasses    = ExpenseClassification::all();
+    $rawClassItems = ExpenseClassItem::all();
 
     $classMap = $rawClasses->keyBy('expense_class_id')
         ->map(fn ($c) => ['expense_class_name' => $c->expense_class_name, 'abbreviation' => $c->abbreviation]);
@@ -201,7 +203,7 @@ private function buildSummaryData(int $budgetPlanId): array
     };
 
     // ── Dept budget plans ─────────────────────────────────────────────────
-    $deptPlans = \App\Models\DepartmentBudgetPlan::with([
+    $deptPlans = DepartmentBudgetPlan::with([
             'items',
             'items.expenseItem',
             'items.expenseItem.classification',
@@ -232,7 +234,7 @@ private function buildSummaryData(int $budgetPlanId): array
 
     // SPA per dept (from AIP programs)
     $deptBudgetPlanIds = $deptPlans->pluck('dept_budget_plan_id')->toArray();
-    $aipItems = \App\Models\DeptBpForm4Item::whereIn('dept_budget_plan_id', $deptBudgetPlanIds)->get();
+    $aipItems = DeptBpForm4Item::whereIn('dept_budget_plan_id', $deptBudgetPlanIds)->get();
     $planToDept = $deptPlans->pluck('dept_id', 'dept_budget_plan_id')->toArray();
     $deptSpa = [];
     foreach ($aipItems as $ai) {
@@ -383,14 +385,14 @@ public function form6PDF(Request $request)
 
 private function buildForm6Data(int $budgetPlanId, string $filter = 'all'): array
 {
-    $plan = \App\Models\BudgetPlan::findOrFail($budgetPlanId);
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
     $year = (int) $plan->year;
 
     // All templates ordered
-    $templates = \App\Models\Form6Template::orderBy('sort_order')->get();
+    $templates = Form6Template::orderBy('sort_order')->get();
 
     // Special account departments
-    $specialDepts = \App\Models\Department::with('category')
+    $specialDepts = Department::with('category')
         ->get()
         ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts');
 
@@ -431,12 +433,12 @@ private function buildOneForm6(
     string $label,
     bool   $isSpecial,
 ): array {
-    $items = \App\Models\Form6Item::where('budget_plan_id', $budgetPlanId)
+    $items = Form6Item::where('budget_plan_id', $budgetPlanId)
         ->where('source', $source)
         ->get()
         ->keyBy('form6_template_id');
 
-    $rows = $templates->map(fn (\App\Models\Form6Template $tpl) => [
+    $rows = $templates->map(fn (Form6Template $tpl) => [
         'form6_template_id' => $tpl->form6_template_id,
         'code'              => $tpl->code,
         'label'             => $tpl->label,
@@ -528,6 +530,310 @@ public function mdf20PDF(Request $request)
     } catch (\Throwable $e) {
         return $this->errorResponse($e);
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POST /api/reports/unified/pscomputationpdf
+// ═══════════════════════════════════════════════════════════════════════════
+public function psComputationPDF(Request $request)
+{
+    $request->validate([
+        'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+    ]);
+
+    try {
+        $this->clearViewCache();
+        $data = $this->buildPsComputationData((int) $request->budget_plan_id);
+        $html = $this->renderHtml('pscomputation', $data);
+        $pdf  = $this->makePdf($html, 'portrait');
+        return $this->pdfResponse(
+            $pdf,
+            "PS_Computation_FY{$data['year']}.pdf",
+            $request->boolean('download')
+        );
+    } catch (\Throwable $e) {
+        return $this->errorResponse($e);
+    }
+}
+
+private function buildPsComputationData(int $budgetPlanId): array
+{
+    $activePlan   = BudgetPlan::findOrFail($budgetPlanId);
+    $proposedYear = (int) $activePlan->year;
+    $incomeYear   = $proposedYear - 2;
+    $lgu          = strtoupper($activePlan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL');
+
+    // ── Manual values ─────────────────────────────────────────────────────
+    $values = \App\Models\PsComputationValue::firstOrCreate(
+        ['budget_plan_id' => $budgetPlanId],
+        ['total_income' => 0, 'non_recurring_income' => 0, 'excess_amount' => 0]
+    );
+
+    // ── Aggregates from dept_bp_form2_items (GF only) ─────────────────────
+    $specialCatId = \App\Models\DepartmentCategory::where('dept_category_name', 'Special Accounts')
+        ->value('dept_category_id');
+
+    $aggregates = \DB::table('dept_bp_form2_items as f2')
+        ->join('department_budget_plans as dbp', 'dbp.dept_budget_plan_id', '=', 'f2.dept_budget_plan_id')
+        ->join('departments as d',               'd.dept_id',               '=', 'dbp.dept_id')
+        ->join('expense_class_items as ei',      'ei.expense_class_item_id','=', 'f2.expense_item_id')
+        ->where('dbp.budget_plan_id', $budgetPlanId)
+        ->when($specialCatId, fn ($q, $id) => $q->where('d.dept_category_id', '!=', $id))
+        ->groupBy('ei.expense_class_item_name', 'ei.expense_class_item_acc_code')
+        ->select(
+            'ei.expense_class_item_name     as item_name',
+            \DB::raw('SUM(f2.total_amount)  as total')
+        )
+        ->get()
+        ->pluck('total', 'item_name')
+        ->map(fn ($v) => (float) $v);
+
+    $agg = fn (string $name): float => (float) ($aggregates->get($name) ?? 0);
+
+    // Section A
+    $salariesWages = $agg('Salaries and Wages - Regular');
+
+    // Section B
+    $retirementInsurance = $agg('Retirement and Life Insurance Premiums');
+    $pagIbig             = $agg('Pag-IBIG Contributions');
+    $philhealth          = $agg('PhilHealth Contributions');
+    $ecInsurance         = $agg('Employees Compensation Insurance Premiums');
+    $subtotalB           = $retirementInsurance + $pagIbig + $philhealth + $ecInsurance;
+
+    // Section C
+    $pera               = $agg('Personal Economic Relief Allowance (PERA)');
+    $representation     = $agg('Representation Allowance (RA)');
+    $transportation     = $agg('Transportation Allowance (TA)');
+    $clothing           = $agg('Clothing/Uniform Allowance');
+    $magnaCarta         = $agg('Subsistence Allowance');
+    $hazardPay          = $agg('Hazard Pay');
+    $honoraria          = $agg('Honoraria');
+    $overtimePay        = $agg('Overtime and Night Pay');
+    $cashGift           = $agg('Cash Gift');
+    $midYearBonus       = $agg('Mid-Year Bonus');
+    $yearEndBonus       = $agg('Year End Bonus');
+    $terminalLeave      = $agg('Terminal Leave Benefits');
+    $productivityInc    = $agg('Productivity Incentive Allowance');
+    $monetization       = $agg('Other Personnel Benefits');
+    $subtotalC          = $pera + $representation + $transportation + $clothing
+                        + $magnaCarta + $hazardPay + $honoraria + $overtimePay
+                        + $cashGift + $midYearBonus + $yearEndBonus
+                        + $terminalLeave + $productivityInc + $monetization;
+
+    $totalPs = $salariesWages + $subtotalB + $subtotalC;
+
+    // Top section calculations
+    $totalIncome         = (float) $values->total_income;
+    $nonRecurring        = (float) $values->non_recurring_income;
+    $excessAmount        = (float) $values->excess_amount;
+    $totalRealizedIncome = $totalIncome - $nonRecurring;
+    $psLimitation        = $totalRealizedIncome * 0.45;
+    $totalWaived         = $terminalLeave + $monetization;
+    $amountAllowable     = $psLimitation - $totalPs - $excessAmount + $totalWaived;
+
+    return [
+        'year'              => $proposedYear,
+        'income_year'       => $incomeYear,
+        'lgu'               => $lgu,
+        // Top section
+        'total_income'           => $totalIncome,
+        'non_recurring'          => $nonRecurring,
+        'total_realized'         => $totalRealizedIncome,
+        'ps_limitation'          => $psLimitation,
+        'total_ps_gf'            => $totalPs,
+        'excess_amount'          => $excessAmount,
+        'terminal_leave_gf'      => $terminalLeave,
+        'monetization_gf'        => $monetization,
+        'total_waived'           => $totalWaived,
+        'amount_allowable'       => $amountAllowable,
+        // Detail
+        'salaries_wages'          => $salariesWages,
+        'retirement_insurance'    => $retirementInsurance,
+        'pag_ibig'                => $pagIbig,
+        'philhealth'              => $philhealth,
+        'ec_insurance'            => $ecInsurance,
+        'subtotal_b'              => $subtotalB,
+        'pera'                    => $pera,
+        'representation'          => $representation,
+        'transportation'          => $transportation,
+        'clothing'                => $clothing,
+        'magna_carta'             => $magnaCarta,
+        'hazard_pay'              => $hazardPay,
+        'honoraria'               => $honoraria,
+        'overtime_pay'            => $overtimePay,
+        'cash_gift'               => $cashGift,
+        'mid_year_bonus'          => $midYearBonus,
+        'year_end_bonus'          => $yearEndBonus,
+        'terminal_leave'          => $terminalLeave,
+        'productivity_incentive'  => $productivityInc,
+        'monetization'            => $monetization,
+        'subtotal_c'              => $subtotalC,
+        'total_ps'                => $totalPs,
+    ];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POST /api/reports/unified/calamity5pdf
+// ═══════════════════════════════════════════════════════════════════════════
+public function calamity5PDF(Request $request)
+{
+    $request->validate([
+        'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+        'filter'         => 'nullable|string',
+    ]);
+
+    try {
+        $this->clearViewCache();
+        $filter = $request->input('filter', 'all');
+        $data   = $this->buildCalamity5Data((int) $request->budget_plan_id, $filter);
+        $html   = $this->renderHtml('calamity5', $data);
+        $pdf    = $this->makePdf($html, 'landscape');
+        $suffix = $filter === 'all' ? '' : ('_' . strtoupper($filter));
+        return $this->pdfResponse(
+            $pdf,
+            "5pct_CalamityFund_FY{$data['year']}{$suffix}.pdf",
+            $request->boolean('download')
+        );
+    } catch (\Throwable $e) {
+        return $this->errorResponse($e);
+    }
+}
+
+private function buildCalamity5Data(int $budgetPlanId, string $filter = 'all'): array
+{
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
+    $year = (int) $plan->year;
+    $lgu  = strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL');
+
+    $specialDepts = Department::with('category')
+        ->get()
+        ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts');
+
+    $forms = [];
+
+    // ── General Fund ──────────────────────────────────────────────────────
+    if ($filter === 'all' || $filter === 'general-fund') {
+        $forms[] = $this->buildOneCalamity5($budgetPlanId, 'general-fund', 'GENERAL FUND', false, $year);
+    }
+
+    // ── Special Accounts ──────────────────────────────────────────────────
+    foreach ($specialDepts as $dept) {
+        $source = $this->sourceKeyForDept($dept);
+        if ($filter !== 'all' && $filter !== $source) continue;
+        $forms[] = $this->buildOneCalamity5(
+            $budgetPlanId,
+            $source,
+            'SPECIAL ACCOUNT for ' . $dept->dept_name,
+            true,
+            $year
+        );
+    }
+
+    // The blade renders the first form's data for single-source preview.
+    // When filter is 'all', the blade iterates $all_forms.
+    // For single-source previews, $forms[0] IS the correct filtered form
+    // because the general-fund block is skipped when filter !== 'all' && filter !== 'general-fund'.
+    // However we must ensure the blade iterates all_forms for 'all', and uses
+    // the single matching form for specific filters.
+    $primaryForm = $forms[0] ?? ['label' => '', 'is_special' => false, 'categories' => [], 'summary' => []];
+
+    return [
+        'year'       => $year,
+        'lgu'        => $lgu,
+        'label'      => $primaryForm['label'],
+        'is_special' => $primaryForm['is_special'],
+        'categories' => $primaryForm['categories'],
+        'summary'    => $primaryForm['summary'],
+        'all_forms'  => $forms,
+    ];
+}
+
+private function buildOneCalamity5(
+    int    $budgetPlanId,
+    string $source,
+    string $label,
+    bool   $isSpecial,
+    int    $year
+): array {
+    // Load items grouped by category
+    $categories = \App\Models\LdrrmfipCategory::where('is_active', true)
+        ->orderBy('sort_order')
+        ->with(['items' => function ($q) use ($budgetPlanId, $source) {
+            $q->where('budget_plan_id', $budgetPlanId)
+              ->where('source', $source)
+              ->orderBy('ldrrmfip_item_id');
+        }])
+        ->get()
+        ->map(fn ($cat) => [
+            'name'           => $cat->name,
+            'items'          => $cat->items->map(fn ($i) => [
+                'description'         => $i->description,
+                'implementing_office' => $i->implementing_office ?? 'LDRRMO',
+                'starting_date'       => $i->starting_date,
+                'completion_date'     => $i->completion_date,
+                'expected_output'     => $i->expected_output,
+                'funding_source'      => $i->funding_source ?? 'LDRRMF',
+                'mooe'                => (float) $i->mooe,
+                'co'                  => (float) $i->co,
+                'total'               => (float) ($i->mooe + $i->co),
+            ])->toArray(),
+            'subtotal_mooe'  => (float) $cat->items->sum('mooe'),
+            'subtotal_co'    => (float) $cat->items->sum('co'),
+            'subtotal_total' => (float) $cat->items->sum(fn ($i) => $i->mooe + $i->co),
+        ])
+        ->filter(fn ($cat) => count($cat['items']) > 0)
+        ->values()
+        ->toArray();
+
+    // Compute 5% calamity fund (same logic as LdrrmfipController)
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
+        ->value('grand');
+
+    $calamityFund = $this->computeCalamity5Fund($budgetPlanId, $source);
+    $reserved30   = round($calamityFund - $total70, 2);
+
+    return [
+        'label'      => $label,
+        'is_special' => $isSpecial,
+        'categories' => $categories,
+        'summary'    => [
+            'total_70pct'   => round($total70, 2),
+            'reserved_30'   => $reserved30,
+            'calamity_fund' => $calamityFund,
+        ],
+    ];
+}
+
+private function computeCalamity5Fund(int $planId, string $source): float
+{
+    $nonIncomeParent = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+        ->first(['id']);
+
+    if (!$nonIncomeParent && $source === 'general-fund') {
+        $nonIncomeParent = \DB::table('income_fund_objects')
+            ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+            ->first(['id']);
+    }
+
+    $excludeIds = [];
+    if ($nonIncomeParent) {
+        $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
+        $excludeIds[] = $nonIncomeParent->id;
+    }
+
+    $query = \DB::table('income_fund_amounts')
+        ->where('budget_plan_id', $planId)
+        ->where('source', $source);
+
+    if (!empty($excludeIds)) {
+        $query->whereNotIn('income_fund_object_id', $excludeIds);
+    }
+
+    return round((float) $query->sum('proposed_amount') * 0.05, 2);
 }
 
 public function form7PDF(Request $request)
@@ -624,9 +930,9 @@ private function buildMdf20Data(int $budgetPlanId): array
                 // if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) return null;
 if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
                     if ($item->debt_type === 'principal') {
-                        $obligation = \App\Models\DebtObligation::find($item->obligation_id);
+                        $obligation = DebtObligation::find($item->obligation_id);
                         if ($obligation) {
-                            $totalPaid = \App\Models\DebtPayment::where('obligation_id', $item->obligation_id)
+                            $totalPaid = DebtPayment::where('obligation_id', $item->obligation_id)
                                 ->sum('principal_due');
                             $balance = (float) $obligation->principal_amount - (float) $totalPaid;
                             if ($balance <= 0) {
@@ -670,9 +976,9 @@ if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
             // if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) return null;
 if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
                     if ($item->debt_type === 'principal') {
-                        $obligation = \App\Models\DebtObligation::find($item->obligation_id);
+                        $obligation = DebtObligation::find($item->obligation_id);
                         if ($obligation) {
-                            $totalPaid = \App\Models\DebtPayment::where('obligation_id', $item->obligation_id)
+                            $totalPaid = DebtPayment::where('obligation_id', $item->obligation_id)
                                 ->sum('principal_due');
                             $balance = (float) $obligation->principal_amount - (float) $totalPaid;
                             if ($balance <= 0) {
@@ -1109,9 +1415,9 @@ private function getGfFundTotals(int $budgetPlanId): array
         $request->validate([
             'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
             'forms'          => 'required|array|min:1',
-            'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20',
-            // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary',
-            // 'forms.*'        => 'in:form1,form2,form3,form4,form5,form6,form7',  // ← add form6
+            'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5,pscomputation',
+            // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5',
+            // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20',
         ]);
 
         try {
@@ -1196,11 +1502,25 @@ private function getGfFundTotals(int $budgetPlanId): array
                     $this->makePdf($html, 'portrait'));
             }
 
+            if (in_array('pscomputation', $forms)) {
+                $data = $this->buildPsComputationData($bpId);
+                $html = $this->renderHtml('pscomputation', $data);
+                $zip->addFromString($sectionGF . "PS_Computation_FY{$year}.pdf",
+                    $this->makePdf($html, 'portrait'));
+            }
+
             if (in_array('mdf20', $forms)) {
                 $data = $this->buildMdf20Data($bpId);
                 $html = $this->renderHtml('mdf20', $data);
                 $zip->addFromString($sectionGF . "20MDF_FY{$year}.pdf",
                     $this->makePdf($html, 'portrait'));
+            }
+
+            if (in_array('calamity5', $forms)) {
+                $data = $this->buildCalamity5Data($bpId, 'general-fund');
+                $html = $this->renderHtml('calamity5', $data);
+                $zip->addFromString($sectionGF . "5pct_CalamityFund_GF_FY{$year}.pdf",
+                    $this->makePdf($html, 'landscape'));
             }
 
             // ── Section 2: Special Account departments ───────────────────
@@ -1238,6 +1558,15 @@ private function getGfFundTotals(int $budgetPlanId): array
                     $zip->addFromString(
                         $sectionSA . "Form7_FundAllocationBySector_{$saAbbr}_FY{$year}.pdf",
                         $this->makePdf($html, 'portrait')
+                    );
+                }
+
+                if (in_array('calamity5', $forms)) {
+                    $data = $this->buildCalamity5Data($bpId, $sourceKey);
+                    $html = $this->renderHtml('calamity5', $data);
+                    $zip->addFromString(
+                        $sectionSA . "5pct_CalamityFund_{$saAbbr}_FY{$year}.pdf",
+                        $this->makePdf($html, 'landscape')
                     );
                 }
 
@@ -2084,10 +2413,22 @@ return response()->stream(function () use ($zipPath) {
     }
 
     // Fetch all signatories needed across all forms
+    // private function buildSignatories(): array
+    // {
+    //     // Fetch 1st position of each specific department by dept_name keyword
+    //     // Using name instead of abbreviation avoids parentheses/format issues
+    //     return [
+    //         'budget_officer'  => $this->getDeptHeadByName('budget'),
+    //         'administrator'   => $this->getDeptHeadByName('administration'),
+    //         'mpdc'            => $this->getDeptHeadByName('planning and development'),
+    //         'treasurer'       => $this->getDeptHeadByName('treasurer'),
+    //         'mayor'           => $this->getDeptHeadByName('mayor'),
+    //         'hrmo'            => $this->getDeptHeadByName('human resources'),
+    //         'accountant'      => $this->getDeptHeadByName('accounting'),
+    //     ];
+    // }
     private function buildSignatories(): array
     {
-        // Fetch 1st position of each specific department by dept_name keyword
-        // Using name instead of abbreviation avoids parentheses/format issues
         return [
             'budget_officer'  => $this->getDeptHeadByName('budget'),
             'administrator'   => $this->getDeptHeadByName('administration'),
@@ -2096,6 +2437,7 @@ return response()->stream(function () use ($zipPath) {
             'mayor'           => $this->getDeptHeadByName('mayor'),
             'hrmo'            => $this->getDeptHeadByName('human resources'),
             'accountant'      => $this->getDeptHeadByName('accounting'),
+            'drrm_officer'    => $this->getDeptHeadByName('disaster'),
         ];
     }
 
@@ -2136,6 +2478,10 @@ return response()->stream(function () use ($zipPath) {
             'bureau of fire' => [
                 'name'  => 'F/SINSP HARLEY GLENN B. GALPO',
                 'title' => 'Fire Marshall - Opol BFP',
+            ],
+            'hrmo' => [
+                'name'  => 'JOSEPH A. ACTUB',
+                'title' => 'HRMO Designate',
             ],
         ];
     }

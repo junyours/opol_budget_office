@@ -7,6 +7,7 @@ use App\Models\SalaryStandardVersion;
 use App\Models\SalaryGradeStep;
 use App\Models\PlantillaAssignment;
 use App\Models\BudgetPlanForm2Item;
+use App\Models\ExpenseClassItem;
 use App\Models\BudgetPlanForm3Assignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -390,6 +391,38 @@ class DepartmentBudgetPlanController extends BaseApiController
                 );
             }
         });
+
+        // ── OCC special honoraria items (Form 2 snapshot) ─────────────────────
+        $dept = $budget_plan->department ?? $budget_plan->load('department')->department;
+
+        if ($dept && $dept->dept_abbreviation === 'OCC') {
+            $occNames = [
+                'Honoraria - BOT',
+                'Honoraria - Part-Time Instructors',
+                'Honoraria - Program Head',
+                'Honoraria - TESDA Coordinator',
+            ];
+
+            $occItems = ExpenseClassItem::whereIn('expense_class_item_name', $occNames)
+                ->get();
+
+            $existingIds = $budget_plan->items()
+                ->pluck('expense_item_id')
+                ->all();
+
+            foreach ($occItems as $occItem) {
+                if (!in_array($occItem->expense_class_item_id, $existingIds)) {
+                    BudgetPlanForm2Item::create([
+                        'dept_budget_plan_id' => $budget_plan->dept_budget_plan_id,
+                        'expense_item_id'     => $occItem->expense_class_item_id,
+                        'sem1_amount'         => 0,
+                        'sem2_amount'         => 0,
+                        'total_amount'        => 0,
+                    ]);
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         return $this->success([
             'message' => 'Plantilla assignments snapshot saved successfully.',

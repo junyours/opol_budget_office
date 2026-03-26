@@ -38,6 +38,62 @@ const FORM_DEFS = [
     needsDept: false,
   },
   {
+    id: 'summary',
+    label: 'Summary of Expenditures',
+    desc: 'Summary of Expenditures by Office (General Fund)',
+    orientation: 'portrait' as const,
+    needsScope: false,
+    needsDept: false,
+  },
+  {
+    id: 'form5',
+    label: 'LBP Form No. 5',
+    desc: 'Statement of Indebtedness',
+    orientation: 'landscape' as const,
+    needsScope: false,
+    needsDept: false,
+  },
+  {
+    id: 'form6',
+    label: 'LBP Form No. 6',
+    desc: 'Statement of Statutory and Contractual Obligations',
+    orientation: 'portrait' as const,
+    needsScope: true,   // has the same filter dropdown as Form 1
+    needsDept: false,
+  },
+  {
+      id: 'form7',
+      label: 'LBP Form No. 7',
+      desc: 'Statement of Fund Allocation by Sector',
+      orientation: 'portrait' as const,
+      needsScope: true,   // same General Fund / Special Accounts selector as Form 1 & 6
+      needsDept: false,
+    },
+    {
+    id: 'pscomputation',
+    label: 'PS Computation',
+    desc: 'Personnel Services Computation (GF)',
+    orientation: 'portrait' as const,
+    needsScope: false,
+    needsDept: false,
+  },
+    {
+    id: 'mdf20',
+    label: '20% MDF Report',
+    desc: '20% Municipal Development Fund',
+    orientation: 'portrait' as const,
+    needsScope: false,
+    needsDept: false,
+  },
+  {
+    id: 'calamity5',
+    label: '5% Calamity Fund',
+    desc: 'LDRRMF Investment Plan (General Fund & Special Accounts)',
+    orientation: 'landscape' as const,
+    needsScope: true,
+    needsDept: false,
+  },
+  {
     id: 'form2',
     label: 'LBP Form No. 2',
     desc: 'Programmed Appropriation by Object of Expenditures',
@@ -61,46 +117,11 @@ const FORM_DEFS = [
     needsScope: false,
     needsDept: true,
   },
-  {
-    id: 'form5',
-    label: 'LBP Form No. 5',
-    desc: 'Statement of Indebtedness',
-    orientation: 'landscape' as const,
-    needsScope: false,
-    needsDept: false,
-  },
-  {
-    id: 'summary',
-    label: 'Summary of Expenditures',
-    desc: 'Summary of Expenditures by Office (General Fund)',
-    orientation: 'portrait' as const,
-    needsScope: false,
-    needsDept: false,
-  },
-  {
-    id: 'form6',
-    label: 'LBP Form No. 6',
-    desc: 'Statement of Statutory and Contractual Obligations',
-    orientation: 'portrait' as const,
-    needsScope: true,   // has the same filter dropdown as Form 1
-    needsDept: false,
-  },
-  {
-      id: 'form7',
-      label: 'LBP Form No. 7',
-      desc: 'Statement of Fund Allocation by Sector',
-      orientation: 'portrait' as const,
-      needsScope: true,   // same General Fund / Special Accounts selector as Form 1 & 6
-      needsDept: false,
-    },
-    {
-    id: 'mdf20',
-    label: '20% MDF Report',
-    desc: '20% Municipal Development Fund',
-    orientation: 'portrait' as const,
-    needsScope: false,
-    needsDept: false,
-  },
+  
+  
+  
+  
+    
   ] as const;
 
 type FormId = typeof FORM_DEFS[number]['id'];
@@ -118,9 +139,11 @@ type FormId = typeof FORM_DEFS[number]['id'];
     if (forms.includes('form1')   && forms.length === 1) return '/reports/unified/form1';
     if (forms.includes('form5')   && forms.length === 1) return '/reports/unified/form5';
     if (forms.includes('summary') && forms.length === 1) return '/reports/unified/summary';
-     if (forms.includes('form6') && forms.length === 1) return '/reports/unified/form6pdf';
+    if (forms.includes('form6') && forms.length === 1) return '/reports/unified/form6pdf';
     if (forms.includes('form7') && forms.length === 1) return '/reports/unified/form7pdf';
+    if (forms.includes('pscomputation') && forms.length === 1) return '/reports/unified/pscomputationpdf';
     if (forms.includes('mdf20') && forms.length === 1) return '/reports/unified/mdf20pdf';
+    if (forms.includes('calamity5') && forms.length === 1) return '/reports/unified/calamity5pdf';
     const deptForms = forms.filter(f => ['form2','form3','form4'].includes(f));
     if (deptForms.length === forms.length) return '/reports/unified/dept';
     return '';
@@ -204,7 +227,9 @@ const UnifiedReportsPage: React.FC = () => {
   const hasForm1  = forms.includes('form1');
   const hasForm6     = forms.includes('form6');
   const hasForm7     = forms.includes('form7');
-  const hasScopeForm = hasForm1 || hasForm6 || hasForm7;
+  const hasCalamity5 = forms.includes('calamity5');
+  const hasScopeForm = hasForm1 || hasForm6 || hasForm7 || hasCalamity5;
+  // const hasScopeForm = hasForm1 || hasForm6 || hasForm7;
  
   const scopeLabel = (() => {
     const scopeForms = [hasForm1 && '1', hasForm6 && '6', hasForm7 && '7'].filter(Boolean);
@@ -359,12 +384,15 @@ const UnifiedReportsPage: React.FC = () => {
     if (hasForm6)                   lines.push('  • Form6_StatutoryObligations_GF_FY***.pdf');
     if (hasForm7)                   lines.push('  • Form7_FundAllocationBySector_GF_FY***.pdf');
     if (forms.includes('summary'))  lines.push('  • SummaryOfExpenditures_FY***.pdf');
+    if (forms.includes('pscomputation')) lines.push('  • PS_Computation_FY***.pdf');
     if (forms.includes('mdf20'))    lines.push('  • 20MDF_FY***.pdf');
+    if (forms.includes('calamity5')) lines.push('  • 5pct_CalamityFund_GF_FY***.pdf');
     lines.push('📁 02_SA_[ABBR]/  (per Special Account dept)');
     if (hasForm1)                   lines.push('  • Form1_[ABBR]_FY***.pdf');
     if (hasDeptForms)               lines.push('  • Forms_[2-3-4]_[ABBR]_FY***.pdf');
     if (hasForm6)                   lines.push('  • Form6_[ABBR]_FY***.pdf');
     if (hasForm7)                   lines.push('  • Form7_FundAllocationBySector_[ABBR]_FY***.pdf');
+    if (forms.includes('calamity5')) lines.push('  • 5pct_CalamityFund_[ABBR]_FY***.pdf');
     return lines.join('\n');
   };
 

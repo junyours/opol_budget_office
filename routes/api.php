@@ -256,6 +256,8 @@ Route::apiResource('form6-special', Form6SpecialController::class)
         Route::post('form6pdf',  [UnifiedReportController::class, 'form6PDF']);
         Route::post('form7pdf',  [UnifiedReportController::class, 'form7PDF']);
         Route::post('mdf20pdf', [UnifiedReportController::class, 'mdf20PDF']);
+        Route::post('calamity5pdf', [UnifiedReportController::class, 'calamity5PDF']);
+        Route::post('pscomputationpdf', [UnifiedReportController::class, 'psComputationPDF']);
         Route::post('summary', [UnifiedReportController::class, 'summary']);
 
         // Generate All → ZIP

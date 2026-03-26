@@ -22,7 +22,7 @@
 /* ═══════════════════════════════════════════════════════
    PAGE SIZE + MARGINS
 ═══════════════════════════════════════════════════════ */
-@if(isset($mode) && $mode === 'form5')
+@if(isset($mode) && ($mode === 'form5' || $mode === 'calamity5'))
 @page { size: 14in 8.5in landscape; margin: 0; }
 @else
 @page { size: 8.5in 14in portrait;  margin: 0; }
@@ -37,15 +37,14 @@ html, body {
     font-size: 7pt;
     color: #000;
 }
-@if(isset($mode) && $mode === 'form5')
+@if(isset($mode) && ($mode === 'form5' || $mode === 'calamity5'))
 body {
-    /* Landscape — binding at TOP (punched for binder) */
     margin-top:    76pt;
     margin-bottom: 36pt;
     margin-left:   36pt;
     margin-right:  36pt;
 }
-.wrap { width: 936pt; } /* 1008pt - 36pt - 36pt */
+.wrap { width: 936pt; }
 @else
 body {
     /* Portrait — binding at LEFT */
@@ -2145,6 +2144,571 @@ $nf = function($n): string {
 
 </div>{{-- end .page --}}
 {{-- end mdf20 --}}
+
+{{-- ── PS COMPUTATION ──────────────────────────────────────────────────────── --}}
+@elseif($mode === 'pscomputation')
+@php
+$year        = $data['year'];
+$incomeYear  = $data['income_year'];
+$lgu         = $data['lgu'];
+
+$pf = function($n): string {
+    if ((float)$n == 0) return '';
+    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+};
+$pa = function($n): string {
+    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+};
+$nf = function($n): string {
+    if ((float)$n == 0) return ' - ';
+    return number_format((float)$n, 0);
+};
+$nfA = function($n): string {
+    return number_format((float)$n, 0);
+};
+@endphp
+
+<div class="page">
+
+<div style="text-align:center;font-size:7pt;font-weight:bold;margin-bottom:1px;border-top:1px solid">Municipality of Opol</div>
+<div style="text-align:center;font-size:7pt;font-weight:bold;margin-bottom:1px;">Misamis Oriental</div>
+<div style="text-align:center;font-size:8pt;font-weight:bold;text-transform:uppercase;margin-bottom:5px;margin-top:3px;">
+    PS COMPUTATION CY-{{ $year }}
+</div>
+
+{{--
+    BORDER STRATEGY:
+    - Outer table border:  border:1px solid #000  on the <table> itself
+    - All td/tr:           border:none  (no individual cell borders except where noted)
+    - Amount column cells: border-left:1px solid #000  (creates center divider)
+    - Highlight rows (Amount Allowable, Sub Total B, Sub Total C, Total PS):
+      full cell borders on both label and amount cells
+    - Spacer rows:         border:none on all cells
+--}}
+
+<table class="data-table" style="font-size:7pt; border:1px solid #000;">
+    {{-- Ghost row for column widths --}}
+    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:40%;padding:0;border:none;"></td>
+        <td style="width:25%;padding:0;border:none;"></td>
+        <td style="width:20%;padding:0;border:none;"></td>
+    </tr>
+    <tbody>
+
+    {{-- ── TOP SECTION ── --}}
+
+    {{-- Total Income --}}
+    <tr>
+        <td colspan="5" class="l" style="border-top:1px solid #000;border-right:none;border-bottom:none;padding:2px 4px;">
+            Total Income from sources realized from next preceding year <strong>{{ $incomeYear }}</strong>
+        </td>
+        <td class="r" style="border-top:1px solid #000;border-left:none;border-bottom:none;padding:2px 4px;">
+            {!! $pa($data['total_income']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- Less Non-Recurring --}}
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;">
+            Less : Non-Recurring Income
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nfA($data['non_recurring']) !!}
+        </td>
+    </tr>
+
+    {{-- Total Realized --}}
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;font-weight:bold;">
+            Total Realized Regular Income from next preceding year ({{ $incomeYear }})
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['total_realized']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- PS Limitation --}}
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;">
+            Less : Personnel Services Limitation (45%)
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['ps_limitation']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- Total PS GF --}}
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;">
+            Total Personnel Services for {{ $year }} - GF
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['total_ps_gf']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- Excess Amount --}}
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;">
+            Excess Amount
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nfA($data['excess_amount']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- Waived Items --}}
+    <tr>
+        <td colspan="6" class="l" style="border:none;padding:2px 4px;">
+            Add: Waived Items
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td colspan="4" class="l" style="border:none;padding:2px 4px;">
+            Terminal Leave - GF
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['terminal_leave_gf']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td colspan="4" class="l" style="border:none;padding:2px 4px;">
+            Monetization - GF
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['monetization_gf']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;font-weight:bold;">
+            Total Waived Items
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;font-weight:bold;">
+            {!! $nf($data['total_waived']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:6px;"></td></tr>
+
+    {{-- ── Amount Allowable — full border on both cells ── --}}
+    <tr>
+        <td colspan="5" class="l" style="border:1px solid #000;padding:3px 4px;font-weight:bold;">
+            Amount Allowable
+        </td>
+        <td class="r" style="border:1px solid #000;padding:3px 4px;font-weight:bold;">
+            {!! $pa($data['amount_allowable']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:10px;"></td></tr>
+
+    {{-- ══ DETAIL SECTION HEADER ══ --}}
+    <tr>
+        <td colspan="6" class="l" style="border:none;padding:3px 4px;font-weight:bold;font-size:7pt;">
+            Personnel Services for Existing Plantilla Position
+        </td>
+    </tr>
+
+    {{-- ── Section A ── --}}
+    <tr>
+        <td style="border:none;"></td>
+        <td colspan="4" class="l" style="border:none;padding:2px 4px;font-weight:bold;">
+            A. Salaries/Wages of Current Personnel
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;font-weight:bold;">
+            {!! $pa($data['salaries_wages']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- ── Section B ── --}}
+    <tr>
+        <td style="border:none;"></td>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;font-weight:bold;">
+            B. Statutory &amp; Contractual Obligation
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Retirement &amp; Life Insurance Premiums
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['retirement_insurance']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Pag-IBIG Contributions
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['pag_ibig']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            PhilHealth Contributions
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['philhealth']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Employees Compensation Insurance Premiums
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['ec_insurance']) !!}
+        </td>
+    </tr>
+
+    {{-- Sub Total B — full border on both cells --}}
+    <tr>
+        
+        <td colspan="5" class="l" style="border:1px solid #000;padding:2px 4px;font-weight:bold;">
+            Sub Total
+        </td>
+        <td class="r" style="border:1px solid #000;padding:2px 4px;font-weight:bold;">
+            {!! $nf($data['subtotal_b']) !!}
+        </td>
+    </tr>
+
+    {{-- Spacer --}}
+    <tr><td colspan="6" style="border:none;padding:1px;height:4px;"></td></tr>
+
+    {{-- ── Section C ── --}}
+    <tr>
+        <td style="border:none;"></td>
+        <td colspan="5" class="l" style="border:none;padding:2px 4px;font-weight:bold;">
+            C. Existing Allowances &amp; Benefits of Regular Employees
+        </td>
+    </tr>
+    @php
+    $cItems = [
+        ['label' => 'PERA',                                          'key' => 'pera',               'peso' => true],
+        ['label' => 'Representation Allowance',                      'key' => 'representation',     'peso' => false],
+        ['label' => 'Transportation Allowance',                      'key' => 'transportation',     'peso' => false],
+        ['label' => 'Clothing Allowance',                            'key' => 'clothing',           'peso' => false],
+        ['label' => 'Magna Carta Benefits of Public Health Workers', 'key' => 'magna_carta',        'peso' => false],
+        ['label' => 'Hazard Pay',                                    'key' => 'hazard_pay',         'peso' => false],
+        ['label' => 'Honoraria',                                     'key' => 'honoraria',          'peso' => false],
+        ['label' => 'Overtime Pay',                                  'key' => 'overtime_pay',       'peso' => false],
+        ['label' => 'Cash Gift',                                     'key' => 'cash_gift',          'peso' => false],
+    ];
+    @endphp
+    @foreach($cItems as $ci)
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            {{ $ci['label'] }}
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $ci['peso'] ? $pf($data[$ci['key']]) : $nf($data[$ci['key']]) !!}
+        </td>
+    </tr>
+    @endforeach
+
+    {{-- Bonus sub-group --}}
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Bonus
+        </td>
+        <td style="border:none;border-left:none;"></td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td class="l" style="border:none;padding:2px 4px;">
+            Mid-Year
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['mid_year_bonus']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td class="l" style="border:none;padding:2px 4px;">
+            Year-End
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['year_end_bonus']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Terminal Leave
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['terminal_leave']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Productivity Enhancement Incentive
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['productivity_incentive']) !!}
+        </td>
+    </tr>
+    <tr>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td style="border:none;"></td>
+        <td colspan="2" class="l" style="border:none;padding:2px 4px;">
+            Other Benefits (Monetization)
+        </td>
+        <td class="r" style="border:none;border-left:none;padding:2px 4px;">
+            {!! $nf($data['monetization']) !!}
+        </td>
+    </tr>
+
+    {{-- Sub Total C — full border on both cells --}}
+    <tr>
+        <td colspan="5" class="l" style="border:1px solid #000;padding:2px 4px;font-weight:bold;">
+            Sub Total
+        </td>
+        <td class="r" style="border:1px solid #000;padding:2px 4px;font-weight:bold;">
+            {!! $nf($data['subtotal_c']) !!}
+        </td>
+    </tr>
+
+    {{-- Total PS — full border on both cells --}}
+    <tr>
+        <td colspan="5" class="l" style="border:1px solid #000;padding:3px 4px;font-weight:bold;">
+            Total Personnel Services for {{ $year }}
+        </td>
+        <td class="r" style="border:1px solid #000;padding:3px 4px;font-weight:bold;">
+            {!! $pa($data['total_ps']) !!}
+        </td>
+    </tr>
+
+    </tbody>
+</table>
+
+{{-- Signature block — same bordered style as Form 1 / Form 2 --}}
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;border:1px solid #000;">
+  <tr>
+    <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
+      Prepared By :
+      <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+    </td>
+    <td style="border-left:none;border-right:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 18px;">
+      Reviewed :
+      <span class="sig-name">{{ $signatories['hrmo']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['hrmo']['title'] }}</span>
+    </td>
+    <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
+      Noted :
+      <span class="sig-name">{{ $signatories['accountant']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['accountant']['title'] }}</span>
+    </td>
+  </tr>
+</table>
+
+</div>{{-- end .page --}}
+{{-- end pscomputation --}}
+
+
+{{-- ── 5% CALAMITY FUND REPORT ──────────────────────────────────────────────── --}}
+@elseif($mode === 'calamity5')
+@php
+$year      = $data['year'];
+$lgu       = $data['lgu'];
+$allForms5 = $data['all_forms'] ?? [['label' => $data['label'], 'is_special' => $data['is_special'], 'categories' => $data['categories'], 'summary' => $data['summary']]];
+
+$pa = function($n): string {
+    if ((float)$n == 0) return '';
+    return number_format((float)$n, 0);
+};
+$paA = function($n): string {
+    return ' ' . number_format((float)$n, 0) . ' ';
+};
+@endphp
+
+@foreach($allForms5 as $cal5)
+@php
+$label      = $cal5['label'];
+$isSpecial  = $cal5['is_special'];
+$categories = $cal5['categories'];
+$summary    = $cal5['summary'];
+@endphp
+
+<div class="page">
+
+<div class="doc-title" style="margin-bottom:1px;">LOCAL DISASTER RISK REDUCTION &amp; MANAGEMENT FUND INVESTMENT PLAN ( LDRRMFIP )</div>
+<div class="doc-title" style="margin-bottom:1px;">5% Calamity Fund ({{ $label }}) JANUARY TO DECEMBER {{ $year }}</div>
+<div class="doc-title" style="margin-bottom:4px;">{{ $lgu }}</div>
+
+<table class="form5-table" style="font-size:6.5pt;">
+  <thead>
+    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+      <td style="width:18%;padding:0;border:none;"></td>
+      <td style="width:26%;padding:0;border:none;"></td>
+      <td style="width:5%;padding:0;border:none;"></td>
+      <td style="width:5%;padding:0;border:none;"></td>
+      <td style="width:5%;padding:0;border:none;"></td>
+      <td style="width:16%;padding:0;border:none;"></td>
+      <td style="width:5%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+    </tr>
+    <tr>
+      <th rowspan="2">Functional Classification</th>
+      <th rowspan="2">Program/Project/Activity Code and Description</th>
+      <th rowspan="2">Implementing Office</th>
+      <th colspan="2">Schedule of Implementation</th>
+      <th rowspan="2">Expected Output</th>
+      <th rowspan="2">Funding Source</th>
+      <th colspan="3">Amount of Appropriation</th>
+    </tr>
+    <tr>
+      <th>Starting Date</th>
+      <th>Completion Date</th>
+      <th>MOOE</th>
+      <th>CO</th>
+      <th>TOTAL</th>
+    </tr>
+  </thead>
+  <tbody>
+
+  @foreach($categories as $cat)
+  @php
+    $items = $cat['items'];
+    $subMOOE  = $cat['subtotal_mooe'];
+    $subCO    = $cat['subtotal_co'];
+    $subTotal = $cat['subtotal_total'];
+  @endphp
+
+  @foreach($items as $idx => $item)
+  <tr>
+    @if($idx === 0)
+    <td class="l" rowspan="{{ count($items) }}" style="font-weight:bold;vertical-align:top;">{{ strtoupper($cat['name']) }}</td>
+    @endif
+    <td class="l">{{ $item['description'] }}</td>
+    <td class="c">{{ $item['implementing_office'] }}</td>
+    <td class="c">{{ $item['starting_date'] ?? '' }}</td>
+    <td class="c">{{ $item['completion_date'] ?? '' }}</td>
+    <td class="c">{{ $item['expected_output'] ?? '' }}</td>
+    <td class="c">{{ $item['funding_source'] }}</td>
+    <td class="r">@if($item['mooe']  > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['mooe'],0)  }}@endif</td>
+    <td class="r">@if($item['co']    > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['co'],0)    }}@endif</td>
+    <td class="r">@if($item['total'] > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['total'],0) }}@endif</td>
+  </tr>
+  @endforeach
+
+  {{-- Sub Total row --}}
+  <tr style="font-weight:bold;">
+    <td class="r" colspan="7" style="font-weight:bold;">Sub Total</td>
+    <td class="r">@if($subMOOE  > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subMOOE,0)  }}@endif</td>
+    <td class="r">@if($subCO    > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subCO,0)    }}@endif</td>
+    <td class="r">@if($subTotal > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subTotal,0) }}@endif</td>
+  </tr>
+
+  @endforeach {{-- categories --}}
+
+  </tbody>
+</table>
+
+{{-- A / B / C summary lines --}}
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:2px;">
+  <tr>
+    <td style="border:none;padding:2px 4px;">
+      <strong>A. Total ( 70% of the 5%CF, Preparedness Fund for CY{{ $year }} )</strong>
+    </td>
+    <td style="border:none;padding:2px 4px;text-align:right;width:120pt;">
+      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['total_70pct'], 0) }}
+    </td>
+  </tr>
+  <tr>
+    <td style="border:none;padding:2px 4px;">
+      <strong>B. Total Reserved for Actual Calamity ( 30% ) for Calendar Year {{ $year }}</strong>
+    </td>
+    <td style="border:none;padding:2px 4px;text-align:right;">
+      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['reserved_30'], 0) }}
+    </td>
+  </tr>
+  <tr>
+    <td style="border:none;padding:2px 4px;">
+      <strong>C. Total 5% Calamity Fund Reserved for CY{{ $year }}</strong>
+    </td>
+    <td style="border:none;padding:2px 4px;text-align:right;">
+      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['calamity_fund'], 0) }}
+    </td>
+  </tr>
+</table>
+
+{{-- Signature block — Prepared by (left) / Approved by (right) --}}
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:6px;">
+  <tr>
+    <td style="border:none;text-align:center;vertical-align:top;width:50%;padding:4px 6px 6px;">
+      Prepared by:
+      <span class="sig-name">{{ $signatories['drrm_officer']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['drrm_officer']['title'] }}</span>
+    </td>
+    <td style="border:none;text-align:center;vertical-align:top;width:50%;padding:4px 6px 6px;">
+      Approved by:
+      <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
+    </td>
+  </tr>
+</table>
+
+</div>{{-- end .page --}}
+@endforeach {{-- allForms5 --}}
+{{-- end calamity5 --}}
 
 @endif {{-- end mode dispatch --}}
 

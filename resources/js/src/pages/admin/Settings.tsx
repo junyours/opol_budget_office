@@ -14,6 +14,7 @@ const PlantillaPage            = React.lazy(() => import('../hrmo/PlantillaPage'
 const PersonnelPage            = React.lazy(() => import('../hrmo/PersonnelPage'));
 const PlantillaOfPersonnelPage = React.lazy(() => import('../hrmo/PlantillaOfPersonnelPage'));
 const DepartmentsPage          = React.lazy(() => import('./DepartmentsPage'));
+const UserAccountPage          = React.lazy(() => import('./UserAccountPage'));
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -68,6 +69,16 @@ const TABS = [
     iconColor:   'text-slate-600',
     component:   DepartmentsPage,
   },
+  {
+  key:         'users',
+  label:       'User Accounts',
+  short:       'Users',
+  description: 'Manage user accounts',
+  icon:        UsersIcon,       // already imported
+  iconBg:      'bg-blue-100',
+  iconColor:   'text-blue-600',
+  component:   UserAccountPage,
+},
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];

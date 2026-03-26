@@ -80,9 +80,15 @@ class BudgetPlanForm2ItemController extends BaseApiController
             return $this->error('Plan locked', 422);
         }
 
+        // $this->authorize('update', $item);
+
+        // if ($department_budget_plan->status !== 'draft') {
+        //     return $this->error('Plan locked', 422);
+        // }
+
         $this->authorize('update', $item);
 
-        if ($department_budget_plan->status !== 'draft') {
+        if ($department_budget_plan->status !== 'draft' && !$request->user()->hasRole('admin')) {
             return $this->error('Plan locked', 422);
         }
 

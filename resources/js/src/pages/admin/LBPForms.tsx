@@ -513,7 +513,8 @@ const LBPForms: React.FC = () => {
                     />
                   </TabsContent>
                   <TabsContent value="4">
-                    <Form4 plan={selectedPlan} isEditable={false} />
+                    {/* <Form4 plan={selectedPlan} isEditable={false} /> */}
+                    <Form4 plan={selectedPlan} isEditable={isAdmin} />
                   </TabsContent>
                 </Tabs>
               )}

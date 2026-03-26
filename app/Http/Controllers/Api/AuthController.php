@@ -29,6 +29,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if (!$user->is_active) {
+            throw ValidationException::withMessages([
+                'username' => ['This account has been deactivated. Please contact the administrator.'],
+            ]);
+        }
+
         return response()->json([
             'user' => $user,
             'token' => $user->createToken('auth-token')->plainTextToken,

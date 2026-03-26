@@ -447,7 +447,9 @@ const Form2: React.FC<Form2Props> = ({
           <tbody>
             {itemsByClassification.map((cls, clsIndex) => {
               const isPS = cls.expense_class_id === PS_CLASS_ID;
-              const canEdit     = isEditable && !isPS;
+              // const canEdit     = isEditable && !isPS;
+              // const canEditSem1 = isEditable && (isAdmin || !isPS);
+              const canEdit     = isEditable && (!isPS || isAdmin);
               const canEditSem1 = isEditable && (isAdmin || !isPS);
 
               const label = cls.expense_class_name === 'Prop/Plant/Eqpt'

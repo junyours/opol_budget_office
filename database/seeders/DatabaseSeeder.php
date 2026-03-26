@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             ///////////////////////////////////////////
             PersonnelSeeder::class,
             PlantillaPositionSeeder::class,
-            PlantillaAssignmentSeeder::class,
+            // PlantillaAssignmentSeeder::class,
             ///////////////////////////////////////////
             IncomeFundObjectSeeder::class,
             SpecialAccountsObjectSeeder::class,

@@ -20,8 +20,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         // uncomment for test tunnel
-        if (app()->environment('local')) {
-            URL::forceScheme('https');
-        }
+        // if (app()->environment('local')) {
+        //     URL::forceScheme('https');
+        // }
     }
 }

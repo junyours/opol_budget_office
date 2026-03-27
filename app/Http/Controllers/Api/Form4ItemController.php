@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AipProgram;
+use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
 use App\Models\DepartmentBudgetPlan;
 use Illuminate\Http\JsonResponse;
@@ -61,7 +61,7 @@ class Form4ItemController extends Controller
         DB::beginTransaction();
         try {
             // Upsert the parent program scoped to the department
-            $aipProgram = AipProgram::firstOrCreate(
+            $aipProgram = AIPProgram::firstOrCreate(
                 [
                     'aip_reference_code'  => $validated['aip_reference_code'] ?? null,
                     'program_description' => $validated['program_description'],

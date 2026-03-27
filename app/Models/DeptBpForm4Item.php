@@ -37,7 +37,7 @@ class DeptBpForm4Item extends Model
 
     public function aipProgram(): BelongsTo
     {
-        return $this->belongsTo(AipProgram::class, 'aip_program_id', 'aip_program_id');
+        return $this->belongsTo(AIPProgram::class, 'aip_program_id', 'aip_program_id');
     }
 
     public function budgetPlan(): BelongsTo

@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class AipProgram extends Model
+class AIPProgram extends Model
 {
+    protected $table = 'aip_programs'; // ← add this line
     protected $primaryKey = 'aip_program_id';
 
     protected $fillable = [

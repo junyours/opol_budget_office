@@ -29,7 +29,7 @@ import { cn } from '@/src/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AipProgram {
+interface AIPProgram {
   aip_program_id: number;
   aip_reference_code: string | null;
   program_description: string;
@@ -66,14 +66,14 @@ const TD_MONO = 'px-3 py-2.5 text-[12px] font-mono tabular-nums text-right text-
 
 const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [items, setItems]                     = useState<DepartmentBudgetPlanForm4Item[]>([]);
-  const [existingPrograms, setExistingPrograms] = useState<AipProgram[]>([]);
+  const [existingPrograms, setExistingPrograms] = useState<AIPProgram[]>([]);
   const [loading, setLoading]                 = useState(true);
 
   const [modalOpen, setModalOpen]             = useState(false);
   const [modalMode, setModalMode]             = useState<ModalMode>('choose');
   const [editingItem, setEditingItem]         = useState<DepartmentBudgetPlanForm4Item | null>(null);
   const [programSearch, setProgramSearch]     = useState('');
-  const [selectedProgram, setSelectedProgram] = useState<AipProgram | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<AIPProgram | null>(null);
   const [formData, setFormData]               = useState({ ...EMPTY_FORM });
 
   const usedProgramIds = useMemo(() => new Set(items.map(i => i.aip_program_id)), [items]);
@@ -156,7 +156,7 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
     setModalOpen(true);
   };
 
-  const handleSelectExistingProgram = (program: AipProgram) => {
+  const handleSelectExistingProgram = (program: AIPProgram) => {
     setSelectedProgram(program);
     setFormData(prev => ({
       ...prev,

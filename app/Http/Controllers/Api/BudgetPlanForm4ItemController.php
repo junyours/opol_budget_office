@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\AipProgram;
+use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
 use App\Models\DepartmentBudgetPlan;
 use Illuminate\Http\JsonResponse;
@@ -60,9 +60,9 @@ class BudgetPlanForm4ItemController extends BaseApiController
         DB::beginTransaction();
         try {
             if (!empty($validated['aip_program_id'])) {
-                $aipProgram = AipProgram::findOrFail($validated['aip_program_id']);
+                $aipProgram = AIPProgram::findOrFail($validated['aip_program_id']);
             } else {
-                $aipProgram = AipProgram::firstOrCreate(
+                $aipProgram = AIPProgram::firstOrCreate(
                     [
                         'aip_reference_code'  => $validated['aip_reference_code'] ?? null,
                         'program_description' => $validated['program_description'],

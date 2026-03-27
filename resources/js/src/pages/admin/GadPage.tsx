@@ -125,7 +125,7 @@ interface Department {
   dept_abbreviation: string | null;
 }
 
-interface GadEntry {
+interface GADEntry {
   gad_entry_id: number;
   budget_plan_id: number;
   focus_type: FocusType;
@@ -144,7 +144,7 @@ interface GadEntry {
 }
 
 interface GadResponse {
-  data: GadEntry[];
+  data: GADEntry[];
   subtotal_a: number;
   subtotal_b: number;
   grand_total: number;
@@ -213,7 +213,7 @@ const dupKey = (r: { focus_type: string; gad_activity?: string | null }) =>
 function parseExcel(
   file: File,
   departments: Department[],
-  existingEntries: GadEntry[],
+  existingEntries: GADEntry[],
 ): Promise<{ rows: ParsedRow[]; wb: XLSX.WorkBook }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -390,8 +390,8 @@ function MooeCell({ value, onSave }: { value: number; onSave: (v: number) => voi
 // ─── LeadOfficeCell ───────────────────────────────────────────────────────────
 
 function LeadOfficeCell({ entry, departments, onUpdate }: {
-  entry: GadEntry; departments: Department[];
-  onUpdate: (id: number, field: keyof GadEntry, value: any) => void;
+  entry: GADEntry; departments: Department[];
+  onUpdate: (id: number, field: keyof GADEntry, value: any) => void;
 }) {
   const [open, setOpen]         = useState(false);
   const [freeText, setFreeText] = useState(entry.lead_office_text ?? "");
@@ -507,9 +507,9 @@ function TableSkeleton() {
 // ─── FocusSection ─────────────────────────────────────────────────────────────
 
 function FocusSection({ focusType, entries, departments, subtotal, onUpdate, onDelete, onAdd }: {
-  focusType: FocusType; entries: GadEntry[]; departments: Department[]; subtotal: number;
-  onUpdate: (id: number, field: keyof GadEntry, value: any) => void;
-  onDelete: (entry: GadEntry) => void;
+  focusType: FocusType; entries: GADEntry[]; departments: Department[]; subtotal: number;
+  onUpdate: (id: number, field: keyof GADEntry, value: any) => void;
+  onDelete: (entry: GADEntry) => void;
   onAdd: (ft: FocusType) => void;
 }) {
   const meta = focusType === "client"
@@ -772,7 +772,7 @@ function EntryDialog({ open, onOpenChange, initialForm, departments, onSubmit, s
 export default function GadPage() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
-  const [entries,     setEntries]     = useState<GadEntry[]>([]);
+  const [entries,     setEntries]     = useState<GADEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading,     setLoading]     = useState(false);
   const [subtotalA,   setSubtotalA]   = useState(0);
@@ -782,7 +782,7 @@ export default function GadPage() {
   const [dialogOpen,    setDialogOpen]    = useState(false);
   const [dialogForm,    setDialogForm]    = useState<EntryForm>(EMPTY_FORM);
   const [submitting,    setSubmitting]    = useState(false);
-  const [deleteTarget,  setDeleteTarget]  = useState<GadEntry | null>(null);
+  const [deleteTarget,  setDeleteTarget]  = useState<GADEntry | null>(null);
   const [previewOpen,   setPreviewOpen]   = useState(false);
   const [previewRows,   setPreviewRows]   = useState<ParsedRow[]>([]);
   const [importing,     setImporting]     = useState(false);
@@ -811,7 +811,7 @@ export default function GadPage() {
     if (activePlan?.budget_plan_id) fetchData(activePlan.budget_plan_id);
   }, [activePlan, fetchData]);
 
-  const handleUpdate = useCallback(async (id: number, field: keyof GadEntry, value: any) => {
+  const handleUpdate = useCallback(async (id: number, field: keyof GADEntry, value: any) => {
     setEntries(prev => {
       const updated = prev.map(e => e.gad_entry_id === id ? { ...e, [field]: value } : e);
       const a = updated.filter(e => e.focus_type === "client").reduce((s, e) => s + e.mooe, 0);

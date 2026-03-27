@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\AipProgram;
+use App\Models\AIPProgram;
 use App\Models\DepartmentBudgetPlan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +33,7 @@ class AipProgramController extends BaseApiController
             $deptBudgetPlanIds = DepartmentBudgetPlan::where('dept_id', $request->dept_id)
                 ->pluck('dept_budget_plan_id');
 
-            $programs = AipProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
+            $programs = AIPProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
                     $q->whereIn('dept_budget_plan_id', $deptBudgetPlanIds);
                 }])
                 ->where('dept_id', $request->dept_id)
@@ -59,7 +59,7 @@ class AipProgramController extends BaseApiController
 
         // Eager-load form4Items but restrict them to the dept plans under THIS
         // budget plan only — this is the fix for amounts leaking across years.
-        $programs = AipProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
+        $programs = AIPProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
                 $q->whereIn('dept_budget_plan_id', $deptBudgetPlanIds);
             }])
             ->whereIn('dept_id', $deptIds)
@@ -80,7 +80,7 @@ class AipProgramController extends BaseApiController
      */
     public function show(int $id): JsonResponse
     {
-        $program = AipProgram::with('form4Items')->findOrFail($id);
+        $program = AIPProgram::with('form4Items')->findOrFail($id);
 
         return $this->success($this->formatProgram($program));
     }
@@ -92,7 +92,7 @@ class AipProgramController extends BaseApiController
      * Amounts are summed from whichever form4Items were eager-loaded
      * (already scoped to the correct plan by the query above).
      */
-    private function formatProgram(AipProgram $program): array
+    private function formatProgram(AIPProgram $program): array
     {
         return [
             'aip_program_id'      => $program->aip_program_id,

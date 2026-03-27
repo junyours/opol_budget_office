@@ -19,7 +19,7 @@ export interface CategoryBlock {
 
 export interface SpecialPlanRow { key: string; label: string; total: number; }
 
-export interface AipProgram {
+export interface AIPProgram {
   aip_program_id: number;
   aip_reference_code: string | null;
   program_description: string;
@@ -138,7 +138,7 @@ export function useSummaryDeptPlans(planId: number | undefined) {
 }
 
 export function useSummaryAipPrograms(planId: number | undefined) {
-  return useQuery<AipProgram[]>({
+  return useQuery<AIPProgram[]>({
     queryKey: summaryQueryKeys.aipPrograms(planId!),
     queryFn:  () =>
       API.get('/aip-programs', { params: { budget_plan_id: planId } })
@@ -214,7 +214,7 @@ export function computeCategoryBlocks(
   departments: Department[],
   categories:  { dept_category_id: number; dept_category_name: string }[],
   deptPlans:   DeptBudgetPlan[],
-  aipPrograms: AipProgram[],
+  aipPrograms: AIPProgram[],
   rawClasses:  { expense_class_id: number; expense_class_name: string; abbreviation: string | null }[],
   rawClassItems: { expense_class_item_id: number; expense_class_id: number }[],
 ): CategoryBlock[] {

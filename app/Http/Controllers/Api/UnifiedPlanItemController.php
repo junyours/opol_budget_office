@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\AipProgram;
+use App\Models\AIPProgram;
 use App\Models\UnifiedPlanItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -173,10 +173,10 @@ class UnifiedPlanItemController extends Controller
     private function resolveAip(?string $refCode, string $desc, ?int $deptId): int
     {
         if ($refCode) {
-            $existing = AipProgram::whereRaw('LOWER(aip_reference_code) = ?', [strtolower(trim($refCode))])->first();
+            $existing = AIPProgram::whereRaw('LOWER(aip_reference_code) = ?', [strtolower(trim($refCode))])->first();
             if ($existing) return $existing->aip_program_id;
         }
-        return AipProgram::create([
+        return AIPProgram::create([
             'aip_reference_code'  => $refCode,
             'program_description' => $desc,
             'dept_id'             => $deptId ?? 1,

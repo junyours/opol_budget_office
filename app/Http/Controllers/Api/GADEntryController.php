@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\GadEntry;
+use App\Models\GADEntry;
 use App\Models\BudgetPlan;
 use App\Models\Department;
 use Illuminate\Http\Request;
@@ -20,7 +20,7 @@ class GadEntryController extends Controller
     {
         $request->validate(['budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id']);
 
-        $entries = GadEntry::with('department')
+        $entries = GADEntry::with('department')
             ->forPlan($request->budget_plan_id)
             ->orderBy('focus_type')
             ->orderBy('sort_order')
@@ -61,12 +61,12 @@ class GadEntryController extends Controller
 
         // Auto-assign sort_order if not given
         if (!isset($data['sort_order'])) {
-            $data['sort_order'] = GadEntry::forPlan($data['budget_plan_id'])
+            $data['sort_order'] = GADEntry::forPlan($data['budget_plan_id'])
                 ->where('focus_type', $data['focus_type'])
                 ->max('sort_order') + 1;
         }
 
-        $entry = GadEntry::create($data);
+        $entry = GADEntry::create($data);
         $entry->load('department');
 
         return response()->json(['data' => $this->format($entry)], 201);
@@ -74,7 +74,7 @@ class GadEntryController extends Controller
 
     // ── GET /api/gad-entries/{id} ─────────────────────────────────────────────
 
-    public function show(GadEntry $gadEntry): JsonResponse
+    public function show(GADEntry $gadEntry): JsonResponse
     {
         $gadEntry->load('department');
         return response()->json(['data' => $this->format($gadEntry)]);
@@ -82,7 +82,7 @@ class GadEntryController extends Controller
 
     // ── PUT /api/gad-entries/{id} ─────────────────────────────────────────────
 
-    public function update(Request $request, GadEntry $gadEntry): JsonResponse
+    public function update(Request $request, GADEntry $gadEntry): JsonResponse
     {
         $data = $request->validate([
             'focus_type'            => ['nullable', Rule::in(['client', 'organization'])],
@@ -106,7 +106,7 @@ class GadEntryController extends Controller
 
     // ── DELETE /api/gad-entries/{id} ──────────────────────────────────────────
 
-    public function destroy(GadEntry $gadEntry): JsonResponse
+    public function destroy(GADEntry $gadEntry): JsonResponse
     {
         $gadEntry->delete();
         return response()->json(['message' => 'Deleted successfully']);
@@ -144,11 +144,11 @@ class GadEntryController extends Controller
                 ]);
 
                 if (!empty($row['gad_entry_id'])) {
-                    GadEntry::where('gad_entry_id', $row['gad_entry_id'])
+                    GADEntry::where('gad_entry_id', $row['gad_entry_id'])
                         ->where('budget_plan_id', $planId)
                         ->update($payload);
                 } else {
-                    GadEntry::create($payload);
+                    GADEntry::create($payload);
                 }
             }
         });
@@ -170,7 +170,7 @@ class GadEntryController extends Controller
 
         DB::transaction(function () use ($request) {
             foreach ($request->items as $item) {
-                GadEntry::where('gad_entry_id', $item['gad_entry_id'])
+                GADEntry::where('gad_entry_id', $item['gad_entry_id'])
                     ->update(['sort_order' => $item['sort_order']]);
             }
         });
@@ -180,7 +180,7 @@ class GadEntryController extends Controller
 
     // ── Private formatter ─────────────────────────────────────────────────────
 
-    private function format(GadEntry $e): array
+    private function format(GADEntry $e): array
     {
         return [
             'gad_entry_id'          => $e->gad_entry_id,

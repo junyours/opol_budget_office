@@ -136,7 +136,7 @@ export const PLAN_META: Record<PlanType, PlanMeta> = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Department { dept_id:number; dept_name:string; dept_abbreviation:string|null; }
-interface AipProgram { aip_program_id:number; aip_reference_code:string|null; program_description:string; }
+interface AIPProgram { aip_program_id:number; aip_reference_code:string|null; program_description:string; }
 type FundSource = "general_fund" | "special_account";
 
 interface UpItem {
@@ -282,7 +282,7 @@ function detectTemplateType(wb: XLSX.WorkBook): PlanType | null {
 
 function parseSectorRows(
   rows: any[][], departments: Department[],
-  aipPrograms: AipProgram[], existingItems: UpItem[],
+  aipPrograms: AIPProgram[], existingItems: UpItem[],
 ): ParsedRow[] {
   const existingKeys = new Set(existingItems.map(dupKey));
   const parsed: ParsedRow[] = [];
@@ -336,7 +336,7 @@ function parseSectorRows(
 
 function parseFundRows(
   rows: any[][], departments: Department[],
-  aipPrograms: AipProgram[], existingItems: UpItem[],
+  aipPrograms: AIPProgram[], existingItems: UpItem[],
 ): ParsedRow[] {
   // Template columns:
   // 0=aip_code, 1=program, 2=office, 3=start, 4=end, 5=expected_outputs(ignored),
@@ -445,7 +445,7 @@ function parseExcel(
   file: File,
   meta: PlanMeta,
   departments: Department[],
-  aipPrograms: AipProgram[],
+  aipPrograms: AIPProgram[],
   existingItems: UpItem[],
 ): Promise<{ rows: ParsedRow[]; detectedType: PlanType | null }> {
   return new Promise((resolve, reject) => {
@@ -774,7 +774,7 @@ function ImportPreview({ open, onOpenChange, rows, onRowsChange, onConfirm, impo
 
 function ItemDialog({ open, onOpenChange, initialForm, departments, aipPrograms, onSubmit, submitting, editMode, meta }: {
   open:boolean; onOpenChange:(v:boolean)=>void; initialForm:ItemForm;
-  departments:Department[]; aipPrograms:AipProgram[];
+  departments:Department[]; aipPrograms:AIPProgram[];
   onSubmit:(form:ItemForm)=>void; submitting:boolean; editMode:boolean; meta:PlanMeta;
 }) {
   const [form, setForm] = useState<ItemForm>(initialForm);
@@ -978,7 +978,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
 
   const [items, setItems]             = useState<UpItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [aipPrograms, setAipPrograms] = useState<AipProgram[]>([]);
+  const [aipPrograms, setAipPrograms] = useState<AIPProgram[]>([]);
   const [loading, setLoading]         = useState(false);
   const [totals, setTotals] = useState({ aip:0, ab:0, ps:0, mooe:0, co:0, total:0, ccAdapt:0, ccMitig:0 });
 

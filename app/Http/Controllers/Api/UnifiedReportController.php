@@ -1622,7 +1622,7 @@ return response()->stream(function () use ($zipPath) {
         ?array $reportData = null
     ): string {
         $signatories = $this->buildSignatories();
-        return view('reports.budget-forms-unified', compact('mode', 'data', 'forms', 'reportData', 'signatories'))->render();
+        return view('reports.budget_forms_unified', compact('mode', 'data', 'forms', 'reportData', 'signatories'))->render();
     }
 
     // ═══════════════════════════════════════════════════════

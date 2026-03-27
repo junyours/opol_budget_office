@@ -121,31 +121,55 @@ const recCls =
 
 // ─── Sub-header ───────────────────────────────────────────────────────────────
 
-const SubHeader: React.FC<{
-  prevYear: number | string | undefined;
-  currYear: number | string | undefined;
-}> = ({ prevYear, currYear }) => (
-  <>
-    <tr>
-      <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Acct Code</th>
-      <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Object of Expenditure</th>
-      {/* Appropriation — blue */}
-      <th className={cn(TH_APP, 'text-center border-t-2 border-blue-300')} colSpan={3}>
-        Appropriation ({prevYear})
-      </th>
-      {/* Proposed — orange */}
-      <th className={cn(TH_PRO, 'border-t-2 border-orange-300')} rowSpan={2}>Proposed ({currYear})</th>
-      <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>Inc / Dec</th>
-      <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>%</th>
-      <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Recommendation</th>
-    </tr>
-    <tr>
-      <th className={TH_APP}>Sem 1</th>
-      <th className={TH_APP}>Sem 2</th>
-      <th className={TH_APP}>Total</th>
-    </tr>
-  </>
-);
+// const SubHeader: React.FC<{
+//   prevYear: number | string | undefined;
+//   currYear: number | string | undefined;
+// }> = ({ prevYear, currYear }) => (
+//   <>
+//     <tr>
+//       <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Acct Code</th>
+//       <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Object of Expenditure</th>
+//       {/* Appropriation — blue */}
+//       <th className={cn(TH_APP, 'text-center border-t-2 border-blue-300')} colSpan={3}>
+//         Appropriation ({prevYear})
+//       </th>
+//       {/* Proposed — orange */}
+//       <th className={cn(TH_PRO, 'border-t-2 border-orange-300')} rowSpan={2}>Proposed ({currYear})</th>
+//       <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>Inc / Dec</th>
+//       <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>%</th>
+//       <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Recommendation</th>
+//     </tr>
+//     <tr>
+//       <th className={TH_APP}>Sem 1</th>
+//       <th className={TH_APP}>Sem 2</th>
+//       <th className={TH_APP}>Total</th>
+//     </tr>
+//   </>
+// );
+  const SubHeader: React.FC<{
+    prevYear: number | string | undefined;
+    currYear: number | string | undefined;
+    isAdmin?: boolean;
+  }> = ({ prevYear, currYear, isAdmin }) => (
+    <>
+      <tr>
+        <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Acct Code</th>
+        <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Object of Expenditure</th>
+        <th className={cn(TH_APP, 'text-center border-t-2 border-blue-300')} colSpan={3}>
+          Appropriation ({prevYear})
+        </th>
+        <th className={cn(TH_PRO, 'border-t-2 border-orange-300')} rowSpan={2}>Proposed ({currYear})</th>
+        <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>Inc / Dec</th>
+        <th className={cn(TH, 'text-right border-t-2 border-gray-300')} rowSpan={2}>%</th>
+        {isAdmin && <th className={cn(TH, 'border-t-2 border-gray-300')} rowSpan={2}>Recommendation</th>}
+      </tr>
+      <tr>
+        <th className={TH_APP}>Sem 1</th>
+        <th className={TH_APP}>Sem 2</th>
+        <th className={TH_APP}>Total</th>
+      </tr>
+    </>
+  );
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -414,8 +438,13 @@ const Form2: React.FC<Form2Props> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-[12px] border-collapse" style={{ minWidth: 960 }}>
 
-          <colgroup>
+          {/* <colgroup>
             {COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
+          </colgroup> */}
+          <colgroup>
+            {COL_WIDTHS.slice(0, isAdmin ? undefined : -1).map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
           </colgroup>
 
           {/* ── Main thead ──────────────────────────────────────────────── */}
@@ -434,7 +463,8 @@ const Form2: React.FC<Form2Props> = ({
 
               <th className={cn(TH, 'text-right')} rowSpan={2}>Inc / Dec</th>
               <th className={cn(TH, 'text-right')} rowSpan={2}>%</th>
-              <th className={TH} rowSpan={2}>Recommendation</th>
+              {/* <th className={TH} rowSpan={2}>Recommendation</th> */}
+              {isAdmin && <th className={TH} rowSpan={2}>Recommendation</th>}
             </tr>
             <tr>
               {/* Appropriation sub-headers — blue */}
@@ -471,7 +501,8 @@ const Form2: React.FC<Form2Props> = ({
 
                   {/* Section divider */}
                   <tr className="bg-gray-50 border-y border-gray-200">
-                    <td colSpan={8} className="px-4 py-2">
+                    {/* <td colSpan={8} className="px-4 py-2"> */}
+                    <td colSpan={isAdmin ? 8 : 7} className="px-4 py-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-semibold text-gray-700">{label}</span>
@@ -500,8 +531,10 @@ const Form2: React.FC<Form2Props> = ({
 
                   {cls.items.length === 0 ? (
                     <>
-                      <tr><td colSpan={9} className="px-4 py-3 text-[12px] text-gray-400 italic">No expense items.</td></tr>
-                      {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} />}
+                      {/* <tr><td colSpan={9} className="px-4 py-3 text-[12px] text-gray-400 italic">No expense items.</td></tr> */}
+                      <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-3 text-[12px] text-gray-400 italic">No expense items.</td></tr>
+                      {/* {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} />} */}
+                      {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} isAdmin={isAdmin} />}
                     </>
                   ) : (
                     <>
@@ -583,7 +616,20 @@ const Form2: React.FC<Form2Props> = ({
                             <td className={cn(TD_M, clr(d))}>{past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}</td>
 
                             {/* Recommendation */}
-                            <td className={TD}>
+                            {isAdmin && (
+                              <td className={TD}>
+                                {isEditable && (isAdmin || !isPS) ? (
+                                  <input type="text" value={item.recommendation ?? ''}
+                                    onChange={e => handleRecommendationChange(item.expense_item_id, e.target.value)}
+                                    onBlur={() => handleRecommendationBlur(item.expense_item_id)}
+                                    disabled={savingRecommendations.has(item.expense_item_id)}
+                                    placeholder="Add note…" maxLength={255} className={recCls} />
+                                ) : (
+                                  <span className="text-gray-500 text-[11px]">{item.recommendation || '–'}</span>
+                                )}
+                              </td>
+                            )}
+                            {/* <td className={TD}>
                               {isEditable && (isAdmin || !isPS) ? (
                                 <input type="text" value={item.recommendation ?? ''}
                                   onChange={e => handleRecommendationChange(item.expense_item_id, e.target.value)}
@@ -593,7 +639,7 @@ const Form2: React.FC<Form2Props> = ({
                               ) : (
                                 <span className="text-gray-500 text-[11px]">{item.recommendation || '–'}</span>
                               )}
-                            </td>
+                            </td> */}
                           </tr>
                         );
                       })}
@@ -612,10 +658,12 @@ const Form2: React.FC<Form2Props> = ({
                         <td className={cn(TD_M, 'font-semibold bg-gray-100', clr(clsDiff))}>
                           {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
                         </td>
-                        <td className="bg-gray-100" />
+                        {/* <td className="bg-gray-100" /> */}
+                        {isAdmin && <td className="bg-gray-100" />}
                       </tr>
 
-                      {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} />}
+                      {/* {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} />} */}
+                      {showSubHeader && <SubHeader prevYear={prevYear} currYear={currYear} isAdmin={isAdmin} />}
                     </>
                   )}
                 </React.Fragment>
@@ -626,7 +674,8 @@ const Form2: React.FC<Form2Props> = ({
             {aipItems.length > 0 && (
               <React.Fragment>
                 <tr className="bg-gray-50 border-y border-gray-200">
-                  <td colSpan={8} className="px-4 py-2">
+                  {/* <td colSpan={8} className="px-4 py-2"> */}
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[12px] font-semibold text-gray-700">Special Programs</span>
                       <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">From AIP Form 4</span>
@@ -652,7 +701,20 @@ const Form2: React.FC<Form2Props> = ({
                       <td className={cn(TD_PRO, 'border-l border-orange-100 text-orange-700 font-semibold')}>{fmtP(item.total_amount)}</td>
                       <td className={cn(TD_M, 'text-emerald-600')}>{fmtP(item.total_amount)}</td>
                       <td className={cn(TD_M, 'text-emerald-600')}>100.00%</td>
-                      <td className={TD}>
+                      {isAdmin && (
+                        <td className={TD}>
+                          {isEditable ? (
+                            <input type="text" value={(item as any).recommendation ?? ''}
+                              onChange={e => handleAipRecommendationChange(item.dept_bp_form4_item_id, e.target.value)}
+                              onBlur={() => handleAipRecommendationBlur(item.dept_bp_form4_item_id)}
+                              disabled={savingAipRecommendations.has(item.dept_bp_form4_item_id)}
+                              placeholder="Add note…" maxLength={255} className={recCls} />
+                          ) : (
+                            <span className="text-gray-500 text-[11px]">{(item as any).recommendation || '–'}</span>
+                          )}
+                        </td>
+                      )}
+                      {/* <td className={TD}>
                         {isEditable ? (
                           <input type="text" value={(item as any).recommendation ?? ''}
                             onChange={e => handleAipRecommendationChange(item.dept_bp_form4_item_id, e.target.value)}
@@ -662,7 +724,7 @@ const Form2: React.FC<Form2Props> = ({
                         ) : (
                           <span className="text-gray-500 text-[11px]">{(item as any).recommendation || '–'}</span>
                         )}
-                      </td>
+                      </td> */}
                     </tr>
                   );
                 })}
@@ -675,11 +737,14 @@ const Form2: React.FC<Form2Props> = ({
                   <td className={cn('bg-gray-100', C_APP_SUB)} />
                   <td className={cn(TD_M, 'font-semibold text-gray-700 border-l', C_PRO_SUB)}>{fmtP(aipTotal)}</td>
                   <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{aipTotal === 0 ? '–' : fmtP(aipTotal)}</td>
+                  {/* <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{aipTotal === 0 ? '–' : '100.00%'}</td>
+                  <td className="bg-gray-100" /> */}
                   <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{aipTotal === 0 ? '–' : '100.00%'}</td>
-                  <td className="bg-gray-100" />
+                  {isAdmin && <td className="bg-gray-100" />}
                 </tr>
 
-                {hasCalamitySection && <SubHeader prevYear={prevYear} currYear={currYear} />}
+                {/* {hasCalamitySection && <SubHeader prevYear={prevYear} currYear={currYear} />} */}
+                {hasCalamitySection && <SubHeader prevYear={prevYear} currYear={currYear} isAdmin={isAdmin} />}
               </React.Fragment>
             )}
 
@@ -687,7 +752,8 @@ const Form2: React.FC<Form2Props> = ({
             {isSpecialAccount && (
               <React.Fragment>
                 <tr className="bg-gray-50 border-y border-gray-200">
-                  <td colSpan={8} className="px-4 py-2">
+                  {/* <td colSpan={8} className="px-4 py-2"> */}
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[12px] font-semibold text-gray-700">5% Calamity Fund</span>
                       <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
@@ -739,13 +805,16 @@ const Form2: React.FC<Form2Props> = ({
                     {calamityLoading ? <span className="text-gray-300 animate-pulse">…</span> : (calamityTotal > 0 ? fmtP(calamityTotal) : '–')}
                   </td>
                   <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{calamityTotal > 0 ? fmtP(calamityTotal) : '–'}</td>
+                  {/* <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{calamityTotal > 0 ? '100.00%' : '–'}</td>
+                  <td className="bg-gray-100" /> */}
                   <td className={cn(TD_M, 'font-semibold text-emerald-600 bg-gray-100')}>{calamityTotal > 0 ? '100.00%' : '–'}</td>
-                  <td className="bg-gray-100" />
+                  {isAdmin && <td className="bg-gray-100" />}
                 </tr>
 
                 {calamityData?.total_tax_revenue_proposed && calamityData.total_tax_revenue_proposed > 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-1.5 text-[10px] text-gray-400 bg-white border-b border-gray-100">
+                    {/* <td colSpan={9} className="px-4 py-1.5 text-[10px] text-gray-400 bg-white border-b border-gray-100"> */}
+                    <td colSpan={isAdmin ? 9 : 8} className="px-4 py-1.5 text-[10px] text-gray-400 bg-white border-b border-gray-100">
                       Base:{' '}
                       <span className="font-semibold text-gray-600 font-mono">{fmtP(calamityData.total_tax_revenue_proposed)}</span>
                       {' '}× 5% = {fmtP(calamityTotal)}. Pre-Disaster = 70% · QRF = 30%.
@@ -779,7 +848,8 @@ const Form2: React.FC<Form2Props> = ({
                 <td className={cn('px-3 py-3 text-right font-mono tabular-nums border-l border-gray-700', clr(gtDiff))}>
                   {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
                 </td>
-                <td className="border-l border-gray-700" />
+                {/* <td className="border-l border-gray-700" /> */}
+                {isAdmin && <td className="border-l border-gray-700" />}
               </tr>
             )}
           </tfoot>

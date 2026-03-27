@@ -968,20 +968,20 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
     <thead>
         {{-- Hidden row: DomPDF reads column widths from first row with no rowspan/colspan --}}
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
-            <td style="width:6%;padding:0;border:none;"></td>
-            <td style="width:6%;padding:0;border:none;"></td>
+            <td style="width:4%;padding:0;border:none;"></td>
+            <td style="width:4%;padding:0;border:none;"></td>
             <td style="width:20%;padding:0;border:none;"></td>
             <td style="width:18%;padding:0;border:none;"></td>
-            <td style="width:5%;padding:0;border:none;"></td>
+            <td style="width:7%;padding:0;border:none;"></td>
             <td style="width:14%;padding:0;border:none;"></td>
-            <td style="width:5%;padding:0;border:none;"></td>
+            <td style="width:7%;padding:0;border:none;"></td>
             <td style="width:13%;padding:0;border:none;"></td>
             <td style="width:13%;padding:0;border:none;"></td>
         </tr>
         <tr>
-            <th colspan="2" rowspan="2" style="width:3%">Item No.</th>
+            <th colspan="2" rowspan="2" style="width:2%">Item No.</th>
             <th rowspan="2" width="25%">Position Title</th>
-            <th rowspan="2" width="17%">Name of Incumbent</th>
+            <th rowspan="2" width="15%">Name of Incumbent</th>
             <th colspan="2">
                 Current Year Authorized Rate / Annum<br>
                 @if($lbcCurrent){{ $lbcCurrent }}<br>@endif
@@ -992,12 +992,12 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
                 @if($lbcProposed){{ $lbcProposed }}<br>@endif
                 @if($tranchePro){{ $tranchePro }}@else No Data @endif
             </th>
-            <th rowspan="2" width="11%">Increase/(Decrease)</th>
+            <th rowspan="2" width="11%">Increase/<br/>Decrease</th>
         </tr>
         <tr>
-            <th width="4%">G/S</th>
+            <th width="5%" >Grade/Salary</th>
             <th width="15%">Amount</th>
-            <th width="4%">G/S</th>
+            <th width="5%">Grade/Salary</th>
             <th width="15%">Amount</th>
         </tr>
         <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th><th>(9)</th></tr>
@@ -1006,15 +1006,36 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
     <tbody>
     @forelse($rows3 as $row)
     <tr>
-        <td class="c" style="width:3%;font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
-        <td class="c" style="width:3%;font-size:6pt;">{{ $row['new_item_number'] }}</td>
+        <td class="c" style="width:2%;font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
+        <td class="c" style="width:2%;font-size:6pt;">{{ $row['new_item_number'] }}</td>
         <td style="word-wrap:break-word;">{{ $row['position_title'] }}</td>
-        <td style="word-wrap:break-word;">{{ $row['incumbent'] }}</td>
+        <td style="word-wrap:break-word;">
+            {{ $row['incumbent'] }}
+            @if(!empty($row['effective_date_note']))
+                <br><span style="font-size:6pt;color:#555;font-style:italic;">Effictive date {{ $row['effective_date_note'] }}</span>
+            @endif
+        </td>
         <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_current'] }}</td>
         <td class="r">@if($row['current_amount'] > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['current_amount'], 0) }}@endif</td>
         <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_proposed'] }}</td>
-        <td class="r">{{ "\u{20B1}\u{00A0}" }}{{ number_format((float)($row['proposed_amount'] ?? 0), 0) }}</td>
-        <td class="r">@if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0){{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['increase_decrease'], 0) }}@endif</td>
+        <td class="r">
+            {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)($row['proposed_amount'] ?? 0), 0) }}
+            @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
+                <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
+                    +{{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['annual_increment'], 0) }}
+                </span>
+            @endif
+        </td>
+        <td class="r" style="{{ $row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '') }}">
+        @if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+            {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['increase_decrease'], 0) }}
+        @endif
+        @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
+            <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
+                +{{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['annual_increment'], 0) }}
+            </span>
+        @endif
+    </td>
     </tr>
     @empty
     <tr><td colspan="9" class="c" style="padding:6px;">No plantilla positions found.</td></tr>
@@ -1022,7 +1043,7 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
     </tbody>
     <tfoot>
         <tr class="grand-total">
-            <td colspan="4" class="c">Total for {{ $dept->dept_abbreviation ?? $deptName }}</td>
+            <td colspan="4" class="c">TOTAL FOR {{ $deptName }}</td>
             <td></td>
             <td class="r">@php echo chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format($grandCurrent3,0); @endphp</td>
             <td></td>

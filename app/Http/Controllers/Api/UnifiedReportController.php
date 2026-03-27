@@ -1972,19 +1972,40 @@ return response()->stream(function () use ($zipPath) {
                 $incumbentName = implode(' ', $parts) ?: 'Vacant';
             }
 
+            // $rows[] = [
+            //     'old_item_number'   => $plantilla?->old_item_number ?? null,
+            //     'new_item_number'   => $plantilla?->new_item_number ?? (string) $newItemNo,
+            //     'position_title'    => $plantilla?->position_title  ?? '',
+            //     'incumbent'         => $incumbentName,
+            //     // 'effective_date_note' => null,
+            //     'effective_date_note' => $proposed?->step_effective_date
+            //     ? $proposed->step_effective_date->format('M d, Y')
+            //     : null,
+            //     'salary_grade'      => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
+            //     'step_current'      => $current?->step  ?? 1,
+            //     'step_proposed'     => $proposed?->step ?? 1,
+            //     'current_amount'    => (float) ($current?->annual_rate  ?? 0),
+            //     'proposed_amount'   => (float) ($proposed?->annual_rate ?? 0),
+            //     'increase_decrease' => (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
+            // ];
             $rows[] = [
-                'old_item_number'   => $plantilla?->old_item_number ?? null,
-                'new_item_number'   => $plantilla?->new_item_number ?? (string) $newItemNo,
-                'position_title'    => $plantilla?->position_title  ?? '',
-                'incumbent'         => $incumbentName,
-                'effective_date_note' => null,
-                'salary_grade'      => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
-                'step_current'      => $current?->step  ?? 1,
-                'step_proposed'     => $proposed?->step ?? 1,
-                'current_amount'    => (float) ($current?->annual_rate  ?? 0),
-                'proposed_amount'   => (float) ($proposed?->annual_rate ?? 0),
-                'increase_decrease' => (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
-            ];
+            'old_item_number'    => $plantilla?->old_item_number ?? null,
+            'new_item_number'    => $plantilla?->new_item_number ?? (string) $newItemNo,
+            'position_title'     => $plantilla?->position_title  ?? '',
+            'incumbent'          => $incumbentName,
+            'effective_date_note' => $proposed?->step_effective_date
+                ? $proposed->step_effective_date->format('M d, Y')
+                : null,
+            'salary_grade'       => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
+            'step_current'       => $current?->step  ?? 1,
+            'step_proposed'      => $proposed?->step ?? 1,
+            'current_amount'     => (float) ($current?->annual_rate  ?? 0),
+            'proposed_amount'    => (float) ($proposed?->annual_rate ?? 0),
+            'annual_increment'   => $proposed?->annual_increment !== null
+                ? (float) $proposed->annual_increment
+                : null,
+            'increase_decrease'  => (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
+        ];
             $newItemNo++;
         }
 

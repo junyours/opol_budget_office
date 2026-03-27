@@ -10,6 +10,13 @@ class ExpenseClassItemController extends BaseMasterCrudController
 {
     protected string $modelClass = ExpenseClassItem::class;
 
+    public function index()
+    {
+        $this->authorize('viewAny', $this->modelClass);
+        return $this->success(
+            ExpenseClassItem::with('classification')->orderBy('expense_class_item_name')->get()
+        );
+    }
     /**
      * Validation rules for create and update
      */

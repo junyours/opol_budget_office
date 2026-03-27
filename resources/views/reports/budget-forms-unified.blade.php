@@ -2170,7 +2170,7 @@ $nfA = function($n): string {
 
 <div class="page">
 
-<div style="text-align:center;font-size:7pt;font-weight:bold;margin-bottom:1px;border-top:1px solid">Municipality of Opol</div>
+<div style="text-align:center;font-size:7pt;font-weight:bold;margin-bottom:1px;">Municipality of Opol</div>
 <div style="text-align:center;font-size:7pt;font-weight:bold;margin-bottom:1px;">Misamis Oriental</div>
 <div style="text-align:center;font-size:8pt;font-weight:bold;text-transform:uppercase;margin-bottom:5px;margin-top:3px;">
     PS COMPUTATION CY-{{ $year }}

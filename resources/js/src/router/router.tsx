@@ -122,7 +122,12 @@ const UnifiedReportsPage = React.lazy(
     () => import('../components/report/UnifiedReportsPage')
   );
 
-  const ProfilePage = React.lazy(() => import("../pages/common/ProfilePage"));
+const ProfilePage = React.lazy(() => import("../pages/common/ProfilePage"));
+
+
+const BudgetProposal = React.lazy(
+  () => import("../pages/department-head/BudgetProposal")
+);
 
 /* ------------------ Suspense Wrapper ------------------ */
 
@@ -363,6 +368,10 @@ const router = createBrowserRouter([
           {
             element: <RoleRoute roles={["department-head"]} />,
             children: [
+              {
+                path: "department/budget-proposal",
+                element: Lazy(BudgetProposal),
+              },
               {
                 path: "department/occ-fund",
                 element: Lazy(IncomeFund) // Reuse the same component

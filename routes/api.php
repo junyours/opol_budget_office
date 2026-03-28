@@ -33,7 +33,7 @@ use App\Http\Controllers\Api\{
     LdrrmfipController,
     LdrrmfPlanController,
     Form6SpecialController,
-    GadEntryController,
+    GADEntryController,
     UnifiedPlanItemController,
     ConsolidatedSpecialIncomeController,
     LbpForm1Controller,
@@ -202,10 +202,10 @@ Route::apiResource('form6-special', Form6SpecialController::class)
     Route::apiResource('ldrrmf-plan', LdrrmfPlanController::class)
         ->only(['index']);
 
-    Route::post('gad-entries/bulk',    [GadEntryController::class, 'bulk']);
-    Route::post('gad-entries/reorder', [GadEntryController::class, 'reorder']);
+    Route::post('gad-entries/bulk',    [GADEntryController::class, 'bulk']);
+    Route::post('gad-entries/reorder', [GADEntryController::class, 'reorder']);
  
-    Route::apiResource('gad-entries', GadEntryController::class)
+    Route::apiResource('gad-entries', GADEntryController::class)
         ->parameters(['gad-entries' => 'gadEntry']);
 
     // Route::post('lcpc-items/bulk', [LcpcItemController::class, 'bulk']);

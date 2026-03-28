@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
-class DeptBpForm6Item extends Model
+//DeptBpForm6Item
+class BudgetPlanForm6Item extends Model
 {
     use HasFactory;
 

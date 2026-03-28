@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
 use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class Form4ItemController extends Controller
+class Form4ItemController extends BaseApiController
 {
     /**
      * GET /api/form4-items?budget_plan_id=X

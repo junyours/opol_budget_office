@@ -249,7 +249,7 @@ const Form6: React.FC = () => {
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="text-xs px-4 rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-500"
+                className="text-xs px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700"
               >
                 {tab.label}
               </TabsTrigger>

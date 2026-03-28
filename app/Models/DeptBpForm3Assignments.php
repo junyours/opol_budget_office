@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class DeptBpFrom3Assignment extends Model
+class DeptBpForm3Assignments extends Model
 {
     protected $table      = 'dept_bp_from3_assignments';
     protected $primaryKey = 'dept_bp_from3_assignment_id';

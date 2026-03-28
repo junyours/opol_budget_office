@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
-class GadEntryController extends Controller
+class GADEntryController extends Controller
 {
     // ── GET /api/gad-entries?budget_plan_id=X ─────────────────────────────────
 

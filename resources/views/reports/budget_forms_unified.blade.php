@@ -212,7 +212,7 @@ $numA = function($n): string {
 // num2()       — 2-decimal, dash when 0  (Form 5)
 $num2 = function($n): string {
     if ((float)$n == 0) return ' - ';
-    return ' ' . number_format((float)$n, 2) . ' ';
+    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0) . number_format((float)$n, 0) . ' ';
 };
 // aliases for legacy Form 2/3/4 partials
 $pesoAlways = $pesoA;
@@ -764,8 +764,17 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
 
 <table class="data-table" style="width:100%; table-layout:fixed;">
     <thead>
+        <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:30%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+        </tr>
         <tr>
-            <th rowspan="2" width="28%">Object of Expenditures</th>
+            <th rowspan="2">Object of Expenditures</th>
             <th rowspan="2" width="10%">Account Code</th>
             <th rowspan="2" width="12%">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
             <th colspan="3">Current Year (Estimate) {{ $currentYear }}</th>
@@ -970,13 +979,13 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
             <td style="width:4%;padding:0;border:none;"></td>
             <td style="width:4%;padding:0;border:none;"></td>
-            <td style="width:20%;padding:0;border:none;"></td>
-            <td style="width:18%;padding:0;border:none;"></td>
+            <td style="width:24%;padding:0;border:none;"></td>
+            <td style="width:21%;padding:0;border:none;"></td>
             <td style="width:7%;padding:0;border:none;"></td>
-            <td style="width:14%;padding:0;border:none;"></td>
+            <td style="width:11%;padding:0;border:none;"></td>
             <td style="width:7%;padding:0;border:none;"></td>
-            <td style="width:13%;padding:0;border:none;"></td>
-            <td style="width:13%;padding:0;border:none;"></td>
+            <td style="width:11%;padding:0;border:none;"></td>
+            <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
             <th colspan="2" rowspan="2" style="width:2%">Item No.</th>
@@ -1165,15 +1174,21 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
 @endif
 
 <table class="data-table">
-    <colgroup>
-        <col style="width:9%"><col style="width:25%"><col style="width:11%">
-        <col style="width:14%"><col style="width:9%">
-        <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%">
-    </colgroup>
     <thead>
+        <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:18;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:12%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+        </tr>
         <tr>
             <th rowspan="2">AIP Reference Code</th>
-            <th rowspan="2">Program/Project/Activity Description</th>
+            <th rowspan="2">Program/Project<br/>/Activity Description</th>
             <th rowspan="2">Major Final Output</th>
             <th rowspan="2">Performance Indicator</th>
             <th rowspan="2">Target for the Budget Year</th>
@@ -1285,19 +1300,33 @@ $totals = $data['totals'];
 
 <table class="form5-table">
   <thead>
+    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+      <td style="width:20%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:14%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
+      <td style="width:10%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
+    </tr>
     <tr>
-      <th rowspan="2" width="16%">Creditor</th>
-      <th rowspan="2" width="6%">Date<br>Contracted</th>
-      <th rowspan="2" width="6%">Term</th>
-      <th rowspan="2" width="8%">Principal<br>Amount</th>
-      <th rowspan="2" width="10%">Purpose</th>
+      <th rowspan="2">Creditor</th>
+      <th rowspan="2">Date<br>Contracted</th>
+      <th rowspan="2">Term</th>
+      <th rowspan="2">Principal<br>Amount</th>
+      <th rowspan="2">Purpose</th>
       <th colspan="3">Previous Payments Made</th>
       <th colspan="3">Amount Due Budget Year &mdash; {{ $year }}</th>
       <th rowspan="2" width="7%">Balance<br>of the<br>Principal</th>
     </tr>
     <tr>
-      <th width="7%">Principal</th><th width="7%">Interest</th><th width="7%">Total</th>
-      <th width="7%">Principal</th><th width="7%">Interest</th><th width="7%">Total</th>
+      <th>Principal</th><th>Interest</th><th>Total</th>
+      <th>Principal</th><th>Interest</th><th>Total</th>
     </tr>
     <tr class="col-num">
       <td>(1)</td><td>(2)</td><td>(3)</td><td>(4)</td><td>(5)</td><td>(6)</td><td>(7)</td><td>(8)</td><td>(9)</td><td>(10)</td><td>(11)</td><td>(12)</td>
@@ -1753,7 +1782,7 @@ $lgu     = $data['lgu'];
 $forms7  = $data['forms'];
 
 $pa = function($n): string {
-    if ((float)$n == 0) return ' - ';
+    if ((float)$n == 0) return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).' - ';
     return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
 };
 $nf = function($n): string {
@@ -1784,24 +1813,24 @@ $colCount   = $isSpecial ? 3 : 7;
 </div>
 
 <table class="data-table" style="font-size:6.5pt;">
-    @if(!$isSpecial)
-    <colgroup>
-        <col style="width:33%;">
-        <col style="width:9%;">
-        <col style="width:14%;">
-        <col style="width:14%;">
-        <col style="width:13%;">
-        <col style="width:13%;">
-        <col style="width:14%;">
-    </colgroup>
-    @else
-    <colgroup>
-        <col style="width:73%;">
-        <col style="width:9%;">
-        <col style="width:18%;">
-    </colgroup>
-    @endif
     <thead>
+    @if(!$isSpecial)
+    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+        <td style="width:30%;padding:0;border:none;"></td>
+        <td style="width:10%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+    </tr>
+    @else
+    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+        <td style="width:70%;padding:0;border:none;"></td>
+        <td style="width:12%;padding:0;border:none;"></td>
+        <td style="width:18%;padding:0;border:none;"></td>
+    </tr>
+    @endif
         <tr>
             <th style="text-align:left;">Particulars</th>
             <th>Account<br>Code</th>

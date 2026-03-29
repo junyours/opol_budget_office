@@ -1,404 +1,4 @@
-// import React, { useEffect, useState } from "react";
-// import { Link } from "react-router-dom";
-// import API from "../../services/api";
-// import { useAuth } from "../../hooks/useAuth";
-// import { DepartmentBudgetPlan, BudgetPlan } from "../../types/api";
-// import { LoadingState } from "../common/LoadingState";
-// import { Button } from "../../components/ui/button";
-// import { Badge } from "../../components/ui/badge";
-// import {
-//   AlertDialog,
-//   AlertDialogAction,
-//   AlertDialogCancel,
-//   AlertDialogContent,
-//   AlertDialogDescription,
-//   AlertDialogFooter,
-//   AlertDialogHeader,
-//   AlertDialogTitle,
-// } from "../../components/ui/alert-dialog";
-// import {
-//   DropdownMenu,
-//   DropdownMenuContent,
-//   DropdownMenuItem,
-//   DropdownMenuSeparator,
-//   DropdownMenuTrigger,
-// } from "../../components/ui/dropdown-menu";
-// import { MoreHorizontalIcon, X } from "lucide-react";
-// import { PlusIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
-// import { toast } from "sonner";
-// import { cn } from "@/src/lib/utils";
-
-// // ─── Status config ────────────────────────────────────────────────────────────
-
-// const statusConfig: Record<
-//   string,
-//   { label: string; dot: string; badge: string }
-// > = {
-//   draft: {
-//     label: "Draft",
-//     dot:   "bg-amber-400",
-//     badge: "text-amber-700 bg-amber-50 border-amber-200",
-//   },
-//   submitted: {
-//     label: "Submitted",
-//     dot:   "bg-blue-400",
-//     badge: "text-blue-700 bg-blue-50 border-blue-200",
-//   },
-//   approved: {
-//     label: "Approved",
-//     dot:   "bg-emerald-400",
-//     badge: "text-emerald-700 bg-emerald-50 border-emerald-200",
-//   },
-// };
-
-// const getStatusCfg = (status: string) =>
-//   statusConfig[status] ?? {
-//     label: status,
-//     dot:   "bg-gray-400",
-//     badge: "text-gray-600 bg-gray-50 border-gray-200",
-//   };
-
-// // ─── Component ────────────────────────────────────────────────────────────────
-
-// const DepartmentHeadDashboard: React.FC = () => {
-//   const { user } = useAuth();
-
-//   const [plans, setPlans]                   = useState<DepartmentBudgetPlan[]>([]);
-//   const [activePlan, setActivePlan]         = useState<BudgetPlan | null>(null);
-//   const [loading, setLoading]               = useState(true);
-//   const [showCreateConfirm, setShowCreateConfirm] = useState(false);
-//   const [showDraftAlert, setShowDraftAlert] = useState(false);
-//   const [justCreated, setJustCreated]       = useState(false);
-
-//   // ── Fetch ─────────────────────────────────────────────────────────────────
-
-//   useEffect(() => { fetchData(); }, []);
-
-//   useEffect(() => {
-//     if (loading || !activePlan) return;
-//     const hasDraft = plans.some(
-//       (p) => p.status === "draft" && p.budget_plan_id === activePlan.budget_plan_id
-//     );
-//     if (hasDraft && !justCreated) setShowDraftAlert(true);
-//   }, [plans, loading, activePlan, justCreated]);
-
-//   const fetchData = async () => {
-//     try {
-//       const [parentRes, deptRes] = await Promise.all([
-//         API.get("/budget-plans"),
-//         API.get("/department-budget-plans"),
-//       ]);
-//       const parentPlans: BudgetPlan[] = parentRes.data.data;
-//       const active = parentPlans.find((p) => p.is_active) ?? null;
-//       setActivePlan(active);
-
-//       const all: DepartmentBudgetPlan[] = deptRes.data.data;
-//       setPlans(all.filter((p) => p.dept_id === user?.dept_id));
-//     } catch {
-//       toast.error("Failed to load budget plans.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   // ── Create ────────────────────────────────────────────────────────────────
-
-//   const handleCreatePlan = () => {
-//     if (!activePlan) {
-//       toast.error("No active budget plan. Please contact admin.");
-//       return;
-//     }
-//     if (plans.some((p) => p.budget_plan_id === activePlan.budget_plan_id)) {
-//       toast.error("You already have a budget plan for the active year.");
-//       return;
-//     }
-//     setShowCreateConfirm(true);
-//   };
-
-//   const createPlan = async () => {
-//     setShowCreateConfirm(false);
-//     const promise = API.post("/department-budget-plans", {
-//       budget_plan_id: activePlan!.budget_plan_id,
-//       dept_id:        user?.dept_id,
-//     }).then(() => {
-//       setJustCreated(true);
-//       fetchData();
-//     });
-//     toast.promise(promise, {
-//       loading: "Creating budget plan…",
-//       success: "Budget plan created.",
-//       error:   "Failed to create budget plan.",
-//     });
-//   };
-
-//   // ── Delete ────────────────────────────────────────────────────────────────
-
-//   // const handleDelete = async (planId: number) => {
-//   //   try {
-//   //     await API.delete(`/department-budget-plans/${planId}`);
-//   //     toast.success("Budget plan deleted.");
-//   //     fetchData();
-//   //   } catch {
-//   //     toast.error("Failed to delete budget plan.");
-//   //   }
-//   // };
-
-//   // ── Render ────────────────────────────────────────────────────────────────
-
-//   if (loading) return <LoadingState />;
-
-//   // The draft for the active plan (used in the alert)
-//   const draftPlan = plans.find(
-//     (p) => p.status === "draft" && p.budget_plan_id === activePlan?.budget_plan_id
-//   );
-
-//   return (
-//     <div className="p-6">
-
-//       {/* ── Page Header ─────────────────────────────────────────────────── */}
-//       <div className="flex items-center justify-between mb-6">
-//         <div>
-//           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
-//             Department Head
-//           </span>
-//           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
-//             Dashboard
-//           </h1>
-//         </div>
-//         {/* <Button
-//           size="sm"
-//           onClick={handleCreatePlan}
-//           disabled={!activePlan}
-//           className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white disabled:opacity-40"
-//         >
-//           <PlusIcon className="w-3.5 h-3.5" />
-//           New Budget Plan
-//         </Button> */}
-//       </div>
-
-//       {/* ── No active plan warning ───────────────────────────────────────── */}
-//       {!activePlan && (
-//         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mb-6">
-//           <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1.5" />
-//           <div>
-//             <p className="text-sm font-medium text-gray-900">No active budget plan</p>
-//             <p className="text-[11px] text-gray-500 mt-0.5">
-//               The admin hasn't activated a budget plan yet. Please check back later.
-//             </p>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* ── Budget Plans Table ───────────────────────────────────────────── */}
-//       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-//         {plans.length === 0 ? (
-//           <div className="text-center py-14 text-gray-400 text-sm">
-//             No budget plans yet.{" "}
-//             {activePlan && (
-//               <button
-//                 onClick={handleCreatePlan}
-//                 className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
-//               >
-//                 Create one now
-//               </button>
-//             )}
-//           </div>
-//         ) : (
-//           <table className="w-full text-[12px] border-collapse">
-//             <thead>
-//               <tr>
-//                 <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-32">
-//                   Fiscal Year
-//                 </th>
-//                 <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">
-//                   Status
-//                 </th>
-//                 <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">
-//                   Created
-//                 </th>
-//                 <th className="border-b border-gray-200 bg-white px-2 py-2.5 text-center align-bottom w-12" />
-//               </tr>
-//             </thead>
-//             <tbody className="divide-y divide-gray-100">
-//               {plans.map((plan) => {
-//                 const cfg = getStatusCfg(plan.status);
-//                 return (
-//                   <tr key={plan.dept_budget_plan_id} className="hover:bg-gray-50/60 transition-colors">
-
-//                     {/* Year */}
-//                     <td className="px-4 py-3 font-semibold text-gray-900 tabular-nums text-sm">
-//                       {plan.budget_plan?.year ?? "N/A"}
-//                     </td>
-
-//                     {/* Status */}
-//                     <td className="px-4 py-3">
-//                       <span className="flex items-center gap-1.5">
-//                         <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", cfg.dot)} />
-//                         <span
-//                           className={cn(
-//                             "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
-//                             cfg.badge
-//                           )}
-//                         >
-//                           {cfg.label}
-//                         </span>
-//                       </span>
-//                     </td>
-
-//                     {/* Created */}
-//                     <td className="px-4 py-3 text-gray-400 text-[11px]">
-//                       {plan.created_at
-//                         ? new Date(plan.created_at).toLocaleDateString("en-PH", {
-//                             year: "numeric", month: "short", day: "numeric",
-//                           })
-//                         : "—"}
-//                     </td>
-
-//                     {/* Actions */}
-//                     <td className="px-2 py-2.5 text-right">
-//                       <DropdownMenu>
-//                         <DropdownMenuTrigger asChild>
-//                           <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700">
-//                             <MoreHorizontalIcon className="w-4 h-4" />
-//                             <span className="sr-only">Open menu</span>
-//                           </Button>
-//                         </DropdownMenuTrigger>
-//                         <DropdownMenuContent align="end" className="w-36">
-//                           {plan.status === "draft" ? (
-//                             <>
-//                               <DropdownMenuItem asChild>
-//                                 <Link to={`/department-budget-plans/${plan.dept_budget_plan_id}`}>
-//                                   Edit
-//                                 </Link>
-//                               </DropdownMenuItem>
-//                               {/* <DropdownMenuSeparator /> */}
-//                               {/* <DropdownMenuItem
-//                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
-//                                 onClick={() => handleDelete(plan.dept_budget_plan_id)}
-//                               >
-//                                 Delete
-//                               </DropdownMenuItem> */}
-//                             </>
-//                           ) : (
-//                             <DropdownMenuItem asChild>
-//                               <Link to={`/department-budget-plans/${plan.dept_budget_plan_id}`}>
-//                                 View
-//                               </Link>
-//                             </DropdownMenuItem>
-//                           )}
-//                         </DropdownMenuContent>
-//                       </DropdownMenu>
-//                     </td>
-
-//                   </tr>
-//                 );
-//               })}
-//             </tbody>
-//           </table>
-//         )}
-//       </div>
-
-//       {/* ════════════════════════════════════════════════════════════════════
-//           Create Confirm Dialog
-//       ════════════════════════════════════════════════════════════════════ */}
-//       <AlertDialog open={showCreateConfirm} onOpenChange={setShowCreateConfirm}>
-//         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
-//           <AlertDialogHeader>
-//             <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
-//               Create budget plan?
-//             </AlertDialogTitle>
-//             <AlertDialogDescription className="text-sm text-gray-500">
-//               This will create a draft budget plan for{" "}
-//               <span className="font-medium text-gray-700">FY {activePlan?.year}</span>.
-//               You can start adding items right away.
-//             </AlertDialogDescription>
-//           </AlertDialogHeader>
-//           <AlertDialogFooter>
-//             <AlertDialogCancel asChild>
-//               <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">
-//                 Cancel
-//               </Button>
-//             </AlertDialogCancel>
-//             <AlertDialogAction asChild>
-//               <Button
-//                 size="sm"
-//                 className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
-//                 onClick={createPlan}
-//               >
-//                 Create
-//               </Button>
-//             </AlertDialogAction>
-//           </AlertDialogFooter>
-//         </AlertDialogContent>
-//       </AlertDialog>
-
-//       {/* ════════════════════════════════════════════════════════════════════
-//           Draft Alert — fixed bottom-right toast-style
-//       ════════════════════════════════════════════════════════════════════ */}
-//       {showDraftAlert && draftPlan && (
-//         <div className="fixed bottom-5 right-5 z-50 w-80 animate-in fade-in slide-in-from-bottom-3 duration-300">
-//           <div className="bg-white border border-amber-200 rounded-xl shadow-lg p-4 relative">
-//             {/* Close */}
-//             <button
-//               onClick={() => setShowDraftAlert(false)}
-//               className="absolute top-3 right-3 text-gray-300 hover:text-gray-600 transition-colors"
-//               aria-label="Close"
-//             >
-//               <X className="h-3.5 w-3.5" />
-//             </button>
-
-//             <div className="flex items-start gap-3 pr-4">
-//               <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-//                 <InformationCircleIcon className="w-4 h-4 text-amber-600" />
-//               </div>
-//               <div className="min-w-0">
-//                 <p className="text-[13px] font-semibold text-gray-900 leading-tight">
-//                   Draft Budget Plan
-//                 </p>
-//                 <p className="text-[11px] text-gray-500 mt-1 leading-snug">
-//                   You have a draft plan for{" "}
-//                   <span className="font-medium text-gray-700">
-//                     FY {draftPlan.budget_plan?.year}
-//                   </span>
-//                   . Finalize and submit it to the Local Budget Officer for review.
-//                 </p>
-//                 <Link
-//                   to={`/department-budget-plans/${draftPlan.dept_budget_plan_id}`}
-//                   className="inline-block mt-2 text-[11px] font-semibold text-gray-900 underline underline-offset-2 hover:text-gray-600"
-//                   onClick={() => setShowDraftAlert(false)}
-//                 >
-//                   Open draft →
-//                 </Link>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-
-//     </div>
-//   );
-// };
-
-// export default DepartmentHeadDashboard;
-/**
- * pages/department-head/Dashboard.tsx
- *
- * Department-scoped dashboard — rendered by the shared Dashboard.tsx router
- * when user.role === "department-head".
- *
- * Shows data scoped to the logged-in user's own department:
- *   • Stat cards  — total budget, PS, MOOE, plantilla fill rate
- *   • RadialBarChart — PS / MOOE / CO allocation split
- *   • BarChart       — top AIP programs by expenditure type
- *   • AreaChart      — Semester 1 vs Semester 2 distribution
- *   • PieChart       — expense classification breakdown
- *   • Plantilla fill bar + position list
- *   • AIP program summary table
- *
- * Loading: skeleton shimmer cards + staggered reveal animation
- */
-
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   RadialBarChart,
@@ -410,8 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   Cell,
@@ -424,6 +22,7 @@ import { useExpenseData } from "@/src/hooks/useExpenseData";
 import { useQuery } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { cn } from "@/src/lib/utils";
+import { X } from "lucide-react";
 import {
   CurrencyDollarIcon,
   UserGroupIcon,
@@ -431,6 +30,7 @@ import {
   ArrowTrendingUpIcon,
   ClipboardDocumentListIcon,
   InformationCircleIcon,
+  BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -445,12 +45,15 @@ const fmt = (n: number) =>
 const pct = (a: number, b: number) =>
   b === 0 ? 0 : Math.round((a / b) * 100);
 
+// Classification name constants
+const CLASS_PS   = "Personal Services";
+const CLASS_MOOE = "Maintenance and Other Operating Expenses";
+const CLASS_CO   = "Capital Outlay";
+
 // ─── Skeleton pieces ─────────────────────────────────────────────────────────
 
 const Shimmer = ({ className }: { className?: string }) => (
-  <div
-    className={cn("rounded-lg bg-zinc-100 animate-pulse", className)}
-  />
+  <div className={cn("rounded-lg bg-zinc-100 animate-pulse", className)} />
 );
 
 const CardSkeleton = () => (
@@ -464,17 +67,10 @@ const CardSkeleton = () => (
 
 const ChartSkeleton = ({ title, h = "h-52" }: { title?: string; h?: string }) => (
   <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
-    {title ? (
-      <div className="space-y-1 mb-4">
-        <Shimmer className="h-2.5 w-24" />
-        <Shimmer className="h-4 w-36" />
-      </div>
-    ) : (
-      <div className="space-y-1 mb-4">
-        <Shimmer className="h-2.5 w-20" />
-        <Shimmer className="h-4 w-32" />
-      </div>
-    )}
+    <div className="space-y-1 mb-4">
+      <Shimmer className="h-2.5 w-24" />
+      <Shimmer className="h-4 w-36" />
+    </div>
     <Shimmer className={cn(h, "w-full rounded-xl")} />
   </div>
 );
@@ -540,8 +136,9 @@ const StatCard: React.FC<StatCardProps> = ({
 
 const ChartTip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl shadow-lg p-3 text-xs max-w-[200px]">
+    <div className="bg-white border border-zinc-200 rounded-xl shadow-lg p-3 text-xs max-w-[220px]">
       {label && <p className="font-semibold text-zinc-700 mb-2 truncate">{label}</p>}
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2 mt-1">
@@ -550,6 +147,13 @@ const ChartTip = ({ active, payload, label }: any) => {
           <span className="font-semibold text-zinc-800 tabular-nums">{fmt(p.value)}</span>
         </div>
       ))}
+      {payload.length > 1 && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-zinc-100">
+          <span className="w-2 h-2 rounded-full flex-shrink-0 bg-zinc-400" />
+          <span className="text-zinc-500">Total:</span>
+          <span className="font-bold text-zinc-900 tabular-nums">{fmt(total)}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -590,7 +194,10 @@ const DepartmentHeadDashboard: React.FC = () => {
   const { programs, loading: aipLoading }             = useAipProgramData(activePlan?.budget_plan_id);
   const { items, amountMap, loading: expLoading }     = useExpenseData(activePlan?.budget_plan_id);
 
-  // This dept's budget plan record (for semester data)
+  // Draft notification state
+  const [showDraftAlert, setShowDraftAlert] = useState(false);
+
+  // This dept's budget plan record
   const { data: deptPlan, isLoading: deptPlanLoading } = useQuery({
     queryKey: ["my-dept-plan", activePlan?.budget_plan_id, deptId],
     queryFn: () =>
@@ -616,6 +223,13 @@ const DepartmentHeadDashboard: React.FC = () => {
 
   const isLoading = planLoading || aipLoading || expLoading || deptPlanLoading;
 
+  // Show draft alert when data is ready
+  useEffect(() => {
+    if (!isLoading && deptPlan && deptPlan.status === "draft" && activePlan) {
+      setShowDraftAlert(true);
+    }
+  }, [isLoading, deptPlan, activePlan]);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const myPrograms = useMemo(
@@ -623,12 +237,45 @@ const DepartmentHeadDashboard: React.FC = () => {
     [programs, deptId]
   );
 
-  const totalBudget = useMemo(() => myPrograms.reduce((s, p) => s + p.total_amount, 0), [myPrograms]);
-  const totalPS     = useMemo(() => myPrograms.reduce((s, p) => s + p.total_ps,     0), [myPrograms]);
-  const totalMOOE   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_mooe,   0), [myPrograms]);
-  const totalCO     = useMemo(() => myPrograms.reduce((s, p) => s + p.total_co,     0), [myPrograms]);
+  // ── Expense-item based totals (scoped to this dept) ───────────────────────
 
-  // Bar chart — top 6 programs
+  // Build a map: expense_item_id → classificationName for this dept's items
+  const expenseItemClassMap = useMemo(() => {
+    const m = new Map<number, string>();
+    items.forEach((item) => {
+      m.set(item.expense_class_item_id, item.classificationName);
+    });
+    return m;
+  }, [items]);
+
+  // Sum amounts for this dept's expense items by classification
+  const { totalExpensePS, totalExpenseMOOE, totalExpenseCO, totalExpense } = useMemo(() => {
+    let ps = 0, mooe = 0, co = 0;
+    items.forEach((item) => {
+      const amt = amountMap.get(`${deptId}-${item.expense_class_item_id}`) ?? 0;
+      const cls = item.classificationName;
+      if (cls === CLASS_PS)   ps   += amt;
+      else if (cls === CLASS_MOOE) mooe += amt;
+      else if (cls === CLASS_CO)   co   += amt;
+    });
+    return {
+      totalExpensePS:   ps,
+      totalExpenseMOOE: mooe,
+      totalExpenseCO:   co,
+      totalExpense:     ps + mooe + co,
+    };
+  }, [items, amountMap, deptId]);
+
+  // AIP program totals (for radial chart)
+  const aipTotalPS   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_ps,   0), [myPrograms]);
+  const aipTotalMOOE = useMemo(() => myPrograms.reduce((s, p) => s + p.total_mooe, 0), [myPrograms]);
+  const aipTotalCO   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_co,   0), [myPrograms]);
+  const aipTotal     = useMemo(() => myPrograms.reduce((s, p) => s + p.total_amount, 0), [myPrograms]);
+
+  // Total proposed expenditure = expense items total + AIP total
+  const totalProposedExpenditure = totalExpense + aipTotal;
+
+  // Bar chart — top 6 AIP programs
   const barData = useMemo(() =>
     [...myPrograms]
       .sort((a, b) => b.total_amount - a.total_amount)
@@ -644,56 +291,38 @@ const DepartmentHeadDashboard: React.FC = () => {
     [myPrograms]
   );
 
-  // Pie — expense classification for this dept
+  // Pie — PS / MOOE / CO from expense items
   const pieData = useMemo(() => {
-    const map = new Map<string, number>();
-    items.forEach((item) => {
-      const amt = amountMap.get(`${deptId}-${item.expense_class_item_id}`) ?? 0;
-      if (amt > 0) map.set(item.classificationName, (map.get(item.classificationName) ?? 0) + amt);
-    });
-    return [...map.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
-  }, [items, amountMap, deptId]);
+    const data = [
+      { name: "Personal Services",   value: totalExpensePS,   color: "#6366f1" },
+      { name: "MOOE",                value: totalExpenseMOOE, color: "#22d3ee" },
+      { name: "Capital Outlay",      value: totalExpenseCO,   color: "#f59e0b" },
+    ].filter((d) => d.value > 0);
+    return data;
+  }, [totalExpensePS, totalExpenseMOOE, totalExpenseCO]);
 
-  // Area — semester split across expense items
-  const areaData = useMemo(() => {
-    if (!deptPlan?.items) return [];
-    return deptPlan.items
-      .filter((i: any) => Number(i.total_amount) > 0)
-      .slice(0, 8)
-      .map((i: any) => ({
-        name: (i.expense_item?.expense_class_item_name ?? `Item ${i.expense_item_id}`).slice(0, 14),
-        Sem1: Number(i.sem1_amount),
-        Sem2: Number(i.sem2_amount),
-      }));
-  }, [deptPlan]);
-
-  // Radial — allocation %
+  // Radial — AIP allocation %
   const radialData = useMemo(() => {
-    if (!totalBudget) return [];
+    if (!aipTotal) return [];
     return [
-      { name: "PS",   value: pct(totalPS,   totalBudget), fill: "#6366f1" },
-      { name: "MOOE", value: pct(totalMOOE, totalBudget), fill: "#22d3ee" },
-      { name: "CO",   value: pct(totalCO,   totalBudget), fill: "#f59e0b" },
+      { name: "PS",   value: pct(aipTotalPS,   aipTotal), fill: "#6366f1" },
+      { name: "MOOE", value: pct(aipTotalMOOE, aipTotal), fill: "#22d3ee" },
+      { name: "CO",   value: pct(aipTotalCO,   aipTotal), fill: "#f59e0b" },
     ];
-  }, [totalBudget, totalPS, totalMOOE, totalCO]);
+  }, [aipTotal, aipTotalPS, aipTotalMOOE, aipTotalCO]);
 
   // Plantilla
   const filled   = (plantilla as any[]).filter((p) => p.assignments?.[0]?.personnel_id != null).length;
   const fillRate = pct(filled, plantilla.length);
-
-  const PIE_COLORS = ["#6366f1", "#22d3ee", "#f59e0b", "#10b981", "#f43f5e", "#a78bfa"];
 
   const dept     = (user as any)?.department;
   const deptName = dept?.dept_name ?? "Your Department";
   const deptAbbr = dept?.dept_abbreviation ?? "";
 
   const statusCfg: Record<string, { label: string; cls: string }> = {
-    draft:     { label: "Draft",     cls: "text-amber-700 bg-amber-50 border-amber-200"          },
-    submitted: { label: "Submitted", cls: "text-blue-700 bg-blue-50 border-blue-200"             },
-    approved:  { label: "Approved",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200"    },
+    draft:     { label: "Draft",     cls: "text-amber-700 bg-amber-50 border-amber-200"        },
+    submitted: { label: "Submitted", cls: "text-blue-700 bg-blue-50 border-blue-200"           },
+    approved:  { label: "Approved",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200"  },
   };
   const planStatus = deptPlan?.status ?? "draft";
   const sCfg       = statusCfg[planStatus] ?? statusCfg.draft;
@@ -735,19 +364,6 @@ const DepartmentHeadDashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              {deptPlan && !isLoading && (
-                <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full border", sCfg.cls)}>
-                  {sCfg.label}
-                </span>
-              )}
-              {deptPlan && !isLoading && (
-                <Link
-                  to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
-                  className="text-[12px] font-semibold text-zinc-700 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-colors px-3 py-1.5 rounded-xl shadow-sm"
-                >
-                  Open Budget →
-                </Link>
-              )}
             </div>
           </div>
         </Reveal>
@@ -769,64 +385,112 @@ const DepartmentHeadDashboard: React.FC = () => {
 
         {/* ── Stat cards ────────────────────────────────────────────── */}
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}
+          <div className="flex gap-4 mb-6">
+            {[...Array(5)].map((_, i) => <CardSkeleton key={i} />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              icon={CurrencyDollarIcon}
-              label="Total Budget"
-              value={fmt(totalBudget)}
-              sub={`${myPrograms.length} AIP program${myPrograms.length !== 1 ? "s" : ""}`}
-              accent="blue"
-              delay={60}
-            />
+          <div className="flex gap-4 mb-6 items-stretch">
+
+            {/* Active Plan */}
+            <Reveal delay={40} className="flex-shrink-0 w-[190px]">
+              <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full relative overflow-hidden">
+                <span className="absolute top-4 right-4 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center mb-3 flex-shrink-0">
+                  <DocumentTextIcon className="w-[18px] h-[18px] text-blue-500" />
+                </div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">Active Plan</p>
+                <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                  {activePlan ? `FY ${activePlan.year}` : "—"}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
+                  {activePlan ? "Currently active" : "No active plan"}
+                </p>
+              </div>
+            </Reveal>
+
+            {/* Vertical divider */}
+            <div className="w-px bg-zinc-200 my-2 flex-shrink-0" />
+
+            {/* Total Proposed Expenditure — clickable card with status */}
+            <Reveal delay={60} className="flex-1">
+              {deptPlan ? (
+                <Link
+                  to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
+                  className="group bg-white border border-blue-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-300 hover:bg-blue-50/30 transition-all h-full flex flex-col cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-100 transition-colors flex items-center justify-center flex-shrink-0">
+                      <CurrencyDollarIcon className="w-[18px] h-[18px] text-blue-600" />
+                    </div>
+                    <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", sCfg.cls)}>
+                      {sCfg.label}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">Total Proposed Expenditure</p>
+                  <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">{fmt(totalProposedExpenditure)}</p>
+                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug group-hover:text-blue-500 transition-colors">Expense items + AIP programs →</p>
+                </Link>
+              ) : (
+                <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm h-full flex flex-col">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center mb-3 flex-shrink-0">
+                    <CurrencyDollarIcon className="w-[18px] h-[18px] text-blue-600" />
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">Total Proposed Expenditure</p>
+                  <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">{fmt(totalProposedExpenditure)}</p>
+                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">Expense items + AIP programs</p>
+                </div>
+              )}
+            </Reveal>
+
             <StatCard
               icon={ArrowTrendingUpIcon}
               label="Personnel Services"
-              value={fmt(totalPS)}
-              sub={`${pct(totalPS, totalBudget)}% of total`}
+              value={fmt(totalExpensePS)}
+              sub={`${pct(totalExpensePS, totalExpense)}% of expense items`}
               accent="violet"
               delay={110}
             />
             <StatCard
               icon={DocumentTextIcon}
               label="MOOE"
-              value={fmt(totalMOOE)}
-              sub={`${pct(totalMOOE, totalBudget)}% of total`}
+              value={fmt(totalExpenseMOOE)}
+              sub={`${pct(totalExpenseMOOE, totalExpense)}% of expense items`}
               accent="cyan"
               delay={160}
             />
             <StatCard
-              icon={UserGroupIcon}
-              label="Plantilla Fill Rate"
-              value={plantillaLoading ? "—" : `${fillRate}%`}
-              sub={plantillaLoading ? "Loading…" : `${filled} of ${plantilla.length} positions`}
-              accent="emerald"
+              icon={BuildingOfficeIcon}
+              label="Capital Outlay"
+              value={fmt(totalExpenseCO)}
+              sub={`${pct(totalExpenseCO, totalExpense)}% of expense items`}
+              accent="amber"
               delay={210}
             />
+
           </div>
         )}
 
         {/* ── Row 2: Radial + Grouped Bar ───────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
-          {/* Radial: PS/MOOE/CO split */}
+          {/* Radial: AIP PS/MOOE/CO split */}
           {isLoading ? (
             <ChartSkeleton h="h-56" />
           ) : (
             <Reveal delay={260}>
               <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
                 <SectionHead
-                  eyebrow="Allocation"
+                  eyebrow="AIP Program Allocation"
                   title="PS / MOOE / CO Split"
                   icon={CurrencyDollarIcon}
                   iconBg="bg-indigo-50"
                   iconColor="text-indigo-600"
                 />
                 {radialData.length === 0 ? (
-                  <div className="h-48 flex items-center justify-center text-zinc-300 text-sm">No data yet</div>
+                  <div className="h-48 flex items-center justify-center text-zinc-300 text-sm">No AIP data yet</div>
                 ) : (
                   <>
                     <ResponsiveContainer width="100%" height={180}>
@@ -854,9 +518,9 @@ const DepartmentHeadDashboard: React.FC = () => {
                     </ResponsiveContainer>
                     <div className="grid grid-cols-3 gap-1.5 mt-1">
                       {[
-                        { label: "PS",   val: fmt(totalPS),   color: "text-indigo-600", bg: "bg-indigo-50" },
-                        { label: "MOOE", val: fmt(totalMOOE), color: "text-cyan-600",   bg: "bg-cyan-50"   },
-                        { label: "CO",   val: fmt(totalCO),   color: "text-amber-600",  bg: "bg-amber-50"  },
+                        { label: "PS",   val: fmt(aipTotalPS),   color: "text-indigo-600", bg: "bg-indigo-50" },
+                        { label: "MOOE", val: fmt(aipTotalMOOE), color: "text-cyan-600",   bg: "bg-cyan-50"   },
+                        { label: "CO",   val: fmt(aipTotalCO),   color: "text-amber-600",  bg: "bg-amber-50"  },
                       ].map((d) => (
                         <div key={d.label} className={cn("rounded-xl py-2 text-center", d.bg)}>
                           <p className={cn("text-[13px] font-bold tabular-nums", d.color)}>{d.val}</p>
@@ -912,64 +576,16 @@ const DepartmentHeadDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* ── Row 3: Semester area + Expense pie ────────────────────── */}
+        {/* ── Row 3: Expense Classification Breakdown + Plantilla ────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-          {/* Area: Sem 1 vs Sem 2 */}
+          {/* Pie: PS / MOOE / CO from expense items */}
           {isLoading ? <ChartSkeleton h="h-44" /> : (
             <Reveal delay={360}>
               <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
                 <SectionHead
-                  eyebrow="Semester Split"
-                  title="Sem 1 vs Sem 2 Distribution"
-                  icon={ArrowTrendingUpIcon}
-                  iconBg="bg-cyan-50"
-                  iconColor="text-cyan-600"
-                />
-                {areaData.length === 0 ? (
-                  <div className="h-44 flex items-center justify-center text-zinc-300 text-sm">No semester data</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={190}>
-                    <AreaChart data={areaData} margin={{ top: 0, right: 8, left: 0, bottom: 24 }}>
-                      <defs>
-                        <linearGradient id="gSem1" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.18} />
-                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}    />
-                        </linearGradient>
-                        <linearGradient id="gSem2" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#22d3ee" stopOpacity={0.18} />
-                          <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}    />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 9, fill: "#a1a1aa" }}
-                        angle={-25} textAnchor="end" interval={0}
-                        tickLine={false} axisLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 9, fill: "#a1a1aa" }}
-                        tickFormatter={fmt}
-                        tickLine={false} axisLine={false} width={50}
-                      />
-                      <Tooltip content={<ChartTip />} />
-                      <Area type="monotone" dataKey="Sem1" name="Sem 1" stroke="#6366f1" strokeWidth={2} fill="url(#gSem1)" dot={false} />
-                      <Area type="monotone" dataKey="Sem2" name="Sem 2" stroke="#22d3ee" strokeWidth={2} fill="url(#gSem2)" dot={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </Reveal>
-          )}
-
-          {/* Pie: expense classification */}
-          {isLoading ? <ChartSkeleton h="h-44" /> : (
-            <Reveal delay={400}>
-              <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
-                <SectionHead
                   eyebrow="Expense Classification"
-                  title="MOOE Category Breakdown"
+                  title="Expense Classification Breakdown"
                   icon={DocumentTextIcon}
                   iconBg="bg-amber-50"
                   iconColor="text-amber-600"
@@ -988,8 +604,8 @@ const DepartmentHeadDashboard: React.FC = () => {
                           stroke="none"
                           paddingAngle={2}
                         >
-                          {pieData.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          {pieData.map((d, i) => (
+                            <Cell key={i} fill={d.color} />
                           ))}
                         </Pie>
                         <Tooltip
@@ -998,15 +614,24 @@ const DepartmentHeadDashboard: React.FC = () => {
                         />
                       </PieChart>
                     </ResponsiveContainer>
-                    <div className="flex-1 space-y-2 min-w-0">
-                      {pieData.map((d, i) => (
-                        <div key={d.name} className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                          />
-                          <span className="text-[11px] text-zinc-500 truncate flex-1">{d.name}</span>
-                          <span className="text-[11px] font-semibold text-zinc-700 tabular-nums">{fmt(d.value)}</span>
+                    <div className="flex-1 space-y-3 min-w-0">
+                      {pieData.map((d) => (
+                        <div key={d.name} className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                            <span className="text-[11px] text-zinc-500 truncate flex-1">{d.name}</span>
+                            <span className="text-[11px] font-semibold text-zinc-700 tabular-nums">{fmt(d.value)}</span>
+                          </div>
+                          <div className="ml-4 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-[width] duration-700"
+                              style={{
+                                width: `${pct(d.value, totalExpense)}%`,
+                                background: d.color,
+                              }}
+                            />
+                          </div>
+                          <p className="ml-4 text-[10px] text-zinc-400">{pct(d.value, totalExpense)}% of total</p>
                         </div>
                       ))}
                     </div>
@@ -1015,14 +640,10 @@ const DepartmentHeadDashboard: React.FC = () => {
               </div>
             </Reveal>
           )}
-        </div>
-
-        {/* ── Row 4: Plantilla + AIP table ──────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Plantilla */}
-          {plantillaLoading ? <ChartSkeleton h="h-36" /> : (
-            <Reveal delay={440}>
+          {plantillaLoading ? <ChartSkeleton h="h-44" /> : (
+            <Reveal delay={400}>
               <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
                 <SectionHead
                   eyebrow="Plantilla"
@@ -1072,82 +693,42 @@ const DepartmentHeadDashboard: React.FC = () => {
               </div>
             </Reveal>
           )}
-
-          {/* AIP program summary table */}
-          {isLoading ? (
-            <div className="lg:col-span-2"><ChartSkeleton h="h-36" /></div>
-          ) : (
-            <Reveal delay={480} className="lg:col-span-2">
-              <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
-                <SectionHead
-                  eyebrow="Programs"
-                  title="AIP Program Summary"
-                  icon={ClipboardDocumentListIcon}
-                  iconBg="bg-indigo-50"
-                  iconColor="text-indigo-600"
-                />
-                {myPrograms.length === 0 ? (
-                  <div className="h-32 flex items-center justify-center text-zinc-300 text-sm">
-                    No AIP programs found for this department
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto -mx-1">
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="border-b border-zinc-100">
-                          {["Program", "PS", "MOOE", "CO", "Total"].map((h, i) => (
-                            <th
-                              key={h}
-                              className={cn(
-                                "pb-2 font-semibold text-[10px] uppercase tracking-wide text-zinc-400",
-                                i === 0 ? "text-left" : "text-right"
-                              )}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-50">
-                        {myPrograms.map((prog) => (
-                          <tr key={prog.aip_program_id} className="hover:bg-zinc-50/70 transition-colors">
-                            <td className="py-2 pr-3">
-                              <div className="flex items-center gap-1.5">
-                                {prog.aip_reference_code && (
-                                  <span className="font-mono text-[9px] bg-zinc-100 text-zinc-400 px-1.5 py-0.5 rounded-md flex-shrink-0">
-                                    {prog.aip_reference_code}
-                                  </span>
-                                )}
-                                <span className="text-zinc-700 font-medium truncate max-w-[180px]">
-                                  {prog.program_description}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-2 text-right tabular-nums text-indigo-600 font-medium">{fmt(prog.total_ps)}</td>
-                            <td className="py-2 text-right tabular-nums text-cyan-600   font-medium">{fmt(prog.total_mooe)}</td>
-                            <td className="py-2 text-right tabular-nums text-amber-600  font-medium">{fmt(prog.total_co)}</td>
-                            <td className="py-2 text-right tabular-nums text-zinc-900   font-bold">{fmt(prog.total_amount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-zinc-200">
-                          <td className="pt-2.5 pb-1 font-bold text-zinc-700 text-[11px]">Total</td>
-                          <td className="pt-2.5 pb-1 text-right tabular-nums font-bold text-indigo-700">{fmt(totalPS)}</td>
-                          <td className="pt-2.5 pb-1 text-right tabular-nums font-bold text-cyan-700">{fmt(totalMOOE)}</td>
-                          <td className="pt-2.5 pb-1 text-right tabular-nums font-bold text-amber-700">{fmt(totalCO)}</td>
-                          <td className="pt-2.5 pb-1 text-right tabular-nums font-bold text-zinc-900">{fmt(totalBudget)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </Reveal>
-          )}
         </div>
 
       </div>
+
+      {/* ── Draft Proposal Notification ────────────────────────────────── */}
+      {showDraftAlert && deptPlan && deptPlan.status === "draft" && (
+        <div className="fixed bottom-5 right-5 z-50 w-80 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <div className="bg-white border border-amber-200 rounded-2xl shadow-lg p-4 relative">
+            <button
+              onClick={() => setShowDraftAlert(false)}
+              className="absolute top-3 right-3 text-zinc-300 hover:text-zinc-600 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <div className="flex items-start gap-3 pr-4">
+              <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <InformationCircleIcon className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-zinc-900 leading-tight">Draft Proposal</p>
+                <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
+                  You have an unsubmitted proposal for{" "}
+                  <span className="font-medium text-zinc-700">FY {activePlan?.year}</span>.
+                </p>
+                <Link
+                  to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
+                  className="inline-block mt-2 text-[11px] font-semibold text-zinc-900 underline underline-offset-2 hover:text-zinc-600"
+                  onClick={() => setShowDraftAlert(false)}
+                >
+                  Open draft →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

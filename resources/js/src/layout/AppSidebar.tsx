@@ -600,6 +600,17 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Department Reports", href: "/department/reports", icon: DocumentTextIcon, iconBg: "bg-green-100", iconColor: "text-green-600", roles: ["department-head"] },
       ] as NavItem[],
     },
+    {
+      label: "Settings",
+      items: [{
+        name: "Department",
+        href: "/department/settings",
+        icon: Cog6ToothIcon,
+        iconBg: "bg-gray-100",
+        iconColor: "text-gray-600",
+        roles: ["department-head"],
+      }] as NavItem[],
+    },
     
 
   ];

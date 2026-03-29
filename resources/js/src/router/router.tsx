@@ -129,6 +129,10 @@ const BudgetProposal = React.lazy(
   () => import("../pages/department-head/BudgetProposal")
 );
 
+const DepartmentSettings = React.lazy(
+  () => import("../pages/department-head/DepartmentSettings")
+);
+
 /* ------------------ Suspense Wrapper ------------------ */
 
 const Lazy = (Component: React.LazyExoticComponent<any>) => (
@@ -387,7 +391,11 @@ const router = createBrowserRouter([
               {
                 path: 'department/reports',
                 element: Lazy(DepartmentReportsPage),
-              }
+              },
+              {
+                path: "department/settings",
+                element: Lazy(DepartmentSettings),
+              },
             ],
           },
         ],

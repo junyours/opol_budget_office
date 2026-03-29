@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\DeptBpForm6Item;
+use App\Models\BudgetPlanForm6Item;
 use Illuminate\Http\Request;
 
 class BudgetPlanForm6ItemController extends BaseMasterCrudController
 {
-    protected string $modelClass = DeptBpForm6Item::class;
+    protected string $modelClass = BudgetPlanForm6Item::class;
 
     protected function rules($id = null): array
     {

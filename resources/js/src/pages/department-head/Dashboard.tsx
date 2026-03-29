@@ -540,13 +540,22 @@ const DepartmentHeadDashboard: React.FC = () => {
           ) : (
             <Reveal delay={310} className="lg:col-span-2">
               <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
-                <SectionHead
-                  eyebrow="AIP Programs"
-                  title="Top Programs by Expenditure Type"
-                  icon={ClipboardDocumentListIcon}
-                  iconBg="bg-violet-50"
-                  iconColor="text-violet-600"
-                />
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+                      <ClipboardDocumentListIcon className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">AIP Programs</p>
+                      <p className="text-[13px] font-bold text-zinc-800 leading-none">Programs by Expenditure Type</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400">Total AIP Expenditures</p>
+                    <p className="text-[18px] font-bold text-violet-600 tabular-nums leading-none">{fmt(aipTotal)}</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">{myPrograms.length} program{myPrograms.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
                 {barData.length === 0 ? (
                   <div className="h-52 flex items-center justify-center text-zinc-300 text-sm">No AIP programs for this department</div>
                 ) : (

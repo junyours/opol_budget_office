@@ -28,7 +28,8 @@ import {
   isDeptEligible,
   type PsSettings,
 } from './PersonnelServicesSettings';
-import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
+import { DeptDots } from '@/src/components/ui/DeptDots';
+
 
 // ── Animation styles injected once ───────────────────────────────────────────
 
@@ -881,7 +882,14 @@ const PersonnelServices: React.FC = () => {
             </svg>
           </button>
         </div>
-        <TabScrollIndicator scrollId="dept-tabs-scroll" />
+        {/* <TabScrollIndicator scrollId="dept-tabs-scroll" /> */}
+        <div className="mt-2 flex justify-center">
+          <DeptDots
+            departments={departments}
+            activeId={parseInt(activeTab)}
+            onSelect={(id) => handleTabChange(id.toString())}
+          />
+        </div>
 
         {departments.map(dept => {
           const tabKey    = dept.dept_id.toString();

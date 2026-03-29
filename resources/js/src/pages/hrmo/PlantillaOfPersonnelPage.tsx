@@ -16,7 +16,7 @@ import {
 } from "@/src/components/ui/command"
 import { Calendar } from "@/src/components/ui/calendar"
 import { cn } from "@/src/lib/utils"
-import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
+import { DeptDots } from '@/src/components/ui/DeptDots';
 import { LoadingState } from '../common/LoadingState'
 import API from '../../services/api'
 import { Department, PlantillaPosition, Personnel } from '../../types/api'
@@ -444,7 +444,14 @@ const PlantillaOfPersonnelPage: React.FC = () => {
             </svg>
           </button>
         </div>
-        <TabScrollIndicator scrollId="pop-tabs-scroll" />
+        {/* <TabScrollIndicator scrollId="pop-tabs-scroll" /> */}
+        <div className="mt-2 flex justify-center">  
+            <DeptDots
+              departments={departments}
+              activeId={activeTab}
+              onSelect={handleTabChange}
+            />
+          </div>
         </div>
       )}
 

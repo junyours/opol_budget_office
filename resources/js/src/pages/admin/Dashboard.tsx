@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
@@ -9,9 +9,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogFooter, DialogDescription,
 } from "../../components/ui/dialog";
+// import {
+//   Carousel, CarouselContent, CarouselItem,
+//   CarouselNext, CarouselPrevious,
+// } from "../../components/ui/carousel";
 import {
   Carousel, CarouselContent, CarouselItem,
   CarouselNext, CarouselPrevious,
+  useCarousel,
 } from "../../components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import {
@@ -173,6 +178,35 @@ function UnapBadge({ value, compact = false }: { value: number; compact?: boolea
     </div>
   );
 }
+
+const CarouselDots = ({ count }: { count: number }) => {
+  const { api } = useCarousel();
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+    setCurrent(api.selectedScrollSnap());
+    api.on("select", () => setCurrent(api.selectedScrollSnap()));
+  }, [api]);
+
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: count }).map((_, i) => (
+        <button
+          key={i}
+          onClick={() => api?.scrollTo(i)}
+          className={cn(
+            "rounded-full transition-all duration-300",
+            i === current
+              ? "w-3 h-1.5 bg-zinc-500"
+              : "w-1.5 h-1.5 bg-zinc-200 hover:bg-zinc-300"
+          )}
+        />
+      ))}
+    </div>
+  );
+};
+
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -383,19 +417,29 @@ const AdminDashboard: React.FC = () => {
               </div>
             </Card>
 
-            <Card style={st(4)} className="col-span-6 lg:col-span-6 p-4">
+            <Card style={st(4)} className="col-span-12 lg:col-span-6 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
                   <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
                 </div>
                 <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
               </div>
-              <div className="flex items-center gap-5">
-                <div className="relative w-32 h-32 flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
+              <div className="flex flex-col sm:flex-row items-center gap-5">
+                <div className="relative w-28 h-28 flex-shrink-0">
+                  {/* <ResponsiveContainer width="100%" height="100%">
                     <RadialBarChart innerRadius="55%" outerRadius="100%"
                       data={[{ value: completion, fill: "#10b981" }]} startAngle={90} endAngle={-270}>
                       <RadialBar dataKey="value" background={{ fill: "#f4f4f5" }} cornerRadius={6} />
+                    </RadialBarChart>
+                  </ResponsiveContainer> */}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart innerRadius="55%" outerRadius="100%"
+                      data={[
+                        { value: 100,        fill: "#f4f4f5" },
+                        { value: completion, fill: "#10b981" },
+                      ]}
+                      startAngle={90} endAngle={-270}>
+                      <RadialBar dataKey="value" cornerRadius={6} />
                     </RadialBarChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -403,7 +447,7 @@ const AdminDashboard: React.FC = () => {
                     <span className="text-[9px] text-zinc-400 mt-0.5">approved</span>
                   </div>
                 </div>
-                <div className="flex-1 grid grid-cols-3 gap-3 min-w-0">
+                <div className="w-full grid grid-cols-3 gap-2 min-w-0">
                   {[
                     { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> },
                     { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} /> },
@@ -772,9 +816,17 @@ const AdminDashboard: React.FC = () => {
                   <div className="border-t border-zinc-100" />
 
                   <Carousel opts={{ align: "start", loop: true }} className="w-full">
-                    <div className="flex items-center justify-between mb-3">
+                    {/* <div className="flex items-center justify-between mb-3">
                       <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Per Account</p>
                       <div className="flex items-center gap-1">
+                        <CarouselPrevious className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
+                        <CarouselNext    className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
+                      </div>
+                    </div> */}
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Per Account</p>
+                      <div className="flex items-center gap-2">
+                        <CarouselDots count={3} />
                         <CarouselPrevious className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
                         <CarouselNext    className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
                       </div>

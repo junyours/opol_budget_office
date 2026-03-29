@@ -26,8 +26,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import API from '../../services/api';
 import { Department } from '../../types/api';
 import { cn } from '@/src/lib/utils';
-import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
-
+import { DeptDots } from '@/src/components/ui/DeptDots';
 const ITEMS_PER_PAGE = 10;
 
 const PlantillaPage: React.FC = () => {
@@ -265,7 +264,14 @@ const PlantillaPage: React.FC = () => {
       </svg>
     </button>
   </div>
-  <TabScrollIndicator scrollId="plantilla-tabs-scroll" />
+  {/* <TabScrollIndicator scrollId="plantilla-tabs-scroll" /> */}
+  <div className="mt-2 flex justify-center">
+          <DeptDots
+            departments={departments}
+            activeId={selectedDeptId}
+            onSelect={(id) => { setSelectedDeptId(id); setCurrentPage(1); }}
+          />
+        </div>
 
         {/* Search + count row */}
         <div className="flex items-center gap-3">

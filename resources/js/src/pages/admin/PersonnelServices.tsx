@@ -597,6 +597,16 @@ const PersonnelServices: React.FC = () => {
       });
     });
 
+    // return rowsByDept;
+    // Sort each department's rows by new item number ascending
+    Object.keys(rowsByDept).forEach(deptId => {
+      rowsByDept[parseInt(deptId)].sort((a, b) => {
+        const aNum = parseInt(a.newItemNumber, 10) || 0;
+        const bNum = parseInt(b.newItemNumber, 10) || 0;
+        return aNum - bNum;
+      });
+    });
+
     return rowsByDept;
   }, [activePlan, matrix, assignments, edits, settings, salaryLookup]);
 

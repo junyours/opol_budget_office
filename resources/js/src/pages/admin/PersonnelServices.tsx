@@ -646,10 +646,25 @@ const PersonnelServices: React.FC = () => {
     const dbp = deptBudgetPlans.find(p => p.dept_id === cDeptId && p.budget_plan_id === activePlan.budget_plan_id);
     if (!dbp) { toast.error('No department budget plan found.'); return; }
     const rows = departmentRows[cDeptId] || [];
-    if (rows.length === 0) { toast.warning('No personnel data to save.'); return; }
-
+    // const rows = departmentRows[cDeptId] || [];
+    //if (rows.length === 0) { toast.warning('No personnel data to save.'); return; }
+    
     setSaving(true);
     const savePromise = (async () => {
+      // await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
+      //   assignments: rows.map(row => ({
+      //     plantilla_position_id:      row.plantillaPositionId,
+      //     personnel_id:               row.personnelId,
+      //     salary_grade:               row.salaryGrade,
+      //     step:                       row.incrementRow ? row.incrementRow.step : row.baseStep,
+      //     monthly_rate:               row.savedMonthly,
+      //     annual_rate:                row.savedAnnual,
+      //     annual_increment:           row.incrementRow ? row.incrementRow.annualRateDiff : null,
+      //     step_effective_date:        row.incrementRow ? toLocalDateString(row.incrementRow.effectiveDate) : null,
+      //     salary_standard_version_id: activeVersion?.salary_standard_version_id ?? null,
+      //   })),
+      // });
+      if (rows.length > 0) {
       await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
         assignments: rows.map(row => ({
           plantilla_position_id:      row.plantillaPositionId,
@@ -663,6 +678,7 @@ const PersonnelServices: React.FC = () => {
           salary_standard_version_id: activeVersion?.salary_standard_version_id ?? null,
         })),
       });
+    }
 
       const totals = departmentTotals[cDeptId] || {};
       const cb = (bk: string, ik: string) => toNumber(totals[bk]) + toNumber(totals[ik] ?? 0);
@@ -691,6 +707,14 @@ const PersonnelServices: React.FC = () => {
         terminalLeave:       toNumber(totals.terminalLeave),
       };
 
+      const ALWAYS_SNAPSHOT_KEYS = new Set([
+        'wagesRegular',
+        'pera', 'ra', 'ta', 'clothing', 'productivity',
+        'midYearBonus', 'yearEndBonus', 'cashGift',
+        'retirementInsurance', 'pagIbig', 'philHealth',
+        'ecip', 'otherBenefits', 'terminalLeave',
+      ]);
+
       const exRes = await API.get(`/department-budget-plans/${dbp.dept_budget_plan_id}/items`);
       const exMap = new Map((exRes.data?.data || []).map((i: any) => [i.expense_item_id, i]));
 
@@ -700,7 +724,7 @@ const PersonnelServices: React.FC = () => {
         const ex = exMap.get(id) as any;
         if (ex) {
           await API.put(`/department-budget-plans/${dbp.dept_budget_plan_id}/items/${ex.dept_bp_form2_item_id}`, { total_amount: amount });
-        } else if (amount > 0) {
+        } else if (amount > 0 || ALWAYS_SNAPSHOT_KEYS.has(key)) {
           await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/items`, { expense_item_id: id, total_amount: amount });
         }
       }));

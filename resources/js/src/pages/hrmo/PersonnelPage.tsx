@@ -24,6 +24,7 @@ import { LoadingState } from '../common/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
 import API from '../../services/api';
 import { cn } from '@/src/lib/utils';
+import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
 
 const ITEMS_PER_PAGE = 10;
 

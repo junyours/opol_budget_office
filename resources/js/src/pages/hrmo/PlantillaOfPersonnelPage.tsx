@@ -16,6 +16,7 @@ import {
 } from "@/src/components/ui/command"
 import { Calendar } from "@/src/components/ui/calendar"
 import { cn } from "@/src/lib/utils"
+import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
 import { LoadingState } from '../common/LoadingState'
 import API from '../../services/api'
 import { Department, PlantillaPosition, Personnel } from '../../types/api'
@@ -377,18 +378,73 @@ const PlantillaOfPersonnelPage: React.FC = () => {
         </div>
       )}
 
-      {/* Department tabs */}
+     {/* Department tabs */}
       {departments.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {departments.map(dept => (
-            <button key={dept.dept_id} onClick={() => handleTabChange(dept.dept_id)}
-              className={cn('px-3 py-1 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap',
-                activeTab === dept.dept_id
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900')}>
-              {dept.dept_abbreviation || dept.dept_name}
-            </button>
-          ))}
+        <div className="space-y-1">
+        <div className="relative flex items-center gap-1">
+          <button
+            onClick={() => {
+              const el = document.getElementById('pop-tabs-scroll');
+              if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
+            }}
+            className="flex-shrink-0 h-8 w-7 flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm z-10"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div
+            id="pop-tabs-scroll"
+            className="flex-1 overflow-x-auto"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <div className="flex w-max gap-1">
+              {departments.map((dept, idx) => (
+                <button
+                  key={dept.dept_id}
+                  onClick={() => {
+                    handleTabChange(dept.dept_id);
+                    setTimeout(() => {
+                      const strip = document.getElementById('pop-tabs-scroll');
+                      const btn = strip?.querySelectorAll('button')[idx] as HTMLElement | undefined;
+                      if (strip && btn) {
+                        const btnLeft = btn.offsetLeft;
+                        const btnWidth = btn.offsetWidth;
+                        const stripW = strip.offsetWidth;
+                        const scrollL = strip.scrollLeft;
+                        if (btnLeft < scrollL + 40) {
+                          strip.scrollBy({ left: btnLeft - scrollL - 40, behavior: 'smooth' });
+                        } else if (btnLeft + btnWidth > scrollL + stripW - 40) {
+                          strip.scrollBy({ left: btnLeft + btnWidth - scrollL - stripW + 40, behavior: 'smooth' });
+                        }
+                      }
+                    }, 0);
+                  }}
+                  className={cn(
+                    'flex-shrink-0 h-8 px-3.5 text-xs font-medium rounded-lg border transition-all duration-200 whitespace-nowrap',
+                    activeTab === dept.dept_id
+                      ? 'bg-gray-900 text-white border-gray-900 shadow-md scale-[1.03]'
+                      : 'text-gray-500 border-transparent bg-gray-100 hover:bg-gray-200 hover:text-gray-800 hover:scale-[1.02]'
+                  )}
+                >
+                  {dept.dept_abbreviation || dept.dept_name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const el = document.getElementById('pop-tabs-scroll');
+              if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
+            }}
+            className="flex-shrink-0 h-8 w-7 flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm z-10"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <TabScrollIndicator scrollId="pop-tabs-scroll" />
         </div>
       )}
 

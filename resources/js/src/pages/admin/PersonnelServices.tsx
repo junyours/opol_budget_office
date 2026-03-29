@@ -28,6 +28,7 @@ import {
   isDeptEligible,
   type PsSettings,
 } from './PersonnelServicesSettings';
+import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
 
 // ── Animation styles injected once ───────────────────────────────────────────
 
@@ -832,7 +833,19 @@ const PersonnelServices: React.FC = () => {
             </TabsList>
           </div>
 
-          <button
+          {/* <button
+            onClick={() => {
+              const el = document.getElementById('dept-tabs-scroll');
+              if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
+            }}
+            className="flex-shrink-0 h-8 w-7 flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm z-10"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div> */}
+        <button
             onClick={() => {
               const el = document.getElementById('dept-tabs-scroll');
               if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
@@ -844,6 +857,7 @@ const PersonnelServices: React.FC = () => {
             </svg>
           </button>
         </div>
+        <TabScrollIndicator scrollId="dept-tabs-scroll" />
 
         {departments.map(dept => {
           const tabKey    = dept.dept_id.toString();
@@ -1065,13 +1079,12 @@ const PersonnelServices: React.FC = () => {
                           )}
 
                           {/* ── Row 4: Combined total (orange) ── */}
-                          {/* ── Row 4: Combined total (orange) ── */}
-{ir && (
-  <TableRow
-    className="bg-orange-50 ps-animate-step-row [&>td]:border-t-2 [&>td]:border-b-2 [&>td]:border-orange-300"
-    style={{ animationDelay: `${Math.min(idx, 8) * 30 + 100}ms` }}
-    key={`orange-${tabAnimKey}-${row.positionId}`}
-  >
+                          {ir && (
+                            <TableRow
+                              className="bg-orange-50 ps-animate-step-row [&>td]:border-t-2 [&>td]:border-b-2 [&>td]:border-orange-300"
+                              style={{ animationDelay: `${Math.min(idx, 8) * 30 + 100}ms` }}
+                              key={`orange-${tabAnimKey}-${row.positionId}`}
+                            >
                               <TableCell colSpan={4} className="py-2 pl-4 text-sm text-orange-800 font-extrabold tracking-wide">
                                 ∑ Combined ({row.baseMonths}mo Step {row.baseStep} + {ir.incrementMonths}mo Step {ir.step})
                               </TableCell>

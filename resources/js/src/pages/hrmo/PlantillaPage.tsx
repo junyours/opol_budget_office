@@ -26,6 +26,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import API from '../../services/api';
 import { Department } from '../../types/api';
 import { cn } from '@/src/lib/utils';
+import { TabScrollIndicator } from '@/src/components/ui/TabScrollIndicator';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -198,44 +199,93 @@ const PlantillaPage: React.FC = () => {
       </div>
 
       {/* Department tabs + search bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Dept pills */}
-        <div className="flex gap-1.5 flex-wrap flex-1">
-          {departments.map(dept => (
-            <button
-              key={dept.dept_id}
-              onClick={() => { setSelectedDeptId(dept.dept_id); setCurrentPage(1); }}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap",
-                selectedDeptId === dept.dept_id
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              {dept.dept_abbreviation || dept.dept_name}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative min-w-[180px] max-w-xs">
-          <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <Input value={searchRaw} onChange={e => { setSearchRaw(e.target.value); setCurrentPage(1); }} placeholder="Search positions…" className="pl-8 pr-8 h-8 text-xs border-gray-200 bg-white" />
-          {isSearching && (
-            <button onClick={() => { setSearchRaw(''); setCurrentPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors">
-              <XMarkIcon className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        {/* Result count */}
-        <span className="text-[11px] text-gray-400 whitespace-nowrap">
-          {isSearching
-            ? <><span className="font-medium text-gray-600">{sortedPositions.length}</span> of <span className="font-medium text-gray-600">{positions.filter(p => p.dept_id === selectedDeptId).length}</span> positions</>
-            : <><span className="font-medium text-gray-600">{sortedPositions.length}</span> position{sortedPositions.length !== 1 ? 's' : ''}</>
-          }
-        </span>
+      <div className="space-y-2">
+        {/* Dept scrollable tab strip — full width row */}
+        <div className="relative flex items-center gap-1 min-w-0">
+    <button
+      onClick={() => {
+        const el = document.getElementById('plantilla-tabs-scroll');
+        if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
+      }}
+      className="flex-shrink-0 h-8 w-7 flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm z-10"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+    <div
+            id="plantilla-tabs-scroll"
+            className="flex-1 overflow-x-hidden min-w-0"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+      <div className="flex w-max gap-1">
+        {departments.map((dept, idx) => (
+          <button
+            key={dept.dept_id}
+            onClick={() => {
+              setSelectedDeptId(dept.dept_id);
+              setCurrentPage(1);
+              setTimeout(() => {
+                const strip = document.getElementById('plantilla-tabs-scroll');
+                const btn = strip?.querySelectorAll('button')[idx] as HTMLElement | undefined;
+                if (strip && btn) {
+                  const btnLeft = btn.offsetLeft;
+                  const btnWidth = btn.offsetWidth;
+                  const stripW = strip.offsetWidth;
+                  const scrollL = strip.scrollLeft;
+                  if (btnLeft < scrollL + 40) {
+                    strip.scrollBy({ left: btnLeft - scrollL - 40, behavior: 'smooth' });
+                  } else if (btnLeft + btnWidth > scrollL + stripW - 40) {
+                    strip.scrollBy({ left: btnLeft + btnWidth - scrollL - stripW + 40, behavior: 'smooth' });
+                  }
+                }
+              }, 0);
+            }}
+            className={cn(
+              'flex-shrink-0 h-8 px-3.5 text-xs font-medium rounded-lg border transition-all duration-200 whitespace-nowrap',
+              selectedDeptId === dept.dept_id
+                ? 'bg-gray-900 text-white border-gray-900 shadow-md scale-[1.03]'
+                : 'text-gray-500 border-transparent bg-gray-100 hover:bg-gray-200 hover:text-gray-800 hover:scale-[1.02]'
+            )}
+          >
+            {dept.dept_abbreviation || dept.dept_name}
+          </button>
+        ))}
       </div>
+    </div>
+    <button
+      onClick={() => {
+        const el = document.getElementById('plantilla-tabs-scroll');
+        if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
+      }}
+      className="flex-shrink-0 h-8 w-7 flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm z-10"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  </div>
+  <TabScrollIndicator scrollId="plantilla-tabs-scroll" />
+
+        {/* Search + count row */}
+        <div className="flex items-center gap-3">
+        <div className="relative min-w-[180px] max-w-xs">
+      <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+      <Input value={searchRaw} onChange={e => { setSearchRaw(e.target.value); setCurrentPage(1); }} placeholder="Search positions…" className="pl-8 pr-8 h-8 text-xs border-gray-200 bg-white" />
+      {isSearching && (
+        <button onClick={() => { setSearchRaw(''); setCurrentPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors">
+          <XMarkIcon className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+    <span className="text-[11px] text-gray-400 whitespace-nowrap">
+      {isSearching
+        ? <><span className="font-medium text-gray-600">{sortedPositions.length}</span> of <span className="font-medium text-gray-600">{positions.filter(p => p.dept_id === selectedDeptId).length}</span> positions</>
+        : <><span className="font-medium text-gray-600">{sortedPositions.length}</span> position{sortedPositions.length !== 1 ? 's' : ''}</>
+      }
+    </span>
+  </div>
+</div>
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">

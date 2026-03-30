@@ -520,6 +520,14 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
       label: "Special Accounts",
       items: [
         { name: "Income Special Account", href: `/department/${deptCode}-fund`, icon: getDeptIcon(user), iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["department-head"] },
+        { 
+          name: "5% Calamity Fund", 
+          href: `/admin/${deptCode}-cf`,   // ← was /department/${deptCode}-cf
+          icon: ShieldCheckIcon, 
+          iconBg: "bg-red-100", 
+          iconColor: "text-red-600", 
+          roles: ["department-head"] 
+        },
       ] as NavItem[],
     }] : []),
     {

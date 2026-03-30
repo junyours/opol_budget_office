@@ -396,6 +396,18 @@ const router = createBrowserRouter([
                 path: "department/settings",
                 element: Lazy(DepartmentSettings),
               },
+              {
+                path: "admin/sh-cf",
+                element: Lazy(LdrrmfipPage)
+              },
+              {
+                path: "admin/occ-cf",
+                element: Lazy(LdrrmfipPage)
+              },
+              {
+                path: "admin/pm-cf",
+                element: Lazy(LdrrmfipPage)
+              },
             ],
           },
         ],

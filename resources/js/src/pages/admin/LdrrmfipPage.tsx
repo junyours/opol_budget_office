@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { useAuth } from "@/src/hooks/useAuth";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FundSource {
@@ -234,17 +235,41 @@ export default function LdrrmfipPage() {
 
   // ── Load sources + categories once ────────────────────────────────────────
 
-  useEffect(() => {
-    Promise.all([
-      API.get("/ldrrmfip/sources"),
-      API.get("/ldrrmfip/categories"),
-    ]).then(([srcRes, catRes]) => {
-      const srcs: FundSource[] = srcRes.data.data ?? [];
-      setSources(srcs);
-      setCategories(catRes.data.data ?? []);
-      if (srcs.length > 0) setActiveSource(srcs[0].id);
-    }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
-  }, []);
+  // const { user } = useAuth();
+   
+  // useEffect(() => {
+  //   Promise.all([
+  //     API.get("/ldrrmfip/sources"),
+  //     API.get("/ldrrmfip/categories"),
+  //   ]).then(([srcRes, catRes]) => {
+  //     const srcs: FundSource[] = srcRes.data.data ?? [];
+  //     setSources(srcs);
+  //     setCategories(catRes.data.data ?? []);
+  //     if (srcs.length > 0) setActiveSource(srcs[0].id);
+  //   }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
+  // }, []);
+  const { user } = useAuth();
+
+useEffect(() => {
+  Promise.all([
+    API.get("/ldrrmfip/sources"),
+    API.get("/ldrrmfip/categories"),
+  ]).then(([srcRes, catRes]) => {
+    let srcs: FundSource[] = srcRes.data.data ?? [];
+
+    // Filter sources based on role + URL path (mirrors IncomeFundPage)
+    if (user?.role === "department-head") {
+      const path = window.location.pathname;
+      if (path.includes("sh-cf"))  srcs = srcs.filter(s => s.id === "sh");
+      else if (path.includes("occ-cf")) srcs = srcs.filter(s => s.id === "occ");
+      else if (path.includes("pm-cf"))  srcs = srcs.filter(s => s.id === "pm");
+    }
+
+    setCategories(catRes.data.data ?? []);
+    setSources(srcs);
+    if (srcs.length > 0) setActiveSource(srcs[0].id);
+  }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
+}, [user]);
 
   // ── Load data for the active source whenever it or the plan changes ────────
 

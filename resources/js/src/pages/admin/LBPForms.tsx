@@ -504,12 +504,21 @@ const LBPForms: React.FC = () => {
                       onItemUpdate={fetchAll}
                     />
                   </TabsContent>
-                  <TabsContent value="3">
+                  {/* <TabsContent value="3">
                     <Form3
                       plan={selectedPlan}
                       pastYearPlan={pastYearPlan}
                       departmentId={selectedPlan.dept_id}
                       isEditable={false}
+                    />
+                  </TabsContent> */}
+                  <TabsContent value="3">
+                    <Form3
+                      plan={selectedPlan}
+                      pastYearPlan={pastYearPlan}
+                      departmentId={selectedPlan.dept_id}
+                      isEditable={isAdmin}   // keep as-is or true — only matters for canDelete
+                      isAdmin={isAdmin}      // ← ADD THIS
                     />
                   </TabsContent>
                   <TabsContent value="4">

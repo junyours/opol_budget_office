@@ -769,30 +769,30 @@ useEffect(() => {
 
       
                   <AlertDialog open={!!deleteItem} onOpenChange={open => { if (!open) setDeleteItem(null); }}>
-  <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200 gap-4">
-    <AlertDialogHeader>
-      <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
-        Remove item?
-      </AlertDialogTitle>
-      <AlertDialogDescription className="text-sm text-zinc-500">
-        <span className="font-medium text-gray-700">"{deleteItem?.description}"</span>
-        {" "}will be permanently deleted from this fund source.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel asChild>
-        <Button variant="outline" size="sm" className="rounded-lg border-gray-200 text-gray-700">
-          Cancel
-        </Button>
-      </AlertDialogCancel>
-      <AlertDialogAction asChild>
-        <Button size="sm" className="rounded-lg bg-red-600 hover:bg-red-700" onClick={confirmDelete}>
-          Delete
-        </Button>
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+                    <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200 gap-4">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+                          Remove item?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm text-zinc-500">
+                          <span className="font-medium text-gray-700">"{deleteItem?.description}"</span>
+                          {" "}will be permanently deleted from this fund source.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel asChild>
+                          <Button variant="outline" size="sm" className="rounded-lg border-gray-200 text-gray-700">
+                            Cancel
+                          </Button>
+                        </AlertDialogCancel>
+                        <AlertDialogAction asChild>
+                          <Button size="sm" className="rounded-lg bg-red-600 hover:bg-red-700" onClick={confirmDelete}>
+                            Delete
+                          </Button>
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
     </div>
   );
 }

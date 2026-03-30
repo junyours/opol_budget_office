@@ -429,4 +429,20 @@ class DepartmentBudgetPlanController extends BaseApiController
             'count'   => count($validated['assignments']),
         ]);
     }
+
+    public function destroyPlantillaAssignment(
+    DepartmentBudgetPlan $budget_plan,
+    BudgetPlanForm3Assignment $assignment
+) {
+    $this->authorize('update', $budget_plan);
+
+    if ($assignment->dept_budget_plan_id !== $budget_plan->dept_budget_plan_id) {
+        return response()->json(['message' => 'Assignment does not belong to this plan.'], 403);
+    }
+
+    $assignment->delete();
+
+    return $this->success(['message' => 'Assignment removed from snapshot.']);
+}
+
 }

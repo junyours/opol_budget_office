@@ -104,9 +104,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('department-budget-plans/{budget_plan}/plantilla-assignments/bulk',  [DepartmentBudgetPlanController::class, 'bulkSavePlantillaAssignments']);
 
     Route::delete(
-    'department-budget-plans/{budget_plan}/plantilla-assignments/{assignment}',
-    [DepartmentBudgetPlanController::class, 'destroyPlantillaAssignment']
-);
+        'department-budget-plans/{budget_plan}/plantilla-assignments/{assignment}',
+        [DepartmentBudgetPlanController::class, 'destroyPlantillaAssignment']
+    );
     // ── Form 4 / AIP ──────────────────────────────────────────────────────────
     Route::apiResource('form4-items', BudgetPlanForm4ItemController::class);
     Route::get('/aip-programs', [AipProgramController::class, 'index']);

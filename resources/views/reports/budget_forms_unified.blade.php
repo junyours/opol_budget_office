@@ -59,13 +59,13 @@ body {
 .page            { width: 100%; page-break-after: always; }
 .page:last-child { page-break-after: avoid; }
 
-.form-no      { font-weight: bold; font-size: 7pt; margin-bottom: 2px; }
+.form-no      { font-weight: bold; font-size: 6.5pt; margin-bottom: 2px; }
 .doc-title    { text-align: center; font-weight: bold; font-size: 8pt;
                 text-transform: uppercase; line-height: 1.4; margin-bottom: 2px; }
-.fund-label   { text-align: center; font-size: 7pt; font-weight: bold; margin-bottom: 3px; }
-.office-label { text-align: center; font-size: 7pt; font-weight: bold; margin-bottom: 3px; }
-.lgu-line     { text-align: center; font-size: 7pt; font-weight: bold; margin-bottom: 1px; }
-.cy-line      { text-align: center; font-size: 7pt; margin-bottom: 5px; }
+.fund-label   { text-align: center; font-size: 6.5pt; font-weight: bold; margin-bottom: 3px; }
+.office-label { text-align: center; font-size: 6.5pt; font-weight: bold; margin-bottom: 3px; }
+.lgu-line     { text-align: center; font-size: 6.5pt; font-weight: bold; margin-bottom: 1px; }
+.cy-line      { text-align: center; font-size: 6.5pt; margin-bottom: 5px; }
 
 /* ═══════════════════════════════════════════════════════
    UNIFIED DATA TABLE  (Forms 1–4)
@@ -73,7 +73,7 @@ body {
 table.data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 7pt;
+    font-size: 6.5pt;
     table-layout: fixed;
 }
 table.data-table th,
@@ -128,7 +128,7 @@ table.form5-table td.l { text-align: left; }
 table.mmv-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 7pt;
+    font-size: 6.5pt;
     margin-bottom: 4px;
 }
 table.mmv-table td {
@@ -158,11 +158,11 @@ table.sig-plain {
     width: 100%;
     border-collapse: collapse;
     margin-top: 12px;
-    font-size: 7pt;
+    font-size: 6.5pt;
 }
 table.sig-plain td { border: none; vertical-align: bottom; padding: 0 4px; }
 
-.sig-name  { font-weight: bold; font-size: 7pt; margin-top: 28px; display: block; }
+.sig-name  { font-weight: bold; font-size: 6.5pt; margin-top: 28px; display: block; }
 .sig-title { font-size: 6.5pt; display: block; }
 
 
@@ -333,9 +333,8 @@ if (count($aipRows) > 0)
                     'totalLabel'=>'Total - Spcl Prpse Apprprtns, (SPA)'];
 
 $mooeItems = $mooeGroup['items'] ?? [];
-$mooeChunk = 30;
 
-/* Repeated header macro helper */
+/* Repeated header macro helper — used on continuation pages */
 $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     return '
     <tr>
@@ -352,6 +351,34 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     </tr>
     <tr class="col-num"><td>(1)</td><td>(2)</td><td>(3)</td><td>(4)</td><td>(5)</td><td>(6)</td><td>(7)</td></tr>
     ';
+};
+
+/*
+ * GLOBAL ROW COUNTER — tracks rows on the current page across ALL sections.
+ * Each data row = 1, sec-hdr = 1, subtotal = 1, repeated thead = 3.
+ * When count + next row would exceed PAGE_ROWS, break page first.
+ */
+$PAGE_ROWS    = 40;
+$pageRowCount = 0;
+
+$maybeBreak = function(
+    int $cost,
+    ?string $continueLabel
+) use (
+    &$pageRowCount, $PAGE_ROWS, $rptHead
+): string {
+    $out = '';
+    if ($pageRowCount + $cost > $PAGE_ROWS && $pageRowCount > 0) {
+        $out .= '</tbody></table></div>';
+        $out .= '<div class="page">';
+        $out .= '<table class="data-table"><thead>' . $rptHead() . '</thead><tbody>';
+        $pageRowCount = 3; // thead = 3 rows
+        if ($continueLabel !== null) {
+            $out .= '<tr class="sec-hdr"><td colspan="7">' . $continueLabel . '</td></tr>';
+            $pageRowCount += 1;
+        }
+    }
+    return $out;
 };
 @endphp
 
@@ -381,6 +408,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 </tr>
 </thead>
 <tbody>
+@php $pageRowCount = 3; /* thead costs 3 rows */ @endphp
 
 {{-- INCOME ROWS --}}
 @foreach($income as $row)
@@ -388,6 +416,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     $isSub = (bool)($row['is_subtotal'] ?? false);
     $ind   = str_repeat('&nbsp;&nbsp;&nbsp;', max(0, (int)$row['level']));
     $fmtFn = $isSub ? $pesoA : $peso;
+    $pageRowCount++;
 @endphp
 <tr class="{{ $isSub ? 'subtotal' : '' }}">
     @if($isSub)
@@ -405,6 +434,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 @endforeach
 
 {{-- Total Available Resources --}}
+@php $pageRowCount++; @endphp
 <tr class="grand">
     <td class="l" colspan="2"><strong>Total Available Resources for Appropriations</strong></td>
     <td class="r">{!! $pesoA($grandIncome['past_total']) !!}</td>
@@ -414,16 +444,17 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     <td class="r">{!! $pesoA($grandIncome['proposed']) !!}</td>
 </tr>
 
-{{-- EXPENDITURE CLASSIFICATION GROUPS --}}
+{{-- EXPENDITURE CLASSIFICATION GROUPS — global row counter across all sections --}}
 @foreach($clsGroups as $cls)
 @php $type = $cls['type']; $grp = $cls['grp']; @endphp
 
-{{-- Repeated column header --}}
-{!! $rptHead() !!}
+{{-- Section header: maybeBreak only inserts a new page+thead if the page is full --}}
+@php echo $maybeBreak(3, null); $pageRowCount++; @endphp
 <tr class="sec-hdr"><td colspan="7">{!! $cls['label'] !!}</td></tr>
 
 @if($type === 'ps')
 @foreach($grp['items'] as $item)
+@php echo $maybeBreak(1, 'Personal Services, (PS) — continued'); $pageRowCount++; @endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
@@ -434,6 +465,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     <td class="r">{!! $peso($item['proposed']) !!}</td>
 </tr>
 @endforeach
+@php echo $maybeBreak(1, 'Personal Services, (PS) — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total Personal Services</td>
     <td class="r">{!! $pesoA($psSub['past_total']) !!}</td>
@@ -446,33 +478,20 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 
 @if($type === 'mooe')
 @php $mooeRunning = array_fill_keys($fields5, 0.0); @endphp
-@foreach($mooeItems as $i => $item)
-    @php $isLastMooe = ($i === count($mooeItems) - 1); @endphp
-    @if($i > 0 && $i % $mooeChunk === 0)
-    <tr class="subtotal">
-        <td class="l" colspan="2">Total MOOE of this page</td>
-        <td class="r">{!! $pesoA($mooeRunning['past_total']) !!}</td>
-        <td class="r">{!! $pesoA($mooeRunning['current_sem1']) !!}</td>
-        <td class="r">{!! $pesoA($mooeRunning['current_sem2']) !!}</td>
-        <td class="r">{!! $pesoA($mooeRunning['current_total']) !!}</td>
-        <td class="r">{!! $pesoA($mooeRunning['proposed']) !!}</td>
-    </tr>
-    @if(!$isLastMooe)
-    {!! $rptHead() !!}
-    <tr class="sec-hdr"><td colspan="7">Maint. &amp; Other Operating Expenditures, (MOOE) — continued</td></tr>
-    @endif
-    @endif
-    <tr>
-        <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
-        <td class="c">{{ $item['account_code'] }}</td>
-        <td class="r">{!! $peso($item['past_total']) !!}</td>
-        <td class="r">{!! $peso($item['current_sem1']) !!}</td>
-        <td class="r">{!! $peso($item['current_sem2']) !!}</td>
-        <td class="r">{!! $peso($item['current_total']) !!}</td>
-        <td class="r">{!! $peso($item['proposed']) !!}</td>
-    </tr>
-    @php foreach($fields5 as $f) $mooeRunning[$f] += (float)$item[$f]; @endphp
+@foreach($mooeItems as $item)
+@php echo $maybeBreak(1, 'Maint. &amp; Other Operating Expenditures, (MOOE) — continued'); $pageRowCount++; @endphp
+<tr>
+    <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
+    <td class="c">{{ $item['account_code'] }}</td>
+    <td class="r">{!! $peso($item['past_total']) !!}</td>
+    <td class="r">{!! $peso($item['current_sem1']) !!}</td>
+    <td class="r">{!! $peso($item['current_sem2']) !!}</td>
+    <td class="r">{!! $peso($item['current_total']) !!}</td>
+    <td class="r">{!! $peso($item['proposed']) !!}</td>
+</tr>
+@php foreach($fields5 as $f) $mooeRunning[$f] += (float)$item[$f]; @endphp
 @endforeach
+@php echo $maybeBreak(1, 'Maint. &amp; Other Operating Expenditures, (MOOE) — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total MOOE</td>
     <td class="r">{!! $pesoA($mooeSub['past_total']) !!}</td>
@@ -485,6 +504,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 
 @if($type === 'co')
 @foreach($grp['items'] as $item)
+@php echo $maybeBreak(1, 'Capital Outlay (C.O.) — continued'); $pageRowCount++; @endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
@@ -495,6 +515,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     <td class="r">{!! $peso($item['proposed']) !!}</td>
 </tr>
 @endforeach
+@php echo $maybeBreak(1, 'Capital Outlay (C.O.) — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total Capital Outlay</td>
     <td class="r">{!! $pesoA($coSub['past_total']) !!}</td>
@@ -508,6 +529,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 @if($type === 'other')
 @php $otherSub = $subTotals($grp); @endphp
 @foreach($grp['items'] as $item)
+@php echo $maybeBreak(1, e($grp['class_name']).' — continued'); $pageRowCount++; @endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
@@ -518,6 +540,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     <td class="r">{!! $peso($item['proposed']) !!}</td>
 </tr>
 @endforeach
+@php echo $maybeBreak(1, e($grp['class_name']).' — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total {{ $grp['class_name'] }}</td>
     <td class="r">{!! $pesoA($otherSub['past_total']) !!}</td>
@@ -530,23 +553,10 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 
 @if($type === 'mdf')
 @php $mdfRunning = array_fill_keys($fields5, 0.0); @endphp
+@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
 <tr><td class="l" colspan="7" style="font-style:italic;padding-left:8pt;font-size:6.5pt;">&nbsp;&nbsp;20% MDF (Unapprop. Bal.)</td></tr>
-@foreach($allMdfLines as $mi => $mline)
-    @php $isLastMdf = ($mi === count($allMdfLines) - 1); @endphp
-    @if($mi > 0 && $mi % 30 === 0)
-    <tr class="subtotal">
-        <td class="l" colspan="2">Total Budgetary &amp; Statutory Reqts. of this page</td>
-        <td class="r">{!! $pesoA($mdfRunning['past_total']) !!}</td>
-        <td class="r">{!! $pesoA($mdfRunning['current_sem1']) !!}</td>
-        <td class="r">{!! $pesoA($mdfRunning['current_sem2']) !!}</td>
-        <td class="r">{!! $pesoA($mdfRunning['current_total']) !!}</td>
-        <td class="r">{!! $pesoA($mdfRunning['proposed']) !!}</td>
-    </tr>
-    @if(!$isLastMdf)
-    {!! $rptHead() !!}
-    <tr class="sec-hdr"><td colspan="7">Budgetary &amp; Statutory Requirements — continued</td></tr>
-    @endif
-    @endif
+@foreach($allMdfLines as $mline)
+@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
     @if($mline['kind'] === 'debt-interest')
     <tr>
         <td class="l" style="padding-left:20pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ $mline['display_name'] }}</td>
@@ -572,6 +582,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 @endforeach
 
 @foreach($ldrrmfRows as $lr)
+@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
 <tr>
     @if($lr['kind'] === 'ldrrmf-70')
     <td class="l" style="padding-left:28pt;">&nbsp;&nbsp;&nbsp;{{ $lr['name'] }}</td>
@@ -586,7 +597,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
     <td class="r">{!! $peso($lr['proposed']) !!}</td>
 </tr>
 @endforeach
-
+@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total Budgetary &amp; Statutory Requirements (20% MDF)</td>
     <td class="r">{!! $pesoA($mdfGrand['past_total']) !!}</td>
@@ -599,33 +610,20 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
 
 @if($type === 'aip')
 @php $aipRunning = array_fill_keys($fields5, 0.0); @endphp
-@foreach($aipRows as $ai => $aip)
-    @php $isLastAip = ($ai === count($aipRows) - 1); @endphp
-    @if($ai > 0 && $ai % 30 === 0)
-    <tr class="subtotal">
-        <td class="l" colspan="2">Total Special Purpose Appropriations of this page</td>
-        <td class="r">{!! $pesoA($aipRunning['past_total']) !!}</td>
-        <td class="r">{!! $pesoA($aipRunning['current_sem1']) !!}</td>
-        <td class="r">{!! $pesoA($aipRunning['current_sem2']) !!}</td>
-        <td class="r">{!! $pesoA($aipRunning['current_total']) !!}</td>
-        <td class="r">{!! $pesoA($aipRunning['proposed']) !!}</td>
-    </tr>
-    @if(!$isLastAip)
-    {!! $rptHead() !!}
-    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations — continued</td></tr>
-    @endif
-    @endif
-    <tr>
-        <td class="l">&nbsp;&nbsp;&nbsp;{{ $aip['program_description'] }}</td>
-        <td class="c">{{ $aip['aip_reference_code'] }}</td>
-        <td class="r">{!! $peso($aip['past_total']) !!}</td>
-        <td class="r">{!! $peso($aip['current_sem1']) !!}</td>
-        <td class="r">{!! $peso($aip['current_sem2']) !!}</td>
-        <td class="r">{!! $peso($aip['current_total']) !!}</td>
-        <td class="r">{!! $peso($aip['proposed']) !!}</td>
-    </tr>
-    @php foreach($fields5 as $f) $aipRunning[$f] += (float)$aip[$f]; @endphp
+@foreach($aipRows as $aip)
+@php echo $maybeBreak(1, 'Special Purpose Appropriations — continued'); $pageRowCount++; @endphp
+<tr>
+    <td class="l">&nbsp;&nbsp;&nbsp;{{ $aip['program_description'] }}</td>
+    <td class="c">{{ $aip['aip_reference_code'] }}</td>
+    <td class="r">{!! $peso($aip['past_total']) !!}</td>
+    <td class="r">{!! $peso($aip['current_sem1']) !!}</td>
+    <td class="r">{!! $peso($aip['current_sem2']) !!}</td>
+    <td class="r">{!! $peso($aip['current_total']) !!}</td>
+    <td class="r">{!! $peso($aip['proposed']) !!}</td>
+</tr>
+@php foreach($fields5 as $f) $aipRunning[$f] += (float)$aip[$f]; @endphp
 @endforeach
+@php echo $maybeBreak(1, 'Special Purpose Appropriations — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
     <td class="l" colspan="2">Total - Spcl Prpse Apprprtns, (SPA)</td>
     <td class="r">{!! $pesoA($aipGrand['past_total']) !!}</td>
@@ -789,9 +787,42 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     </thead>
     <tbody>
 
+    @php
+    $f2Head = function() use ($pastYear, $currentYear, $proposedYear): string {
+        return '
+        <tr>
+            <th rowspan="2">Object of Expenditures</th>
+            <th rowspan="2" width="10%">Account Code</th>
+            <th rowspan="2" width="12%">Past Year<br>(Actual)<br>'.$pastYear.'</th>
+            <th colspan="3">Current Year (Estimate) '.$currentYear.'</th>
+            <th rowspan="2" width="12%">'.$proposedYear.'<br>Budget Year<br>(Proposed)</th>
+        </tr>
+        <tr>
+            <th width="9%">1st Semester<br>(Actual)</th>
+            <th width="9%">2nd Semester<br>(Estimate)</th>
+            <th width="9%">Total</th>
+        </tr>
+        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+        ';
+    };
+    @endphp
+
     @if(count($psItems) > 0)
+    @php $psC = array_chunk($psItems, 30); $psCT = count($psC); @endphp
+    @foreach($psC as $psCI => $psCK)
+    @if($psCI > 0)
+    </tbody></table></div>{{-- end page --}}
+    <div class="page">
+    <div class="form-no">LBP Form No. 2</div>
+    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
+    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
+    <table class="data-table" style="width:100%; table-layout:fixed;">
+    <thead>{!! $f2Head() !!}</thead><tbody>
+    <tr class="sec-hdr"><td colspan="7">Personal Services (PS) — continued</td></tr>
+    @else
     <tr class="sec-hdr"><td colspan="7">Personal Services (PS)</td></tr>
-    @foreach($psItems as $item)
+    @endif
+    @foreach($psCK as $item)
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -802,6 +833,7 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $pesoA($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+    @if($psCI === $psCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total Personal Services</td>
         <td class="r">{!! $pesoA($sumCol($psItems,'past_total')) !!}</td>
@@ -811,23 +843,46 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $pesoA($psProp) !!}</td>
     </tr>
     @endif
+    @endforeach
+    @endif
 
     @if(count($mooeItems) > 0)
-    <tr>
-        <th rowspan="2" width="28%" style="text-align:center;font-weight:bold;font-size:7pt;">Object of Expenditures</th>
-        <th rowspan="2" width="10%" style="text-align:center;font-weight:bold;font-size:7pt;">Account Code</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Past Year<br>(Actual)</th>
-        <th colspan="3" style="text-align:center;font-weight:bold;font-size:7pt;">Current Year (Estimate)</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Budget Year<br>(Proposed)</th>
-    </tr>
-    <tr>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">1st Semester<br>(Actual)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">2nd Semester<br>(Estimate)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">Total</th>
-    </tr>
-    <tr class="col-num"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+    @php $mooeC = array_chunk($mooeItems, 15); $mooeCT = count($mooeC); @endphp
+    @foreach($mooeC as $mooeCI => $mooeCK)
+    @if($mooeCI > 0)
+    </tbody></table></div>{{-- end page --}}
+    <div class="page">
+    <table class="data-table" style="width:100%; table-layout:fixed;">
+    <thead>
+        <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:30%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+        </tr>
+        <tr>
+            <th rowspan="2">Object of Expenditures</th>
+            <th rowspan="2" width="10%">Account Code</th>
+            <th rowspan="2" width="12%">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
+            <th colspan="3">Current Year (Estimate) {{ $currentYear }}</th>
+            <th rowspan="2" width="12%">{{ $proposedYear }}<br>Budget Year<br>(Proposed)</th>
+        </tr>
+        <tr>
+            <th width="9%">1st Semester<br>(Actual)</th>
+            <th width="9%">2nd Semester<br>(Estimate)</th>
+            <th width="9%">Total</th>
+        </tr>
+        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+    </thead>
+    <tr class="sec-hdr"><td colspan="7">Maintenance &amp; Other Operating Expenditures (MOOE) — continued</td></tr>
+    @else
+    {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Maintenance &amp; Other Operating Expenditures (MOOE)</td></tr>
-    @foreach($mooeItems as $item)
+    @endif
+    @foreach($mooeCK as $item)
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -838,6 +893,7 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $num($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+    @if($mooeCI === $mooeCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total MOOE</td>
         <td class="r">{!! $pesoA($sumCol($mooeItems,'past_total')) !!}</td>
@@ -847,23 +903,26 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $pesoA($mooeProp) !!}</td>
     </tr>
     @endif
+    @endforeach
+    @endif
 
     @if(count($spItems) > 0)
-    <tr>
-        <th rowspan="2" width="28%" style="text-align:center;font-weight:bold;font-size:7pt;">Object of Expenditures</th>
-        <th rowspan="2" width="10%" style="text-align:center;font-weight:bold;font-size:7pt;">Account Code</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Past Year<br>(Actual)</th>
-        <th colspan="3" style="text-align:center;font-weight:bold;font-size:7pt;">Current Year (Estimate)</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Budget Year<br>(Proposed)</th>
-    </tr>
-    <tr>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">1st Semester<br>(Actual)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">2nd Semester<br>(Estimate)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">Total</th>
-    </tr>
-    <tr class="col-num"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+    @php $spC = array_chunk($spItems, 30); $spCT = count($spC); @endphp
+    @foreach($spC as $spCI => $spCK)
+    @if($spCI > 0)
+    </tbody></table></div>{{-- end page --}}
+    <div class="page">
+    <div class="form-no">LBP Form No. 2</div>
+    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
+    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
+    <table class="data-table" style="width:100%; table-layout:fixed;">
+    <thead>{!! $f2Head() !!}</thead><tbody>
+    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations / Programs — continued</td></tr>
+    @else
+    {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations / Programs</td></tr>
-    @foreach($spItems as $sp)
+    @endif
+    @foreach($spCK as $sp)
     <tr>
         <td class="l">{{ $sp['program_description'] }}</td>
         <td class="c">{{ $sp['aip_reference_code'] ?? '' }}</td>
@@ -874,6 +933,7 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $sp['proposed']      > 0 ? $num($sp['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+    @if($spCI === $spCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Sub-Total for Spcl Prog/Prcts</td>
         <td class="r">{!! $pesoA($sumCol($spItems,'past_total')) !!}</td>
@@ -883,23 +943,26 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $pesoA($spProp) !!}</td>
     </tr>
     @endif
+    @endforeach
+    @endif
 
     @if(count($capItems) > 0)
-    <tr>
-        <th rowspan="2" width="28%" style="text-align:center;font-weight:bold;font-size:7pt;">Object of Expenditures</th>
-        <th rowspan="2" width="10%" style="text-align:center;font-weight:bold;font-size:7pt;">Account Code</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Past Year<br>(Actual)</th>
-        <th colspan="3" style="text-align:center;font-weight:bold;font-size:7pt;">Current Year (Estimate)</th>
-        <th rowspan="2" width="12%" style="text-align:center;font-weight:bold;font-size:7pt;">Budget Year<br>(Proposed)</th>
-    </tr>
-    <tr>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">1st Semester<br>(Actual)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">2nd Semester<br>(Estimate)</th>
-        <th width="9%" style="text-align:center;font-weight:bold;font-size:7pt;">Total</th>
-    </tr>
-    <tr class="col-num"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+    @php $capC = array_chunk($capItems, 30); $capCT = count($capC); @endphp
+    @foreach($capC as $capCI => $capCK)
+    @if($capCI > 0)
+    </tbody></table></div>{{-- end page --}}
+    <div class="page">
+    <div class="form-no">LBP Form No. 2</div>
+    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
+    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
+    <table class="data-table" style="width:100%; table-layout:fixed;">
+    <thead>{!! $f2Head() !!}</thead><tbody>
+    <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt — continued</td></tr>
+    @else
+    {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt</td></tr>
-    @foreach($capItems as $item)
+    @endif
+    @foreach($capCK as $item)
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -910,6 +973,7 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $num($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+    @if($capCI === $capCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total Prop/Plant/Eqpt</td>
         <td class="r">{!! $pesoA($sumCol($capItems,'past_total')) !!}</td>
@@ -918,6 +982,8 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $pesoA($sumCol($capItems,'current_total')) !!}</td>
         <td class="r">{!! $pesoA($capProp) !!}</td>
     </tr>
+    @endif
+    @endforeach
     @endif
 
     <tr class="grand-total">
@@ -1110,9 +1176,9 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
 <div class="page">
 
 {{-- ── Header: form number INSIDE the outer border ── --}}
-<table style="width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:0;">
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-bottom:0;">
   <tr>
-    <td style="border:1px solid #000;border-bottom:none;padding:3px 6px;font-weight:bold;font-size:7pt;">
+    <td style="border:1px solid #000;border-bottom:none;padding:3px 6px;font-weight:bold;font-size:6.5pt;">
       LBP Form No. 4
     </td>
   </tr>
@@ -1120,7 +1186,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
 
 @if($isFirst4)
 {{-- ── MMV block: no vertical border between label and text ── --}}
-<table style="width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:0;">
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-bottom:0;">
   {{-- Mandate — only this row changes per department --}}
   <tr>
     <td style="border:1px solid #000;border-top:none;border-bottom:none;border-right:none;
@@ -1178,13 +1244,13 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:18;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:9%;padding:0;border:none;"></td>
             <td style="width:12%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
             <th rowspan="2">AIP Reference Code</th>
@@ -1200,7 +1266,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
     <tbody>
     @forelse($pageRows4 as $row4)
     <tr>
-        <td class="c">{{ $row4['aip_reference_code'] ?? '' }}</td>
+        <td class="c" style="font-size: 5.5pt;">{{ $row4['aip_reference_code'] ?? '' }}</td>
         <td>{{ $row4['program_description'] ?? '' }}</td>
         <td class="c">{{ $row4['major_final_output'] ?? 'Imprvd Svcs' }}</td>
         <td>{{ $row4['performance_indicator'] ?? '' }}</td>
@@ -1221,7 +1287,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
             <td class="r">{!! $pesoInt($grandPS) !!}</td>
             <td class="r">{!! $pesoInt($grandMOOE) !!}</td>
             <td class="r">{!! $pesoInt($grandCO) !!}</td>
-            <td class="r">{!! $pesoInt($grandAmt4) !!}</td>
+            <td class="r" style="font-size: 6pt;">{!! $pesoInt($grandAmt4) !!}</td>
         </tr>
     </tfoot>
     @endif
@@ -2674,18 +2740,76 @@ $summary    = $cal5['summary'];
   </thead>
   <tbody>
 
-  @foreach($categories as $cat)
   @php
-    $items = $cat['items'];
+  $rowsPerPage5 = 30;
+  @endphp
+
+  @foreach($categories as $catIdx => $cat)
+  @php
+    $items    = $cat['items'];
     $subMOOE  = $cat['subtotal_mooe'];
     $subCO    = $cat['subtotal_co'];
     $subTotal = $cat['subtotal_total'];
+    $catChunks      = array_chunk($items, $rowsPerPage5);
+    $catTotalChunks = count($catChunks);
   @endphp
 
-  @foreach($items as $idx => $item)
+  @foreach($catChunks as $catChunkIdx => $catChunk)
+  @if($catChunkIdx > 0)
+  {{-- Close previous table/page and open new one with repeated header --}}
+  </tbody>
+  </table>
+  </div>{{-- end .page --}}
+  <div class="page">
+  <div class="doc-title" style="margin-bottom:1px;">LOCAL DISASTER RISK REDUCTION &amp; MANAGEMENT FUND INVESTMENT PLAN ( LDRRMFIP )</div>
+  <div class="doc-title" style="margin-bottom:1px;">5% Calamity Fund ({{ $label }}) JANUARY TO DECEMBER {{ $year }}</div>
+  <div class="doc-title" style="margin-bottom:4px;">{{ $lgu }}</div>
+  <table class="form5-table" style="font-size:6.5pt;">
+    <thead>
+      <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+        <td style="width:18%;padding:0;border:none;"></td>
+        <td style="width:26%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:16%;padding:0;border:none;"></td>
+        <td style="width:5%;padding:0;border:none;"></td>
+        <td style="width:7%;padding:0;border:none;"></td>
+        <td style="width:7%;padding:0;border:none;"></td>
+        <td style="width:6%;padding:0;border:none;"></td>
+      </tr>
+      <tr>
+        <th rowspan="2">Functional Classification</th>
+        <th rowspan="2">Program/Project/Activity Code and Description</th>
+        <th rowspan="2">Implementing Office</th>
+        <th colspan="2">Schedule of Implementation</th>
+        <th rowspan="2">Expected Output</th>
+        <th rowspan="2">Funding Source</th>
+        <th colspan="3">Amount of Appropriation</th>
+      </tr>
+      <tr>
+        <th>Starting Date</th>
+        <th>Completion Date</th>
+        <th>MOOE</th>
+        <th>CO</th>
+        <th>TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+  @endif
+
+  @foreach($catChunk as $idx => $item)
+  @php $isFirstRowOfChunk = ($idx === 0); @endphp
   <tr>
-    @if($idx === 0)
-    <td class="l" rowspan="{{ count($items) }}" style="font-weight:bold;vertical-align:top;">{{ strtoupper($cat['name']) }}</td>
+    {{-- Never use rowspan — it breaks when the category spans a page/table boundary.
+         Instead emit the category label on the first row and a blank bordered cell
+         for the rest, so every row always has exactly 10 cells. --}}
+    @if($isFirstRowOfChunk)
+      <td class="l" style="font-weight:bold;vertical-align:top;">
+        {{ strtoupper($cat['name']) }}{{ $catChunkIdx > 0 ? ' (cont.)' : '' }}
+      </td>
+    @else
+      <td style="border-top:none;border-bottom:none;"></td>
     @endif
     <td class="l">{{ $item['description'] }}</td>
     <td class="c">{{ $item['implementing_office'] }}</td>
@@ -2699,14 +2823,17 @@ $summary    = $cal5['summary'];
   </tr>
   @endforeach
 
-  {{-- Sub Total row --}}
+  {{-- Sub Total only on the last chunk of each category --}}
+  @if($catChunkIdx === $catTotalChunks - 1)
   <tr style="font-weight:bold;">
     <td class="r" colspan="7" style="font-weight:bold;">Sub Total</td>
     <td class="r">@if($subMOOE  > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subMOOE,0)  }}@endif</td>
     <td class="r">@if($subCO    > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subCO,0)    }}@endif</td>
     <td class="r">@if($subTotal > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subTotal,0) }}@endif</td>
   </tr>
+  @endif
 
+  @endforeach {{-- catChunks --}}
   @endforeach {{-- categories --}}
 
   </tbody>

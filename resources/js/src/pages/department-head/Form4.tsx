@@ -52,15 +52,29 @@ const EMPTY_FORM = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// const fmtCurrency = (v: number) => {
+//   if (typeof v !== 'number' || isNaN(v)) return '₱0.00';
+//   return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// };
 const fmtCurrency = (v: number) => {
-  if (typeof v !== 'number' || isNaN(v)) return '₱0.00';
-  return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (typeof v !== 'number' || isNaN(v)) return '₱0';
+  return `₱${Math.round(v).toLocaleString('en-PH')}`;
 };
 
-const TH = 'border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left';
-const TH_R = 'border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-right';
-const TD = 'px-3 py-2.5 text-[12px] text-gray-700';
-const TD_MONO = 'px-3 py-2.5 text-[12px] font-mono tabular-nums text-right text-gray-700';
+const fmtAmount = (v: number) => {
+  if (!v || v === 0) return '–';
+  return `₱${Math.round(v).toLocaleString('en-PH')}`;
+};
+
+// const TH = 'border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left';
+// const TH_R = 'border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-right';
+// const TD = 'px-3 py-2.5 text-[12px] text-gray-700';
+// const TD_MONO = 'px-3 py-2.5 text-[12px] font-mono tabular-nums text-right text-gray-700';
+
+const TH_R = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-right whitespace-nowrap';
+const TH   = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap';
+const TD      = 'px-4 py-3 text-[12px] text-gray-700';
+const TD_MONO = 'px-4 py-3 text-[12px] font-mono tabular-nums text-right text-gray-700';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -173,9 +187,19 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const { name, value } = e.target;
+  //   setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+  // };
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+    // Strip commas, allow only digits
+    const raw = value.replace(/,/g, '').replace(/[^\d]/g, '');
+    setFormData(prev => ({ ...prev, [name]: raw === '' ? 0 : parseInt(raw, 10) }));
+  };
+  const formatAmountDisplay = (val: number): string => {
+    if (val === 0) return '';
+    return Math.round(val).toLocaleString('en-PH');
   };
 
   // ── Save / Delete ─────────────────────────────────────────────────────────
@@ -249,7 +273,7 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
 
       {/* Main table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px] border-collapse" style={{ minWidth: 900 }}>
+        <table className="w-full text-[12px] border-collapse" style={{ minWidth: 1100 }}>
           <thead>
             <tr>
               <th className={TH}>AIP Ref. Code</th>
@@ -276,10 +300,14 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
                 <td className={TD}>{item.major_final_output || '–'}</td>
                 <td className={TD}>{item.performance_indicator || '–'}</td>
                 <td className={TD}>{item.target || '–'}</td>
-                <td className={TD_MONO}>{fmtCurrency(item.ps_amount)}</td>
+                {/* <td className={TD_MONO}>{fmtCurrency(item.ps_amount)}</td>
                 <td className={TD_MONO}>{fmtCurrency(item.mooe_amount)}</td>
                 <td className={TD_MONO}>{fmtCurrency(item.co_amount)}</td>
-                <td className={cn(TD_MONO, 'font-semibold')}>{fmtCurrency(item.total_amount)}</td>
+                <td className={cn(TD_MONO, 'font-semibold')}>{fmtCurrency(item.total_amount)}</td> */}
+                <td className={TD_MONO}>{fmtAmount(item.ps_amount)}</td>
+                <td className={TD_MONO}>{fmtAmount(item.mooe_amount)}</td>
+                <td className={TD_MONO}>{fmtAmount(item.co_amount)}</td>
+                <td className={cn(TD_MONO, 'font-semibold')}>{fmtAmount(item.total_amount)}</td>
                 {isEditable && (
                   <td className="px-2 py-2 text-right">
                     <DropdownMenu>
@@ -533,7 +561,7 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
                 </div>
 
                 {/* PS / MOOE / CO */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* <div className="grid grid-cols-3 gap-3">
                   {(['ps_amount', 'mooe_amount', 'co_amount'] as const).map(field => (
                     <div key={field} className="space-y-1.5">
                       <Label className="text-xs font-semibold text-gray-600">
@@ -542,6 +570,25 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
                       <Input id={field} name={field} type="number" min="0" step="0.01"
                         value={(formData as any)[field]} onChange={handleNumberChange}
                         className="h-9 text-sm text-right font-mono border-gray-200" />
+                    </div>
+                  ))}
+                </div> */}
+                {/* PS / MOOE / CO */}
+                <div className="grid grid-cols-3 gap-3">
+                  {(['ps_amount', 'mooe_amount', 'co_amount'] as const).map(field => (
+                    <div key={field} className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-gray-600">
+                        {field === 'ps_amount' ? 'PS' : field === 'mooe_amount' ? 'MOOE' : 'CO'}
+                      </Label>
+                      <Input
+                        name={field}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatAmountDisplay((formData as any)[field])}
+                        onChange={handleAmountChange}
+                        placeholder="0"
+                        className="h-9 text-sm text-right font-mono border-gray-200"
+                      />
                     </div>
                   ))}
                 </div>

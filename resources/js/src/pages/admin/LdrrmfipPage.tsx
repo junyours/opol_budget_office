@@ -19,6 +19,12 @@ import { cn } from "@/src/lib/utils";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useAuth } from "@/src/hooks/useAuth";
+import { LdrrmfipUpload } from "@/src/components/ldrrmfip/LdrrmfipUpload";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FundSource {
@@ -231,6 +237,8 @@ export default function LdrrmfipPage() {
   const [form,       setForm]       = useState({ ...EMPTY_FORM });
   const [saving,     setSaving]     = useState(false);
 
+  const [deleteItem, setDeleteItem] = useState<LdrrmfipItem | null>(null);
+
   const activePlanId = activePlan?.budget_plan_id ?? null;
 
   // ── Load sources + categories once ────────────────────────────────────────
@@ -360,14 +368,30 @@ useEffect(() => {
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
-  const handleDelete = async (item: LdrrmfipItem) => {
-    if (!confirm(`Remove "${item.description}"?`)) return;
+  // const handleDelete = async (item: LdrrmfipItem) => {
+  //   if (!confirm(`Remove "${item.description}"?`)) return;
+  //   try {
+  //     await API.delete(`/ldrrmfip/${item.ldrrmfip_item_id}`);
+  //     toast.success("Item removed.");
+  //     fetchSource(activeSource);
+  //   } catch {
+  //     toast.error("Delete failed.");
+  //   }
+  // };
+  const handleDelete = (item: LdrrmfipItem) => {
+    setDeleteItem(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteItem) return;
     try {
-      await API.delete(`/ldrrmfip/${item.ldrrmfip_item_id}`);
+      await API.delete(`/ldrrmfip/${deleteItem.ldrrmfip_item_id}`);
       toast.success("Item removed.");
       fetchSource(activeSource);
     } catch {
       toast.error("Delete failed.");
+    } finally {
+      setDeleteItem(null);
     }
   };
 
@@ -582,7 +606,7 @@ useEffect(() => {
     <div className="p-5 space-y-4">
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <div>
+      {/* <div>
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-gray-400">
             LDRRMF Investment Plan
@@ -593,7 +617,30 @@ useEffect(() => {
         <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
           LOCAL DISASTER RISK REDUCTION & MANAGEMENT FUND INVESTMENT PLAN
         </h1>
-      </div>
+      </div> */}
+      <div className="flex items-center justify-between">
+  <div>
+    <div className="flex items-center gap-2 mb-0.5">
+      <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-gray-400">
+        LDRRMF Investment Plan
+      </span>
+      <span className="text-gray-300 text-[10px]">·</span>
+      <span className="text-[10px] font-semibold text-gray-500">CY {year}</span>
+    </div>
+    <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
+      LOCAL DISASTER RISK REDUCTION & MANAGEMENT FUND INVESTMENT PLAN
+    </h1>
+  </div>
+  {activePlanId && (
+    <LdrrmfipUpload
+      activePlanId={activePlanId}
+      activeSource={activeSource}
+      sources={sources}
+      categories={categories}
+      onSuccess={() => fetchSource(activeSource)}
+    />
+  )}
+</div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       {sources.length > 0 ? (
@@ -721,7 +768,31 @@ useEffect(() => {
       </Dialog>
 
       
-
+                  <AlertDialog open={!!deleteItem} onOpenChange={open => { if (!open) setDeleteItem(null); }}>
+  <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200 gap-4">
+    <AlertDialogHeader>
+      <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+        Remove item?
+      </AlertDialogTitle>
+      <AlertDialogDescription className="text-sm text-zinc-500">
+        <span className="font-medium text-gray-700">"{deleteItem?.description}"</span>
+        {" "}will be permanently deleted from this fund source.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel asChild>
+        <Button variant="outline" size="sm" className="rounded-lg border-gray-200 text-gray-700">
+          Cancel
+        </Button>
+      </AlertDialogCancel>
+      <AlertDialogAction asChild>
+        <Button size="sm" className="rounded-lg bg-red-600 hover:bg-red-700" onClick={confirmDelete}>
+          Delete
+        </Button>
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
     </div>
   );
 }

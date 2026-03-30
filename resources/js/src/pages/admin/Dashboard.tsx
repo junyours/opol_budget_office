@@ -1035,7 +1035,6 @@ import {
   useAllFunds,
   useMdfFund, useLdrrmfSummary, useDeptExpenditures,
   useCreateBudgetPlan,
-  useSpecialAccountExpenditures,
 } from "../../hooks/useDashboardQueries";
 
 const getInitials = (d: Department) =>
@@ -1231,20 +1230,11 @@ const AdminDashboard: React.FC = () => {
   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
-  // ── Special account AIP expenditures ──────────────────────────────────────
-  const {
-    data: specialAip,
-    isLoading: specialAipLoading,
-  } = useSpecialAccountExpenditures(planId, departments);
-
-  const specialAipSh  = specialAip?.sh       ?? 0;
-  const specialAipOcc = specialAip?.occ      ?? 0;
-  const specialAipPm  = specialAip?.pm       ?? 0;
-
-  // Combined form2 + AIP per special account
-  const shExpTotal  = exp.shExpenditure  + specialAipSh;
-  const occExpTotal = exp.occExpenditure + specialAipOcc;
-  const pmExpTotal  = exp.pmExpenditure  + specialAipPm;
+  // exp.shExpenditure / occExpenditure / pmExpenditure already include AIP
+  // (useBudgetTotals sums form2 + AIP internally), so use them directly.
+  const shExpTotal  = exp.shExpenditure;
+  const occExpTotal = exp.occExpenditure;
+  const pmExpTotal  = exp.pmExpenditure;
 
   const createPlan = useCreateBudgetPlan();
 
@@ -1271,8 +1261,7 @@ const AdminDashboard: React.FC = () => {
 
   const allocLoading = mdfLoading || ldrLoading;
 
-  // Loading state for special accounts section
-  const specialExpLoading = expLoading || specialAipLoading;
+  const specialExpLoading = expLoading;
 
   const ldrrmf30Actual = ldrrmfData?.reserved30 ?? 0;
   const ldrrmf70Actual = ldrrmfData?.total70    ?? 0;

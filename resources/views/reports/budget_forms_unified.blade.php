@@ -23,9 +23,9 @@
    PAGE SIZE + MARGINS
 ═══════════════════════════════════════════════════════ */
 @if(isset($mode) && ($mode === 'form5' || $mode === 'calamity5'))
-@page { size: 14in 8.5in landscape; margin: 0; }
+@page { size: 13in 8.5in landscape; margin: 0; }
 @else
-@page { size: 8.5in 14in portrait;  margin: 0; }
+@page { size: 8.5in 13in portrait;  margin: 0; }
 @endif
 
 /* ═══════════════════════════════════════════════════════
@@ -33,7 +33,7 @@
 ═══════════════════════════════════════════════════════ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
-    font-family: 'DejaVu Sans', Arial, sans-serif;
+    font-family: 'DejaVu Sans Condensed', Arial, sans-serif;
     font-size: 7pt;
     color: #000;
 }
@@ -192,13 +192,14 @@ if (!isset($signatories)) {
 }
 
 // peso()       — data row: P + number, blank when 0
-$peso = function($n): string {
+$pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
+
+$peso = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0) . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 0);
 };
-// pesoA()      — totals: always ₱
-$pesoA = function($n): string {
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0) . number_format((float)$n, 0);
+$pesoA = function($n) use ($pesoSign): string {
+    return $pesoSign . number_format((float)$n, 0);
 };
 // num()        — continuation: number only, blank when 0
 $num = function($n): string {
@@ -210,14 +211,14 @@ $numA = function($n): string {
     return number_format((float)$n, 0);
 };
 // num2()       — 2-decimal, dash when 0  (Form 5)
-$num2 = function($n): string {
+$num2 = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return ' - ';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0) . number_format((float)$n, 0) . ' ';
+    return $pesoSign . number_format((float)$n, 0) . ' ';
 };
 // aliases for legacy Form 2/3/4 partials
 $pesoAlways = $pesoA;
 $numAlways  = function($n): string { return number_format((float)$n, 0); };
-$pesoInt    = function($n): string { return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0) . number_format((float)$n, 0); };
+$pesoInt    = function($n) use ($pesoSign): string { return $pesoSign . number_format((float)$n, 0); };
 $signed     = function($n): string {
     $v = (float)$n;
     return ($v == 0) ? '0' : (($v > 0 ? '+' : '') . number_format($v, 0));
@@ -847,7 +848,7 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     @endif
 
     @if(count($mooeItems) > 0)
-    @php $mooeC = array_chunk($mooeItems, 15); $mooeCT = count($mooeC); @endphp
+    @php $mooeC = array_chunk($mooeItems, 30); $mooeCT = count($mooeC); @endphp
     @foreach($mooeC as $mooeCI => $mooeCK)
     @if($mooeCI > 0)
     </tbody></table></div>{{-- end page --}}
@@ -1030,7 +1031,10 @@ $lbcCurrent  = !empty($form3['lbcCurrent'])      ? $form3['lbcCurrent']      : n
 $lbcProposed = !empty($form3['lbcProposed'])      ? $form3['lbcProposed']     : null;
 $trancheCur  = !empty($form3['trancheCurrent'])   ? $form3['trancheCurrent']  : null;
 $tranchePro  = !empty($form3['trancheProposed'])  ? $form3['trancheProposed'] : null;
-$grandCurrent3  = (float) array_sum(array_column($rows3, 'current_amount'));
+$grandCurrent3  = (float) array_sum(array_map(
+    fn($r) => $r['current_amount'] > 0 ? (float)$r['current_amount'] : (float)$r['proposed_amount'],
+    $rows3
+));
 $grandProposed3 = (float) array_sum(array_column($rows3, 'proposed_amount'));
 $grandIncrease3 = $grandProposed3 - $grandCurrent3;
 @endphp
@@ -1045,17 +1049,17 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
             <td style="width:4%;padding:0;border:none;"></td>
             <td style="width:4%;padding:0;border:none;"></td>
-            <td style="width:24%;padding:0;border:none;"></td>
+            <td style="width:26%;padding:0;border:none;"></td>
             <td style="width:21%;padding:0;border:none;"></td>
-            <td style="width:7%;padding:0;border:none;"></td>
+            <td style="width:6%;padding:0;border:none;"></td>
             <td style="width:11%;padding:0;border:none;"></td>
-            <td style="width:7%;padding:0;border:none;"></td>
+            <td style="width:6%;padding:0;border:none;"></td>
             <td style="width:11%;padding:0;border:none;"></td>
             <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
             <th colspan="2" rowspan="2" style="width:2%">Item No.</th>
-            <th rowspan="2" width="25%">Position Title</th>
+            <th rowspan="2" width="27%">Position Title</th>
             <th rowspan="2" width="15%">Name of Incumbent</th>
             <th colspan="2">
                 Current Year Authorized Rate / Annum<br>
@@ -1070,9 +1074,9 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
             <th rowspan="2" width="11%">Increase/<br/>Decrease</th>
         </tr>
         <tr>
-            <th width="5%" >Grade/Salary</th>
+            <th width="4%" >Grade/<br/>Salary</th>
             <th width="15%">Amount</th>
-            <th width="5%">Grade/Salary</th>
+            <th width="4%">Grade/<br/>Salary</th>
             <th width="15%">Amount</th>
         </tr>
         <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th><th>(9)</th></tr>
@@ -1090,24 +1094,25 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
                 <br><span style="font-size:6pt;color:#555;font-style:italic;">Effictive date {{ $row['effective_date_note'] }}</span>
             @endif
         </td>
-        <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_current'] }}</td>
-        <td class="r">@if($row['current_amount'] > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['current_amount'], 0) }}@endif</td>
+        <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_current'] ?? $row['step_proposed'] }}</td>
+<td class="r">{!! $peso($row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0)) !!}</td>
         <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_proposed'] }}</td>
         <td class="r">
-            {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)($row['proposed_amount'] ?? 0), 0) }}
+            {!! $pesoA($row['proposed_amount'] ?? 0) !!}
             @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
                 <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
-                    +{{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['annual_increment'], 0) }}
+                    +{!! $pesoA($row['annual_increment']) !!}
                 </span>
             @endif
         </td>
+        @php $noCurrent = ($row['current_amount'] <= 0); @endphp
         <td class="r" style="{{ $row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '') }}">
-        @if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
-            {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['increase_decrease'], 0) }}
+        @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+            {!! $pesoA($row['increase_decrease']) !!}
         @endif
-        @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
+        @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
             <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
-                +{{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$row['annual_increment'], 0) }}
+                +{!! $pesoA($row['annual_increment']) !!}
             </span>
         @endif
     </td>
@@ -1120,10 +1125,10 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr class="grand-total">
             <td colspan="4" class="c">TOTAL FOR {{ $deptName }}</td>
             <td></td>
-            <td class="r">@php echo chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format($grandCurrent3,0); @endphp</td>
+            <td class="r">{!! $pesoA($grandCurrent3) !!}</td>
             <td></td>
-            <td class="r">@php echo chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format($grandProposed3,0); @endphp</td>
-            <td class="r">@php echo chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format($grandIncrease3,0); @endphp</td>
+            <td class="r">{!! $pesoA($grandProposed3) !!}</td>
+            <td class="r">{!! $grandIncrease3 != 0 ? $pesoA($grandIncrease3) : '' !!}</td>
         </tr>
     </tfoot>
 </table>
@@ -1266,7 +1271,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
     <tbody>
     @forelse($pageRows4 as $row4)
     <tr>
-        <td class="c" style="font-size: 5.5pt;">{{ $row4['aip_reference_code'] ?? '' }}</td>
+        <td class="c">{{ $row4['aip_reference_code'] ?? '' }}</td>
         <td>{{ $row4['program_description'] ?? '' }}</td>
         <td class="c">{{ $row4['major_final_output'] ?? 'Imprvd Svcs' }}</td>
         <td>{{ $row4['performance_indicator'] ?? '' }}</td>
@@ -1287,7 +1292,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
             <td class="r">{!! $pesoInt($grandPS) !!}</td>
             <td class="r">{!! $pesoInt($grandMOOE) !!}</td>
             <td class="r">{!! $pesoInt($grandCO) !!}</td>
-            <td class="r" style="font-size: 6pt;">{!! $pesoInt($grandAmt4) !!}</td>
+            <td class="r">{!! $pesoInt($grandAmt4) !!}</td>
         </tr>
     </tfoot>
     @endif
@@ -1479,12 +1484,12 @@ $subTotal      = $data['sub_total'];
 $statutory     = $data['statutory'];
 $grandTotal    = $data['grand_total'];
 
-$pf = function($n): string {   // first row in section — ₱ prefix, dash when 0
+$pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return ' - ';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 0);
 };
-$pa = function($n): string {   // subtotal / grand — ₱ always
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+$pa = function($n) use ($pesoSign): string {
+    return $pesoSign . number_format((float)$n, 0);
 };
 $nf = function($n): string {   // continuation rows — number, dash when 0
     if ((float)$n == 0) return ' - ';
@@ -1639,12 +1644,12 @@ $lgu         = $data['lgu'];
 $forms6      = $data['forms'];   // array of { label, source, is_special, rows, grand_total }
 
 // Formatters
-$pf = function($n): string {   // ₱ prefix, blank when 0
+$pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 0);
 };
-$pa = function($n): string {   // ₱ always
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+$pa = function($n) use ($pesoSign): string {
+    return $pesoSign . number_format((float)$n, 0);
 };
 $nf = function($n): string {   // number only, blank when 0
     if ((float)$n == 0) return '0';
@@ -1739,7 +1744,7 @@ foreach ($rows as $r) { $computeAmount($r); }
             $displayAmt = '';
         } elseif ($showPeso) {
             $displayAmt = $pf($amount);
-            if ($displayAmt === '') $displayAmt = chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).' - ';
+            if ($displayAmt === '') $displayAmt = $pesoSign . ' - ';
         } else {
             $displayAmt = $nf($amount);
         }
@@ -1847,9 +1852,9 @@ $year    = $data['year'];
 $lgu     = $data['lgu'];
 $forms7  = $data['forms'];
 
-$pa = function($n): string {
-    if ((float)$n == 0) return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).' - ';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+$pa = function($n) use ($pesoSign): string {
+    if ((float)$n == 0) return $pesoSign . ' - ';
+    return $pesoSign . number_format((float)$n, 0);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
@@ -2101,12 +2106,12 @@ $grandTotals  = $data['grand_totals'];
 $fields5 = ['past_total','cur_sem1','cur_sem2','cur_total','proposed'];
 
 // Same formatters as the rest of the blade
-$pf = function($n): string {
+$pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 0);
 };
-$pa = function($n): string {
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+$pa = function($n) use ($pesoSign): string {
+    return $pesoSign . number_format((float)$n, 0);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
@@ -2268,12 +2273,12 @@ $year        = $data['year'];
 $incomeYear  = $data['income_year'];
 $lgu         = $data['lgu'];
 
-$pf = function($n): string {
+$pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 0);
 };
-$pa = function($n): string {
-    return chr(0xE2).chr(0x82).chr(0xB1).chr(0xC2).chr(0xA0).number_format((float)$n, 0);
+$pa = function($n) use ($pesoSign): string {
+    return $pesoSign . number_format((float)$n, 0);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
@@ -2817,9 +2822,9 @@ $summary    = $cal5['summary'];
     <td class="c">{{ $item['completion_date'] ?? '' }}</td>
     <td class="c">{{ $item['expected_output'] ?? '' }}</td>
     <td class="c">{{ $item['funding_source'] }}</td>
-    <td class="r">@if($item['mooe']  > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['mooe'],0)  }}@endif</td>
-    <td class="r">@if($item['co']    > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['co'],0)    }}@endif</td>
-    <td class="r">@if($item['total'] > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($item['total'],0) }}@endif</td>
+    <td class="r">@if($item['mooe']  > 0){!! $peso($item['mooe'])  !!}@endif</td>
+    <td class="r">@if($item['co']    > 0){!! $peso($item['co'])    !!}@endif</td>
+    <td class="r">@if($item['total'] > 0){!! $peso($item['total']) !!}@endif</td>
   </tr>
   @endforeach
 
@@ -2827,9 +2832,9 @@ $summary    = $cal5['summary'];
   @if($catChunkIdx === $catTotalChunks - 1)
   <tr style="font-weight:bold;">
     <td class="r" colspan="7" style="font-weight:bold;">Sub Total</td>
-    <td class="r">@if($subMOOE  > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subMOOE,0)  }}@endif</td>
-    <td class="r">@if($subCO    > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subCO,0)    }}@endif</td>
-    <td class="r">@if($subTotal > 0){{ "\u{20B1}\u{00A0}" }}{{ number_format($subTotal,0) }}@endif</td>
+    <td class="r">@if($subMOOE  > 0){!! $peso($subMOOE)  !!}@endif</td>
+    <td class="r">@if($subCO    > 0){!! $peso($subCO)    !!}@endif</td>
+    <td class="r">@if($subTotal > 0){!! $peso($subTotal) !!}@endif</td>
   </tr>
   @endif
 
@@ -2846,7 +2851,7 @@ $summary    = $cal5['summary'];
       <strong>A. Total ( 70% of the 5%CF, Preparedness Fund for CY{{ $year }} )</strong>
     </td>
     <td style="border:none;padding:2px 4px;text-align:right;width:120pt;">
-      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['total_70pct'], 0) }}
+      {!! $pesoA($summary['total_70pct']) !!}
     </td>
   </tr>
   <tr>
@@ -2854,7 +2859,7 @@ $summary    = $cal5['summary'];
       <strong>B. Total Reserved for Actual Calamity ( 30% ) for Calendar Year {{ $year }}</strong>
     </td>
     <td style="border:none;padding:2px 4px;text-align:right;">
-      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['reserved_30'], 0) }}
+      {!! $pesoA($summary['reserved_30']) !!}
     </td>
   </tr>
   <tr>
@@ -2862,7 +2867,7 @@ $summary    = $cal5['summary'];
       <strong>C. Total 5% Calamity Fund Reserved for CY{{ $year }}</strong>
     </td>
     <td style="border:none;padding:2px 4px;text-align:right;">
-      {{ "\u{20B1}\u{00A0}" }}{{ number_format((float)$summary['calamity_fund'], 0) }}
+      {!! $pesoA($summary['calamity_fund']) !!}
     </td>
   </tr>
 </table>

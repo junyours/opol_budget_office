@@ -42,6 +42,7 @@ class BudgetPlanForm4ItemController extends BaseApiController
             'co_amount'             => 'nullable|numeric|min:0',
             'sem1_amount'           => 'nullable|numeric|min:0',
             'sem2_amount'           => 'nullable|numeric|min:0',
+            'obligation_amount'     => 'nullable|numeric|min:0',
             'recommendation'        => 'nullable|string|max:255',
         ]);
 
@@ -83,6 +84,7 @@ class BudgetPlanForm4ItemController extends BaseApiController
                 'co_amount'             => $validated['co_amount'] ?? 0,
                 'sem1_amount'           => $validated['sem1_amount'] ?? 0,
                 'sem2_amount'           => $validated['sem2_amount'] ?? 0,
+                'obligation_amount'     => $validated['obligation_amount'] ?? 0,
                 'recommendation'        => $validated['recommendation'] ?? null,
                 'created_by'            => Auth::id(),
                 'updated_by'            => Auth::id(),
@@ -112,6 +114,7 @@ class BudgetPlanForm4ItemController extends BaseApiController
             'co_amount'             => 'nullable|numeric|min:0',
             'sem1_amount'           => 'nullable|numeric|min:0',
             'sem2_amount'           => 'nullable|numeric|min:0',
+            'obligation_amount'     => 'nullable|numeric|min:0',
             'recommendation'        => 'nullable|string|max:255',
         ]);
 
@@ -132,7 +135,7 @@ class BudgetPlanForm4ItemController extends BaseApiController
             $childUpdate = ['updated_by' => Auth::id()];
             foreach (['major_final_output', 'performance_indicator', 'target',
                       'ps_amount', 'mooe_amount', 'co_amount',
-                      'sem1_amount', 'sem2_amount', 'recommendation'] as $field) {
+                      'sem1_amount', 'sem2_amount', 'obligation_amount', 'recommendation'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $childUpdate[$field] = $validated[$field] ?? $item->{$field};
                 }
@@ -172,6 +175,7 @@ class BudgetPlanForm4ItemController extends BaseApiController
             'total_amount'          => (float) $item->total_amount,
             'sem1_amount'           => (float) $item->sem1_amount,
             'sem2_amount'           => (float) $item->sem2_amount,
+            'obligation_amount'     => (float) $item->obligation_amount,
             'recommendation'        => $item->recommendation,
             'created_by'            => $item->created_by,
             'updated_by'            => $item->updated_by,

@@ -21,6 +21,7 @@ class DeptBpForm4Item extends Model
         // total_amount is DB-computed (storedAs) — not fillable
         'sem1_amount',
         'sem2_amount',
+        'obligation_amount',
         'recommendation',
         'created_by',
         'updated_by',

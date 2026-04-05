@@ -1,18 +1,15 @@
+// // export default AdminDashboard;
 // import React, { useState,useEffect } from "react";
 // import { Link, useNavigate } from "react-router-dom";
 // import { toast } from "sonner";
 // import { Button } from "../../components/ui/button";
 // import { Input } from "../../components/ui/input";
-// import { Label } from "../../components/ui/label";
+// import { Label as ShadcnLabel } from "../../components/ui/label";
 // import { Switch } from "../../components/ui/switch";
 // import {
 //   Dialog, DialogContent, DialogHeader, DialogTitle,
 //   DialogFooter, DialogDescription,
 // } from "../../components/ui/dialog";
-// // import {
-// //   Carousel, CarouselContent, CarouselItem,
-// //   CarouselNext, CarouselPrevious,
-// // } from "../../components/ui/carousel";
 // import {
 //   Carousel, CarouselContent, CarouselItem,
 //   CarouselNext, CarouselPrevious,
@@ -23,6 +20,8 @@
 //   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
 //   RadialBarChart, RadialBar,
 //   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+//   PolarGrid, PolarRadiusAxis,
+//   Label as RechartsLabel,   // ← add this
 // } from "recharts";
 // import { useSalaryMatrix } from "../../hooks/useSalaryMatrix";
 // import { useBudgetTotals } from "../../hooks/useBudgetTotals";
@@ -42,6 +41,11 @@
 //   useMdfFund, useLdrrmfSummary, useDeptExpenditures,
 //   useCreateBudgetPlan,
 // } from "../../hooks/useDashboardQueries";
+
+// import { ChartContainer, type ChartConfig } from "../../components/ui/chart";
+// // import { PolarGrid, PolarRadiusAxis } from "recharts";
+// // import { Label } from "recharts";
+
 
 // const getInitials = (d: Department) =>
 //   (d.dept_abbreviation ?? d.dept_name).slice(0, 2).toUpperCase();
@@ -207,6 +211,174 @@
 //   );
 // };
 
+// const ApprovalProgressCard: React.FC<{
+//   style: React.CSSProperties;
+//   completion: number;
+//   totalWithPlan: number;
+//   approvedDepts: Department[];
+//   submittedDepts: Department[];
+//   draftDepts: Department[];
+// }> = ({ style, completion, totalWithPlan, approvedDepts, submittedDepts, draftDepts }) => {
+
+//   const [activeIdx, setActiveIdx] = useState(0);
+//   const [visible, setVisible] = useState(true);
+
+//   const statuses = [
+//     { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#10b981" }} /> },
+//     { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} /> },
+//     { label: "Draft",     depts: draftDepts,     color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} /> },
+//   ];
+
+//   useEffect(() => {
+//     const interval = setInterval(() => {
+//       // fade out
+//       setVisible(false);
+//       setTimeout(() => {
+//         setActiveIdx(prev => (prev + 1) % statuses.length);
+//         // fade in
+//         setVisible(true);
+//       }, 400);
+//     }, 5000);
+//     return () => clearInterval(interval);
+//   }, []);
+
+//   const s = statuses[activeIdx];
+
+//   return (
+//     <Card style={style} className="col-span-6 lg:col-span-5 p-4 flex flex-col">
+//       <div className="flex items-center gap-2 mb-4">
+//         <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+//           <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
+//         </div>
+//         <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
+//       </div>
+
+//       <div className="flex items-center gap-5 flex-1">
+
+//         {/* Radial chart */}
+//         {/* Radial chart — shadcn style */}
+//         <div className="relative w-24 h-24 flex-shrink-0">
+//           <ChartContainer
+//             config={{
+//               completion: {
+//                 label: "Approved",
+//                 color: "#10b981",
+//               },
+//             } satisfies ChartConfig}
+//             className="w-full h-full"
+//           >
+//             <RadialBarChart
+//               data={[{ name: "completion", value: completion, fill: "#10b981" }]}
+//               endAngle={(completion / 100) * 360}
+//               innerRadius={30}
+//               outerRadius={46}
+//             >
+//               <PolarGrid
+//                 gridType="circle"
+//                 radialLines={false}
+//                 stroke="none"
+//                 className="first:fill-muted last:fill-background"
+//                 polarRadius={[40, 32]}
+//               />
+//               <RadialBar dataKey="value" background />
+//               <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+//                 <Label
+//                   content={({ viewBox }) => {
+//                     if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+//                       return (
+//                         <text
+//                           x={viewBox.cx}
+//                           y={viewBox.cy}
+//                           textAnchor="middle"
+//                           dominantBaseline="middle"
+//                         >
+//                           <tspan
+//                             x={viewBox.cx}
+//                             y={viewBox.cy}
+//                             className="fill-foreground text-lg font-bold"
+//                             style={{ fontSize: 16, fontWeight: 700, fill: "#18181b" }}
+//                           >
+//                             {completion}%
+//                           </tspan>
+//                           <tspan
+//                             x={viewBox.cx}
+//                             y={(viewBox.cy || 0) + 14}
+//                             style={{ fontSize: 9, fill: "#a1a1aa" }}
+//                           >
+//                             approved
+//                           </tspan>
+//                         </text>
+//                       );
+//                     }
+//                   }}
+//                 />
+//               </PolarRadiusAxis>
+//             </RadialBarChart>
+//           </ChartContainer>
+//         </div>
+
+//         {/* Fading status card */}
+//         <div className="flex-1 min-w-0">
+
+//           {/* Dot indicators */}
+//           <div className="flex items-center gap-1.5 mb-3">
+//             {statuses.map((st, i) => (
+//               <button
+//                 key={st.label}
+//                 onClick={() => { setVisible(false); setTimeout(() => { setActiveIdx(i); setVisible(true); }, 400); }}
+//                 className="rounded-full transition-all duration-300"
+//                 style={{
+//                   width: i === activeIdx ? 12 : 6,
+//                   height: 6,
+//                   background: i === activeIdx ? s.color : "#e4e4e7",
+//                 }}
+//               />
+//             ))}
+//           </div>
+
+//           {/* Fixed-height container — prevents layout shift on switch */}
+//           <div className="relative min-w-0" style={{ height: 100 }}>
+//             <div
+//               style={{
+//                 transition: "opacity 400ms ease, transform 400ms ease",
+//                 opacity: visible ? 1 : 0,
+//                 transform: visible ? "translateY(0)" : "translateY(6px)",
+//                 position: "absolute",
+//                 inset: 0,
+//               }}
+//               className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5"
+//             >
+//               <div className="flex items-center justify-between mb-2">
+//                 <div className="flex items-center gap-2">
+//                   {s.icon}
+//                   <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{s.label}</span>
+//                 </div>
+//                 <span className="text-2xl font-bold text-zinc-900">{s.depts.length}</span>
+//               </div>
+
+//               <div className="h-1 rounded-full bg-zinc-200 overflow-hidden mb-2.5">
+//                 <div
+//                   className="h-full rounded-full transition-all duration-700"
+//                   style={{
+//                     width: totalWithPlan > 0 ? `${(s.depts.length / totalWithPlan) * 100}%` : "0%",
+//                     background: s.color,
+//                   }}
+//                 />
+//               </div>
+
+//               {s.depts.length > 0
+//                 ? <DeptAvatars depts={s.depts} max={10} />
+//                 : <p className="text-[10px] text-zinc-300">None yet</p>
+//               }
+//             </div>
+//           </div>
+
+//         </div>
+//       </div>
+//     </Card>
+//   );
+// };
+
 
 // const AdminDashboard: React.FC = () => {
 //   const navigate = useNavigate();
@@ -224,7 +396,6 @@
 
 //   const { data: deptBudgetPlans = [] } = useDepartmentBudgetPlans(planId);
 
-//   // ← KEY: use `funds !== undefined` so we never shimmer after data resolves
 //   const { data: funds } = useAllFunds();
 //   const fundsReady = funds !== undefined;
 //   const gf  = funds?.gf  ?? null;
@@ -236,6 +407,12 @@
 //   const { data: ldrrmfData,       isLoading: ldrLoading  } = useLdrrmfSummary(planId);
 //   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
 //   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
+
+//   // exp.shExpenditure / occExpenditure / pmExpenditure already include AIP
+//   // (useBudgetTotals sums form2 + AIP internally), so use them directly.
+//   const shExpTotal  = exp.shExpenditure;
+//   const occExpTotal = exp.occExpenditure;
+//   const pmExpTotal  = exp.pmExpenditure;
 
 //   const createPlan = useCreateBudgetPlan();
 
@@ -262,6 +439,8 @@
 
 //   const allocLoading = mdfLoading || ldrLoading;
 
+//   const specialExpLoading = expLoading;
+
 //   const ldrrmf30Actual = ldrrmfData?.reserved30 ?? 0;
 //   const ldrrmf70Actual = ldrrmfData?.total70    ?? 0;
 //   const mdfActual      = mdfAllocated;
@@ -283,7 +462,9 @@
 //   const occCal       = (occ?.nonTaxRevenue ?? 0) * 0.05;
 //   const pmCal        = (pm?.nonTaxRevenue  ?? 0) * 0.05;
 //   const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
-//   const specialExp   = exp.shExpenditure + exp.occExpenditure + exp.pmExpenditure;
+
+//   // Combined expenditure for special accounts now includes AIP
+//   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
 //   const specialCal   = shCal + occCal + pmCal;
 //   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
 
@@ -350,7 +531,7 @@
 //                 Municipal Budget Office · Opol, Misamis Oriental
 //               </p>
 //               <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
-//                 Budget Dashboard
+//                 Dashboard
 //               </h1>
 //             </div>
 //             {!activePlan && (
@@ -362,117 +543,97 @@
 //           </div>
 
 //           {/* ── ROW 1 ── */}
-//           <div className="grid grid-cols-12 gap-4">
+//          {/* ── ROW 1 ── */}
+// <div className="grid grid-cols-12 gap-4 items-stretch">
 
-//             <Card style={st(1)} onClick={() => navigate("/admin/budget-plans")}
-//               className="col-span-6 lg:col-span-2 p-4 relative overflow-hidden">
-//               {activePlan && (
-//                 <span className="absolute top-3 right-3 flex h-2 w-2">
-//                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-//                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-//                 </span>
-//               )}
-//               <div className="flex items-center gap-2 mb-3">
-//                 <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-//                   <DocumentTextIcon className="w-4 h-4 text-blue-500" />
-//                 </div>
-//                 <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Active Plan</p>
-//               </div>
-//               <p className="text-2xl font-semibold text-zinc-900 leading-none">{activePlan ? `FY ${activePlan.year}` : "—"}</p>
-//               <p className="text-[10px] text-zinc-400 mt-1">{activePlan ? "Currently active" : "None"}</p>
-//               <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-//                 <span>Budget Plans</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
-//               </div>
-//             </Card>
+//   {/* Active Plan */}
+//   <Card style={st(1)} onClick={() => navigate("/admin/budget-plans")}
+//     className="col-span-6 lg:col-span-3 p-4 relative overflow-hidden flex flex-col">
+//     {activePlan && (
+//       <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
+//         <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 opacity-60" />
+//         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+//         <span className="text-[11px] font-medium text-emerald-500 tracking-wide ml-2">Active</span>
+//       </div>
+//     )}
+//     <div className="flex items-center gap-2.5 mb-3.5">
+//       <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+//         <DocumentTextIcon className="w-4 h-4 text-blue-500" />
+//       </div>
+//       <div>
+//         <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Budget Plan</p>
+//         {activePlan && (
+//           <p className="text-[11px] text-zinc-400 mt-0.5">Fiscal Year {activePlan.year}</p>
+//         )}
+//       </div>
+//     </div>
+//     <div className="flex-1">
+//       <p className="text-[13px] font-medium text-zinc-500 leading-snug">Proposed Annual Budget</p>
+//       <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none mt-1">
+//         {activePlan ? activePlan.year : "—"}
+//       </p>
+//     </div>
+//     <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+//       <span className="text-[10px] text-zinc-400">Budget Plans</span>
+//       <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+//     </div>
+//   </Card>
 
-//             <Card style={st(2)} onClick={() => navigate("/admin/departments")}
-//               className="col-span-6 lg:col-span-2 p-4">
-//               <div className="flex items-center gap-2 mb-3">
-//                 <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-//                   <BuildingOffice2Icon className="w-4 h-4 text-violet-500" />
-//                 </div>
-//                 <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Departments</p>
-//               </div>
-//               <p className="text-2xl font-semibold text-zinc-900 leading-none">{departments.length}</p>
-//               <p className="text-[10px] text-zinc-400 mt-1">registered offices</p>
-//               <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-//                 <span>View all</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
-//               </div>
-//             </Card>
+//   {/* Departments */}
+//   <Card style={st(2)} onClick={() => navigate("/admin/departments")}
+//     className="col-span-6 lg:col-span-2 p-4 flex flex-col">
+//     <div className="flex items-center gap-2 mb-3">
+//       <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+//         <BuildingOffice2Icon className="w-4 h-4 text-violet-500" />
+//       </div>
+//       <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Departments</p>
+//     </div>
+//     <div className="flex-1">
+//       <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none">
+//         {departments.length}
+//       </p>
+//       <p className="text-[12px] text-zinc-400 mt-1">registered offices</p>
+//     </div>
+//     <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+//       <span className="text-[10px] text-zinc-400">View all</span>
+//       <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+//     </div>
+//   </Card>
 
-//             <Card style={st(3)} onClick={() => navigate("/admin/tranche")}
-//               className="col-span-6 lg:col-span-2 p-4">
-//               <div className="flex items-center gap-2 mb-3">
-//                 <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-//                   <BriefcaseIcon className="w-4 h-4 text-orange-500" />
-//                 </div>
-//                 <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Salary Tranche</p>
-//               </div>
-//               <p className="text-lg font-semibold text-zinc-900 leading-tight truncate">{activeVersion?.lbc_reference ?? "—"}</p>
-//               <p className="text-[10px] text-zinc-400 mt-1 truncate">
-//                 {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
-//               </p>
-//               <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-//                 <span>Salary Standards</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
-//               </div>
-//             </Card>
+//   {/* Salary Tranche */}
+//   <Card style={st(3)} onClick={() => navigate("/admin/tranche")}
+//     className="col-span-6 lg:col-span-2 p-4 flex flex-col">
+//     <div className="flex items-center gap-2 mb-3">
+//       <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+//         <BriefcaseIcon className="w-4 h-4 text-orange-500" />
+//       </div>
+//       <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Salary Tranche</p>
+//     </div>
+//     <div className="flex-1">
+//       <p className="text-lg font-semibold text-zinc-900 leading-tight truncate">
+//         {activeVersion?.lbc_reference ?? "—"}
+//       </p>
+//       <p className="text-[11px] text-zinc-400 mt-1 truncate">
+//         {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
+//       </p>
+//     </div>
+//     <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+//       <span className="text-[10px] text-zinc-400">Salary Standards</span>
+//       <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+//     </div>
+//   </Card>
 
-//             <Card style={st(4)} className="col-span-12 lg:col-span-6 p-4">
-//               <div className="flex items-center gap-2 mb-3">
-//                 <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-//                   <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
-//                 </div>
-//                 <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
-//               </div>
-//               <div className="flex flex-col sm:flex-row items-center gap-5">
-//                 <div className="relative w-28 h-28 flex-shrink-0">
-//                   {/* <ResponsiveContainer width="100%" height="100%">
-//                     <RadialBarChart innerRadius="55%" outerRadius="100%"
-//                       data={[{ value: completion, fill: "#10b981" }]} startAngle={90} endAngle={-270}>
-//                       <RadialBar dataKey="value" background={{ fill: "#f4f4f5" }} cornerRadius={6} />
-//                     </RadialBarChart>
-//                   </ResponsiveContainer> */}
-//                   <ResponsiveContainer width="100%" height="100%">
-//                     <RadialBarChart innerRadius="55%" outerRadius="100%"
-//                       data={[
-//                         { value: 100,        fill: "#f4f4f5" },
-//                         { value: completion, fill: "#10b981" },
-//                       ]}
-//                       startAngle={90} endAngle={-270}>
-//                       <RadialBar dataKey="value" cornerRadius={6} />
-//                     </RadialBarChart>
-//                   </ResponsiveContainer>
-//                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-//                     <span className="text-xl font-bold text-zinc-900 leading-none">{completion}%</span>
-//                     <span className="text-[9px] text-zinc-400 mt-0.5">approved</span>
-//                   </div>
-//                 </div>
-//                 <div className="w-full grid grid-cols-3 gap-2 min-w-0">
-//                   {[
-//                     { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> },
-//                     { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} /> },
-//                     { label: "Draft",     depts: draftDepts,     color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} /> },
-//                   ].map(s => (
-//                     <div key={s.label} className="rounded-xl bg-zinc-50 border border-zinc-100 p-3 space-y-2">
-//                       <div className="flex items-center justify-between">
-//                         <div className="flex items-center gap-1.5">{s.icon}
-//                           <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{s.label}</span>
-//                         </div>
-//                         <span className="text-lg font-bold text-zinc-900">{s.depts.length}</span>
-//                       </div>
-//                       <div className="h-1 rounded-full bg-zinc-200 overflow-hidden">
-//                         <div className="h-full rounded-full transition-all duration-700"
-//                           style={{ width: totalWithPlan > 0 ? `${(s.depts.length / totalWithPlan) * 100}%` : "0%", background: s.color }} />
-//                       </div>
-//                       {s.depts.length > 0
-//                         ? <DeptAvatars depts={s.depts} max={6} />
-//                         : <p className="text-[10px] text-zinc-300">None yet</p>}
-//                     </div>
-//                   ))}
-//                 </div>
-//               </div>
-//             </Card>
-//           </div>
+//   {/* Approval Progress */}
+//   <ApprovalProgressCard
+//     style={st(4)}
+//     completion={completion}
+//     totalWithPlan={totalWithPlan}
+//     approvedDepts={approvedDepts}
+//     submittedDepts={submittedDepts}
+//     draftDepts={draftDepts}
+//   />
+
+// </div>
 
 //           {/* ── ROW 2 ── */}
 //           <div className="grid grid-cols-12 gap-4 items-start">
@@ -657,7 +818,7 @@
 //                           </div>
 //                         </div>
 //                         <div className="text-right">
-//                           <p className="text-base font-semibold text-zinc-900">{pesoC(ldrrmf)}</p>
+//                           <p className="text-base font-semibold text-zinc-900">{peso(ldrrmf)}</p>
 //                           <p className="text-[10px] text-zinc-400 font-mono">budgeted</p>
 //                         </div>
 //                       </div>
@@ -671,8 +832,8 @@
 //                           </div>
 //                           <div className="flex items-baseline gap-1">
 //                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-//                               : <><p className="text-sm font-semibold text-rose-700">{pesoC(ldrrmf30Actual)}</p>
-//                                   <p className="text-[10px] text-zinc-400">/ {pesoC(qrf)}</p></>}
+//                               : <><p className="text-sm font-semibold text-rose-700">{peso(ldrrmf30Actual)}</p>
+//     <p className="text-[10px] text-zinc-400">/ {peso(qrf)}</p></>}
 //                           </div>
 //                           <p className="text-[10px] text-zinc-400">allocated</p>
 //                           <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
@@ -681,7 +842,7 @@
 //                           </div>
 //                           <div className="flex items-center justify-between">
 //                             <span className="text-[10px] text-zinc-400">Remaining</span>
-//                             <span className="text-[10px] font-semibold font-mono text-rose-500">{pesoC(ldrrmf30Remaining)}</span>
+//                             <span className="text-[10px] font-semibold font-mono text-rose-500">{peso(ldrrmf30Remaining)}</span>
 //                           </div>
 //                         </div>
 //                         <div className="px-4 py-3 space-y-1.5">
@@ -693,8 +854,8 @@
 //                           </div>
 //                           <div className="flex items-baseline gap-1">
 //                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-//                               : <><p className="text-sm font-semibold text-orange-700">{pesoC(ldrrmf70Actual)}</p>
-//                                   <p className="text-[10px] text-zinc-400">/ {pesoC(predis)}</p></>}
+//                               : <><p className="text-sm font-semibold text-orange-700">{peso(ldrrmf70Actual)}</p>
+//     <p className="text-[10px] text-zinc-400">/ {peso(predis)}</p></>}
 //                           </div>
 //                           <p className="text-[10px] text-zinc-400">allocated</p>
 //                           <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
@@ -703,7 +864,7 @@
 //                           </div>
 //                           <div className="flex items-center justify-between">
 //                             <span className="text-[10px] text-zinc-400">Remaining</span>
-//                             <span className="text-[10px] font-semibold font-mono text-orange-500">{pesoC(ldrrmf70Remaining)}</span>
+//                             <span className="text-[10px] font-semibold font-mono text-orange-500">{peso(ldrrmf70Remaining)}</span>
 //                           </div>
 //                           <p className="text-[10px] text-zinc-300">JMC 2013-1 · R.A. 10121</p>
 //                         </div>
@@ -715,7 +876,7 @@
 
 //               {/* Dept Expenditure Chart */}
 //               <Card style={st(6)} className="p-5">
-//                 <div className="flex items-center justify-between mb-4">
+//                 {/* <div className="flex items-center justify-between mb-4">
 //                   <div className="flex items-center gap-3">
 //                     <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
 //                       <ChartBarIcon className="w-4 h-4 text-indigo-500" />
@@ -725,7 +886,29 @@
 //                       <p className="text-sm font-semibold text-zinc-900 mt-0.5">General Fund</p>
 //                     </div>
 //                   </div>
-//                 </div>
+//                 </div> */}
+//                 <div className="flex items-center justify-between mb-4">
+//   <div className="flex items-center gap-3">
+//     <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+//       <ChartBarIcon className="w-4 h-4 text-indigo-500" />
+//     </div>
+//     <div>
+//       <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Department Expenditures</p>
+//       <p className="text-sm font-semibold text-zinc-900 mt-0.5">General Fund</p>
+//     </div>
+//   </div>
+//   {!deptExpLoading && deptExp.length > 0 && (
+//     <div className="text-right">
+//       <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Grand Total</p>
+//       <p className="text-base font-semibold text-zinc-900 tabular-nums">
+//         {pesoC(deptExp.reduce((sum, d) => sum + d.total, 0))}
+//       </p>
+//       <p className="text-[10px] font-mono text-zinc-400">
+//         {peso(deptExp.reduce((sum, d) => sum + d.total, 0))}
+//       </p>
+//     </div>
+//   )}
+// </div>
 //                 {deptExpLoading ? (
 //                   <Shimmer className="h-44 w-full" />
 //                 ) : deptExp.length === 0 ? (
@@ -734,10 +917,21 @@
 //                     <p className="text-xs">No expenditure data yet</p>
 //                   </div>
 //                 ) : (
-//                   <ResponsiveContainer width="100%" height={180}>
+//                   // <ResponsiveContainer width="100%" height={180}>
+//                   <ResponsiveContainer width="100%" height={220}>
 //                     <BarChart data={deptExp} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={16}>
 //                       <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
-//                       <XAxis dataKey="abbr" tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }} tickLine={false} axisLine={false} />
+//                       {/* <XAxis dataKey="abbr" tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }} tickLine={false} axisLine={false} /> */}
+//                       <XAxis
+//   dataKey="abbr"
+//   interval={0}
+//   angle={-35}
+//   textAnchor="end"
+//   tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }}
+//   tickLine={false}
+//   axisLine={false}
+//   height={40}
+// />
 //                       <YAxis tickFormatter={v => pesoC(v)} tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 600 }} tickLine={false} axisLine={false} width={56} />
 //                       <Tooltip content={<BarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
 //                       <Bar dataKey="total" name="Expenditure" radius={[4, 4, 0, 0]}>
@@ -772,7 +966,6 @@
 //                 <div className="p-5 space-y-4">
 //                   <div className="grid grid-cols-2 gap-4">
 
-//                     {/* ── Special Accounts Pie — three explicit branches ── */}
 //                     <div className="flex items-center justify-center">
 //                       {!fundsReady ? (
 //                         <Shimmer className="w-28 h-28 rounded-full" />
@@ -800,7 +993,8 @@
 //                       </div>
 //                       <div>
 //                         <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
-//                         <Money v={expLoading ? null : specialExp} loading={expLoading} size="sm" />
+//                         {/* specialExp now includes form2 + AIP for all three accounts */}
+//                         <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
 //                       </div>
 //                       {fundsReady && (
 //                         <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-2.5 py-2">
@@ -809,20 +1003,13 @@
 //                           <p className="text-xs text-zinc-400 font-mono">{peso(specialCal)}</p>
 //                         </div>
 //                       )}
-//                       {fundsReady && !expLoading && <UnapBadge value={specialUnap} compact />}
+//                       {fundsReady && !specialExpLoading && <UnapBadge value={specialUnap} compact />}
 //                     </div>
 //                   </div>
 
 //                   <div className="border-t border-zinc-100" />
 
 //                   <Carousel opts={{ align: "start", loop: true }} className="w-full">
-//                     {/* <div className="flex items-center justify-between mb-3">
-//                       <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Per Account</p>
-//                       <div className="flex items-center gap-1">
-//                         <CarouselPrevious className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
-//                         <CarouselNext    className="static h-7 w-7 translate-y-0 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500 rounded-xl" />
-//                       </div>
-//                     </div> */}
 //                     <div className="flex items-center justify-between mb-3">
 //                       <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Per Account</p>
 //                       <div className="flex items-center gap-2">
@@ -833,9 +1020,9 @@
 //                     </div>
 //                     <CarouselContent className="-ml-3">
 //                       {[
-//                         { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: exp.shExpenditure,  cal: shCal,  accentColor: "#8b5cf6" },
-//                         { label: "OCC",            abbr: "OCC", data: occ, expV: exp.occExpenditure, cal: occCal, accentColor: "#0ea5e9" },
-//                         { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b" },
+//                         { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: shExpTotal,  cal: shCal,  accentColor: "#8b5cf6" },
+//                         { label: "OCC",            abbr: "OCC", data: occ, expV: occExpTotal, cal: occCal, accentColor: "#0ea5e9" },
+//                         { label: "Public Market",  abbr: "PM",  data: pm,  expV: pmExpTotal,  cal: pmCal,  accentColor: "#f59e0b" },
 //                       ].map(({ label, abbr, data, expV, cal, accentColor }) => {
 //                         const rev  = data?.total ?? 0;
 //                         const unap = Math.max(0, rev - expV - cal);
@@ -859,7 +1046,8 @@
 //                                 </div>
 //                                 <div className="bg-white rounded-xl p-3 border border-zinc-100">
 //                                   <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1">Expenditure</p>
-//                                   {expLoading ? <Shimmer className="h-5 w-full" /> : (
+//                                   {/* expV now = form2 + AIP for this specific account */}
+//                                   {specialExpLoading ? <Shimmer className="h-5 w-full" /> : (
 //                                     <><p className="text-base font-semibold text-zinc-700">{pesoC(expV)}</p>
 //                                     <p className="text-xs font-mono text-zinc-400">{peso(expV)}</p></>
 //                                   )}
@@ -996,12 +1184,12 @@
 // };
 
 // export default AdminDashboard;
-import React, { useState,useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
+import { Label as ShadcnLabel } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -1017,7 +1205,10 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   RadialBarChart, RadialBar,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  PolarGrid, PolarRadiusAxis,
+  Label as RechartsLabel,
 } from "recharts";
+import { ChartContainer, type ChartConfig } from "../../components/ui/chart";
 import { useSalaryMatrix } from "../../hooks/useSalaryMatrix";
 import { useBudgetTotals } from "../../hooks/useBudgetTotals";
 import { cn } from "@/src/lib/utils";
@@ -1201,6 +1392,160 @@ const CarouselDots = ({ count }: { count: number }) => {
   );
 };
 
+const ApprovalProgressCard: React.FC<{
+  style: React.CSSProperties;
+  completion: number;
+  totalWithPlan: number;
+  approvedDepts: Department[];
+  submittedDepts: Department[];
+  draftDepts: Department[];
+}> = ({ style, completion, totalWithPlan, approvedDepts, submittedDepts, draftDepts }) => {
+
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  const statuses = [
+    { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#10b981" }} /> },
+    { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} /> },
+    { label: "Draft",     depts: draftDepts,     color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} /> },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setActiveIdx(prev => (prev + 1) % statuses.length);
+        setVisible(true);
+      }, 400);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const s = statuses[activeIdx];
+
+  const radialConfig = {
+  completion: { 
+    label: "Approved", 
+    color: "#10b981"  // ← color goes in config
+  },
+} satisfies ChartConfig;
+
+  return (
+    <Card style={style} className="col-span-6 lg:col-span-5 p-4 flex flex-col">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+          <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
+        </div>
+        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
+      </div>
+
+      <div className="flex items-center gap-5 flex-1">
+
+        {/* Radial chart — shadcn ChartContainer style */}
+        <div className="relative w-24 h-24 flex-shrink-0">
+          <ChartContainer config={radialConfig} className="w-full h-full">
+  <RadialBarChart
+    data={[{ name: "completion", value: completion, fill: "var(--color-completion)" }]}  // ← use var(), not hex
+    startAngle={90}
+    endAngle={90 - (completion / 100) * 360}
+    innerRadius={55}
+    outerRadius={15}
+  >
+    <PolarGrid
+      gridType="circle"
+      radialLines={false}
+      stroke="none"
+      className="first:fill-muted last:fill-background"
+      polarRadius={[40, 30]}
+    />
+    <RadialBar dataKey="value" background />
+    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+      <RechartsLabel
+        content={(props: any) => {
+          const vb = props?.viewBox as { cx?: number; cy?: number } | undefined;
+          if (!vb?.cx || !vb?.cy) return null;
+          return (
+            <text x={vb.cx} y={vb.cy} textAnchor="middle" dominantBaseline="middle">
+              <tspan x={vb.cx} y={vb.cy} style={{ fontSize: 16, fontWeight: 700, fill: "#18181b" }}>
+                {completion}%
+              </tspan>
+              <tspan x={vb.cx} y={vb.cy + 14} style={{ fontSize: 9, fill: "#a1a1aa" }}>
+                approved
+              </tspan>
+            </text>
+          );
+        }}
+      />
+    </PolarRadiusAxis>
+  </RadialBarChart>
+</ChartContainer>
+        </div>
+
+        {/* Fading status card */}
+        <div className="flex-1 min-w-0">
+
+          {/* Dot indicators */}
+          <div className="flex items-center gap-1.5 mb-3">
+            {statuses.map((st, i) => (
+              <button
+                key={st.label}
+                onClick={() => {
+                  setVisible(false);
+                  setTimeout(() => { setActiveIdx(i); setVisible(true); }, 400);
+                }}
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: i === activeIdx ? 12 : 6,
+                  height: 6,
+                  background: i === activeIdx ? s.color : "#e4e4e7",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Fixed-height container — prevents layout shift on switch */}
+          <div className="relative min-w-0" style={{ height: 100 }}>
+            <div
+              style={{
+                transition: "opacity 400ms ease, transform 400ms ease",
+                opacity: visible ? 1 : 0,
+                transform: visible ? "translateY(0)" : "translateY(6px)",
+                position: "absolute",
+                inset: 0,
+              }}
+              className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  {s.icon}
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{s.label}</span>
+                </div>
+                <span className="text-2xl font-bold text-zinc-900">{s.depts.length}</span>
+              </div>
+
+              <div className="h-1 rounded-full bg-zinc-200 overflow-hidden mb-2.5">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: totalWithPlan > 0 ? `${(s.depts.length / totalWithPlan) * 100}%` : "0%",
+                    background: s.color,
+                  }}
+                />
+              </div>
+
+              {s.depts.length > 0
+                ? <DeptAvatars depts={s.depts} max={10} />
+                : <p className="text-[10px] text-zinc-300">None yet</p>
+              }
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -1230,8 +1575,6 @@ const AdminDashboard: React.FC = () => {
   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
-  // exp.shExpenditure / occExpenditure / pmExpenditure already include AIP
-  // (useBudgetTotals sums form2 + AIP internally), so use them directly.
   const shExpTotal  = exp.shExpenditure;
   const occExpTotal = exp.occExpenditure;
   const pmExpTotal  = exp.pmExpenditure;
@@ -1260,23 +1603,38 @@ const AdminDashboard: React.FC = () => {
   const completion     = totalWithPlan > 0 ? Math.round((approvedDepts.length / totalWithPlan) * 100) : 0;
 
   const allocLoading = mdfLoading || ldrLoading;
-
   const specialExpLoading = expLoading;
 
-  const ldrrmf30Actual = ldrrmfData?.reserved30 ?? 0;
-  const ldrrmf70Actual = ldrrmfData?.total70    ?? 0;
+  // const ldrrmf30Actual = ldrrmfData?.reserved30 ?? 0;
+  // const ldrrmf70Actual = ldrrmfData?.total70    ?? 0;
+  const ldrrmf70Actual = ldrrmfData?.total70 ?? 0;
+  // QRF (30%) is a reserved fund — the "used" amount is the full 30% allocation.
+  // Actual QRF spending is not tracked separately; show full qrf as the allocated value.
+  // Once qrf is computed below, we use it directly.
   const mdfActual      = mdfAllocated;
 
+  // const ldrrmf = (gf?.total ?? 0) * 0.05;
+  // const qrf    = ldrrmf * 0.30;
+  // const predis = ldrrmf * 0.70;
+  // const mdf    = (gf?.nta ?? 0) * 0.20;
+
+  // const mdfRemaining      = Math.max(0, mdf - mdfActual);
+  // const ldrrmf30Remaining = Math.max(0, qrf - ldrrmf30Actual);
+  // const ldrrmf70Remaining = Math.max(0, predis - ldrrmf70Actual);
   const ldrrmf = (gf?.total ?? 0) * 0.05;
   const qrf    = ldrrmf * 0.30;
   const predis = ldrrmf * 0.70;
   const mdf    = (gf?.nta ?? 0) * 0.20;
 
+  // QRF is reserved (not yet disbursed) — actual used = 0 until spending is recorded.
+  // Show qrf as fully allocated to itself (100% reserved, 0% spent).
+  const ldrrmf30Actual    = 0;
+  const ldrrmf30Remaining = qrf;  // entire QRF is still available
   const mdfRemaining      = Math.max(0, mdf - mdfActual);
-  const ldrrmf30Remaining = Math.max(0, qrf - ldrrmf30Actual);
   const ldrrmf70Remaining = Math.max(0, predis - ldrrmf70Actual);
 
-  const ldrrmfPieTotal = qrf + ldrrmf70Actual;
+  // const ldrrmfPieTotal = qrf + ldrrmf70Actual;
+  const ldrrmfPieTotal = qrf + ldrrmf70Actual; // qrf is always fully reserved
   const mdfPieValue    = mdfActual;
   const gfUnap         = Math.max(0, (gf?.total ?? 0) - exp.gfExpenditure - mdfPieValue - ldrrmfPieTotal);
 
@@ -1284,8 +1642,6 @@ const AdminDashboard: React.FC = () => {
   const occCal       = (occ?.nonTaxRevenue ?? 0) * 0.05;
   const pmCal        = (pm?.nonTaxRevenue  ?? 0) * 0.05;
   const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
-
-  // Combined expenditure for special accounts now includes AIP
   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
   const specialCal   = shCal + occCal + pmCal;
   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
@@ -1353,7 +1709,7 @@ const AdminDashboard: React.FC = () => {
                 Municipal Budget Office · Opol, Misamis Oriental
               </p>
               <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
-                Budget Dashboard
+                Dashboard
               </h1>
             </div>
             {!activePlan && (
@@ -1365,110 +1721,95 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* ── ROW 1 ── */}
-          <div className="grid grid-cols-12 gap-4">
+          <div className="grid grid-cols-12 gap-4 items-stretch">
 
+            {/* Active Plan */}
             <Card style={st(1)} onClick={() => navigate("/admin/budget-plans")}
-              className="col-span-6 lg:col-span-2 p-4 relative overflow-hidden">
+              className="col-span-6 lg:col-span-3 p-4 relative overflow-hidden flex flex-col">
               {activePlan && (
-                <span className="absolute top-3 right-3 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
+                <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
+                  <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[11px] font-medium text-emerald-500 tracking-wide ml-2">Active</span>
+                </div>
               )}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-2.5 mb-3.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
                   <DocumentTextIcon className="w-4 h-4 text-blue-500" />
                 </div>
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Active Plan</p>
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Budget Plan</p>
+                  {/* {activePlan && (
+                    // <p className="text-[11px] text-zinc-400 mt-0.5">Fiscal Year {activePlan.year}</p>
+                  )} */}
+                </div>
               </div>
-              <p className="text-2xl font-semibold text-zinc-900 leading-none">{activePlan ? `FY ${activePlan.year}` : "—"}</p>
-              <p className="text-[10px] text-zinc-400 mt-1">{activePlan ? "Currently active" : "None"}</p>
-              <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-                <span>Budget Plans</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
+              <div className="flex-1">
+                <p className="text-[13px] font-medium text-zinc-500 leading-snug">Proposed Annual Budget</p>
+                <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none mt-1">
+                  {activePlan ? activePlan.year : "—"}
+                </p>
+              </div>
+              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-[10px] text-zinc-400">Budget Plans</span>
+                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
               </div>
             </Card>
 
+            {/* Departments */}
             <Card style={st(2)} onClick={() => navigate("/admin/departments")}
-              className="col-span-6 lg:col-span-2 p-4">
+              className="col-span-6 lg:col-span-2 p-4 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
                   <BuildingOffice2Icon className="w-4 h-4 text-violet-500" />
                 </div>
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Departments</p>
+                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Departments</p>
               </div>
-              <p className="text-2xl font-semibold text-zinc-900 leading-none">{departments.length}</p>
-              <p className="text-[10px] text-zinc-400 mt-1">registered offices</p>
-              <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-                <span>View all</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
+              <div className="flex-1">
+                <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none">
+                  {departments.length}
+                </p>
+                <p className="text-[12px] text-zinc-400 mt-1">Registered Offices</p>
+              </div>
+              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-[10px] text-zinc-400">View all</span>
+                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
               </div>
             </Card>
 
+            {/* Salary Tranche */}
             <Card style={st(3)} onClick={() => navigate("/admin/tranche")}
-              className="col-span-6 lg:col-span-2 p-4">
+              className="col-span-6 lg:col-span-2 p-4 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
                   <BriefcaseIcon className="w-4 h-4 text-orange-500" />
                 </div>
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Salary Tranche</p>
+                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Salary Tranche</p>
               </div>
-              <p className="text-lg font-semibold text-zinc-900 leading-tight truncate">{activeVersion?.lbc_reference ?? "—"}</p>
-              <p className="text-[10px] text-zinc-400 mt-1 truncate">
-                {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
-              </p>
-              <div className="mt-3 flex items-center gap-1 text-[10px] text-zinc-400">
-                <span>Salary Standards</span><ChevronRightIcon className="w-3 h-3 ml-auto" />
+              <div className="flex-1">
+                <p className="text-lg font-semibold text-zinc-900 leading-tight truncate">
+                  {activeVersion?.lbc_reference ?? "—"}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-1 truncate">
+                  {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
+                </p>
+              </div>
+              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-[10px] text-zinc-400">Salary Standards</span>
+                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
               </div>
             </Card>
 
-            <Card style={st(4)} className="col-span-12 lg:col-span-6 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                  <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
-                </div>
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
-              </div>
-              <div className="flex flex-col sm:flex-row items-center gap-5">
-                <div className="relative w-28 h-28 flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart innerRadius="55%" outerRadius="100%"
-                      data={[
-                        { value: 100,        fill: "#f4f4f5" },
-                        { value: completion, fill: "#10b981" },
-                      ]}
-                      startAngle={90} endAngle={-270}>
-                      <RadialBar dataKey="value" cornerRadius={6} />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold text-zinc-900 leading-none">{completion}%</span>
-                    <span className="text-[9px] text-zinc-400 mt-0.5">approved</span>
-                  </div>
-                </div>
-                <div className="w-full grid grid-cols-3 gap-2 min-w-0">
-                  {[
-                    { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> },
-                    { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} /> },
-                    { label: "Draft",     depts: draftDepts,     color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} /> },
-                  ].map(s => (
-                    <div key={s.label} className="rounded-xl bg-zinc-50 border border-zinc-100 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">{s.icon}
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{s.label}</span>
-                        </div>
-                        <span className="text-lg font-bold text-zinc-900">{s.depts.length}</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-zinc-200 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width: totalWithPlan > 0 ? `${(s.depts.length / totalWithPlan) * 100}%` : "0%", background: s.color }} />
-                      </div>
-                      {s.depts.length > 0
-                        ? <DeptAvatars depts={s.depts} max={6} />
-                        : <p className="text-[10px] text-zinc-300">None yet</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
+            {/* Approval Progress */}
+            <ApprovalProgressCard
+              style={st(4)}
+              completion={completion}
+              totalWithPlan={totalWithPlan}
+              approvedDepts={approvedDepts}
+              submittedDepts={submittedDepts}
+              draftDepts={draftDepts}
+            />
+
           </div>
 
           {/* ── ROW 2 ── */}
@@ -1654,7 +1995,7 @@ const AdminDashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-base font-semibold text-zinc-900">{pesoC(ldrrmf)}</p>
+                          <p className="text-base font-semibold text-zinc-900">{peso(ldrrmf)}</p>
                           <p className="text-[10px] text-zinc-400 font-mono">budgeted</p>
                         </div>
                       </div>
@@ -1662,14 +2003,17 @@ const AdminDashboard: React.FC = () => {
                         <div className="px-4 py-3 border-r border-zinc-100 space-y-1.5">
                           <div className="flex items-center justify-between">
                             <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">30% QRF</p>
-                            <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">
+                            {/* <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">
                               {qrf > 0 ? `${Math.round((ldrrmf30Actual / qrf) * 100)}%` : "0%"}
+                            </span> */}
+                            <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">
+                              reserved
                             </span>
                           </div>
-                          <div className="flex items-baseline gap-1">
+                          {/* <div className="flex items-baseline gap-1">
                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-                              : <><p className="text-sm font-semibold text-rose-700">{pesoC(ldrrmf30Actual)}</p>
-                                  <p className="text-[10px] text-zinc-400">/ {pesoC(qrf)}</p></>}
+                              : <><p className="text-sm font-semibold text-rose-700">{peso(ldrrmf30Actual)}</p>
+                                  <p className="text-[10px] text-zinc-400">/ {peso(qrf)}</p></>}
                           </div>
                           <p className="text-[10px] text-zinc-400">allocated</p>
                           <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
@@ -1678,7 +2022,21 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-zinc-400">Remaining</span>
-                            <span className="text-[10px] font-semibold font-mono text-rose-500">{pesoC(ldrrmf30Remaining)}</span>
+                            <span className="text-[10px] font-semibold font-mono text-rose-500">{peso(ldrrmf30Remaining)}</span>
+                          </div> */}
+                          <div className="flex items-baseline gap-1">
+                            {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
+                              : <><p className="text-sm font-semibold text-rose-700">{peso(qrf)}</p>
+                                  <p className="text-[10px] text-zinc-400">/ {peso(qrf)}</p></>}
+                          </div>
+                          <p className="text-[10px] text-zinc-400">reserved · not yet disbursed</p>
+                          <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-400 rounded-full transition-all duration-700"
+                              style={{ width: "100%" }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-400">Available</span>
+                            <span className="text-[10px] font-semibold font-mono text-rose-500">{peso(qrf)}</span>
                           </div>
                         </div>
                         <div className="px-4 py-3 space-y-1.5">
@@ -1690,8 +2048,8 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <div className="flex items-baseline gap-1">
                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-                              : <><p className="text-sm font-semibold text-orange-700">{pesoC(ldrrmf70Actual)}</p>
-                                  <p className="text-[10px] text-zinc-400">/ {pesoC(predis)}</p></>}
+                              : <><p className="text-sm font-semibold text-orange-700">{peso(ldrrmf70Actual)}</p>
+                                  <p className="text-[10px] text-zinc-400">/ {peso(predis)}</p></>}
                           </div>
                           <p className="text-[10px] text-zinc-400">allocated</p>
                           <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
@@ -1700,7 +2058,7 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-zinc-400">Remaining</span>
-                            <span className="text-[10px] font-semibold font-mono text-orange-500">{pesoC(ldrrmf70Remaining)}</span>
+                            <span className="text-[10px] font-semibold font-mono text-orange-500">{peso(ldrrmf70Remaining)}</span>
                           </div>
                           <p className="text-[10px] text-zinc-300">JMC 2013-1 · R.A. 10121</p>
                         </div>
@@ -1718,10 +2076,21 @@ const AdminDashboard: React.FC = () => {
                       <ChartBarIcon className="w-4 h-4 text-indigo-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Expenditures by Department</p>
+                      <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Department Expenditures</p>
                       <p className="text-sm font-semibold text-zinc-900 mt-0.5">General Fund</p>
                     </div>
                   </div>
+                  {!deptExpLoading && deptExp.length > 0 && (
+                    <div className="text-right">
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">Grand Total</p>
+                      <p className="text-base font-semibold text-zinc-900 tabular-nums">
+                        {pesoC(deptExp.reduce((sum, d) => sum + d.total, 0))}
+                      </p>
+                      <p className="text-[10px] font-mono text-zinc-400">
+                        {peso(deptExp.reduce((sum, d) => sum + d.total, 0))}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {deptExpLoading ? (
                   <Shimmer className="h-44 w-full" />
@@ -1731,10 +2100,19 @@ const AdminDashboard: React.FC = () => {
                     <p className="text-xs">No expenditure data yet</p>
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={180}>
+                  <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={deptExp} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={16}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
-                      <XAxis dataKey="abbr" tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }} tickLine={false} axisLine={false} />
+                      <XAxis
+                        dataKey="abbr"
+                        interval={0}
+                        angle={-35}
+                        textAnchor="end"
+                        tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }}
+                        tickLine={false}
+                        axisLine={false}
+                        height={40}
+                      />
                       <YAxis tickFormatter={v => pesoC(v)} tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 600 }} tickLine={false} axisLine={false} width={56} />
                       <Tooltip content={<BarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
                       <Bar dataKey="total" name="Expenditure" radius={[4, 4, 0, 0]}>
@@ -1768,7 +2146,6 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-
                     <div className="flex items-center justify-center">
                       {!fundsReady ? (
                         <Shimmer className="w-28 h-28 rounded-full" />
@@ -1796,7 +2173,6 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
-                        {/* specialExp now includes form2 + AIP for all three accounts */}
                         <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
                       </div>
                       {fundsReady && (
@@ -1849,7 +2225,6 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                                 <div className="bg-white rounded-xl p-3 border border-zinc-100">
                                   <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1">Expenditure</p>
-                                  {/* expV now = form2 + AIP for this specific account */}
                                   {specialExpLoading ? <Shimmer className="h-5 w-full" /> : (
                                     <><p className="text-base font-semibold text-zinc-700">{pesoC(expV)}</p>
                                     <p className="text-xs font-mono text-zinc-400">{peso(expV)}</p></>
@@ -1952,7 +2327,9 @@ const AdminDashboard: React.FC = () => {
             </DialogHeader>
             <div className="px-6 py-5 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-zinc-600">Fiscal Year <span className="text-red-400">*</span></Label>
+                <ShadcnLabel className="text-xs font-semibold text-zinc-600">
+                  Fiscal Year <span className="text-red-400">*</span>
+                </ShadcnLabel>
                 <Input type="number" value={newYear} onChange={e => setNewYear(parseInt(e.target.value))}
                   className="h-9 text-sm font-mono" placeholder={String(new Date().getFullYear() + 1)} />
               </div>

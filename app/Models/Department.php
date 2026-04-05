@@ -9,16 +9,18 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $table = 'departments';
+    protected $table      = 'departments';
     protected $primaryKey = 'dept_id';
-    protected $fillable = [
-        'dept_name', 
-        'dept_abbreviation', 
-        'dept_category_id', 
+    protected $fillable   = [
+        'dept_name',
+        'dept_abbreviation',
+        'dept_category_id',
         'mandate',
-        'logo',];
+        'special_provisions',
+        'logo',
+    ];
 
-   public function category()
+    public function category()
     {
         return $this->belongsTo(
             DepartmentCategory::class,

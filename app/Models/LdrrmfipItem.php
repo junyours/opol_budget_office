@@ -24,13 +24,21 @@ class LdrrmfipItem extends Model
         'funding_source',
         'mooe',
         'co',
+        'obligation_amount',
+        'sem1_amount',
+        'sem2_amount',
+        'total_amount',
         'created_by',
         'updated_by',
     ];
 
     protected $casts = [
-        'mooe' => 'float',
-        'co'   => 'float',
+        'mooe'              => 'float',
+        'co'                => 'float',
+        'obligation_amount' => 'float',
+        'sem1_amount'       => 'float',
+        'sem2_amount'       => 'float',
+        'total_amount'      => 'float',
     ];
 
     public function getTotalAttribute(): float

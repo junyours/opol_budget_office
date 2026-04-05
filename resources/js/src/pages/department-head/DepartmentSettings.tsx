@@ -39,12 +39,13 @@ const DepartmentSettings: React.FC = () => {
   const [dept, setDept]       = useState<Department | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [mandate, setMandate]         = useState("");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const logoFileRef                   = useRef<File | null>(null);
-  const fileInputRef                  = useRef<HTMLInputElement>(null);
-  const [submitting, setSubmitting]   = useState(false);
-  const [dirty, setDirty]             = useState(false);
+  const [mandate, setMandate]                     = useState("");
+  const [specialProvisions, setSpecialProvisions] = useState("");
+  const [logoPreview, setLogoPreview]             = useState<string | null>(null);
+  const logoFileRef                               = useRef<File | null>(null);
+  const fileInputRef                              = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting]               = useState(false);
+  const [dirty, setDirty]                         = useState(false);
 
   useEffect(() => {
     const deptId = (user as any)?.dept_id;
@@ -55,11 +56,12 @@ const DepartmentSettings: React.FC = () => {
   const fetchDepartment = async (id: number) => {
     setLoading(true);
     try {
-      const res  = await API.get("/departments");
+      const res   = await API.get("/departments");
       const list: Department[] = Array.isArray(res.data?.data) ? res.data.data : [];
       const found = list.find((d) => d.dept_id === id) ?? null;
       setDept(found);
       setMandate(found?.mandate ?? "");
+      setSpecialProvisions(found?.special_provisions ?? "");
       setLogoPreview(found?.logo ? `/storage/${found.logo}` : null);
     } catch {
       toast.error("Failed to load department details.");
@@ -78,20 +80,16 @@ const DepartmentSettings: React.FC = () => {
     }
   };
 
-  const handleMandateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMandate(e.target.value);
-    setDirty(true);
-  };
-
   const handleSubmit = async () => {
     if (!dept) return;
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("_method", "PUT");
-      fd.append("dept_name", dept.dept_name);
-      fd.append("dept_category_id", dept.dept_category_id?.toString() ?? "");
-      fd.append("mandate", mandate);
+      fd.append("_method",            "PUT");
+      fd.append("dept_name",          dept.dept_name);
+      fd.append("dept_category_id",   dept.dept_category_id?.toString() ?? "");
+      fd.append("mandate",            mandate);
+      fd.append("special_provisions", specialProvisions);
       if (logoFileRef.current) fd.append("logo", logoFileRef.current);
 
       const token = localStorage.getItem("token");
@@ -135,7 +133,7 @@ const DepartmentSettings: React.FC = () => {
   return (
     <div className="p-6 flex flex-col h-full">
 
-      {/* ── Page Header — title only, no button ── */}
+      {/* ── Page Header ── */}
       <div className="mb-6 flex-shrink-0">
         <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
           Department
@@ -144,14 +142,14 @@ const DepartmentSettings: React.FC = () => {
           Department Settings
         </h1>
         <p className="text-xs text-gray-400 mt-1">
-          Update your department's mandate and logo. Other fields are managed by administrators.
+          Update your department's mandate, special provisions, and logo. Other fields are managed by administrators.
         </p>
       </div>
 
       {/* ── Card ── */}
       <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
 
-        {/* Hero — logo + identity */}
+        {/* Hero */}
         <div className="px-8 py-5 border-b border-gray-100 flex items-center gap-5 flex-shrink-0">
           <Avatar className="h-14 w-14 rounded-full border border-gray-200 shadow-sm flex-shrink-0">
             <AvatarImage src={logoPreview ?? undefined} alt={dept.dept_name} />
@@ -172,23 +170,19 @@ const DepartmentSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* Body — 3-col grid */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto px-8 py-7">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
             {/* ── Col 1: read-only info ── */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                  Department Info
-                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Department Info</span>
                 <div className="h-px flex-1 bg-gray-100" />
               </div>
-
               <ReadOnlyField label="Department Name" value={dept.dept_name} />
               <ReadOnlyField label="Abbreviation"    value={dept.dept_abbreviation} />
               <ReadOnlyField label="Category"        value={dept.category?.dept_category_name} />
-
               <p className="text-[10px] text-gray-300 leading-relaxed pt-1">
                 These fields are controlled by system administrators and cannot be edited here.
               </p>
@@ -197,25 +191,34 @@ const DepartmentSettings: React.FC = () => {
             {/* ── Col 2+3: editable fields ── */}
             <div className="lg:col-span-2 flex flex-col gap-6">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                  Editable Fields
-                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Editable Fields</span>
                 <div className="h-px flex-1 bg-gray-100" />
               </div>
 
               {/* Mandate */}
-              <div className="space-y-1.5 flex flex-col flex-1">
+              <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-gray-600">Mandate</Label>
                 <Textarea
                   value={mandate}
-                  onChange={handleMandateChange}
+                  onChange={(e) => { setMandate(e.target.value); setDirty(true); }}
                   placeholder="Describe your department's mandate, purpose, and key responsibilities…"
-                  className="text-sm resize-none min-h-[200px] flex-1"
-                  rows={10}
+                  className="text-sm resize-none min-h-[120px]"
+                  rows={5}
                 />
-                <p className="text-[10px] text-gray-400">
-                  Visible in official department listings and reports.
-                </p>
+                <p className="text-[10px] text-gray-400">Visible in official department listings and reports.</p>
+              </div>
+
+              {/* Special Provisions */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-gray-600">Special Provisions</Label>
+                <Textarea
+                  value={specialProvisions}
+                  onChange={(e) => { setSpecialProvisions(e.target.value); setDirty(true); }}
+                  placeholder="Enter any special provisions applicable to this department…"
+                  className="text-sm resize-none min-h-[120px]"
+                  rows={5}
+                />
+                <p className="text-[10px] text-gray-400">Used in budget reports and formal department documents.</p>
               </div>
 
               {/* Logo */}
@@ -231,16 +234,8 @@ const DepartmentSettings: React.FC = () => {
                   <div className="flex-1 space-y-1.5">
                     <label className="flex items-center gap-2.5 h-9 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs text-gray-500 w-full">
                       <PhotoIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">
-                        {logoFileRef.current?.name ?? "Choose image…"}
-                      </span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleFileChange}
-                      />
+                      <span className="truncate">{logoFileRef.current?.name ?? "Choose image…"}</span>
+                      <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
                     </label>
                     <p className="text-[10px] text-gray-400">JPEG, PNG, SVG or GIF · max 5 MB</p>
                   </div>
@@ -251,11 +246,9 @@ const DepartmentSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Card footer — single save button, warning RIGHT beside it ── */}
+        {/* Card footer */}
         <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-end gap-2.5 flex-shrink-0">
-          {dirty && (
-            <span className="text-[11px] text-amber-500">Unsaved changes</span>
-          )}
+          {dirty && <span className="text-[11px] text-amber-500">Unsaved changes</span>}
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
@@ -263,10 +256,7 @@ const DepartmentSettings: React.FC = () => {
             disabled={submitting || !dirty}
           >
             {submitting ? (
-              <>
-                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Saving…
-              </>
+              <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</>
             ) : "Save Changes"}
           </Button>
         </div>

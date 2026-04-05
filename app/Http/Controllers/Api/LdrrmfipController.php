@@ -154,8 +154,12 @@ class LdrrmfipController extends BaseApiController
             'completion_date'       => 'nullable|string|max:50',
             'expected_output'       => 'nullable|string|max:255',
             'funding_source'        => 'nullable|string|max:100',
-            'mooe'                  => 'nullable|numeric|min:0',
-            'co'                    => 'nullable|numeric|min:0',
+            'mooe'              => 'nullable|numeric|min:0',
+            'co'                => 'nullable|numeric|min:0',
+            'obligation_amount' => 'nullable|numeric|min:0',
+            'sem1_amount'       => 'nullable|numeric|min:0',
+            'sem2_amount'       => 'nullable|numeric|min:0',
+            'total_amount'      => 'nullable|numeric|min:0',
         ]);
 
         $exists = LdrrmfipItem::where('budget_plan_id',       $validated['budget_plan_id'])
@@ -176,8 +180,12 @@ class LdrrmfipController extends BaseApiController
             ...$validated,
             'implementing_office' => $validated['implementing_office'] ?? 'LDRRMO',
             'funding_source'      => $validated['funding_source']      ?? 'LDRRMF',
-            'mooe'                => $validated['mooe'] ?? 0,
-            'co'                  => $validated['co']   ?? 0,
+            'mooe'                => $validated['mooe']              ?? 0,
+            'co'                  => $validated['co']                ?? 0,
+            'obligation_amount'   => $validated['obligation_amount'] ?? 0,
+            'sem1_amount'         => $validated['sem1_amount']       ?? 0,
+            'sem2_amount'         => $validated['sem2_amount']       ?? 0,
+            'total_amount'        => $validated['total_amount']      ?? 0,
             'created_by'          => $userId,
             'updated_by'          => $userId,
         ]);
@@ -197,8 +205,12 @@ class LdrrmfipController extends BaseApiController
             'completion_date'      => 'nullable|string|max:50',
             'expected_output'      => 'nullable|string|max:255',
             'funding_source'       => 'nullable|string|max:100',
-            'mooe'                 => 'nullable|numeric|min:0',
-            'co'                   => 'nullable|numeric|min:0',
+            'mooe'              => 'nullable|numeric|min:0',
+            'co'                => 'nullable|numeric|min:0',
+            'obligation_amount' => 'nullable|numeric|min:0',
+            'sem1_amount'       => 'nullable|numeric|min:0',
+            'sem2_amount'       => 'nullable|numeric|min:0',
+            'total_amount'      => 'nullable|numeric|min:0',
         ]);
 
         if (isset($validated['description']) && $validated['description'] !== $ldrrmfip->description) {
@@ -374,4 +386,84 @@ class LdrrmfipController extends BaseApiController
 
         return $ids;
     }
+
+    // ── upsertYearAmounts ─────────────────────────────────────────────────────
+
+    /**
+     * PATCH /api/ldrrmfip/upsert-year-amounts
+     *
+     * Upserts obligation_amount (past year) or sem1_amount (current year)
+     * for an item identified by budget_plan_id + source + description.
+     * If the item doesn't exist in that plan year, creates it with 0 mooe/co
+     * and the provided amount column only.
+     */
+    public function upsertYearAmounts(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'budget_plan_id'   => 'required|integer|exists:budget_plans,budget_plan_id',
+            'source'           => 'required|string|max:50',
+            'description'      => 'required|string|max:500',
+            'obligation_amount'=> 'sometimes|nullable|numeric|min:0',
+            'sem1_amount'      => 'sometimes|nullable|numeric|min:0',
+        ]);
+
+        $planId      = $validated['budget_plan_id'];
+        $source      = $validated['source'];
+        $description = $validated['description'];
+
+        // Find the item in the target plan year by description+source
+        $item = LdrrmfipItem::where('budget_plan_id', $planId)
+            ->where('source', $source)
+            ->where('description', $description)
+            ->first();
+
+        if (!$item) {
+            // Auto-create the item in this plan year so the amount can be stored
+            // Inherit category from the active plan's matching item if possible
+            $activePlan   = BudgetPlan::where('is_active', true)->first();
+            $categoryId   = 1; // fallback
+            if ($activePlan) {
+                $ref = LdrrmfipItem::where('source', $source)
+                    ->where('description', $description)
+                    ->first();
+                if ($ref) $categoryId = $ref->ldrrmfip_category_id;
+            }
+
+            $item = LdrrmfipItem::create([
+                'budget_plan_id'       => $planId,
+                'ldrrmfip_category_id' => $categoryId,
+                'source'               => $source,
+                'description'          => $description,
+                'implementing_office'  => 'LDRRMO',
+                'funding_source'       => 'LDRRMF',
+                'mooe'                 => 0,
+                'co'                   => 0,
+                'obligation_amount'    => 0,
+                'sem1_amount'          => 0,
+                'sem2_amount'          => 0,
+                'total_amount'         => 0,
+                'created_by'           => $request->user()?->user_id,
+                'updated_by'           => $request->user()?->user_id,
+            ]);
+        }
+
+        $updateData = ['updated_by' => $request->user()?->user_id];
+
+        if (array_key_exists('obligation_amount', $validated)) {
+            $updateData['obligation_amount'] = $validated['obligation_amount'] ?? 0;
+        }
+
+        if (array_key_exists('sem1_amount', $validated)) {
+            $sem1 = $validated['sem1_amount'] ?? 0;
+            // sem2 = total_amount - sem1 (never negative)
+            $sem2 = max(0, $item->total_amount - $sem1);
+            $updateData['sem1_amount'] = $sem1;
+            $updateData['sem2_amount'] = $sem2;
+        }
+
+        $item->update($updateData);
+
+        return $this->success($item->fresh());
+    }
+    
 }

@@ -1873,49 +1873,197 @@ return response()->stream(function () use ($zipPath) {
     // FORM 2 / 3 / 4 BUILDERS (ported from BudgetReportController)
     // ═══════════════════════════════════════════════════════
 
+    // private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
+    // {
+    //     $items = [];
+    //     foreach ($proposedPlan->items as $proposedItem) {
+    //         $expenseItem = $proposedItem->expenseItem;
+    //         if (! $expenseItem) continue;
+
+    //         $currentItem = $currentPlan
+    //             ? BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
+    //                 ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
+    //             : null;
+    //         $pastItem = $pastPlan
+    //             ? BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+    //                 ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
+    //             : null;
+
+    //         $items[] = [
+    //             'classification' => $expenseItem->classification->expense_class_name ?? 'Uncategorized',
+    //             'description'    => $expenseItem->expense_class_item_name,
+    //             'account_code'   => $expenseItem->expense_class_item_acc_code,
+    //             'past_total'     => (float) ($pastItem?->obligation_amount ?? 0),  // ← FIXED: use obligation_amount
+    //             'current_sem1'   => (float) ($currentItem?->sem1_amount    ?? 0),
+    //             'current_sem2'   => (float) ($currentItem?->sem2_amount    ?? 0),
+    //             'current_total'  => (float) ($currentItem?->total_amount   ?? 0),
+    //             'proposed'       => (float) $proposedItem->total_amount,
+    //         ];
+    //     }
+
+    //     // ── Special Programs (AIP Form 4 items) ──────────────────────────────
+    //     // Build a union of all AIP programs that appear in ANY of the three
+    //     // periods (proposed / current / past).  This ensures programs that exist
+    //     // in earlier years still show up even when the proposed year has no
+    //     // Form 4 entries yet.
+
+    //     // Load form4 items for each period (keyed by aip_program_id)
+    //     $proposedAip = DeptBpForm4Item::with('aipProgram')
+    //         ->where('dept_budget_plan_id', $proposedPlan->dept_budget_plan_id)
+    //         ->get()
+    //         ->keyBy('aip_program_id');
+
+    //     $currentAip = $currentPlan
+    //         ? DeptBpForm4Item::with('aipProgram')
+    //             ->where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
+    //             ->get()
+    //             ->keyBy('aip_program_id')
+    //         : collect();
+
+    //     $pastAip = $pastPlan
+    //         ? DeptBpForm4Item::with('aipProgram')
+    //             ->where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+    //             ->get()
+    //             ->keyBy('aip_program_id')
+    //         : collect();
+
+    //     // Union of all program IDs across the three periods
+    //     $allProgramIds = $proposedAip->keys()
+    //         ->merge($currentAip->keys())
+    //         ->merge($pastAip->keys())
+    //         ->unique()
+    //         ->sort()
+    //         ->values();
+
+    //     $specialPrograms = [];
+    //     foreach ($allProgramIds as $programId) {
+    //         $proposedRow = $proposedAip->get($programId);
+    //         $currentRow  = $currentAip->get($programId);
+    //         $pastRow     = $pastAip->get($programId);
+
+    //         // Resolve the AIP program meta from whichever period has it
+    //         $aipProgram = $proposedRow?->aipProgram
+    //             ?? $currentRow?->aipProgram
+    //             ?? $pastRow?->aipProgram;
+
+    //         if (! $aipProgram) continue;
+
+    //         // $pastTotal    = (float) ($pastRow?->total_amount ?? 0);
+    //         $pastTotal    = (float) ($pastRow?->obligation_amount ?? 0);  // ← FIXED
+    //         $curSem1      = (float) ($currentRow?->sem1_amount ?? 0);
+    //         $curSem2      = (float) ($currentRow?->sem2_amount ?? 0);
+    //         $curTotal     = (float) ($currentRow?->total_amount
+    //                         ?? (($currentRow?->sem1_amount ?? 0) + ($currentRow?->sem2_amount ?? 0)));
+    //         $proposed     = (float) ($proposedRow?->total_amount ?? 0);
+
+    //         // Skip entirely if there is absolutely no data in any period
+    //         if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) continue;
+
+    //         $specialPrograms[] = [
+    //             'aip_reference_code'  => $aipProgram->aip_reference_code,
+    //             'program_description' => $aipProgram->program_description,
+    //             'past_total'          => $pastTotal,
+    //             'current_sem1'        => $curSem1,
+    //             'current_sem2'        => $curSem2,
+    //             'current_total'       => $curTotal,
+    //             'proposed'            => $proposed,
+    //         ];
+    //     }
+
+    //     return compact('items', 'specialPrograms');
+    // }
     private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
-    {
-        $items = [];
-        foreach ($proposedPlan->items as $proposedItem) {
-            $expenseItem = $proposedItem->expenseItem;
-            if (! $expenseItem) continue;
-
-            $currentItem = $currentPlan
-                ? BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
-                    ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
-                : null;
-            $pastItem = $pastPlan
-                ? BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
-                    ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
-                : null;
-
-            $items[] = [
-                'classification' => $expenseItem->classification->expense_class_name ?? 'Uncategorized',
-                'description'    => $expenseItem->expense_class_item_name,
-                'account_code'   => $expenseItem->expense_class_item_acc_code,
-                'past_total'     => (float) ($pastItem?->total_amount    ?? 0),
-                'current_sem1'   => (float) ($currentItem?->sem1_amount  ?? 0),
-                'current_sem2'   => (float) ($currentItem?->sem2_amount  ?? 0),
-                'current_total'  => (float) ($currentItem?->total_amount ?? 0),
-                'proposed'       => (float) $proposedItem->total_amount,
-            ];
-        }
-
-        $aipItems        = DeptBpForm4Item::with('aipProgram')
-            ->where('dept_budget_plan_id', $proposedPlan->dept_budget_plan_id)
-            ->orderBy('dept_bp_form4_item_id')->get();
-        $specialPrograms = $aipItems->map(fn ($i) => [
-            'aip_reference_code'  => $i->aipProgram?->aip_reference_code,
-            'program_description' => $i->aipProgram?->program_description,
-            'past_total'          => 0,
-            'current_sem1'        => (float) ($i->sem1_amount ?? 0),
-            'current_sem2'        => (float) ($i->sem2_amount ?? 0),
-            'current_total'       => (float) (($i->sem1_amount ?? 0) + ($i->sem2_amount ?? 0)),
-            'proposed'            => (float) $i->total_amount,
-        ])->toArray();
-
-        return compact('items', 'specialPrograms');
+{
+    $items = [];
+    foreach ($proposedPlan->items as $proposedItem) {
+        $expenseItem = $proposedItem->expenseItem;
+        if (! $expenseItem) continue;
+ 
+        $currentItem = $currentPlan
+            ? BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
+                ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
+            : null;
+        $pastItem = $pastPlan
+            ? BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+                ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
+            : null;
+ 
+        $items[] = [
+            'classification' => $expenseItem->classification->expense_class_name ?? 'Uncategorized',
+            'description'    => $expenseItem->expense_class_item_name,
+            'account_code'   => $expenseItem->expense_class_item_acc_code,
+            // ↓ FIXED: past year ACTUAL = obligation_amount (what was actually spent/obligated)
+            //          NOT total_amount (which is the appropriation/budget)
+            'past_total'     => (float) ($pastItem?->obligation_amount ?? 0),
+            'current_sem1'   => (float) ($currentItem?->sem1_amount    ?? 0),
+            'current_sem2'   => (float) ($currentItem?->sem2_amount    ?? 0),
+            'current_total'  => (float) ($currentItem?->total_amount   ?? 0),
+            'proposed'       => (float) $proposedItem->total_amount,
+        ];
     }
+ 
+    // ── Special Programs (AIP Form 4 items) ──────────────────────────────────
+    $proposedAip = DeptBpForm4Item::with('aipProgram')
+        ->where('dept_budget_plan_id', $proposedPlan->dept_budget_plan_id)
+        ->get()
+        ->keyBy('aip_program_id');
+ 
+    $currentAip = $currentPlan
+        ? DeptBpForm4Item::with('aipProgram')
+            ->where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
+            ->get()
+            ->keyBy('aip_program_id')
+        : collect();
+ 
+    $pastAip = $pastPlan
+        ? DeptBpForm4Item::with('aipProgram')
+            ->where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+            ->get()
+            ->keyBy('aip_program_id')
+        : collect();
+ 
+    $allProgramIds = $proposedAip->keys()
+        ->merge($currentAip->keys())
+        ->merge($pastAip->keys())
+        ->unique()
+        ->sort()
+        ->values();
+ 
+    $specialPrograms = [];
+    foreach ($allProgramIds as $programId) {
+        $proposedRow = $proposedAip->get($programId);
+        $currentRow  = $currentAip->get($programId);
+        $pastRow     = $pastAip->get($programId);
+ 
+        $aipProgram = $proposedRow?->aipProgram
+            ?? $currentRow?->aipProgram
+            ?? $pastRow?->aipProgram;
+ 
+        if (! $aipProgram) continue;
+ 
+        // ↓ FIXED: past year ACTUAL = obligation_amount
+        $pastTotal = (float) ($pastRow?->obligation_amount ?? 0);
+        $curSem1   = (float) ($currentRow?->sem1_amount    ?? 0);
+        $curSem2   = (float) ($currentRow?->sem2_amount    ?? 0);
+        $curTotal  = (float) ($currentRow?->total_amount
+                    ?? (($currentRow?->sem1_amount ?? 0) + ($currentRow?->sem2_amount ?? 0)));
+        $proposed  = (float) ($proposedRow?->total_amount  ?? 0);
+ 
+        if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) continue;
+ 
+        $specialPrograms[] = [
+            'aip_reference_code'  => $aipProgram->aip_reference_code,
+            'program_description' => $aipProgram->program_description,
+            'past_total'          => $pastTotal,
+            'current_sem1'        => $curSem1,
+            'current_sem2'        => $curSem2,
+            'current_total'       => $curTotal,
+            'proposed'            => $proposed,
+        ];
+    }
+ 
+    return compact('items', 'specialPrograms');
+}
 
     private function buildForm3($proposedPlan, $currentPlan, int $currentYear, int $proposedYear): array
     {

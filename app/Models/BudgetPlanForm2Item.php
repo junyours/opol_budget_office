@@ -21,14 +21,16 @@ class BudgetPlanForm2Item extends Model
         'sem1_amount',
         'sem2_amount',
         'total_amount',
+        'obligation_amount',
         'recommendation',
         'updated_by',
     ];
 
     protected $casts = [
-        'sem1_amount' => 'decimal:2',
-        'sem2_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'sem1_amount'       => 'decimal:2',
+        'sem2_amount'       => 'decimal:2',
+        'total_amount'      => 'decimal:2',
+        'obligation_amount' => 'decimal:2',
     ];
 
     public function budgetPlan()

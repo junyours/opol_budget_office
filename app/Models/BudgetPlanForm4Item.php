@@ -22,13 +22,15 @@ class BudgetPlanForm4Item extends Model
         'mooe_amount',
         'co_amount',
         'total_amount',
+        'obligation_amount',
     ];
 
     protected $casts = [
-        'ps_amount' => 'decimal:2',
-        'mooe_amount' => 'decimal:2',
-        'co_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'ps_amount'         => 'decimal:2',
+        'mooe_amount'       => 'decimal:2',
+        'co_amount'         => 'decimal:2',
+        'total_amount'      => 'decimal:2',
+        'obligation_amount' => 'decimal:2',
     ];
 
     public function budgetPlan()

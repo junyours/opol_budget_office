@@ -57,7 +57,8 @@ const BudgetPlanDetail: React.FC = () => {
   const [plan, setPlan]                     = useState<DepartmentBudgetPlan | null>(null);
   const [classifications, setClassifications] = useState<ExpenseClassification[]>([]);
   const [expenseItems, setExpenseItems]     = useState<ExpenseItem[]>([]);
-  const [pastYearPlan, setPastYearPlan]     = useState<DepartmentBudgetPlan | null>(null);
+  const [pastYearPlan,        setPastYearPlan]        = useState<DepartmentBudgetPlan | null>(null);
+  const [obligationYearPlan,  setObligationYearPlan]  = useState<DepartmentBudgetPlan | null>(null);
   const [loading, setLoading]               = useState(true);
   const [activeTab, setActiveTab]           = useState('2');
 
@@ -80,12 +81,19 @@ const BudgetPlanDetail: React.FC = () => {
       const currentPlan: DepartmentBudgetPlan = planRes.data.data;
 
       let pastPlan: DepartmentBudgetPlan | null = null;
+      let obligationPlan: DepartmentBudgetPlan | null = null;
       try {
         const pastRes = await API.get(
           `/department-budget-plans/by-dept-year/${currentPlan.dept_id}/${currentPlan.budget_plan!.year - 1}`
         );
         pastPlan = pastRes.data.data;
       } catch { /* 404 — no past plan */ }
+      try {
+        const oblRes = await API.get(
+          `/department-budget-plans/by-dept-year/${currentPlan.dept_id}/${currentPlan.budget_plan!.year - 2}`
+        );
+        obligationPlan = oblRes.data.data;
+      } catch { /* 404 — no obligation plan */ }
 
       // Auto-copy items from past year if current plan is empty
       if (currentPlan.items.length === 0 && pastPlan && pastPlan.items.length > 0) {
@@ -103,6 +111,7 @@ const BudgetPlanDetail: React.FC = () => {
       setClassifications(classRes.data.data);
       setExpenseItems(itemsRes.data.data);
       setPastYearPlan(pastPlan);
+      setObligationYearPlan(obligationPlan);
     } catch (error: any) {
       console.error('Failed to fetch data', error);
       if (error.response?.status === 403) {
@@ -218,6 +227,7 @@ const BudgetPlanDetail: React.FC = () => {
           <Form2
             plan={plan}
             pastYearPlan={pastYearPlan}
+            obligationYearPlan={obligationYearPlan}
             classifications={classifications}
             expenseItems={expenseItems}
             isEditable={isEditable}

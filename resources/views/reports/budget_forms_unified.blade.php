@@ -44,7 +44,7 @@ body {
     margin-left:   36pt;
     margin-right:  36pt;
 }
-.wrap { width: 936pt; }
+.wrap { width: 864pt; }
 @else
 body {
     /* Portrait — binding at LEFT */
@@ -393,16 +393,16 @@ $maybeBreak = function(
 <table class="data-table">
 <thead>
 <tr>
-    <th rowspan="2" width="28%">Object of Expenditures</th>
-    <th rowspan="2" width="12%">Account<br>Code</th>
-    <th rowspan="2" width="10%">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
+    <th rowspan="2" width="36%">Object of Expenditures</th>
+    <th rowspan="2" width="10%">Account<br>Code</th>
+    <th rowspan="2" width="11%">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
     <th colspan="3">Current Year Appropriation {{ $currYear }}</th>
     <th rowspan="2" width="13%">{{ $propYear }}<br>Budget Year<br>(Proposed)</th>
 </tr>
 <tr>
-    <th width="9%">1st Semester<br>(Actual)</th>
-    <th width="9%">2nd Semester<br>(Estimate)</th>
-    <th width="9%">Total</th>
+    <th width="10%">1st Semester<br>(Actual)</th>
+    <th width="10%">2nd Semester<br>(Estimate)</th>
+    <th width="11%">Total</th>
 </tr>
 <tr class="col-num">
     <td>(1)</td><td>(2)</td><td>(3)</td><td>(4)</td><td>(5)</td><td>(6)</td><td>(7)</td>

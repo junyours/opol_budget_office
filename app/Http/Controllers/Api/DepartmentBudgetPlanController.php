@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\BudgetPlan;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use App\Models\AIPProgram;
+use App\Models\DeptBpForm4Item;
 
 class DepartmentBudgetPlanController extends BaseApiController
 {
@@ -444,5 +447,113 @@ class DepartmentBudgetPlanController extends BaseApiController
 
     return $this->success(['message' => 'Assignment removed from snapshot.']);
 }
+
+/**
+     * POST /api/department-budget-plans/{plan}/upload-obligations
+     *
+     * Accepts a JSON body (parsed from Excel on the frontend) with shape:
+     * {
+     *   "items": [
+     *     { "expense_item_name": "...", "amount": 12345 },
+     *     ...
+     *   ],
+     *   "aip_programs": [
+     *     { "program_description": "...", "amount": 12345 },
+     *     ...
+     *   ]
+     * }
+     *
+     * Matches by expense_item_name (case-insensitive) and program_description,
+     * upserts obligation_amount, and auto-adds missing items to current (year+1)
+     * and proposed (year+2) plans if not already present.
+     */
+    public function uploadObligations(Request $request, DepartmentBudgetPlan $department_budget_plan)
+    {
+        $this->authorize('update', $department_budget_plan);
+
+        $validated = $request->validate([
+            'items'                       => 'sometimes|array',
+            'items.*.expense_item_name'   => 'required_with:items|string',
+            'items.*.amount'              => 'required_with:items|numeric|min:0',
+            'aip_programs'                => 'sometimes|array',
+            'aip_programs.*.program_description' => 'required_with:aip_programs|string',
+            'aip_programs.*.amount'       => 'required_with:aip_programs|numeric|min:0',
+        ]);
+
+        $pastPlan   = $department_budget_plan;
+        $pastBpYear = $pastPlan->budgetPlan->year ?? null;
+
+        if (!$pastBpYear) {
+            return $this->error('Could not determine year for this plan.', 422);
+        }
+
+        // Find current (pastYear+1) and proposed (pastYear+2) plans for same dept
+        $currentBp  = BudgetPlan::where('year', $pastBpYear + 1)->first();
+        $proposedBp = BudgetPlan::where('year', $pastBpYear + 2)->first();
+
+        $currentPlan  = $currentBp  ? DepartmentBudgetPlan::where('dept_id', $pastPlan->dept_id)->where('budget_plan_id', $currentBp->budget_plan_id)->first()  : null;
+        $proposedPlan = $proposedBp ? DepartmentBudgetPlan::where('dept_id', $pastPlan->dept_id)->where('budget_plan_id', $proposedBp->budget_plan_id)->first() : null;
+
+        DB::beginTransaction();
+        try {
+            // ── Regular expense items ─────────────────────────────────────────
+            foreach ($validated['items'] ?? [] as $row) {
+                // Find expense item by name (case-insensitive)
+                $expItem = \App\Models\ExpenseClassItem::whereRaw(
+                    'LOWER(expense_class_item_name) = ?', [strtolower(trim($row['expense_item_name']))]
+                )->first();
+
+                if (!$expItem) continue;
+
+                // Upsert obligation on past plan
+                $pastItem = BudgetPlanForm2Item::firstOrCreate(
+                    ['dept_budget_plan_id' => $pastPlan->dept_budget_plan_id, 'expense_item_id' => $expItem->expense_class_item_id],
+                    ['sem1_amount' => 0, 'sem2_amount' => 0, 'total_amount' => 0, 'obligation_amount' => 0]
+                );
+                $pastItem->obligation_amount = $row['amount'];
+                $pastItem->save();
+
+                // Auto-add to current year plan (0 amount) if missing
+                if ($currentPlan) {
+                    BudgetPlanForm2Item::firstOrCreate(
+                        ['dept_budget_plan_id' => $currentPlan->dept_budget_plan_id, 'expense_item_id' => $expItem->expense_class_item_id],
+                        ['sem1_amount' => 0, 'sem2_amount' => 0, 'total_amount' => 0, 'obligation_amount' => 0]
+                    );
+                }
+                // Auto-add to proposed year plan (0 amount) if missing
+                if ($proposedPlan) {
+                    BudgetPlanForm2Item::firstOrCreate(
+                        ['dept_budget_plan_id' => $proposedPlan->dept_budget_plan_id, 'expense_item_id' => $expItem->expense_class_item_id],
+                        ['sem1_amount' => 0, 'sem2_amount' => 0, 'total_amount' => 0, 'obligation_amount' => 0]
+                    );
+                }
+            }
+
+            // ── AIP program items ─────────────────────────────────────────────
+            foreach ($validated['aip_programs'] ?? [] as $row) {
+                $program = AIPProgram::where('dept_id', $pastPlan->dept_id)
+                    ->whereRaw('LOWER(program_description) = ?', [strtolower(trim($row['program_description']))])
+                    ->first();
+
+                if (!$program) continue;
+
+                $pastForm4 = DeptBpForm4Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+                    ->where('aip_program_id', $program->aip_program_id)
+                    ->first();
+
+                if ($pastForm4) {
+                    $pastForm4->obligation_amount = $row['amount'];
+                    $pastForm4->save();
+                }
+            }
+
+            DB::commit();
+            $pastPlan->load('items');
+            return $this->success(['message' => 'Obligations uploaded successfully.', 'plan' => $pastPlan]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return $this->error('Upload failed: ' . $e->getMessage(), 500);
+        }
+    }
 
 }

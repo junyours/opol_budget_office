@@ -347,6 +347,10 @@ useEffect(() => {
         funding_source:       form.funding_source        || "LDRRMF",
         mooe:                 parseFloat(form.mooe as string) || 0,
         co:                   parseFloat(form.co   as string) || 0,
+        obligation_amount:    0,
+        sem1_amount:          0,
+        sem2_amount:          0,
+        total_amount:         parseFloat(form.mooe as string) + parseFloat(form.co as string) || 0,
       };
 
       if (editItem) {

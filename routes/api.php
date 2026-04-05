@@ -94,7 +94,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Status transitions
     Route::post('department-budget-plans/{department_budget_plan}/submit',  [DepartmentBudgetPlanController::class, 'submit']);
     Route::post('department-budget-plans/{department_budget_plan}/approve', [DepartmentBudgetPlanController::class, 'approve']);
-    Route::post('department-budget-plans/{department_budget_plan}/reject',  [DepartmentBudgetPlanController::class, 'reject']);
+    Route::post('department-budget-plans/{department_budget_plan}/reject',           [DepartmentBudgetPlanController::class, 'reject']);
+    Route::post('department-budget-plans/{department_budget_plan}/upload-obligations',[DepartmentBudgetPlanController::class, 'uploadObligations']);
 
     // Nested items (Form 2)
     Route::apiResource('department-budget-plans.items', BudgetPlanForm2ItemController::class);
@@ -191,18 +192,20 @@ Route::apiResource('form6-special', Form6SpecialController::class)
     Route::get ('/ps-computation',       [PsComputationController::class, 'index']);
     Route::post('/ps-computation/save',  [PsComputationController::class, 'save']);
 
-    Route::get('ldrrmfip/categories',     [LdrrmfipController::class, 'categories']);
-    Route::get('ldrrmfip/sources',        [LdrrmfipController::class, 'sources']);      // ← NEW
-    Route::get('ldrrmfip/previous-items', [LdrrmfipController::class, 'previousItems']);
-    Route::get('ldrrmfip/summary',        [LdrrmfipController::class, 'summary']);
+    Route::get  ('ldrrmfip/categories',         [LdrrmfipController::class, 'categories']);
+    Route::get  ('ldrrmfip/sources',            [LdrrmfipController::class, 'sources']);
+    Route::get  ('ldrrmfip/previous-items',     [LdrrmfipController::class, 'previousItems']);
+    Route::get  ('ldrrmfip/summary',            [LdrrmfipController::class, 'summary']);
+    Route::patch('ldrrmfip/upsert-year-amounts',[LdrrmfipController::class, 'upsertYearAmounts']);
     
     Route::apiResource('ldrrmfip', LdrrmfipController::class)
         ->parameters(['ldrrmfip' => 'ldrrmfip'])
         ->only(['index', 'store', 'update', 'destroy']);
 
     // Static named route before apiResource
-    Route::get('ldrrmf-plan/special-accounts', [LdrrmfPlanController::class, 'specialAccounts']);
-    
+    Route::get('ldrrmf-plan/special-accounts',  [LdrrmfPlanController::class, 'specialAccounts']);
+    Route::get('ldrrmf-plan/consolidated',      [LdrrmfPlanController::class, 'consolidated']);
+
     Route::apiResource('ldrrmf-plan', LdrrmfPlanController::class)
         ->only(['index']);
 

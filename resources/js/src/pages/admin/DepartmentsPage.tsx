@@ -87,7 +87,8 @@ const DepartmentsPage: React.FC = () => {
   const [modalOpen, setModalOpen]     = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [form, setForm] = useState({
-    dept_name: "", dept_abbreviation: "", dept_category_id: "", mandate: "",
+    dept_name: "", dept_abbreviation: "", dept_category_id: "",
+    mandate: "", special_provisions: "",
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef                   = useRef<File | null>(null);
@@ -130,14 +131,12 @@ const DepartmentsPage: React.FC = () => {
   const filtered = useMemo(() => {
     let list = departments;
 
-    // Category filter
     if (filterCategory !== ALL_CATEGORIES) {
       list = list.filter(
         (d) => d.dept_category_id?.toString() === filterCategory
       );
     }
 
-    // Search (debounced) — matches name or abbreviation
     const q = debouncedSearch.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -150,28 +149,12 @@ const DepartmentsPage: React.FC = () => {
     return list;
   }, [departments, filterCategory, debouncedSearch]);
 
-  // Reset to page 1 whenever filter/search changes
-  const handleFilterChange = (val: string) => {
-    setFilterCategory(val);
-    setPage(1);
-  };
+  const handleFilterChange = (val: string) => { setFilterCategory(val); setPage(1); };
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setSearchRaw(e.target.value); setPage(1); };
+  const clearSearch = () => { setSearchRaw(""); setPage(1); };
+  const clearFilter = () => { setFilterCategory(ALL_CATEGORIES); setPage(1); };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchRaw(e.target.value);
-    setPage(1);
-  };
-
-  const clearSearch = () => {
-    setSearchRaw("");
-    setPage(1);
-  };
-
-  const clearFilter = () => {
-    setFilterCategory(ALL_CATEGORIES);
-    setPage(1);
-  };
-
-  const isFiltered = filterCategory !== ALL_CATEGORIES;
+  const isFiltered  = filterCategory !== ALL_CATEGORIES;
   const isSearching = debouncedSearch.trim().length > 0;
   const activeCategory = categories.find(
     (c) => c.dept_category_id.toString() === filterCategory
@@ -185,10 +168,8 @@ const DepartmentsPage: React.FC = () => {
   const getPageNumbers = (): (number | "ellipsis")[] => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
     const pages: (number | "ellipsis")[] = [1];
-    if (page > 3)              pages.push("ellipsis");
-    for (let p = Math.max(2, page - 1); p <= Math.min(totalPages - 1, page + 1); p++) {
-      pages.push(p);
-    }
+    if (page > 3) pages.push("ellipsis");
+    for (let p = Math.max(2, page - 1); p <= Math.min(totalPages - 1, page + 1); p++) pages.push(p);
     if (page < totalPages - 2) pages.push("ellipsis");
     pages.push(totalPages);
     return pages;
@@ -198,7 +179,7 @@ const DepartmentsPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingDept(null);
-    setForm({ dept_name: "", dept_abbreviation: "", dept_category_id: "", mandate: "" });
+    setForm({ dept_name: "", dept_abbreviation: "", dept_category_id: "", mandate: "", special_provisions: "" });
     logoFileRef.current = null;
     setLogoPreview(null);
     setModalOpen(true);
@@ -207,10 +188,11 @@ const DepartmentsPage: React.FC = () => {
   const openEdit = (dept: Department) => {
     setEditingDept(dept);
     setForm({
-      dept_name:         dept.dept_name,
-      dept_abbreviation: dept.dept_abbreviation ?? "",
-      dept_category_id:  dept.dept_category_id?.toString() ?? "",
-      mandate:           dept.mandate ?? "",
+      dept_name:          dept.dept_name,
+      dept_abbreviation:  dept.dept_abbreviation ?? "",
+      dept_category_id:   dept.dept_category_id?.toString() ?? "",
+      mandate:            dept.mandate ?? "",
+      special_provisions: dept.special_provisions ?? "",
     });
     logoFileRef.current = null;
     setLogoPreview(dept.logo ? `/storage/${dept.logo}` : null);
@@ -239,16 +221,15 @@ const DepartmentsPage: React.FC = () => {
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("dept_name", form.dept_name);
-      fd.append("dept_category_id", form.dept_category_id);
-      if (form.dept_abbreviation) fd.append("dept_abbreviation", form.dept_abbreviation);
-      if (form.mandate)           fd.append("mandate", form.mandate);
-      if (logoFileRef.current)    fd.append("logo", logoFileRef.current);
+      fd.append("dept_name",          form.dept_name);
+      fd.append("dept_category_id",   form.dept_category_id);
+      if (form.dept_abbreviation)  fd.append("dept_abbreviation",  form.dept_abbreviation);
+      if (form.mandate)            fd.append("mandate",            form.mandate);
+      if (form.special_provisions) fd.append("special_provisions", form.special_provisions);
+      if (logoFileRef.current)     fd.append("logo",               logoFileRef.current);
 
       const token = localStorage.getItem("token");
-      const url   = editingDept
-        ? `/api/departments/${editingDept.dept_id}`
-        : "/api/departments";
+      const url   = editingDept ? `/api/departments/${editingDept.dept_id}` : "/api/departments";
       if (editingDept) fd.append("_method", "PUT");
 
       const res = await fetch(url, {
@@ -313,8 +294,6 @@ const DepartmentsPage: React.FC = () => {
 
       {/* ── Filter + Search bar ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-
-        {/* Search input */}
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
@@ -324,70 +303,40 @@ const DepartmentsPage: React.FC = () => {
             className="pl-8 h-8 text-xs border-gray-200 bg-white"
           />
           {isSearching && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors"
-            >
+            <button onClick={clearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors">
               <XMarkIcon className="w-3 h-3" />
             </button>
           )}
         </div>
-
-        {/* Category filter */}
         <div className="flex items-center gap-2">
           <FunnelIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           <Select value={filterCategory} onValueChange={handleFilterChange}>
-            <SelectTrigger
-              className={cn(
-                "h-8 text-xs w-44 border-gray-200",
-                isFiltered && "border-gray-400 bg-gray-50"
-              )}
-            >
+            <SelectTrigger className={cn("h-8 text-xs w-44 border-gray-200", isFiltered && "border-gray-400 bg-gray-50")}>
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_CATEGORIES} className="text-xs">
-                All categories
-              </SelectItem>
+              <SelectItem value={ALL_CATEGORIES} className="text-xs">All categories</SelectItem>
               {categories.map((cat) => (
-                <SelectItem
-                  key={cat.dept_category_id}
-                  value={cat.dept_category_id.toString()}
-                  className="text-xs"
-                >
+                <SelectItem key={cat.dept_category_id} value={cat.dept_category_id.toString()} className="text-xs">
                   {cat.dept_category_name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-
-        {/* Active category filter pill */}
         {isFiltered && (
           <div className="flex items-center gap-1.5 text-[11px] text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1">
             <span>{activeCategory?.dept_category_name}</span>
-            <button
-              onClick={clearFilter}
-              className="text-gray-400 hover:text-gray-700 transition-colors ml-0.5"
-              title="Clear filter"
-            >
+            <button onClick={clearFilter} className="text-gray-400 hover:text-gray-700 transition-colors ml-0.5" title="Clear filter">
               <XMarkIcon className="w-3 h-3" />
             </button>
           </div>
         )}
-
-        {/* Result count */}
         <span className="text-[11px] text-gray-400 ml-auto">
           {isFiltered || isSearching ? (
-            <>
-              <span className="font-medium text-gray-600">{filtered.length}</span> of{" "}
-              <span className="font-medium text-gray-600">{departments.length}</span> departments
-            </>
+            <><span className="font-medium text-gray-600">{filtered.length}</span> of <span className="font-medium text-gray-600">{departments.length}</span> departments</>
           ) : (
-            <>
-              <span className="font-medium text-gray-600">{departments.length}</span> department
-              {departments.length !== 1 ? "s" : ""}
-            </>
+            <><span className="font-medium text-gray-600">{departments.length}</span> department{departments.length !== 1 ? "s" : ""}</>
           )}
         </span>
       </div>
@@ -397,38 +346,16 @@ const DepartmentsPage: React.FC = () => {
         {filtered.length === 0 ? (
           <div className="text-center py-14 text-gray-400 text-sm">
             {isSearching ? (
-              <>
-                No departments match{" "}
-                <span className="font-medium text-gray-600">"{debouncedSearch}"</span>.{" "}
-                <button
-                  onClick={clearSearch}
-                  className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
-                >
-                  Clear search
-                </button>
+              <>No departments match <span className="font-medium text-gray-600">"{debouncedSearch}"</span>.{" "}
+                <button onClick={clearSearch} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Clear search</button>
               </>
             ) : isFiltered ? (
-              <>
-                No departments in{" "}
-                <span className="font-medium text-gray-600">
-                  {activeCategory?.dept_category_name}
-                </span>.{" "}
-                <button
-                  onClick={clearFilter}
-                  className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
-                >
-                  Clear filter
-                </button>
+              <>No departments in <span className="font-medium text-gray-600">{activeCategory?.dept_category_name}</span>.{" "}
+                <button onClick={clearFilter} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Clear filter</button>
               </>
             ) : (
-              <>
-                No departments yet.{" "}
-                <button
-                  onClick={openCreate}
-                  className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
-                >
-                  Add the first one
-                </button>
+              <>No departments yet.{" "}
+                <button onClick={openCreate} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Add the first one</button>
               </>
             )}
           </div>
@@ -437,76 +364,45 @@ const DepartmentsPage: React.FC = () => {
             <table className="w-full text-[12px] border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-14">
-                    Logo
-                  </th>
-                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">
-                    Department Name
-                  </th>
-                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-28">
-                    Abbreviation
-                  </th>
-                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-48">
-                    Category
-                  </th>
+                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-14">Logo</th>
+                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Department Name</th>
+                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-28">Abbreviation</th>
+                  <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-48">Category</th>
                   <th className="border-b border-gray-200 bg-white px-2 py-2.5 text-center align-bottom w-12" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginated.map((dept) => (
                   <tr key={dept.dept_id} className="hover:bg-gray-50/60 transition-colors">
-
-                    {/* Logo */}
                     <td className="px-4 py-3">
                       <Avatar className="h-8 w-8 rounded-lg border border-gray-100">
-                        <AvatarImage
-                          src={dept.logo ? `/storage/${dept.logo}` : undefined}
-                          alt={dept.dept_name}
-                        />
+                        <AvatarImage src={dept.logo ? `/storage/${dept.logo}` : undefined} alt={dept.dept_name} />
                         <AvatarFallback className="rounded-lg bg-gray-100 text-gray-600 text-[10px] font-semibold">
                           {getInitials(dept)}
                         </AvatarFallback>
                       </Avatar>
                     </td>
-
-                    {/* Name — highlight search match */}
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {isSearching
-                        ? highlightMatch(dept.dept_name, debouncedSearch)
-                        : dept.dept_name}
+                      {isSearching ? highlightMatch(dept.dept_name, debouncedSearch) : dept.dept_name}
                     </td>
-
-                    {/* Abbreviation — highlight search match */}
                     <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
                       {dept.dept_abbreviation
-                        ? isSearching
-                          ? highlightMatch(dept.dept_abbreviation, debouncedSearch)
-                          : dept.dept_abbreviation
+                        ? isSearching ? highlightMatch(dept.dept_abbreviation, debouncedSearch) : dept.dept_abbreviation
                         : "–"}
                     </td>
-
-                    {/* Category */}
                     <td className="px-4 py-3 text-gray-500">
                       {dept.category?.dept_category_name ?? "–"}
                     </td>
-
-                    {/* Actions */}
                     <td className="px-2 py-2.5 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-gray-400 hover:text-gray-700"
-                          >
+                          <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700">
                             <MoreHorizontalIcon className="w-4 h-4" />
                             <span className="sr-only">Open menu</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-36">
-                          <DropdownMenuItem onClick={() => openEdit(dept)}>
-                            Edit
-                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEdit(dept)}>Edit</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-red-600 focus:text-red-600 focus:bg-red-50"
@@ -526,57 +422,26 @@ const DepartmentsPage: React.FC = () => {
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
                 <p className="text-[11px] text-gray-400">
-                  Showing{" "}
-                  <span className="font-medium text-gray-600">
-                    {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-gray-600">{filtered.length}</span>
+                  Showing <span className="font-medium text-gray-600">{(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)}</span> of <span className="font-medium text-gray-600">{filtered.length}</span>
                 </p>
-
                 <Pagination className="w-auto mx-0">
                   <PaginationContent className="gap-0.5">
                     <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        className={cn(
-                          "h-7 px-2 text-[11px] rounded-md cursor-pointer",
-                          page === 1 && "pointer-events-none opacity-40"
-                        )}
-                      />
+                      <PaginationPrevious onClick={() => setPage((p) => Math.max(1, p - 1))} className={cn("h-7 px-2 text-[11px] rounded-md cursor-pointer", page === 1 && "pointer-events-none opacity-40")} />
                     </PaginationItem>
-
                     {getPageNumbers().map((p, i) =>
                       p === "ellipsis" ? (
-                        <PaginationItem key={`ellipsis-${i}`}>
-                          <PaginationEllipsis className="h-7 w-7 text-[11px]" />
-                        </PaginationItem>
+                        <PaginationItem key={`ellipsis-${i}`}><PaginationEllipsis className="h-7 w-7 text-[11px]" /></PaginationItem>
                       ) : (
                         <PaginationItem key={p}>
-                          <PaginationLink
-                            onClick={() => setPage(p)}
-                            isActive={page === p}
-                            className={cn(
-                              "h-7 w-7 text-[11px] rounded-md cursor-pointer",
-                              page === p
-                                ? "bg-gray-900 text-white hover:bg-gray-800 border-gray-900"
-                                : "text-gray-600 hover:bg-gray-50"
-                            )}
-                          >
+                          <PaginationLink onClick={() => setPage(p)} isActive={page === p} className={cn("h-7 w-7 text-[11px] rounded-md cursor-pointer", page === p ? "bg-gray-900 text-white hover:bg-gray-800 border-gray-900" : "text-gray-600 hover:bg-gray-50")}>
                             {p}
                           </PaginationLink>
                         </PaginationItem>
                       )
                     )}
-
                     <PaginationItem>
-                      <PaginationNext
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        className={cn(
-                          "h-7 px-2 text-[11px] rounded-md cursor-pointer",
-                          page === totalPages && "pointer-events-none opacity-40"
-                        )}
-                      />
+                      <PaginationNext onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className={cn("h-7 px-2 text-[11px] rounded-md cursor-pointer", page === totalPages && "pointer-events-none opacity-40")} />
                     </PaginationItem>
                   </PaginationContent>
                 </Pagination>
@@ -588,7 +453,7 @@ const DepartmentsPage: React.FC = () => {
 
       {/* ════════ Create / Edit Dialog ════════ */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
+        <DialogContent className="max-w-3xl rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
             <DialogTitle className="text-[15px] font-semibold text-gray-900">
               {editingDept ? "Edit Department" : "Add Department"}
@@ -641,20 +506,6 @@ const DepartmentsPage: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Right column */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-gray-600">Mandate</Label>
-                <Textarea
-                  value={form.mandate}
-                  onChange={(e) => setForm((p) => ({ ...p, mandate: e.target.value }))}
-                  placeholder="Brief description of the department's mandate…"
-                  rows={5}
-                  className="text-sm resize-none"
-                />
-              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-gray-600">Logo</Label>
                 <Input
@@ -672,6 +523,30 @@ const DepartmentsPage: React.FC = () => {
                     <p className="text-[11px] text-gray-400">Logo preview</p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Right column */}
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-gray-600">Mandate</Label>
+                <Textarea
+                  value={form.mandate}
+                  onChange={(e) => setForm((p) => ({ ...p, mandate: e.target.value }))}
+                  placeholder="Brief description of the department's mandate…"
+                  rows={4}
+                  className="text-sm resize-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-gray-600">Special Provisions</Label>
+                <Textarea
+                  value={form.special_provisions}
+                  onChange={(e) => setForm((p) => ({ ...p, special_provisions: e.target.value }))}
+                  placeholder="Enter any special provisions for this department…"
+                  rows={4}
+                  className="text-sm resize-none"
+                />
               </div>
             </div>
           </div>
@@ -697,8 +572,7 @@ const DepartmentsPage: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[15px] font-semibold">Delete department?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-500">
-              <span className="font-medium text-gray-700">{deleteTarget?.dept_name}</span> and
-              all associated data will be permanently removed.
+              <span className="font-medium text-gray-700">{deleteTarget?.dept_name}</span> and all associated data will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -706,9 +580,7 @@ const DepartmentsPage: React.FC = () => {
               <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
-              <Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700" onClick={handleDelete}>
-                Delete
-              </Button>
+              <Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700" onClick={handleDelete}>Delete</Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -717,7 +589,7 @@ const DepartmentsPage: React.FC = () => {
   );
 };
 
-// ─── Highlight helper — wraps matched substring in a yellow <mark> ────────────
+// ─── Highlight helper ─────────────────────────────────────────────────────────
 
 function highlightMatch(text: string, query: string): React.ReactNode {
   if (!query.trim()) return text;

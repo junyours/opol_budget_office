@@ -544,16 +544,17 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
     {
       label: "Income, Budget",
       items: [
-        { name: "Budget Plans",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin"] },
+        { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin"] },
         { name: "Income Funds",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin"] },
         { name: "SA Income Consolidated", href: "/admin/consolidated-special-income", icon: TableCellsIcon,      iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin"] },
-        { name: "Personnel Services",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin"] },
+        { name: "PS Abstract",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin"] },
         { name: "Obligations & Budget",   href: "/admin/lbp-form6",                   icon: DocumentTextIcon,    iconBg: "bg-teal-100",    iconColor: "text-teal-600",    roles: ["super-admin", "admin"] },
         { name: "Allocation by Sector",   href: "/admin/lbp-form7",                   icon: TableCellsIcon,      iconBg: "bg-indigo-100",  iconColor: "text-indigo-600",  roles: ["super-admin", "admin"] },
         { name: "PS Computation",         href: "/admin/ps-computation",              icon: CalculatorIcon,      iconBg: "bg-sky-100",     iconColor: "text-sky-600",     roles: ["super-admin", "admin"] },
         { name: "20% MDF",                href: "/admin/mdf-fund",                    icon: HeroPiggyIcon,       iconBg: "bg-amber-100",   iconColor: "text-amber-600",   roles: ["super-admin", "admin"] },
         { name: "5% CF",                  href: "/admin/ldrrmfip",                    icon: ShieldCheckIcon,     iconBg: "bg-red-100",     iconColor: "text-red-600",     roles: ["super-admin", "admin"] },
         { name: "5% SA Consolidated",     href: "/admin/ldrrmf-plan",                 icon: DocumentChartBarIcon,iconBg: "bg-orange-100",  iconColor: "text-orange-600",  roles: ["super-admin", "admin"] },
+        { name: "Summary of Expenditures", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
     {
@@ -567,7 +568,7 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
       items: [
         { name: "General Funds",           href: "/admin/object-of-expenditures", icon: TableCellsIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
         { name: "Special Accounts",        href: "/admin/special-accounts",       icon: CreditCardIcon, iconBg: "bg-rose-100",   iconColor: "text-rose-600",   roles: ["super-admin", "admin"] },
-        { name: "Summary of Expenditures", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin"] },
+        
       ] as NavItem[],
     },
     {
@@ -579,13 +580,13 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
     {
       label: "Review",
       items: [
-        { name: "LBP Forms Review", href: "/admin/lbp-forms", icon: ClipboardDocumentListIcon, iconBg: "bg-blue-100", iconColor: "text-blue-600", roles: ["super-admin", "admin"] },
+        { name: "Budget Prop GF & SA", href: "/admin/lbp-forms", icon: ClipboardDocumentListIcon, iconBg: "bg-blue-100", iconColor: "text-blue-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
     {
       label: "Reports",
       items: [
-        { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
+        { name: "LBP Forms 1 to 7", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
     {
@@ -778,7 +779,7 @@ export function AppSidebar() {
             </div>
             <div className="flex flex-col group-data-[collapsible=icon]:hidden min-w-0">
               <span className="text-[13px] font-semibold text-zinc-900 leading-tight truncate">Municipal Budget Office</span>
-              <span className="sb-mono text-[10px] text-zinc-400 mt-0.5">Opol LGU · FY {new Date().getFullYear()}</span>
+              <span className="sb-mono text-[10px] text-zinc-400 mt-0.5">Opol LGU · CY {new Date().getFullYear()}</span>
             </div>
           </div>
 

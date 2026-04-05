@@ -24,83 +24,51 @@ class DepartmentController extends BaseMasterCrudController
      * Store a newly created department with optional logo.
      */
     public function store(Request $request)
-{
-    $this->authorize('create', $this->modelClass);
+    {
+        $this->authorize('create', $this->modelClass);
 
-    \Log::info('Store request received', [
-        'has_logo' => $request->hasFile('logo'),
-        'all_files' => array_keys($request->allFiles()),
-    ]);
+        $rules = $this->rules();
+        if ($request->hasFile('logo')) {
+            $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        }
 
-    $rules = $this->rules();
-    if ($request->hasFile('logo')) {
-        $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        $validated = $request->validate($rules);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('departments', 'public');
+        }
+
+        $department = $this->modelClass::create($validated);
+
+        return $this->success($department, 201);
     }
-
-    $validated = $request->validate($rules);
-
-    if ($request->hasFile('logo')) {
-        $file = $request->file('logo');
-        \Log::info('Logo file details', [
-            'original_name' => $file->getClientOriginalName(),
-            'size' => $file->getSize(),
-            'mime' => $file->getMimeType(),
-        ]);
-        $path = $file->store('departments', 'public');
-        \Log::info('Logo stored at: ' . $path);
-        $validated['logo'] = $path;
-    }
-
-    $department = $this->modelClass::create($validated);
-    \Log::info('Department created', $department->toArray());
-
-    return $this->success($department, 201);
-}
 
     /**
      * Update the specified department, handling logo replacement.
      */
     public function update(Request $request, $id)
-{
-    $model = $this->modelClass::findOrFail($id);
-    $this->authorize('update', $model);
+    {
+        $model = $this->modelClass::findOrFail($id);
+        $this->authorize('update', $model);
 
-    \Log::info('=== Department Update Start ===');
-    \Log::info('Request has file "logo"?', ['hasFile' => $request->hasFile('logo')]);
-    if ($request->hasFile('logo')) {
-        $file = $request->file('logo');
-        \Log::info('File details', [
-            'originalName' => $file->getClientOriginalName(),
-            'mime' => $file->getMimeType(),
-            'size' => $file->getSize(),
-            'isValid' => $file->isValid(),
-        ]);
-    }
-
-    $rules = $this->rules($id);
-    if ($request->hasFile('logo')) {
-        $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
-    }
-
-    $validated = $request->validate($rules);
-    \Log::info('Validated data', $validated);
-
-    if ($request->hasFile('logo')) {
-        // Delete old logo if exists
-        if ($model->logo) {
-            Storage::disk('public')->delete($model->logo);
-            \Log::info('Deleted old logo', ['old' => $model->logo]);
+        $rules = $this->rules($id);
+        if ($request->hasFile('logo')) {
+            $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
-        $path = $request->file('logo')->store('departments', 'public');
-        \Log::info('New logo stored at', ['path' => $path]);
-        $validated['logo'] = $path;
+
+        $validated = $request->validate($rules);
+
+        if ($request->hasFile('logo')) {
+            if ($model->logo) {
+                Storage::disk('public')->delete($model->logo);
+            }
+            $validated['logo'] = $request->file('logo')->store('departments', 'public');
+        }
+
+        $model->update($validated);
+
+        return $this->success($model);
     }
-
-    $model->update($validated);
-    \Log::info('Department after update', $model->fresh()->toArray());
-
-    return $this->success($model);
-}
 
     /**
      * Remove the specified department and its logo.
@@ -126,14 +94,15 @@ class DepartmentController extends BaseMasterCrudController
     protected function rules($id = null): array
     {
         $rules = [
-            'dept_name' => 'required|string|max:255',
-            'dept_category_id' => 'required|exists:department_categories,dept_category_id',
-            'dept_abbreviation' => 'nullable|string|max:50',
-            'mandate' => 'nullable|string',
+            'dept_name'          => 'required|string|max:255',
+            'dept_category_id'   => 'required|exists:department_categories,dept_category_id',
+            'dept_abbreviation'  => 'nullable|string|max:50',
+            'mandate'            => 'nullable|string',
+            'special_provisions' => 'nullable|string',
         ];
 
         if ($id) {
-            $rules['dept_name'] = 'sometimes|string|max:255';
+            $rules['dept_name']        = 'sometimes|string|max:255';
             $rules['dept_category_id'] = 'sometimes|exists:department_categories,dept_category_id';
         }
 

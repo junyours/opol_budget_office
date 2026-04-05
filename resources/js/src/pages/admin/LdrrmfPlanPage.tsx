@@ -43,9 +43,16 @@ interface LdrrmfItem {
   description:         string;
   category_name:       string | null;
   implementing_office: string;
+  // Budget year
   mooe:                number;
   co:                  number;
   total:               number;
+  // Past year
+  obligation_amount:   number;
+  // Current year
+  sem1_amount:         number;
+  sem2_amount:         number;
+  total_amount:        number;
 }
 
 interface SpecialAccountSection {
@@ -68,6 +75,8 @@ interface PlanReport {
   year:             number;
   past_year:        number;
   current_year:     number;
+  past_plan_id:     number | null;
+  current_plan_id:  number | null;
   special_accounts: SpecialAccountSection[];
   grand_total:      GrandTotal;
 }
@@ -174,6 +183,10 @@ export default function LdrrmfPlanPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Inline sem1 editing state — MUST be before any early return ──────────
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
+  const [savingKeys,    setSavingKeys]    = useState<Set<string>>(new Set());
+
   if (loading) return <LoadingState />;
   if (!report) return (
     <div className="flex items-center justify-center h-64">
@@ -181,7 +194,71 @@ export default function LdrrmfPlanPage() {
     </div>
   );
 
-  const { year, past_year, current_year, special_accounts, grand_total } = report;
+  const { year, past_year, current_year, special_accounts, grand_total,
+          past_plan_id, current_plan_id } = report;
+
+  const fmtInput = (v: number): string =>
+    v === 0 ? "" : Math.floor(v).toLocaleString("en-PH");
+
+  const parseInput = (s: string): number =>
+    parseFloat(s.replace(/,/g, "")) || 0;
+
+  const handleAmountChange = (key: string, raw: string) => {
+    const digits    = raw.replace(/[^0-9.]/g, "");
+    const num       = parseFloat(digits) || 0;
+    const formatted = num === 0 ? digits : Math.floor(num).toLocaleString("en-PH");
+    setEditingValues(prev => ({ ...prev, [key]: digits === "" ? "" : formatted }));
+  };
+
+  const handleSem1Blur = async (
+    key: string,
+    item: LdrrmfItem,
+    source: string,
+    currentPlanId: number | null
+  ) => {
+    if (!currentPlanId) return;
+    const raw   = editingValues[key] ?? "";
+    const value = parseInput(raw);
+    setEditingValues(prev => { const n = { ...prev }; delete n[key]; return n; });
+    setSavingKeys(prev => new Set(prev).add(key));
+    try {
+      await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+        budget_plan_id:    currentPlanId,
+        source,
+        description:       item.description,
+        ldrrmfip_category_id: item.ldrrmfip_item_id, // passed for upsert lookup — backend uses description+source+plan
+        sem1_amount:       value,
+      });
+      // Reload the whole report to reflect new sem2 = total - sem1
+      const res = await API.get("/ldrrmf-plan");
+      setReport(res.data.data ?? null);
+    } catch {
+      toast.error("Failed to save Sem 1 amount.");
+    } finally {
+      setSavingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  };
+
+  const handleObligationBlur = async (
+    item: LdrrmfItem,
+    source: string,
+    pastPlanId: number | null,
+    value: number
+  ) => {
+    if (!pastPlanId) return;
+    try {
+      await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+        budget_plan_id:       pastPlanId,
+        source,
+        description:          item.description,
+        obligation_amount:    value,
+      });
+      const res = await API.get("/ldrrmf-plan");
+      setReport(res.data.data ?? null);
+    } catch {
+      toast.error("Failed to save obligation amount.");
+    }
+  };
 
   // ── Shared th classes ─────────────────────────────────────────────────────
   // Past Year   → amber tint
@@ -356,30 +433,107 @@ export default function LdrrmfPlanPage() {
                         </td>
                       </tr>
                     ) : (
-                      sa.items.map((item, itemIdx) => (
-                        <tr
-                          key={item.ldrrmfip_item_id}
-                          className="hover:bg-gray-50/40 transition-colors"
-                        >
-                          <td className="px-4 py-2.5 border-r border-gray-100 text-[12px] text-gray-700 pl-8">
-                            <span className="text-gray-300 mr-1.5">·</span>
-                            {item.description}
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-gray-100 text-center text-gray-300">—</td>
-                          {/* Past/current cols blank for items */}
-                          <td className="px-3 py-2.5 border-r border-l border-green-100 text-right text-gray-300 text-[12px] bg-green-50/30">–</td>
-                          <td className="px-3 py-2.5 border-r border-l border-blue-100 text-right text-gray-300 text-[12px] bg-blue-50/30">–</td>
-                          <td className="px-3 py-2.5 border-r border-blue-100 text-right text-gray-300 text-[12px] bg-blue-50/30">–</td>
-                          <td className="px-3 py-2.5 border-r border-blue-100 text-right text-gray-300 text-[12px] bg-blue-50/30">–</td>
-                          {/* Budget year amount */}
-                          <td className="px-3 py-2.5 border-r border-l border-orange-100 text-right font-mono tabular-nums text-[12px] text-blue-600 bg-orange-50/30">
-                            {itemIdx === 0
-                              ? <span className="font-semibold">{fmtPeso(item.total)}</span>
-                              : fmtAbs(item.total)
-                            }
-                          </td>
-                        </tr>
-                      ))
+                      sa.items.map((item) => {
+                        const sem1Key  = `${sa.source}-${item.ldrrmfip_item_id}`;
+                        const isSaving = savingKeys.has(sem1Key);
+                        const sem1Display = editingValues[sem1Key] !== undefined
+                          ? editingValues[sem1Key]
+                          : fmtInput(item.sem1_amount);
+                        const sem2Computed = Math.max(0, Math.floor(item.total_amount - item.sem1_amount));
+                        return (
+                          <tr key={item.ldrrmfip_item_id} className="hover:bg-gray-50/40 transition-colors group/item">
+                            <td className="px-4 py-2 border-r border-gray-100 text-[12px] text-gray-700 pl-8">
+                              <span className="text-gray-300 mr-1.5">·</span>
+                              {item.description}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100 text-center text-gray-300">—</td>
+
+                            {/* Past year — obligation_amount (editable) */}
+                            {/* Past year — obligation_amount (editable, controlled) */}
+                            {(() => {
+                              const obligKey     = `oblig-${sa.source}-${item.ldrrmfip_item_id}`;
+                              const isObligSaving = savingKeys.has(obligKey);
+                              const obligDisplay  = editingValues[obligKey] !== undefined
+                                ? editingValues[obligKey]
+                                : fmtInput(item.obligation_amount);
+                              return (
+                                <td className="px-1.5 py-1.5 border-r border-l border-green-100 bg-green-50/30">
+                                  <input
+                                    type="text"
+                                    value={obligDisplay}
+                                    placeholder="–"
+                                    disabled={isObligSaving}
+                                    className={cn(
+                                      "w-full text-right font-mono text-[11.5px] bg-transparent border-0 outline-none rounded px-1.5 py-0.5 placeholder-gray-300",
+                                      isObligSaving
+                                        ? "text-gray-400 cursor-wait"
+                                        : "text-gray-700 focus:bg-green-50 focus:ring-1 focus:ring-green-300"
+                                    )}
+                                    onChange={e => handleAmountChange(obligKey, e.target.value)}
+                                    onBlur={async () => {
+                                      if (!past_plan_id) return;
+                                      const raw   = editingValues[obligKey] ?? "";
+                                      const value = parseInput(raw);
+                                      setEditingValues(prev => { const n = { ...prev }; delete n[obligKey]; return n; });
+                                      setSavingKeys(prev => new Set(prev).add(obligKey));
+                                      try {
+                                        await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                                          budget_plan_id:    past_plan_id,
+                                          source:            sa.source,
+                                          description:       item.description,
+                                          obligation_amount: value,
+                                        });
+                                        const res = await API.get("/ldrrmf-plan");
+                                        setReport(res.data.data ?? null);
+                                      } catch {
+                                        toast.error("Failed to save obligation amount.");
+                                      } finally {
+                                        setSavingKeys(prev => { const n = new Set(prev); n.delete(obligKey); return n; });
+                                      }
+                                    }}
+                                  />
+                                </td>
+                              );
+                            })()}
+
+                            {/* Current sem1 — editable */}
+                            <td className="px-1.5 py-1.5 border-r border-l border-blue-100 bg-blue-50/30">
+                              <input
+                                type="text"
+                                value={sem1Display}
+                                placeholder="–"
+                                disabled={isSaving}
+                                className={cn(
+                                  "w-full text-right font-mono text-[11.5px] bg-transparent border-0 outline-none rounded px-1.5 py-0.5 placeholder-gray-300",
+                                  isSaving
+                                    ? "text-gray-400 cursor-wait"
+                                    : "text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-300"
+                                )}
+                                onChange={e => handleAmountChange(sem1Key, e.target.value)}
+                                onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
+                              />
+                            </td>
+
+                            {/* Current sem2 — calculated (total - sem1), read-only */}
+                            <td className="px-3 py-2 border-r border-blue-100 text-right font-mono tabular-nums text-[11.5px] text-gray-500 bg-blue-50/20">
+                              {sem2Computed > 0 ? sem2Computed.toLocaleString("en-PH") : "–"}
+                            </td>
+
+                            {/* Current total — total_amount column */}
+                            <td className="px-3 py-2 border-r border-blue-100 text-right font-mono tabular-nums text-[11.5px] font-semibold text-gray-700 bg-blue-50/30">
+                              {item.total_amount > 0 ? Math.floor(item.total_amount).toLocaleString("en-PH") : "–"}
+                            </td>
+
+                            {/* Budget year — mooe + co */}
+                            <td className="px-3 py-2 border-r border-l border-orange-100 text-right font-mono tabular-nums text-[12px] text-blue-600 bg-orange-50/30">
+                              {item.total > 0
+                                ? Math.floor(item.total).toLocaleString("en-PH")
+                                : "–"
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
 
                     {/* ── 70% derived subtotal row ──────────────────────── */}

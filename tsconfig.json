@@ -1,27 +1,3 @@
-// {
-//   "compilerOptions": {
-//     "target": "ESNext",
-//     "useDefineForClassFields": true,
-//     "lib": ["DOM", "DOM.Iterable", "ESNext"],
-//     "allowJs": false,
-//     "skipLibCheck": true,
-//     "esModuleInterop": false,
-//     "allowSyntheticDefaultImports": true,
-//     "strict": true,
-//     "forceConsistentCasingInFileNames": true,
-//     "module": "ESNext",
-//     "moduleResolution": "Bundler",
-//     "resolveJsonModule": true,
-//     "isolatedModules": true,
-//     "noEmit": true,
-//     "jsx": "react-jsx",
-//     "baseUrl": ".",
-//     "types": ["vite/client"] 
-//   },
-//   "include": ["resources/js", "resources/js/hooks/useAuth.ts"]
-// }
-
-
 {
   "compilerOptions": {
     "target": "ESNext",
@@ -29,6 +5,7 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": false,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0", //ignore deprecation warnings for TypeScript 6.0 and above
     "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
     "strict": true,

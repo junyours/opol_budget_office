@@ -10,18 +10,36 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    
 
-    public function login(Request $request)
-    {
-        $validated = $request->validate([
-            'username' => 'required',
-            'password' => 'required',
-        ]);
 
-        $user = User::with('department')
-            ->where('username', $validated['username'])
-            ->first();
+    // public function login(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'username' => 'required',
+    //         'password' => 'required',
+    //     ]);
+
+    //     $user = User::with('department')
+    //         ->where('username', $validated['username'])
+    //         ->first();
+
+        public function login(Request $request)
+        {
+            $validated = $request->validate([
+                'username' => 'required',
+                'password' => 'required',
+            ]);
+
+            try {
+                $user = User::with('department')
+                    ->where('username', $validated['username'])
+                    ->first();
+            } catch (\Exception $e) {
+                \Log::error('Login DB error: ' . $e->getMessage());
+                return response()->json([
+                    'message' => 'Unable to process login. Please try again later.',
+                ], 503);
+            }
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([

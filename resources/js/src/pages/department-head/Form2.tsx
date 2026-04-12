@@ -2289,7 +2289,7 @@ const Form2: React.FC<Form2Props> = ({
                                             >
                                                 {row.value ? "100.00%" : "–"}
                                             </td>
-                                            <td />
+                                            {isAdmin && <td />}
                                         </tr>
                                     );
                                 })}

@@ -97,7 +97,6 @@ const TD_PREV_CTR = cn(TD_BASE, 'text-center text-gray-600', C_PREV_TD);
 const TD_PREV_NUM = cn(TD_BASE, 'font-mono tabular-nums text-right text-gray-600', C_PREV_TD);
 const TD_CURR_CTR = cn(TD_BASE, 'text-center text-gray-600', C_CURR_TD);
 const TD_CURR_NUM = cn(TD_BASE, 'font-mono tabular-nums text-right text-gray-700 font-medium', C_CURR_TD);
-
 // ─── Row type ─────────────────────────────────────────────────────────────────
 
 type MergedRow = {
@@ -145,7 +144,10 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
           ? API.get(`/department-budget-plans/${pastYearPlan.dept_budget_plan_id}/plantilla-assignments`)
           : Promise.resolve({ data: { data: [] } }),
       ]);
-      setCurrentRows((currRes.data.data || []).map(parseRow));
+      // setCurrentRows((currRes.data.data || []).map(parseRow));
+      const savedRows = (currRes.data.data || []).map(parseRow)
+          .filter((r: SnapshotRow) => r.dept_bp_from3_assignment_id != null);
+      setCurrentRows(savedRows);
       setPastRows((pastRes.data.data   || []).map(parseRow));
     } catch (err) {
       console.error('Failed to fetch Form 3 assignments', err);

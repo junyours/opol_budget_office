@@ -315,7 +315,8 @@ class DepartmentBudgetPlanController extends BaseApiController
                 $annualRate  = $monthlyRate * $baseMonths;
 
                 return [
-                    'dept_bp_from3_assignment_id' => $assignment->assignment_id,
+                    // 'dept_bp_from3_assignment_id' => $assignment->assignment_id,
+                    'dept_bp_from3_assignment_id' => null,
                     'budget_plan_id'              => $plan->dept_budget_plan_id,
                     'plantilla_position_id'       => $assignment->plantilla_position_id,
                     'personnel_id'                => $assignment->personnel_id,

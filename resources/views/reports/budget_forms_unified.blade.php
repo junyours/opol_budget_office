@@ -326,9 +326,9 @@ if ($coGroup   && count($coGroup['items'])   > 0)
 foreach ($otherGroups as $og)
     if (count($og['items']) > 0)
         $clsGroups[] = ['type'=>'other','grp'=>$og,'label'=>$og['class_name'],'totalLabel'=>'Total '.$og['class_name']];
-if (count($allMdfLines) > 0)
+if (count($allMdfLines) > 0 || count($ldrrmfRows) > 0)
     $clsGroups[] = ['type'=>'mdf','grp'=>null,'label'=>'Budgetary &amp; Statutory Requirements',
-                    'totalLabel'=>'Total Budgetary &amp; Statutory Requirements (20% MDF)'];
+                    'totalLabel'=>'Total Budgetary &amp; Statutory Requirements'];
 if (count($aipRows) > 0)
     $clsGroups[] = ['type'=>'aip','grp'=>null,'label'=>'Special Purpose Appropriations',
                     'totalLabel'=>'Total - Spcl Prpse Apprprtns, (SPA)'];
@@ -600,7 +600,7 @@ $maybeBreak = function(
 @endforeach
 @php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
 <tr class="subtotal">
-    <td class="l" colspan="2">Total Budgetary &amp; Statutory Requirements (20% MDF)</td>
+    <td class="l" colspan="2">Total Budgetary &amp; Statutory Requirements</td>
     <td class="r">{!! $pesoA($mdfGrand['past_total']) !!}</td>
     <td class="r">{!! $pesoA($mdfGrand['current_sem1']) !!}</td>
     <td class="r">{!! $pesoA($mdfGrand['current_sem2']) !!}</td>

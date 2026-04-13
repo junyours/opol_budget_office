@@ -1058,15 +1058,15 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
             <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
-            <th colspan="2" rowspan="2" style="width:2%">Item No.</th>
+            <th colspan="2" style="width:2%">Item No.</th>
             <th rowspan="2" width="27%">Position Title</th>
             <th rowspan="2" width="15%">Name of Incumbent</th>
-            <th colspan="2">
+            <th colspan="2" >
                 Current Year Authorized Rate / Annum<br>
                 @if($lbcCurrent){{ $lbcCurrent }}<br>@endif
                 @if($trancheCur){{ $trancheCur }}@else No Data @endif
             </th>
-            <th colspan="2">
+            <th colspan="2" >
                 Budget Year {{ $proposedYear }} Proposed Rate / Annum<br>
                 @if($lbcProposed){{ $lbcProposed }}<br>@endif
                 @if($tranchePro){{ $tranchePro }}@else No Data @endif
@@ -1074,12 +1074,18 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
             <th rowspan="2" width="11%">Increase/<br/>Decrease</th>
         </tr>
         <tr>
+            <th style="font-size:6pt">Old</th>
+            <th style="font-size:6pt">New</th>
             <th width="4%" >Grade/<br/>Salary</th>
             <th width="15%">Amount</th>
             <th width="4%">Grade/<br/>Salary</th>
             <th width="15%">Amount</th>
         </tr>
-        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th><th>(9)</th></tr>
+        <tr>
+            <th>(1)</th>
+            <th>(2)</th>
+            <th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th><th>(9)</th>
+        </tr>
         <tr><td colspan="9" style="font-weight:bold;padding:2px 4px;">{{ $deptName }}</td></tr>
     </thead>
     <tbody>
@@ -2520,7 +2526,7 @@ $nfA = function($n): string {
 
     {{-- Sub Total B — full border on both cells --}}
     <tr>
-        
+
         <td colspan="5" class="l" style="border:1px solid #000;padding:2px 4px;font-weight:bold;">
             Sub Total
         </td>

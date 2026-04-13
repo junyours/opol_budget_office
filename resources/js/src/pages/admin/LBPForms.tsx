@@ -362,13 +362,13 @@ const filteredPlans = useMemo(() => {
 
         <div className="px-2.5 mb-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 mb-0.5">
-            LBP Forms Review
+            Budget Proposals Review
           </p>
-          <p className="text-[13px] font-semibold text-gray-800">FY {activePlan.year}</p>
+          <p className="text-[13px] font-semibold text-gray-800">Budget Year {activePlan.year}</p>
         </div>
 
         {/* Summary pills */}
-        <div className="px-2.5 mb-3 flex flex-wrap gap-1.5">
+        {/* <div className="px-2.5 mb-3 flex flex-wrap gap-1.5">
           {counts.submitted > 0 && (
             <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
               {counts.submitted} to review
@@ -384,7 +384,7 @@ const filteredPlans = useMemo(() => {
               {counts.draft} draft
             </span>
           )}
-        </div>
+        </div> */}
 
         {/* Search */}
         {/* Search */}
@@ -574,7 +574,7 @@ const filteredPlans = useMemo(() => {
                         </span>
                       );
                     })()}
-                    <span className="text-[11px] text-gray-400">FY {activePlan.year}</span>
+                    <span className="text-[11px] text-gray-400">Budget Year {activePlan.year}</span>
                   </div>
                 </div>
               </div>

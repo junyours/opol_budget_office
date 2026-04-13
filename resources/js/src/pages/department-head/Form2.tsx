@@ -2762,6 +2762,9 @@ const Form2: React.FC<Form2Props> = ({
     const [aipOblEdits, setAipOblEdits] = useState<Map<number, number>>(
         new Map(),
     );
+    const [aipSem1Edits, setAipSem1Edits] = useState<Map<number, number>>(new Map());
+    const [savingAipSem1, setSavingAipSem1] = useState<Set<number>>(new Set());
+
     const [inputDraft, setInputDraft] = useState<Map<string, string>>(
         new Map(),
     );
@@ -2787,6 +2790,8 @@ const Form2: React.FC<Form2Props> = ({
     const oblAipItemIdRef = useRef(new Map<number, number>());
     const aipProgramIdRef = useRef(new Map<number, number>());
     const aipOblEditsRef = useRef(new Map<number, number>());
+    const aipSem1EditsRef = useRef(new Map<number, number>());
+    const savedAipSem1 = useRef(new Map<number, number>());
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -2805,71 +2810,90 @@ const Form2: React.FC<Form2Props> = ({
     const prevYear = Number(plan.budget_plan?.year) - 1;
     const currYear = plan.budget_plan?.year;
 
+
+    const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
+
     // ── Effect: Load AIP items + obligation-year obligations ──────────────────
 
     useEffect(() => {
-        const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
+    const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
+    const appPlanId = pastYearPlan?.dept_budget_plan_id; // ← ADD
 
-        const currentReq = API.get("/form4-items", {
-            params: { budget_plan_id: plan.dept_budget_plan_id },
-        });
-        const obligationReq = oblPlanId
-            ? API.get("/form4-items", { params: { budget_plan_id: oblPlanId } })
-            : Promise.resolve({ data: { data: [] as any[] } });
+    const currentReq = API.get("/form4-items", {
+        params: { budget_plan_id: plan.dept_budget_plan_id },
+    });
+    const obligationReq = oblPlanId
+        ? API.get("/form4-items", { params: { budget_plan_id: oblPlanId } })
+        : Promise.resolve({ data: { data: [] as any[] } });
+    const appropriationReq = appPlanId                  // ← ADD
+        ? API.get("/form4-items", { params: { budget_plan_id: appPlanId } })
+        : Promise.resolve({ data: { data: [] as any[] } });
 
-        Promise.all([currentReq, obligationReq])
-            .then(([currentRes, oblRes]) => {
-                const currentItems: any[] = currentRes.data.data ?? [];
-                const obligationItems: any[] = oblRes.data.data ?? [];
+    Promise.all([currentReq, obligationReq, appropriationReq]) // ← ADD
+        .then(([currentRes, oblRes, appRes]) => {               // ← ADD
+            const currentItems: any[] = currentRes.data.data ?? [];
+            const obligationItems: any[] = oblRes.data.data ?? [];
+            const appropriationItems: any[] = appRes.data.data ?? []; // ← ADD
 
-                const oblByProgram = new Map<
-                    number,
-                    { itemId: number; obligation: number }
-                >();
-                for (const pi of obligationItems) {
-                    oblByProgram.set(pi.aip_program_id, {
-                        itemId: pi.dept_bp_form4_item_id,
-                        obligation: parseFloat(pi.obligation_amount) || 0,
-                    });
-                }
-
-                const merged = currentItems.map((item: any) => {
-                    const obl = oblByProgram.get(item.aip_program_id);
-                    return {
-                        ...item,
-                        ps_amount: parseFloat(item.ps_amount) || 0,
-                        mooe_amount: parseFloat(item.mooe_amount) || 0,
-                        co_amount: parseFloat(item.co_amount) || 0,
-                        total_amount: parseFloat(item.total_amount) || 0,
-                        sem1_amount: parseFloat(item.sem1_amount) || 0,
-                        sem2_amount: parseFloat(item.sem2_amount) || 0,
-                        obligation_amount: obl?.obligation ?? 0,
-                        oblAipItemId: obl?.itemId,
-                        recommendation: item.recommendation ?? null,
-                    };
+            // existing oblByProgram map...
+            const oblByProgram = new Map<number, { itemId: number; obligation: number }>();
+            for (const pi of obligationItems) {
+                oblByProgram.set(pi.aip_program_id, {
+                    itemId: pi.dept_bp_form4_item_id,
+                    obligation: parseFloat(pi.obligation_amount) || 0,
                 });
+            }
 
-                setAipItems(merged);
+            // ← ADD: appropriation map by aip_program_id
+            const appByProgram = new Map<number, { sem1: number; sem2: number; total: number }>();
+            for (const pi of appropriationItems) {
+                appByProgram.set(pi.aip_program_id, {
+                    sem1:  parseFloat(pi.sem1_amount)  || 0,
+                    sem2:  parseFloat(pi.sem2_amount)  || 0,
+                    total: parseFloat(pi.total_amount) || 0,
+                });
+            }
 
-                oblAipItemIdRef.current.clear();
-                aipProgramIdRef.current.clear();
-                savedAipObligations.current.clear();
-                savedAipRecommendations.current.clear();
+            const merged = currentItems.map((item: any) => {
+                const obl = oblByProgram.get(item.aip_program_id);
+                const app = appByProgram.get(item.aip_program_id); // ← ADD
+                return {
+                    ...item,
+                    ps_amount:          parseFloat(item.ps_amount)    || 0,
+                    mooe_amount:        parseFloat(item.mooe_amount)   || 0,
+                    co_amount:          parseFloat(item.co_amount)     || 0,
+                    total_amount:       parseFloat(item.total_amount)  || 0,
+                    sem1_amount:        parseFloat(item.sem1_amount)   || 0,
+                    sem2_amount:        parseFloat(item.sem2_amount)   || 0,
+                    obligation_amount:  obl?.obligation ?? 0,
+                    oblAipItemId:       obl?.itemId,
+                    recommendation:     item.recommendation ?? null,
+                    // ← ADD appropriation year data
+                    app_sem1:  app?.sem1  ?? 0,
+                    app_sem2:  app?.sem2  ?? 0,
+                    app_total: app?.total ?? 0,
+                };
+            });
 
-                for (const item of merged) {
-                    const id = item.dept_bp_form4_item_id;
-                    savedAipRecommendations.current.set(
-                        id,
-                        item.recommendation ?? null,
-                    );
-                    savedAipObligations.current.set(id, item.obligation_amount);
-                    if (item.oblAipItemId)
-                        oblAipItemIdRef.current.set(id, item.oblAipItemId);
-                    aipProgramIdRef.current.set(id, item.aip_program_id);
-                }
-            })
-            .catch(console.error);
-    }, [plan.dept_budget_plan_id, obligationYearPlan?.dept_budget_plan_id]);
+           setAipItems(merged);
+
+            oblAipItemIdRef.current.clear();
+            aipProgramIdRef.current.clear();
+            savedAipObligations.current.clear();
+            savedAipRecommendations.current.clear();
+            savedAipSem1.current.clear();
+
+            for (const item of merged) {
+                const id = item.dept_bp_form4_item_id;
+                savedAipRecommendations.current.set(id, item.recommendation ?? null);
+                savedAipObligations.current.set(id, item.obligation_amount);
+                savedAipSem1.current.set(id, item.app_sem1 ?? 0);
+                if (item.oblAipItemId) oblAipItemIdRef.current.set(id, item.oblAipItemId);
+                aipProgramIdRef.current.set(id, item.aip_program_id);
+            }
+        })
+        .catch(console.error);
+}, [plan.dept_budget_plan_id, obligationYearPlan?.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]); // ← ADD pastYearPlan dep
 
     // ── Effect: Build regular items from plan + pastYear + obligationYear ─────
 
@@ -3564,6 +3588,96 @@ const Form2: React.FC<Form2Props> = ({
         [aipItems, obligationYearPlan, onItemUpdate],
     );
 
+    // ── Handlers: AIP sem1 ────────────────────────────────────────────────────
+
+    const handleAipSem1Blur = useCallback(
+        async (id: number) => {
+            const edit = aipSem1EditsRef.current.get(id);
+            if (edit === undefined) return;
+            const clamped = Math.max(edit, 0);
+            if (clamped === savedAipSem1.current.get(id)) {
+                aipSem1EditsRef.current.delete(id);
+                setAipSem1Edits((prev) => {
+                    const n = new Map(prev);
+                    n.delete(id);
+                    return n;
+                });
+                return;
+            }
+            const appPlanId = pastYearPlan?.dept_budget_plan_id;
+            if (!appPlanId) {
+                toast.error("Appropriation year plan not found.");
+                return;
+            }
+            const aipProgramId = aipProgramIdRef.current.get(id);
+            if (!aipProgramId) return;
+            setSavingAipSem1((prev) => new Set(prev).add(id));
+            const promise = (async () => {
+                const listRes = await API.get("/form4-items", {
+                    params: { budget_plan_id: appPlanId },
+                });
+                const existing = (listRes.data.data ?? []).find(
+                    (pi: any) =>
+                        Number(pi.aip_program_id) === Number(aipProgramId),
+                );
+                const appTotal =
+                    (aipItems.find((i) => i.dept_bp_form4_item_id === id) as any)
+                        ?.app_total ?? 0;
+                const sem2 = Math.max(appTotal - clamped, 0);
+                if (existing) {
+                    await API.put(
+                        `/form4-items/${existing.dept_bp_form4_item_id}`,
+                        { sem1_amount: clamped, sem2_amount: sem2 },
+                    );
+                } else {
+                    const currentItem = aipItems.find(
+                        (i) => i.dept_bp_form4_item_id === id,
+                    );
+                    await API.post("/form4-items", {
+                        budget_plan_id: appPlanId,
+                        aip_program_id: aipProgramId,
+                        program_description:
+                            currentItem?.program_description ?? "",
+                        sem1_amount: clamped,
+                        sem2_amount: sem2,
+                    });
+                }
+                savedAipSem1.current.set(id, clamped);
+                setAipItems((prev) =>
+                    prev.map((i) =>
+                        i.dept_bp_form4_item_id === id
+                            ? { ...i, app_sem1: clamped, app_sem2: sem2 }
+                            : i,
+                    ),
+                );
+                aipSem1EditsRef.current.delete(id);
+                setAipSem1Edits((prev) => {
+                    const n = new Map(prev);
+                    n.delete(id);
+                    return n;
+                });
+            })();
+            toast.promise(promise, {
+                loading: "Saving Sem 1…",
+                success: "Sem 1 saved",
+                error: (e: any) =>
+                    `Failed: ${e.response?.data?.message || e.message}`,
+            });
+            try {
+                await promise;
+            } catch {
+                /* handled by toast */
+            } finally {
+                setSavingAipSem1((prev) => {
+                    const n = new Set(prev);
+                    n.delete(id);
+                    return n;
+                });
+            }
+        },
+        [aipItems, pastYearPlan],
+    );
+
     // ── Unified comma-input helpers ───────────────────────────────────────────
 
     const handleCommaInput = useCallback(
@@ -3601,23 +3715,39 @@ const Form2: React.FC<Form2Props> = ({
         ],
     );
 
+    // const handleAipCommaInput = useCallback(
+    //     (id: number, rawValue: string) => {
+    //         const digits = rawValue.replace(/[^0-9]/g, "");
+    //         setDraft(`aip_${id}_obligation`, digits);
+    //         const num = digits === "" ? 0 : parseInt(digits, 10);
+    //         aipOblEditsRef.current.set(id, num);
+    //         setAipOblEdits((prev) => new Map(prev).set(id, num));
+    //     },
+    //     [setDraft],
+    // );
     const handleAipCommaInput = useCallback(
-        (id: number, rawValue: string) => {
+        (id: number, field: "obligation" | "sem1", rawValue: string) => {
             const digits = rawValue.replace(/[^0-9]/g, "");
-            setDraft(`aip_${id}_obligation`, digits);
             const num = digits === "" ? 0 : parseInt(digits, 10);
-            aipOblEditsRef.current.set(id, num);
-            setAipOblEdits((prev) => new Map(prev).set(id, num));
+            setDraft(`aip_${id}_${field}`, digits);
+            if (field === "obligation") {
+                aipOblEditsRef.current.set(id, num);
+                setAipOblEdits((prev) => new Map(prev).set(id, num));
+            } else {
+                aipSem1EditsRef.current.set(id, num);
+                setAipSem1Edits((prev) => new Map(prev).set(id, num));
+            }
         },
         [setDraft],
     );
 
     const handleAipCommaBlur = useCallback(
-        (id: number) => {
-            clearDraft(`aip_${id}_obligation`);
-            handleAipOblBlur(id);
+        (id: number, field: "obligation" | "sem1") => {
+            clearDraft(`aip_${id}_${field}`);
+            if (field === "obligation") handleAipOblBlur(id);
+            else handleAipSem1Blur(id);
         },
-        [clearDraft, handleAipOblBlur],
+        [clearDraft, handleAipOblBlur, handleAipSem1Blur],
     );
 
     // ── Memoized derived data ─────────────────────────────────────────────────
@@ -4457,16 +4587,18 @@ const Form2: React.FC<Form2Props> = ({
                                                         inputMode="numeric"
                                                         value={oblDisplay}
                                                         onChange={(e) =>
-                                                            handleAipCommaInput(
-                                                                id,
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        onBlur={() =>
-                                                            handleAipCommaBlur(
-                                                                id,
-                                                            )
-                                                        }
+                                            handleAipCommaInput(
+                                                id,
+                                                "obligation",
+                                                e.target.value,
+                                            )
+                                        }
+                                        onBlur={() =>
+                                            handleAipCommaBlur(
+                                                id,
+                                                "obligation",
+                                            )
+                                        }
                                                         disabled={savingAipObligations.has(
                                                             id,
                                                         )}
@@ -4476,30 +4608,41 @@ const Form2: React.FC<Form2Props> = ({
                                                 </td>
                                             )}
 
-                                            <td
-                                                className={cn(
-                                                    TD_APP,
-                                                    "border-l border-blue-100 text-blue-200",
+                                            <td className={cn(TD_APP, "border-l border-blue-100")}>
+                                                {isEditable ? (
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={
+                                                            inputDraft.has(`aip_${id}_sem1`)
+                                                                ? inputDraft.get(`aip_${id}_sem1`)!
+                                                                : comma(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleAipCommaInput(id, "sem1", e.target.value)
+                                                        }
+                                                        onBlur={() =>
+                                                            handleAipCommaBlur(id, "sem1")
+                                                        }
+                                                        disabled={savingAipSem1.has(id)}
+                                                        className={inputAppCls}
+                                                    />
+                                                ) : (
+                                                    <span className="text-gray-600">
+                                                        {((item as any).app_sem1 ?? 0) === 0 ? "–" : fmtP((item as any).app_sem1)}
+                                                    </span>
                                                 )}
-                                            >
-                                                –
                                             </td>
-                                            <td
-                                                className={cn(
-                                                    TD_APP,
-                                                    "text-blue-200",
-                                                )}
-                                            >
-                                                –
+                                            <td className={cn(TD_APP)}>
+                                                {(() => {
+                                                    const s1 = aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0);
+                                                    const s2 = Math.max(((item as any).app_total ?? 0) - s1, 0);
+                                                    return s2 === 0 ? "–" : fmtP(s2);
+                                                })()}
                                             </td>
-                                            <td
-                                                className={cn(
-                                                    TD_APP,
-                                                    "text-blue-200",
-                                                )}
-                                            >
-                                                –
-                                            </td>
+                                            <td className={cn(TD_APP)}>
+    {(item as any).app_total === 0 ? "–" : fmtP((item as any).app_total)}
+</td>
                                             <td
                                                 className={cn(
                                                     TD_PRO,
@@ -4508,7 +4651,7 @@ const Form2: React.FC<Form2Props> = ({
                                             >
                                                 {fmtP(item.total_amount)}
                                             </td>
-                                            <td
+                                            {/* <td
                                                 className={cn(
                                                     TD_M,
                                                     "text-emerald-600",
@@ -4523,7 +4666,23 @@ const Form2: React.FC<Form2Props> = ({
                                                 )}
                                             >
                                                 100.00%
-                                            </td>
+                                            </td> */}
+                                            {(() => {
+    const appTotal = (item as any).app_total ?? 0;
+    const proposed = item.total_amount;
+    const diff = proposed - appTotal;
+    const pct = pctOf(appTotal, diff);
+    return (
+        <>
+            <td className={cn(TD_M, clr(diff))}>
+                {diff === 0 ? "–" : fmtP(diff)}
+            </td>
+            <td className={cn(TD_M, clr(diff))}>
+                {appTotal === 0 && diff === 0 ? "–" : `${pct.toFixed(2)}%`}
+            </td>
+        </>
+    );
+})()}
 
                                             {isAdmin && (
                                                 <td className={TD}>
@@ -4589,7 +4748,7 @@ const Form2: React.FC<Form2Props> = ({
                                                 : fmtP(aipObligationTotal)}
                                         </td>
                                     )}
-                                    <td
+                                    {/* <td
                                         className={cn(
                                             "bg-gray-100 border-l",
                                             C_APP_SUB,
@@ -4600,7 +4759,16 @@ const Form2: React.FC<Form2Props> = ({
                                     />
                                     <td
                                         className={cn("bg-gray-100", C_APP_SUB)}
-                                    />
+                                    /> */}
+                                    <td className={cn(TD_M, "font-semibold text-gray-700 border-l", C_APP_SUB)}>
+                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_sem1 ?? 0), 0))}
+                                    </td>
+                                    <td className={cn(TD_M, "font-semibold text-gray-700", C_APP_SUB)}>
+                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_sem2 ?? 0), 0))}
+                                    </td>
+                                    <td className={cn(TD_M, "font-semibold text-gray-700", C_APP_SUB)}>
+                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_total ?? 0), 0))}
+                                    </td>
                                     <td
                                         className={cn(
                                             TD_M,

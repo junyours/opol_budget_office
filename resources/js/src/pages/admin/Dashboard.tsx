@@ -1424,8 +1424,8 @@ const ApprovalProgressCard: React.FC<{
   const s = statuses[activeIdx];
 
   const radialConfig = {
-  completion: { 
-    label: "Approved", 
+  completion: {
+    label: "Approved",
     color: "#10b981"  // ← color goes in config
   },
 } satisfies ChartConfig;
@@ -1738,7 +1738,7 @@ const AdminDashboard: React.FC = () => {
                   <DocumentTextIcon className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Budget Plan</p>
+                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Budget Plan Year</p>
                   {/* {activePlan && (
                     // <p className="text-[11px] text-zinc-400 mt-0.5">Fiscal Year {activePlan.year}</p>
                   )} */}

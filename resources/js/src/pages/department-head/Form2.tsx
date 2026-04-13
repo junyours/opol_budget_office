@@ -3789,9 +3789,10 @@ const Form2: React.FC<Form2Props> = ({
                 ? pastSem1Edits.get(i.expense_item_id)!
                 : i.pastSem1;
             const cap = i.pastTotal > 0 ? i.pastTotal : 0;
-            const sem2 = pastSem1Edits.has(i.expense_item_id)
-                ? Math.max(cap - sem1, 0)
-                : i.pastSem2;
+            // const sem2 = pastSem1Edits.has(i.expense_item_id)
+            //     ? Math.max(cap - sem1, 0)
+            //     : i.pastSem2;
+            const sem2 = Math.max(cap - sem1, 0);
             pastSem1 += sem1;
             pastSem2 += sem2;
             pastTotal += i.pastTotal;
@@ -3942,22 +3943,28 @@ const Form2: React.FC<Form2Props> = ({
                                         : i.pastSem1),
                                 0,
                             );
+                            // const clsSem2 = cls.items.reduce((s, i) => {
+                            //     if (pastSem1Edits.has(i.expense_item_id)) {
+                            //         const sem1 = pastSem1Edits.get(
+                            //             i.expense_item_id,
+                            //         )!;
+                            //         return (
+                            //             s +
+                            //             Math.max(
+                            //                 (i.pastTotal > 0
+                            //                     ? i.pastTotal
+                            //                     : 0) - sem1,
+                            //                 0,
+                            //             )
+                            //         );
+                            //     }
+                            //     return s + i.pastSem2;
+                            // }, 0);
                             const clsSem2 = cls.items.reduce((s, i) => {
-                                if (pastSem1Edits.has(i.expense_item_id)) {
-                                    const sem1 = pastSem1Edits.get(
-                                        i.expense_item_id,
-                                    )!;
-                                    return (
-                                        s +
-                                        Math.max(
-                                            (i.pastTotal > 0
-                                                ? i.pastTotal
-                                                : 0) - sem1,
-                                            0,
-                                        )
-                                    );
-                                }
-                                return s + i.pastSem2;
+                                const sem1 = pastSem1Edits.has(i.expense_item_id)
+                                    ? pastSem1Edits.get(i.expense_item_id)!
+                                    : i.pastSem1;
+                                return s + Math.max((i.pastTotal > 0 ? i.pastTotal : 0) - sem1, 0);
                             }, 0);
                             const clsPast = cls.items.reduce(
                                 (s, i) => s + i.pastTotal,
@@ -4084,12 +4091,13 @@ const Form2: React.FC<Form2Props> = ({
                                                         : item.pastSem1;
                                                 const sem2Cap =
                                                     past > 0 ? past : proposed;
-                                                const dispSem2 =
-                                                    pastSem1Edits.has(
-                                                        item.expense_item_id,
-                                                    )
-                                                        ? sem2Cap - dispSem1
-                                                        : item.pastSem2;
+                                                // const dispSem2 =
+                                                //     pastSem1Edits.has(
+                                                //         item.expense_item_id,
+                                                //     )
+                                                //         ? sem2Cap - dispSem1
+                                                //         : item.pastSem2;
+                                                const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 const sem1Editable =
                                                     canEditSem1 &&
                                                     past > 0 &&
@@ -4633,14 +4641,14 @@ const Form2: React.FC<Form2Props> = ({
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className={cn(TD_APP)}>
+                                            <td className={cn(TD_APP,"text-gray-500")}>
                                                 {(() => {
                                                     const s1 = aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0);
                                                     const s2 = Math.max(((item as any).app_total ?? 0) - s1, 0);
                                                     return s2 === 0 ? "–" : fmtP(s2);
                                                 })()}
                                             </td>
-                                            <td className={cn(TD_APP)}>
+                                            <td className={cn(TD_APP, "text-gray-600")}>
     {(item as any).app_total === 0 ? "–" : fmtP((item as any).app_total)}
 </td>
                                             <td

@@ -447,17 +447,19 @@ const DepartmentHeadDashboard: React.FC = () => {
                 <Reveal delay={0}>
                     <div className="flex items-start justify-between mb-7">
                         <div>
-                            <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-zinc-400">
+                            {/* <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-zinc-400">
                                 {deptAbbr ? `${deptAbbr} · ` : ""}Department
                                 Dashboard
-                            </span>
-                            <h1 className="text-[22px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
-                                {deptName}
-                            </h1>
-                            <p className="text-[12px] text-zinc-400 mt-0.5">
-                                FY {activePlan?.year ?? "—"} &nbsp;·&nbsp;
-                                Budget Overview
+                            </span> */}
+                            <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+                                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                             </p>
+                            <h1 className="text-[22px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
+                                Overview
+                            </h1>
+                            {/* <p className="text-[12px] text-zinc-400 mt-0.5">
+                                Budget Overview
+                            </p> */}
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0"></div>
@@ -502,10 +504,10 @@ const DepartmentHeadDashboard: React.FC = () => {
                                     <DocumentTextIcon className="w-[18px] h-[18px] text-blue-500" />
                                 </div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
-                                    Active Plan
+                                    Budget Plan Year
                                 </p>
                                 <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
-                                    {activePlan ? `FY ${activePlan.year}` : "—"}
+                                    {activePlan ? `${activePlan.year}` : "—"}
                                 </p>
                                 <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
                                     {activePlan

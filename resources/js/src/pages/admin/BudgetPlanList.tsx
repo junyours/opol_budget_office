@@ -382,7 +382,7 @@ const BudgetPlanList: React.FC = () => {
             {newActive && plans.some(p => p.is_active) && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
                 <p className="text-[11px] text-amber-700 font-medium">
-                  FY {plans.find(p => p.is_active)?.year} will be deactivated.
+                  Budget Plan Year {plans.find(p => p.is_active)?.year} will be deactivated.
                 </p>
               </div>
             )}
@@ -401,7 +401,7 @@ const BudgetPlanList: React.FC = () => {
         <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
             <DialogTitle className="text-[15px] font-semibold text-gray-900">Edit Budget Plan</DialogTitle>
-            <DialogDescription className="text-xs text-gray-400 mt-0.5">FY {editPlan?.year}</DialogDescription>
+            <DialogDescription className="text-xs text-gray-400 mt-0.5">Budget Plan Year {editPlan?.year}</DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
@@ -425,7 +425,7 @@ const BudgetPlanList: React.FC = () => {
       <AlertDialog open={!!activateTarget} onOpenChange={o => { if (!o) setActivateTarget(null); }}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[15px] font-semibold">Activate FY {activateTarget?.year}?</AlertDialogTitle>
+            <AlertDialogTitle className="text-[15px] font-semibold">Activate Budget Plan Year {activateTarget?.year}?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-500">
               <span className="font-medium text-amber-600">FY {plans.find(p => p.is_active)?.year}</span> will be deactivated.
             </AlertDialogDescription>

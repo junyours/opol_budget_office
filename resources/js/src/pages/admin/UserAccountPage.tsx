@@ -83,7 +83,8 @@ const ROLE_BADGE: Record<string, string> = {
 const ROLE_LABEL: Record<string, string> = {
   'super-admin':     'Super Admin',
   'admin':           'Budget Officer',
-  'department-head': 'Dept. Head',
+//   'department-head': 'Dept. Head',
+'department-head': 'Department Head',
   'admin-hrmo':      'HRMO',
 };
 

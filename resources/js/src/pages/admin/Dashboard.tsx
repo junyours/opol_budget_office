@@ -1705,11 +1705,17 @@ const AdminDashboard: React.FC = () => {
           {/* Header */}
           <div className="flex items-end justify-between animate-in fade-in duration-500" style={st(0)}>
             <div>
-              <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+              {/* <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
                 Municipal Budget Office · Opol, Misamis Oriental
               </p>
               <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
                 Dashboard
+              </h1> */}
+              <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+              <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
+                Overview
               </h1>
             </div>
             {!activePlan && (

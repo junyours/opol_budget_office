@@ -200,7 +200,7 @@ const BudgetProposal: React.FC = () => {
                         <div className="bg-white border border-zinc-100 rounded-xl px-3 py-1.5 shadow-sm flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             <span className="text-[11px] font-semibold text-zinc-600">
-                                Active: FY {activePlan.year}
+                                Active: Budget Plan Year {activePlan.year}
                             </span>
                         </div>
                         {activePlan.is_open ? (
@@ -270,7 +270,7 @@ const BudgetProposal: React.FC = () => {
                             <thead>
                                 <tr className="border-b border-zinc-100">
                                     <th className="bg-zinc-50/60 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-400 w-36">
-                                        Fiscal Year
+                                        Budget Plan
                                     </th>
                                     <th className="bg-zinc-50/60 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                                         Status

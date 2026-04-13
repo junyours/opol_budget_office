@@ -71,6 +71,7 @@ export interface DepartmentBudgetPlan {
   items: DepartmentBudgetPlanItem[];
   department?: Department;
   budget_plan?: BudgetPlan;
+  department_category?: DepartmentCategory;
 }
 
 ///////////////////////////////////////////////////////////

@@ -470,7 +470,7 @@ export default function PsComputation() {
               Personnel Services
             </span>
             <span className="text-gray-300 text-[10px]">·</span>
-            <span className="text-[10px] font-medium text-gray-400">CY {year}</span>
+            <span className="text-[10px] font-medium text-gray-400">Budget Year {year}</span>
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] text-gray-400">Municipality of Opol, Misamis Oriental</span>
           </div>

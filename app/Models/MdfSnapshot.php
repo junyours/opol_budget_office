@@ -1,6 +1,46 @@
 <?php
 // app/Models/MdfSnapshot.php
 
+// namespace App\Models;
+
+// use Illuminate\Database\Eloquent\Model;
+// use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+// class MdfSnapshot extends Model
+// {
+//     protected $primaryKey = 'snapshot_id';
+
+//     protected $fillable = [
+//         'item_id',
+//         'budget_plan_id',
+//         'total_amount',
+//         'sem1_actual',
+//     ];
+
+//     protected $casts = [
+//         'total_amount' => 'float',
+//         'sem1_actual'  => 'float',
+//     ];
+
+//     // sem2 is always derived — never stored separately
+//     public function getSem2Attribute(): float
+//     {
+//         return max(0.0, $this->total_amount - $this->sem1_actual);
+//     }
+
+//     public function item(): BelongsTo
+//     {
+//         return $this->belongsTo(MdfItem::class, 'item_id', 'item_id');
+//     }
+
+//     public function budgetPlan(): BelongsTo
+//     {
+//         return $this->belongsTo(BudgetPlan::class, 'budget_plan_id', 'budget_plan_id');
+//     }
+// }
+
+// app/Models/MdfSnapshot.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -15,14 +55,18 @@ class MdfSnapshot extends Model
         'budget_plan_id',
         'total_amount',
         'sem1_actual',
+        'sem2_actual',       // ← stored: auto-set when sem1 is saved (total - sem1)
+        'obligation_amount', // ← past year obligation; saved into the past plan snapshot
     ];
 
     protected $casts = [
-        'total_amount' => 'float',
-        'sem1_actual'  => 'float',
+        'total_amount'      => 'float',
+        'sem1_actual'       => 'float',
+        'sem2_actual'       => 'float',
+        'obligation_amount' => 'float',
     ];
 
-    // sem2 is always derived — never stored separately
+    // Convenience accessor — same as sem2_actual once stored
     public function getSem2Attribute(): float
     {
         return max(0.0, $this->total_amount - $this->sem1_actual);

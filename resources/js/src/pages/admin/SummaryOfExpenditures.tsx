@@ -129,13 +129,13 @@ export default function SummaryOfExpenditures() {
     <div className="p-6 pb-16">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          {/* <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">General Fund — In Pesos</span>
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] font-medium text-gray-400">FY {year}</span>
-          </div>
+          </div> */}
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Summary of Expenditures</h1>
-          <p className="text-[11px] text-gray-400 mt-0.5">Municipal Budget Office · Opol, Misamis Oriental · CY {year}</p>
+          {/* <p className="text-[11px] text-gray-400 mt-0.5">Municipal Budget Office · Opol, Misamis Oriental · CY {year}</p> */}
         </div>
       </div>
 

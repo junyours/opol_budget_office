@@ -1551,7 +1551,7 @@ private function getGfFundTotals(int $budgetPlanId): array
                         $this->makePdf($html, 'portrait')
                     );
                 }
-                
+
                 if (in_array('form7', $forms)) {
                     $data = $this->buildForm7Data($bpId, $sourceKey);
                     $html = $this->renderHtml('form7', $data);
@@ -1980,7 +1980,7 @@ return response()->stream(function () use ($zipPath) {
     foreach ($proposedPlan->items as $proposedItem) {
         $expenseItem = $proposedItem->expenseItem;
         if (! $expenseItem) continue;
- 
+
         $currentItem = $currentPlan
             ? BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
                 ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
@@ -1989,7 +1989,7 @@ return response()->stream(function () use ($zipPath) {
             ? BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
                 ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
             : null;
- 
+
         $items[] = [
             'classification' => $expenseItem->classification->expense_class_name ?? 'Uncategorized',
             'description'    => $expenseItem->expense_class_item_name,
@@ -2003,46 +2003,46 @@ return response()->stream(function () use ($zipPath) {
             'proposed'       => (float) $proposedItem->total_amount,
         ];
     }
- 
+
     // ── Special Programs (AIP Form 4 items) ──────────────────────────────────
     $proposedAip = DeptBpForm4Item::with('aipProgram')
         ->where('dept_budget_plan_id', $proposedPlan->dept_budget_plan_id)
         ->get()
         ->keyBy('aip_program_id');
- 
+
     $currentAip = $currentPlan
         ? DeptBpForm4Item::with('aipProgram')
             ->where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
             ->get()
             ->keyBy('aip_program_id')
         : collect();
- 
+
     $pastAip = $pastPlan
         ? DeptBpForm4Item::with('aipProgram')
             ->where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
             ->get()
             ->keyBy('aip_program_id')
         : collect();
- 
+
     $allProgramIds = $proposedAip->keys()
         ->merge($currentAip->keys())
         ->merge($pastAip->keys())
         ->unique()
         ->sort()
         ->values();
- 
+
     $specialPrograms = [];
     foreach ($allProgramIds as $programId) {
         $proposedRow = $proposedAip->get($programId);
         $currentRow  = $currentAip->get($programId);
         $pastRow     = $pastAip->get($programId);
- 
+
         $aipProgram = $proposedRow?->aipProgram
             ?? $currentRow?->aipProgram
             ?? $pastRow?->aipProgram;
- 
+
         if (! $aipProgram) continue;
- 
+
         // ↓ FIXED: past year ACTUAL = obligation_amount
         $pastTotal = (float) ($pastRow?->obligation_amount ?? 0);
         $curSem1   = (float) ($currentRow?->sem1_amount    ?? 0);
@@ -2050,9 +2050,9 @@ return response()->stream(function () use ($zipPath) {
         $curTotal  = (float) ($currentRow?->total_amount
                     ?? (($currentRow?->sem1_amount ?? 0) + ($currentRow?->sem2_amount ?? 0)));
         $proposed  = (float) ($proposedRow?->total_amount  ?? 0);
- 
+
         if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) continue;
- 
+
         $specialPrograms[] = [
             'aip_reference_code'  => $aipProgram->aip_reference_code,
             'program_description' => $aipProgram->program_description,
@@ -2063,7 +2063,7 @@ return response()->stream(function () use ($zipPath) {
             'proposed'            => $proposed,
         ];
     }
- 
+
     return compact('items', 'specialPrograms');
 }
 
@@ -2427,14 +2427,25 @@ return ['rows' => $rows, 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcPropo
     {
         $objects = IncomeFundObject::where('source', $source)->orderBy('sort_order')->get();
 
+        // $loadAmounts = function (?int $bpId) use ($source): array {
+        //     if (! $bpId) return [];
+        //     return IncomeFundAmount::where('budget_plan_id', $bpId)->where('source', $source)->get()
+        //         ->keyBy('income_fund_object_id')
+        //         ->map(fn ($r) => [
+        //             'sem1_actual'     => (float) $r->sem1_actual,
+        //             'sem2_actual'     => (float) $r->sem2_actual,
+        //             'proposed_amount' => (float) $r->proposed_amount,
+        //         ])->toArray();
+        // };
         $loadAmounts = function (?int $bpId) use ($source): array {
             if (! $bpId) return [];
             return IncomeFundAmount::where('budget_plan_id', $bpId)->where('source', $source)->get()
                 ->keyBy('income_fund_object_id')
                 ->map(fn ($r) => [
-                    'sem1_actual'     => (float) $r->sem1_actual,
-                    'sem2_actual'     => (float) $r->sem2_actual,
-                    'proposed_amount' => (float) $r->proposed_amount,
+                    'sem1_actual'       => (float) $r->sem1_actual,
+                    'sem2_actual'       => (float) $r->sem2_actual,
+                    'proposed_amount'   => (float) $r->proposed_amount,
+                    'obligation_amount' => (float) ($r->obligation_amount ?? 0),
                 ])->toArray();
         };
 
@@ -2451,14 +2462,23 @@ return ['rows' => $rows, 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcPropo
             $past = $pastAmts[$id]     ?? [];
             $cur  = $currentAmts[$id]  ?? [];
             $prop = $proposedAmts[$id] ?? [];
+            // $row  = [
+            //     'id' => $id, 'parent_id' => $obj->parent_id, 'name' => $obj->name,
+            //     'code' => $obj->code, 'level' => (int) $obj->level, 'is_subtotal' => false,
+            //     'past_total'    => $past['proposed_amount'] ?? 0.0,
+            //     'current_sem1'  => $cur['sem1_actual']      ?? 0.0,
+            //     'current_sem2'  => $cur['sem2_actual']      ?? 0.0,
+            //     'current_total' => $cur['proposed_amount']  ?? 0.0,
+            //     'proposed'      => $prop['proposed_amount'] ?? 0.0,
+            // ];
             $row  = [
                 'id' => $id, 'parent_id' => $obj->parent_id, 'name' => $obj->name,
                 'code' => $obj->code, 'level' => (int) $obj->level, 'is_subtotal' => false,
-                'past_total'    => $past['proposed_amount'] ?? 0.0,
-                'current_sem1'  => $cur['sem1_actual']      ?? 0.0,
-                'current_sem2'  => $cur['sem2_actual']      ?? 0.0,
-                'current_total' => $cur['proposed_amount']  ?? 0.0,
-                'proposed'      => $prop['proposed_amount'] ?? 0.0,
+                'past_total'    => $past['obligation_amount'] ?? ($past['proposed_amount'] ?? 0.0), // use obligation if available
+                'current_sem1'  => $cur['sem1_actual']        ?? 0.0,
+                'current_sem2'  => $cur['sem2_actual']         ?? 0.0,
+                'current_total' => $cur['proposed_amount']     ?? 0.0,
+                'proposed'      => $prop['proposed_amount']    ?? 0.0,
             ];
             $rawRows[]            = $row;
             $idToRow[$id]         = $row;
@@ -2782,5 +2802,5 @@ return ['rows' => $rows, 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcPropo
         $files = glob($viewsDir . DIRECTORY_SEPARATOR . '*.php');
         if ($files) foreach ($files as $f) @unlink($f);
     }
-    
+
 }

@@ -244,7 +244,7 @@ export default function LdrrmfipPage() {
   // ── Load sources + categories once ────────────────────────────────────────
 
   // const { user } = useAuth();
-   
+
   // useEffect(() => {
   //   Promise.all([
   //     API.get("/ldrrmfip/sources"),
@@ -629,7 +629,7 @@ useEffect(() => {
         LDRRMF Investment Plan
       </span>
       <span className="text-gray-300 text-[10px]">·</span>
-      <span className="text-[10px] font-semibold text-gray-500">CY {year}</span>
+      <span className="text-[10px] font-semibold text-gray-500">Budget Year {year}</span>
     </div>
     <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
       LOCAL DISASTER RISK REDUCTION & MANAGEMENT FUND INVESTMENT PLAN
@@ -771,7 +771,7 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
 
-      
+
                   <AlertDialog open={!!deleteItem} onOpenChange={open => { if (!open) setDeleteItem(null); }}>
                     <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200 gap-4">
                       <AlertDialogHeader>

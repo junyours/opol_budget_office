@@ -1166,8 +1166,8 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
 @php
 $form4      = $dr['form4'];
 $rows4      = $form4['rows'];
-$firstChunk = array_slice($rows4, 0, 13);
-$rest       = array_slice($rows4, 13);
+$firstChunk = array_slice($rows4, 0, 30);
+$rest       = array_slice($rows4, 30);
 $extraChunks= array_chunk($rest, 18);
 $pages4     = count($rows4) > 0 ? array_merge([$firstChunk], $extraChunks) : [[]];
 $totalPages4= count($pages4);
@@ -1254,17 +1254,17 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
     <thead>
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
             <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:18;padding:0;border:none;"></td>
+            <td style="width:20;padding:0;border:none;"></td>
             <td style="width:9%;padding:0;border:none;"></td>
-            <td style="width:12%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:15%;padding:0;border:none;"></td>
+            <td style="width:9%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
-            <th rowspan="2">AIP Reference Code</th>
+            <th rowspan="2">AIP Reference</th>
             <th rowspan="2">Program/Project<br/>/Activity Description</th>
             <th rowspan="2">Major Final Output</th>
             <th rowspan="2">Performance Indicator</th>
@@ -1280,7 +1280,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
         <td class="c">{{ $row4['aip_reference_code'] ?? '' }}</td>
         <td>{{ $row4['program_description'] ?? '' }}</td>
         <td class="c">{{ $row4['major_final_output'] ?? 'Imprvd Svcs' }}</td>
-        <td>{{ $row4['performance_indicator'] ?? '' }}</td>
+        <td style="font-size:6pt">{{ $row4['performance_indicator'] ?? '' }}</td>
         <td class="c">{{ $row4['target'] ?? '' }}</td>
         <td class="r">{!! $row4['ps_amount']    > 0 ? $pesoInt($row4['ps_amount'])    : '-' !!}</td>
         <td class="r">{!! $row4['mooe_amount']  > 0 ? $pesoInt($row4['mooe_amount'])  : '-' !!}</td>

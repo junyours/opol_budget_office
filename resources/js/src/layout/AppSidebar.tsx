@@ -95,7 +95,7 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Income Special Account", href: `/department/${deptCode}-fund`, icon: getDeptIcon(user), iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["department-head"] },
         {
           name: "5% Calamity Fund",
-          href: `/admin/${deptCode}-cf`,   // ← was /department/${deptCode}-cf
+          href: `/admin/${deptCode}-cf`,   
           icon: ShieldCheckIcon,
           iconBg: "bg-red-100",
           iconColor: "text-red-600",
@@ -115,7 +115,7 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
       }] as NavItem[],
     },
     {
-      label: "Income, Budget",
+      label: "Income & Expenditures",
       items: [
         { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin"] },
         { name: "Income Funds",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin"] },
@@ -130,28 +130,28 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Summary of Expenditures", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
-    {
-      label: "Plans",
-      items: [
-        { name: "Special Purpose & Annual Plans", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", roles: ["super-admin", "admin"] },
-      ] as NavItem[],
-    },
-    {
-      label: "Workbook",
-      items: [
-        { name: "General Funds",           href: "/admin/object-of-expenditures", icon: TableCellsIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
-        { name: "Special Accounts",        href: "/admin/special-accounts",       icon: CreditCardIcon, iconBg: "bg-rose-100",   iconColor: "text-rose-600",   roles: ["super-admin", "admin"] },
+    // {
+    //   label: "Plans",
+    //   items: [
+    //     { name: "Special Purpose & Annual Plans", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", roles: ["super-admin", "admin"] },
+    //   ] as NavItem[],
+    // },
+    // {
+    //   label: "Workbook",
+    //   items: [
+    //     { name: "General Funds",           href: "/admin/object-of-expenditures", icon: TableCellsIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
+    //     { name: "Special Accounts",        href: "/admin/special-accounts",       icon: CreditCardIcon, iconBg: "bg-rose-100",   iconColor: "text-rose-600",   roles: ["super-admin", "admin"] },
 
-      ] as NavItem[],
-    },
+    //   ] as NavItem[],
+    // },
     {
-      label: "Debt Management",
+      label: "Debt Services",
       items: [
         { name: "Statement of Indebtedness", href: "/admin/lbp-form5", icon: ScaleIcon, iconBg: "bg-red-100", iconColor: "text-red-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
     {
-      label: "Review",
+      label: "LBP Forms (2,3, & 4) Review",
       items: [
         { name: "Budget Prop GF & SA", href: "/admin/lbp-forms", icon: ClipboardDocumentListIcon, iconBg: "bg-blue-100", iconColor: "text-blue-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
@@ -182,6 +182,21 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Department Reports", href: "/department/reports", icon: DocumentTextIcon, iconBg: "bg-green-100", iconColor: "text-green-600", roles: ["department-head"] },
       ] as NavItem[],
     },
+
+    {
+        label: "Expenditure",
+        items: [
+        {
+            name: "Expense & AIP Items",
+            href: "/admin/expenditure",
+            icon: TableCellsIcon,          // already imported
+            iconBg: "bg-amber-100",
+            iconColor: "text-amber-600",
+            roles: ["super-admin", "admin"],
+        },
+        ] as NavItem[],
+    },
+
     {
       label: "Settings",
       items: [{

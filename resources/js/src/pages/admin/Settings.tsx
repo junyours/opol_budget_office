@@ -13,7 +13,7 @@ const TranchePage              = React.lazy(() => import('./TranchePage'));
 const PlantillaPage            = React.lazy(() => import('../hrmo/PlantillaPage'));
 const PersonnelPage            = React.lazy(() => import('../hrmo/PersonnelPage'));
 const PlantillaOfPersonnelPage = React.lazy(() => import('../hrmo/PlantillaOfPersonnelPage'));
-const ExpenseClassItemsPage = React.lazy(() => import('./ExpenseClassItemsPage'));
+// const ExpenseClassItemsPage = React.lazy(() => import('./ExpenseClassItemsPage'));
 const DepartmentsPage          = React.lazy(() => import('./DepartmentsPage'));
 const UserAccountPage          = React.lazy(() => import('./UserAccountPage'));
 
@@ -60,16 +60,16 @@ const TABS = [
     iconColor:   'text-purple-600',
     component:   PlantillaOfPersonnelPage,
   },
-  {
-    key:         'expense-items',
-    label:       'Expense Items',
-    short:       'Expense Items',
-    description: 'Manage expense class items',
-    icon:        ClipboardDocumentListIcon,   // already imported
-    iconBg:      'bg-amber-100',
-    iconColor:   'text-amber-600',
-    component:   ExpenseClassItemsPage,
-  },
+//   {
+//     key:         'expense-items',
+//     label:       'Expense Items',
+//     short:       'Expense Items',
+//     description: 'Manage expense class items',
+//     icon:        ClipboardDocumentListIcon,   // already imported
+//     iconBg:      'bg-amber-100',
+//     iconColor:   'text-amber-600',
+//     component:   ExpenseClassItemsPage,
+//   },
   {
     key:         'departments',
     label:       'Departments',

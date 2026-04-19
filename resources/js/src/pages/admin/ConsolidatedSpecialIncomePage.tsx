@@ -183,20 +183,20 @@ export default function ConsolidatedSpecialIncomePage() {
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
+          {/* <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Consolidated Estimated Income
-          </span>
-          <span className="text-gray-300 text-[10px]">·</span>
+          </span> */}
+          {/* <span className="text-gray-300 text-[10px]">·</span>
           <span className="text-[10px] font-medium text-gray-400">Special Account, CY {year}</span>
           <span className="text-gray-300 text-[10px]">·</span>
-          <span className="text-[10px] font-medium text-gray-400">Municipality of Opol, Misamis Oriental</span>
+          <span className="text-[10px] font-medium text-gray-400">Municipality of Opol, Misamis Oriental</span> */}
         </div>
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
           Consolidated Special Account Income
         </h1>
-        <p className="text-sm text-gray-400 mt-0.5">
+        {/* <p className="text-sm text-gray-400 mt-0.5">
           Estimated income per department from special-account sources
-        </p>
+        </p> */}
       </div>
 
       {/* ── Summary cards ────────────────────────────────────────────────── */}

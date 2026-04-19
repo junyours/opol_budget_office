@@ -511,8 +511,8 @@ export default function Form5() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">LBP Form No. 5</span>
-            <span className="text-gray-300 text-[10px]">·</span>
-            <span className="text-[10px] font-medium text-gray-400">FY {budgetYear}</span>
+            {/* <span className="text-gray-300 text-[10px]">·</span> */}
+            {/* <span className="text-[10px] font-medium text-gray-400">FY {budgetYear}</span> */}
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Statement of Indebtedness</h1>
         </div>

@@ -133,6 +133,10 @@ const DepartmentSettings = React.lazy(
   () => import("../pages/department-head/DepartmentSettings")
 );
 
+const ExpenditurePage = React.lazy(
+     () => import("../pages/admin/ExpenditurePage")
+   );
+
 /* ------------------ Suspense Wrapper ------------------ */
 
 const Lazy = (Component: React.LazyExoticComponent<any>) => (
@@ -224,7 +228,7 @@ const router = createBrowserRouter([
             element: Lazy(BudgetPlanDetail),
           },
 
-          
+
           /* ---------------- ADMIN ---------------- */
 
           {
@@ -297,7 +301,7 @@ const router = createBrowserRouter([
               {
                 path: "admin/mdf-fund",
                 element: Lazy(MDFFund),
-              },  
+              },
               {
                 path: "hrmo/plantilla",
                 element: Lazy(HrmoPlantilla),
@@ -332,19 +336,23 @@ const router = createBrowserRouter([
               },
               { path: "admin/plans", element: Lazy(PlansPage) },
               {
-  path: "admin/consolidated-special-income",
-  element: Lazy(ConsolidatedSpecialIncomePage),
-},
-{
-  path: "admin/summary-expenditures",
-  element: Lazy(SummaryOfExpenditures),
-},
+                path: "admin/consolidated-special-income",
+                element: Lazy(ConsolidatedSpecialIncomePage),
+                },
+                {
+                path: "admin/summary-expenditures",
+                element: Lazy(SummaryOfExpenditures),
+                },
 
-{
-    path: 'admin/reports-unified',
-    element: Lazy(UnifiedReportsPage),
-  },
- 
+                {
+                    path: 'admin/reports-unified',
+                    element: Lazy(UnifiedReportsPage),
+                },
+            {
+                path: "admin/expenditure",
+                element: Lazy(ExpenditurePage),
+            },
+
             ],
           },
 

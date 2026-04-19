@@ -255,17 +255,33 @@ export interface BudgetPlan {
 //   records_exist: boolean
 // }
 
+// export interface IncomeFundRow {
+//   id: number
+//   parent_id: number | null
+//   code: string
+//   name: string
+//   level: number
+//   past: number | null
+//   current_total: number | null
+//   sem1: number | null
+//   sem2: number | null
+//   proposed: number | null
+// }
+
 export interface IncomeFundRow {
-  id: number
-  parent_id: number | null
-  code: string
-  name: string
-  level: number
-  past: number | null
-  current_total: number | null
-  sem1: number | null
-  sem2: number | null
-  proposed: number | null
+  id: number;
+  parent_id: number | null;
+  code: string;
+  name: string;
+  level: number;
+  past: number | null;
+  past_obligation: number | null;   // ← new: editable actual for past year
+  current_sem1: number | null;      // ← renamed
+  current_sem2: number | null;      // ← renamed
+  current_total: number | null;
+  sem1: number | null;
+  sem2: number | null;
+  proposed: number | null;
 }
 
 export interface IncomeFundResponse {
@@ -274,7 +290,8 @@ export interface IncomeFundResponse {
   past_year: number
   current_year: number
   source: string
-  records_exist: boolean
+  records_exist: boolean,
+  past_plan_missing?: boolean
 }
 
 /////////////////////////////////////////////////

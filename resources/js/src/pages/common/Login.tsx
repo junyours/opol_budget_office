@@ -10,13 +10,14 @@ import API from "../../services/api";
 import { Input }              from "@/src/components/ui/input";
 import { Label }              from "@/src/components/ui/label";
 import { Button }             from "@/src/components/ui/button";
-import { Checkbox }           from "@/src/components/ui/checkbox";
+// import { Checkbox }           from "@/src/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Separator }          from "@/src/components/ui/separator";
 import { Badge }              from "@/src/components/ui/badge";
+import { toast }              from "sonner";
 
-const MAX_LOGIN_ATTEMPTS = 5;
-const RATE_LIMIT_WINDOW  = 30000;
+const MAX_LOGIN_ATTEMPTS = 50;
+const RATE_LIMIT_WINDOW  = 60000;
 const RATE_LIMIT_KEY     = "login_attempts";
 
 interface LoginAttempt {
@@ -42,7 +43,7 @@ export default function Login() {
   const [isRateLimited,  setIsRateLimited]  = useState(false);
   const [hasLoginError,  setHasLoginError]  = useState(false);
   const [isSubmitting,   setIsSubmitting]   = useState(false);
-  const [rememberMe,     setRememberMe]     = useState(false);
+//   const [rememberMe,     setRememberMe]     = useState(false);
   const [mounted,        setMounted]        = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,11 +125,38 @@ export default function Login() {
       resetRateLimit();
       navigate("/dashboard");
     } catch (err: any) {
-      updateRateLimit();
-      if (checkRateLimit()) return;
-      setHasLoginError(true);
-      setLoginError(err.response?.data?.message ?? "Invalid username or password.");
-    } finally {
+  // Server-side 429 (throttle:login fired) — surface it directly,
+  // skip local rate-limit counter so we don't double-penalise.
+  if (err.response?.status === 429 || (err as any).isRateLimit) {
+  // Prefer header, fall back to body, then 0 (show generic message without timer)
+const retryAfterSec =
+  err.response?.headers?.['retry-after'] ??
+  err.response?.data?.retry_after;
+
+const waitMs = retryAfterSec ? parseInt(retryAfterSec, 10) * 1000 : 0;
+
+  // Persist so countdown survives a page refresh
+  if (waitMs > 0) {
+  localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify({
+    count: MAX_LOGIN_ATTEMPTS,
+    timestamp: Date.now() - (RATE_LIMIT_WINDOW - waitMs),
+  }));
+  setRemainingTime(waitMs);
+  setIsRateLimited(true);
+  setRateLimitError("Too many attempts. Try again in ");
+} else {
+  // No timer info — just show the server's message
+  setHasLoginError(true);
+  setLoginError(err.response?.data?.message ?? "Too many login attempts. Please wait a moment.");
+}
+return;
+}
+
+  updateRateLimit();
+  if (checkRateLimit()) return;
+  setHasLoginError(true);
+  setLoginError(err.response?.data?.message ?? "Invalid username or password.");
+} finally {
       setIsSubmitting(false);
     }
   };
@@ -224,7 +252,7 @@ export default function Login() {
                     <div>
                       <p className="text-sm font-semibold text-zinc-900 leading-tight">Municipal Budget Office</p>
                       <p className="login-mono text-[11px] text-zinc-400 leading-tight tracking-wide mt-0.5">
-                        FY {new Date().getFullYear()} · MGMT SYSTEM
+                        CY {new Date().getFullYear()} · MGMT SYSTEM
                       </p>
                     </div>
                   </div>
@@ -235,13 +263,14 @@ export default function Login() {
                       Budget planning,<br />made simple.
                     </h1>
                     <p className="mt-3 text-sm text-zinc-500 leading-relaxed">
-                      A unified platform for municipal financial management, allocation, and transparent reporting.
+                      A unified platform for municipal budget management, allocation, and transparent reporting.
                     </p>
                   </div>
 
                   {/* Features */}
-                  <div className="space-y-1">
-                    {FEATURES.map(({ icon: Icon, label }, i) => (
+                  <div className="hidden lg:block">
+                    <div className="space-y-1">
+                        {FEATURES.map(({ icon: Icon, label }, i) => (
                       <div
                         key={label}
                         className={`feat-row flex items-center gap-3 px-3 py-2.5 cursor-default ${sl("left", `d${i + 3}`)}`}
@@ -252,6 +281,7 @@ export default function Login() {
                         <span className="text-sm text-zinc-600">{label}</span>
                       </div>
                     ))}
+                  </div>
                   </div>
                 </div>
 
@@ -281,7 +311,8 @@ export default function Login() {
 
                   {/* Error */}
                   {(rateLimitError || loginError) && (
-                    <Alert variant="destructive" className="mb-5 login-slide-up login-in login-anim">
+                    // <Alert variant="destructive" className="mb-5 login-slide-up login-in login-anim">
+                    <Alert variant="destructive" className="mb-5 login-slide-up login-in login-anim" role="alert" aria-live="assertive" id="login-error">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-sm">
                         {rateLimitError
@@ -307,6 +338,8 @@ export default function Login() {
                         disabled={isLoading || isRateLimited}
                         className={`login-input h-10 text-sm focus-visible:ring-0 ${hasLoginError ? "err" : ""}`}
                         autoComplete="username"
+                        aria-invalid={hasLoginError}
+                        aria-describedby="login-error"
                         required
                       />
                     </div>
@@ -326,13 +359,17 @@ export default function Login() {
                           disabled={isLoading || isRateLimited}
                           className={`login-input h-10 text-sm pr-10 focus-visible:ring-0 ${hasLoginError ? "err" : ""}`}
                           autoComplete="current-password"
+                          aria-invalid={hasLoginError}
+                          aria-describedby="login-error"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(v => !v)}
                           disabled={isLoading || isRateLimited}
-                          tabIndex={-1}
+                        //   tabIndex={-1}
+                        tabIndex={0}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                           className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors disabled:opacity-40"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -343,21 +380,29 @@ export default function Login() {
                     {/* Remember + Forgot */}
                     <div className={`flex items-center justify-between ${sl("right", "d4")}`}>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <Checkbox
+                        {/* <Checkbox
                           id="remember"
                           checked={rememberMe}
                           onCheckedChange={v => setRememberMe(!!v)}
                           disabled={isLoading || isRateLimited}
                           className="h-4 w-4"
                         />
-                        <span className="text-sm text-zinc-600">Remember me</span>
+                        <span className="text-sm text-zinc-600">Remember me</span> */}
                       </label>
                       <a
                         href="#"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            toast("Password assistance", {
+                            description: "Please contact your Budget Officer to reset your password.",
+                            icon: <ShieldCheck className="w-4 h-4 text-zinc-700" />,
+                            duration: 5000,
+                            });
+                        }}
                         className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors hover:underline underline-offset-4"
-                      >
+                        >
                         Forgot password?
-                      </a>
+                    </a>
                     </div>
 
                     {/* Submit */}
@@ -368,7 +413,8 @@ export default function Login() {
                         className="w-full h-10 text-sm font-semibold"
                       >
                         {isLoading ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /><span>Signing in…</span></>
+                        //   <><Loader2 className="h-4 w-4 animate-spin" /><span>Signing in…</span></>
+                        <><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Signing in…</span></>
                         ) : isRateLimited ? "Please wait…" : "Sign in"}
                       </Button>
                     </div>

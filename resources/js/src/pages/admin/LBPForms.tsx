@@ -574,7 +574,7 @@ const filteredPlans = useMemo(() => {
                         </span>
                       );
                     })()}
-                    <span className="text-[11px] text-gray-400">Budget Year {activePlan.year}</span>
+                    {/* <span className="text-[11px] text-gray-400">Budget Year {activePlan.year}</span> */}
                   </div>
                 </div>
               </div>

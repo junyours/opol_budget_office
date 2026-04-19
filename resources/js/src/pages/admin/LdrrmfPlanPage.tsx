@@ -275,7 +275,7 @@ export default function LdrrmfPlanPage() {
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-          CY-{year} 5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) —{" "}
+          5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) —{" "}
           <span className="text-gray-500 font-normal text-xl">JMC 2013-1, RA-10121</span>
         </h1>
         <div className="mt-1.5 space-y-0.5">
@@ -615,7 +615,7 @@ export default function LdrrmfPlanPage() {
                           <span className="text-blue-700 font-bold font-mono tabular-nums text-[12px]">
                             {fmtPeso(sa.budget_year.total_5pct)}
                           </span>
-                          
+
                         </div>
                       </td>
                     </tr>

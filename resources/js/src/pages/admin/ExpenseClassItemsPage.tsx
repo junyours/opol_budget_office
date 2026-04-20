@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import API from "../../services/api";
 import { useDebounce } from "../../hooks/useDebounce";
@@ -35,7 +36,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import {
@@ -80,6 +80,24 @@ const PER_PAGE = 10;
 const ALL_CLASSIFICATIONS = "__all__";
 const ALL_STATUS = "__all__";
 
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+function useClassifications() {
+  return useQuery<ExpenseClassification[]>({
+    queryKey: ["expense-classifications"],
+    queryFn: () => API.get("/expense-classifications").then((r) => r.data?.data ?? []),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+function useExpenseClassItems() {
+  return useQuery<ExpenseClassItem[]>({
+    queryKey: ["expense-class-items"],
+    queryFn: () => API.get("/expense-class-items").then((r) => r.data?.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // ─── Highlight helper ──────────────────────────────────────────────────────────
 
 function highlightMatch(text: string, query: string): React.ReactNode {
@@ -100,9 +118,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const ExpenseClassItemsPage: React.FC = () => {
-  const [items, setItems]                   = useState<ExpenseClassItem[]>([]);
-  const [classifications, setClassifications] = useState<ExpenseClassification[]>([]);
-  const [loading, setLoading]               = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: items = [],           isLoading: itemsLoading }  = useExpenseClassItems();
+  const { data: classifications = [], isLoading: classLoading }  = useClassifications();
+
+  const loading = itemsLoading || classLoading;
 
   // ── Search ─────────────────────────────────────────────────────────────────
   const [searchRaw, setSearchRaw]     = useState("");
@@ -123,10 +144,10 @@ const ExpenseClassItemsPage: React.FC = () => {
   const [modalOpen, setModalOpen]     = useState(false);
   const [editingItem, setEditingItem] = useState<ExpenseClassItem | null>(null);
   const [form, setForm] = useState({
-    expense_class_id:         "",
-    expense_class_item_name:  "",
+    expense_class_id:            "",
+    expense_class_item_name:     "",
     expense_class_item_acc_code: "",
-    is_active:                true,
+    is_active:                   true,
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -134,54 +155,20 @@ const ExpenseClassItemsPage: React.FC = () => {
   const [deleteTarget,     setDeleteTarget]     = useState<ExpenseClassItem | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<ExpenseClassItem | null>(null);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetchClassifications();
-    fetchItems();
-  }, []);
-
-  const fetchClassifications = async () => {
-    try {
-      const res = await API.get("/expense-classifications");
-      setClassifications(Array.isArray(res.data?.data) ? res.data.data : []);
-    } catch {
-      toast.error("Failed to load expense classifications");
-    }
-  };
-
-  const fetchItems = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get("/expense-class-items");
-      setItems(Array.isArray(res.data?.data) ? res.data.data : []);
-      setPage(1);
-    } catch {
-      toast.error("Failed to load expense items");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ── Filtered + sorted list ─────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
     let list = items;
 
-    // Classification filter
     if (filterClass !== ALL_CLASSIFICATIONS) {
-      list = list.filter(
-        (i) => i.expense_class_id?.toString() === filterClass
-      );
+      list = list.filter((i) => i.expense_class_id?.toString() === filterClass);
     }
 
-    // Status filter
     if (filterStatus !== ALL_STATUS) {
       const active = filterStatus === "active";
       list = list.filter((i) => i.is_active === active);
     }
 
-    // Search (debounced) — matches name or acc code
     const q = debouncedSearch.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -192,7 +179,6 @@ const ExpenseClassItemsPage: React.FC = () => {
       );
     }
 
-    // Sort
     list = [...list].sort((a, b) => {
       let av = "", bv = "";
       if (sortField === "name") {
@@ -212,11 +198,10 @@ const ExpenseClassItemsPage: React.FC = () => {
     return list;
   }, [items, filterClass, filterStatus, debouncedSearch, sortField, sortDir]);
 
-  // Reset page on filter/search
-  const handleFilterClassChange = (val: string) => { setFilterClass(val);   setPage(1); };
-  const handleFilterStatusChange = (val: string) => { setFilterStatus(val); setPage(1); };
+  const handleFilterClassChange  = (val: string) => { setFilterClass(val);   setPage(1); };
+  const handleFilterStatusChange = (val: string) => { setFilterStatus(val);  setPage(1); };
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setSearchRaw(e.target.value); setPage(1); };
-  const clearSearch = () => { setSearchRaw(""); setPage(1); };
+  const clearSearch  = () => { setSearchRaw(""); setPage(1); };
   const clearFilters = () => { setFilterClass(ALL_CLASSIFICATIONS); setFilterStatus(ALL_STATUS); setPage(1); };
 
   const toggleSort = (field: typeof sortField) => {
@@ -292,8 +277,8 @@ const ExpenseClassItemsPage: React.FC = () => {
         toast.success("Expense item created.");
       }
 
+      queryClient.invalidateQueries({ queryKey: ["expense-class-items"] });
       setModalOpen(false);
-      fetchItems();
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? "Operation failed.";
       toast.error(msg);
@@ -311,7 +296,7 @@ const ExpenseClassItemsPage: React.FC = () => {
       });
       toast.success(item.is_active ? "Item deactivated." : "Item activated.");
       setDeactivateTarget(null);
-      fetchItems();
+      queryClient.invalidateQueries({ queryKey: ["expense-class-items"] });
     } catch {
       toast.error("Failed to update status.");
     }
@@ -325,7 +310,7 @@ const ExpenseClassItemsPage: React.FC = () => {
       await API.delete(`/expense-class-items/${deleteTarget.expense_class_item_id}`);
       toast.success(`"${deleteTarget.expense_class_item_name}" deleted.`);
       setDeleteTarget(null);
-      fetchItems();
+      queryClient.invalidateQueries({ queryKey: ["expense-class-items"] });
     } catch {
       toast.error("Failed to delete item.");
     }
@@ -375,7 +360,6 @@ const ExpenseClassItemsPage: React.FC = () => {
       {/* ── Filter + Search bar ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
 
-        {/* Search */}
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
@@ -396,7 +380,6 @@ const ExpenseClassItemsPage: React.FC = () => {
 
         <FunnelIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
 
-        {/* Classification filter */}
         <Select value={filterClass} onValueChange={handleFilterClassChange}>
           <SelectTrigger className={cn("h-8 text-xs w-52 border-gray-200", filterClass !== ALL_CLASSIFICATIONS && "border-gray-400 bg-gray-50")}>
             <SelectValue placeholder="All classifications" />
@@ -411,7 +394,6 @@ const ExpenseClassItemsPage: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {/* Status filter */}
         <Select value={filterStatus} onValueChange={handleFilterStatusChange}>
           <SelectTrigger className={cn("h-8 text-xs w-32 border-gray-200", filterStatus !== ALL_STATUS && "border-gray-400 bg-gray-50")}>
             <SelectValue placeholder="All statuses" />
@@ -423,7 +405,6 @@ const ExpenseClassItemsPage: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {/* Active filter pills */}
         {isFiltered && (
           <div className="flex items-center gap-1.5">
             {filterClass !== ALL_CLASSIFICATIONS && (
@@ -444,7 +425,6 @@ const ExpenseClassItemsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Count */}
         <span className="text-[11px] text-gray-400 ml-auto">
           {isFiltered || isSearching ? (
             <><span className="font-medium text-gray-600">{filtered.length}</span> of <span className="font-medium text-gray-600">{items.length}</span> items</>
@@ -507,14 +487,11 @@ const ExpenseClassItemsPage: React.FC = () => {
                       !item.is_active && "opacity-60"
                     )}
                   >
-                    {/* Name */}
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {isSearching
                         ? highlightMatch(item.expense_class_item_name, debouncedSearch)
                         : item.expense_class_item_name}
                     </td>
-
-                    {/* Account Code */}
                     <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
                       {item.expense_class_item_acc_code
                         ? isSearching
@@ -522,8 +499,6 @@ const ExpenseClassItemsPage: React.FC = () => {
                           : item.expense_class_item_acc_code
                         : <span className="text-gray-300">—</span>}
                     </td>
-
-                    {/* Classification */}
                     <td className="px-4 py-3">
                       {item.classification ? (
                         <span className="inline-flex items-center gap-1">
@@ -542,8 +517,6 @@ const ExpenseClassItemsPage: React.FC = () => {
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-
-                    {/* Status badge */}
                     <td className="px-4 py-3">
                       <Badge
                         variant="outline"
@@ -557,8 +530,6 @@ const ExpenseClassItemsPage: React.FC = () => {
                         {item.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </td>
-
-                    {/* Actions */}
                     <td className="px-2 py-2.5 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -574,13 +545,6 @@ const ExpenseClassItemsPage: React.FC = () => {
                           <DropdownMenuItem onClick={() => setDeactivateTarget(item)}>
                             {item.is_active ? "Deactivate" : "Activate"}
                           </DropdownMenuItem>
-                          {/* <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                            onClick={() => setDeleteTarget(item)}
-                          >
-                            Delete
-                          </DropdownMenuItem> */}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -589,7 +553,6 @@ const ExpenseClassItemsPage: React.FC = () => {
               </tbody>
             </table>
 
-            {/* ── Pagination ── */}
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
                 <p className="text-[11px] text-gray-400">
@@ -599,7 +562,6 @@ const ExpenseClassItemsPage: React.FC = () => {
                   </span>{" "}
                   of <span className="font-medium text-gray-600">{filtered.length}</span>
                 </p>
-
                 <Pagination className="w-auto mx-0">
                   <PaginationContent className="gap-0.5">
                     <PaginationItem>
@@ -650,8 +612,6 @@ const ExpenseClassItemsPage: React.FC = () => {
           </DialogHeader>
 
           <div className="px-6 py-5 space-y-4">
-
-            {/* Classification */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">
                 Classification {!editingItem && <span className="text-red-400">*</span>}
@@ -673,7 +633,6 @@ const ExpenseClassItemsPage: React.FC = () => {
               </Select>
             </div>
 
-            {/* Item Name */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">
                 Item Name <span className="text-red-400">*</span>
@@ -686,7 +645,6 @@ const ExpenseClassItemsPage: React.FC = () => {
               />
             </div>
 
-            {/* Account Code */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Account Code</Label>
               <Input
@@ -698,7 +656,6 @@ const ExpenseClassItemsPage: React.FC = () => {
               />
             </div>
 
-            {/* Status (only on edit) */}
             {editingItem && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-gray-600">Status</Label>

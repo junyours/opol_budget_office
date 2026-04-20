@@ -123,7 +123,12 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           </td>
         </tr>
 
-        @forelse($rows as $row)
+        @forelse($rows as $rIdx => $row)
+        @php
+          $fmt       = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+          $noCurrent = ($row['current_amount'] <= 0);
+          $curAmt    = $row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0);
+        @endphp
         <tr style="line-height:1.2;">
           <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
           <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
@@ -138,26 +143,23 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             {{ $row['salary_grade'] ?? '' }}<br>
             {{ $row['step_current'] ?? '' }}
           </td>
-          <td class="r">
-            {!! ($peso)($row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0)) !!}
-          </td>
+          <td class="r">{!! $fmt($curAmt) !!}</td>
           <td class="c" style="font-size:6pt;">
             {{ $row['salary_grade'] ?? '' }}<br>
             {{ $row['step_proposed'] ?? '' }}
           </td>
           <td class="r">
-            {!! ($pesoA)($row['proposed_amount'] ?? 0) !!}
+            {!! $fmt($row['proposed_amount'] ?? 0) !!}
             @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
-              <br><span style="font-size:5.5pt;font-style:italic;">+{!! ($pesoA)($row['annual_increment']) !!}</span>
+              <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
           </td>
-          @php $noCurrent = ($row['current_amount'] <= 0); @endphp
           <td class="r">
             @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
-              {!! ($pesoA)($row['increase_decrease']) !!}
+              {!! $fmt($row['increase_decrease']) !!}
             @endif
             @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
-              <br><span style="font-size:5.5pt;font-style:italic;">+{!! ($pesoA)($row['annual_increment']) !!}</span>
+              <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
           </td>
         </tr>
@@ -247,7 +249,12 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             </td>
           </tr>
 
-          @forelse($rows as $row)
+          @forelse($rows as $rIdx => $row)
+          @php
+            $fmt       = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+            $noCurrent = ($row['current_amount'] <= 0);
+            $curAmt    = $row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0);
+          @endphp
           <tr style="line-height:1.2;">
             <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
             <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
@@ -262,26 +269,23 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
               {{ $row['salary_grade'] ?? '' }}<br>
               {{ $row['step_current'] ?? '' }}
             </td>
-            <td class="r">
-              {!! ($peso)($row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0)) !!}
-            </td>
+            <td class="r">{!! $fmt($curAmt) !!}</td>
             <td class="c" style="font-size:6pt;">
               {{ $row['salary_grade'] ?? '' }}<br>
               {{ $row['step_proposed'] ?? '' }}
             </td>
             <td class="r">
-              {!! ($pesoA)($row['proposed_amount'] ?? 0) !!}
+              {!! $fmt($row['proposed_amount'] ?? 0) !!}
               @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
-                <br><span style="font-size:5.5pt;font-style:italic;">+{!! ($pesoA)($row['annual_increment']) !!}</span>
+                <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
               @endif
             </td>
-            @php $noCurrent = ($row['current_amount'] <= 0); @endphp
             <td class="r">
               @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
-                {!! ($pesoA)($row['increase_decrease']) !!}
+                {!! $fmt($row['increase_decrease']) !!}
               @endif
               @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
-                <br><span style="font-size:5.5pt;font-style:italic;">+{!! ($pesoA)($row['annual_increment']) !!}</span>
+                <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
               @endif
             </td>
           </tr>

@@ -2469,11 +2469,14 @@ type FormId = typeof FORM_DEFS[number]['id'];
 
 // ─── LEP Form definitions ─────────────────────────────────────────────────────
 
-type LepFormId = 'consolidated_plantilla';
+// type LepFormId = 'consolidated_plantilla';
+type LepFormId = 'consolidated_plantilla' | 'receipts_program' | 'lep_form2' | 'lep_form7';
+
 
 const LEP_FORM_DEFS: ReadonlyArray<{
   id: LepFormId; label: string; desc: string;
   orientation: 'portrait' | 'landscape'; endpoint: string;
+  needsDept: boolean;   // ← new flag
 }> = [
   {
     id: 'consolidated_plantilla',
@@ -2481,6 +2484,31 @@ const LEP_FORM_DEFS: ReadonlyArray<{
     desc: 'All departments — General Fund + Special Accounts',
     orientation: 'portrait',
     endpoint: '/reports/lep/consolidated-plantilla',
+    needsDept: false,
+  },
+  {
+    id: 'receipts_program',
+    label: 'Receipts Program',
+    desc: 'Part II — General Fund & Special Accounts income',
+    orientation: 'portrait',
+    endpoint: '/reports/lep/receipts-program',
+    needsDept: false,
+  },
+  {
+    id: 'lep_form2',
+    label: 'Appropriations by Office',
+    desc: 'Part III — Programmed Appropriation & Obligation by Object of Expenditures',
+    orientation: 'portrait',
+    endpoint: '/reports/lep/form2',
+    needsDept: true,   // ← shows department selector
+  },
+  {
+    id: 'lep_form7',
+    label: 'Summary of Appropriations by Sector',
+    desc: 'Part IV — New Appropriations by Object of Expenditures and by Sector',
+    orientation: 'portrait' as const,
+    endpoint: '/reports/lep/form7',
+    needsDept: false,
   },
 ];
 
@@ -2966,11 +2994,13 @@ const AbpPanel: React.FC<{
 
 const LepPanel: React.FC<{
   budgetPlans: BudgetPlan[];
+  departments: Department[];   // ← add this prop
   loadingInit: boolean;
-}> = ({ budgetPlans, loadingInit }) => {
+}> = ({ budgetPlans, departments, loadingInit }) => {
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [selectedForms,  setSelectedForms]  = useState<Set<LepFormId>>(new Set(['consolidated_plantilla']));
+  const [selectedDept,   setSelectedDept]   = useState<string>('all');   // ← new
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingDl,      setLoadingDl]      = useState(false);
   const [previewUrl,     setPreviewUrl]     = useState<string | null>(null);
@@ -2990,10 +3020,15 @@ const LepPanel: React.FC<{
       return next;
     });
     setPreviewUrl(null);
+    // Reset dept when switching away from lep_form2
+    if (id !== 'lep_form2') setSelectedDept('all');
   };
 
   const isReady = Boolean(selectedPlanId) && selectedForms.size > 0;
   const isBusy  = loadingPreview || loadingDl;
+
+  // Dept selector is shown only when lep_form2 is the (single) selected form
+  const needsDept = selectedForms.size === 1 && selectedForms.has('lep_form2');
 
   const currentEndpoint = selectedForms.size === 1
     ? LEP_FORM_DEFS.find(f => selectedForms.has(f.id))?.endpoint ?? '' : '';
@@ -3001,8 +3036,16 @@ const LepPanel: React.FC<{
 
   const fetchLepPdf = useCallback(async (download: boolean): Promise<Blob> => {
     if (!currentEndpoint) throw new Error('Select a single LEP form to preview.');
+    const params: Record<string, unknown> = {
+      budget_plan_id: selectedPlanId,
+      download: download ? 1 : undefined,
+      _: Date.now(),
+    };
+    // Only pass department param when lep_form2 is selected
+    if (needsDept) params.department = selectedDept;
+
     const response = await API.post(currentEndpoint, null, {
-      params: { budget_plan_id: selectedPlanId, download: download ? 1 : undefined, _: Date.now() },
+      params,
       responseType: 'blob',
       headers: { Accept: 'application/pdf', 'X-Requested-With': 'XMLHttpRequest' },
     });
@@ -3014,7 +3057,7 @@ const LepPanel: React.FC<{
     }
     if ((response.data as Blob).size === 0) throw new Error('Empty PDF received');
     return response.data as Blob;
-  }, [currentEndpoint, selectedPlanId]);
+  }, [currentEndpoint, selectedPlanId, needsDept, selectedDept]);
 
   const handlePreview = async () => {
     if (!canPreview || loadingPreview) return;
@@ -3029,11 +3072,14 @@ const LepPanel: React.FC<{
     if (!canPreview || loadingDl) return;
     setLoadingDl(true);
     try {
-      const blob = await fetchLepPdf(true);
+      const blob  = await fetchLepPdf(true);
       const plan  = budgetPlans.find(p => String(p.budget_plan_id) === selectedPlanId);
       const label = Array.from(selectedForms).map(f => f.toUpperCase()).join('-');
       const url   = URL.createObjectURL(blob);
-      const a     = Object.assign(document.createElement('a'), { href: url, download: `LEP_${label}_FY${plan?.year ?? ''}.pdf` });
+      const a     = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `LEP_${label}_FY${plan?.year ?? ''}.pdf`,
+      });
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success('PDF downloaded');
@@ -3042,12 +3088,15 @@ const LepPanel: React.FC<{
   };
 
   const selectedPlan = budgetPlans.find(p => String(p.budget_plan_id) === selectedPlanId);
+  const selectedDeptName = selectedDept === 'all'
+    ? 'All Offices'
+    : departments.find(d => String(d.dept_id) === selectedDept)?.dept_name ?? '—';
 
-  // ── Left sidebar content (shared between generate/settings tabs) ──────────
+  // ── Sidebar JSX ────────────────────────────────────────────────────────────
   const Sidebar = (
     <div className="w-60 flex-shrink-0 flex flex-col gap-3 p-3 border-r border-zinc-200 bg-zinc-50 overflow-y-auto">
 
-      {/* Budget plan selector */}
+      {/* Budget plan */}
       <div>
         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Budget Plan</p>
         <Select value={selectedPlanId} onValueChange={v => { setSelectedPlanId(v); setPreviewUrl(null); }} disabled={loadingInit}>
@@ -3088,30 +3137,55 @@ const LepPanel: React.FC<{
             <div className="space-y-2">
               {LEP_FORM_DEFS.map(form => (
                 <label key={form.id} htmlFor={`lep-chk-${form.id}`} className="flex items-start gap-2 cursor-pointer group">
-                  <Checkbox id={`lep-chk-${form.id}`} checked={selectedForms.has(form.id)} onCheckedChange={() => toggleForm(form.id)} className="mt-0.5 flex-shrink-0" />
+                  <Checkbox
+                    id={`lep-chk-${form.id}`}
+                    checked={selectedForms.has(form.id)}
+                    onCheckedChange={() => toggleForm(form.id)}
+                    className="mt-0.5 flex-shrink-0"
+                  />
                   <div>
                     <div className="text-xs font-semibold text-zinc-800 leading-tight group-hover:text-zinc-900">
                       {form.label}
-                      {form.orientation === 'landscape' && <span className="ml-1 text-[9px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">landscape</span>}
+                      {form.orientation === 'landscape' && (
+                        <span className="ml-1 text-[9px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">landscape</span>
+                      )}
                     </div>
                     <div className="text-[9px] text-zinc-400 leading-tight mt-0.5">{form.desc}</div>
                   </div>
                 </label>
               ))}
-              {/* Coming soon */}
-              <div className="opacity-40 cursor-not-allowed flex items-start gap-2">
-                <Checkbox disabled className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-xs font-semibold text-zinc-500 leading-tight">Receipt Program</div>
-                  <div className="text-[9px] text-zinc-400 leading-tight mt-0.5">General Fund & Special Accounts income — coming soon</div>
-                </div>
-              </div>
             </div>
           </div>
 
+          {/* Department selector — only visible when lep_form2 is the selected form */}
+          {needsDept && (
+            <div>
+              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Office / Department</p>
+              <Select
+                value={selectedDept}
+                onValueChange={v => { setSelectedDept(v); setPreviewUrl(null); }}
+                disabled={loadingInit}
+              >
+                <SelectTrigger className="w-full h-7 text-xs bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Offices</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.dept_id} value={String(d.dept_id)}>
+                      {d.dept_abbreviation ? `${d.dept_abbreviation} — ${d.dept_name}` : d.dept_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Summary card */}
           {selectedPlan && (
             <div className="rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-[10px] text-zinc-500 space-y-0.5">
               <p className="font-semibold text-zinc-700">Budget Year {selectedPlan.year}</p>
+              {needsDept && <p>Office: {selectedDeptName}</p>}
               <p>Docs: {Array.from(selectedForms).join(', ')}</p>
             </div>
           )}
@@ -3151,15 +3225,12 @@ const LepPanel: React.FC<{
     </div>
   );
 
+  // ── Right panel (unchanged) ─────────────────────────────────────────────────
   return (
     <div className="flex flex-1 min-h-full overflow-hidden">
-
       {Sidebar}
-
-      {/* Right panel — full height, matching ABP */}
       <div className="flex-1 min-w-0 min-h-full flex flex-col bg-zinc-100">
 
-        {/* Generate tab: iframe preview */}
         {innerTab === 'generate' && (
           <>
             {previewUrl && (
@@ -3184,30 +3255,27 @@ const LepPanel: React.FC<{
               />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-                {loadingPreview ? (
-                  <><Loader2 className="w-10 h-10 text-zinc-300 animate-spin" /><p className="text-sm text-zinc-400">Generating PDF…</p></>
-                ) : (
-                  <>
-                    <ClipboardList className="w-14 h-14 text-zinc-200" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-400">No preview yet</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        {canPreview ? 'Click Preview PDF to generate' : 'Select a single document to preview'}
-                      </p>
-                    </div>
-                    {canPreview && isReady && (
-                      <Button size="sm" variant="outline" className="mt-1 text-xs h-7" onClick={handlePreview} disabled={isBusy}>
-                        <Eye className="mr-1.5 h-3 w-3" />Preview PDF
-                      </Button>
-                    )}
-                  </>
-                )}
+                {loadingPreview
+                  ? <><Loader2 className="w-10 h-10 text-zinc-300 animate-spin" /><p className="text-sm text-zinc-400">Generating PDF…</p></>
+                  : <>
+                      <ClipboardList className="w-14 h-14 text-zinc-200" />
+                      <div>
+                        <p className="text-sm font-medium text-zinc-400">No preview yet</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {canPreview ? 'Click Preview PDF to generate' : 'Select a single document to preview'}
+                        </p>
+                      </div>
+                      {canPreview && isReady && (
+                        <Button size="sm" variant="outline" className="mt-1 text-xs h-7" onClick={handlePreview} disabled={isBusy}>
+                          <Eye className="mr-1.5 h-3 w-3" />Preview PDF
+                        </Button>
+                      )}
+                    </>}
               </div>
             )}
           </>
         )}
 
-        {/* Settings tab: header editor fills the full right panel */}
         {innerTab === 'settings' && (
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white">
             {selectedPlanId
@@ -3310,7 +3378,7 @@ const UnifiedReportsPage: React.FC = () => {
     </TabsContent>
 
     <TabsContent value="lep" className="flex-1 min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden">
-      <LepPanel budgetPlans={budgetPlans} loadingInit={loadingInit} />
+      <LepPanel budgetPlans={budgetPlans} departments={departments} loadingInit={loadingInit} />
     </TabsContent>
   </Tabs>
       </div>

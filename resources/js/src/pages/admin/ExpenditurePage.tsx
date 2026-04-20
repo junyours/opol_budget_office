@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { cn } from "@/src/lib/utils";
 import {
   ListBulletIcon,
-  ClipboardDocumentListIcon,
+  ClipboardDocumentListIcon,BanknotesIcon
 } from "@heroicons/react/24/outline";
 
 // Lazy-load sub-tabs
 const ExpenseClassItemsPage = React.lazy(() => import("./ExpenseClassItemsPage"));
 const AipProgramsTab        = React.lazy(() => import("./AipProgramsTab"));
+const IncomeItemsTab = React.lazy(() => import("./IncomeItemsTab"));
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -32,6 +33,17 @@ const TABS = [
     iconColor:   "text-indigo-600",
     component:   AipProgramsTab,
   },
+  // after the aip-programs entry, add:
+    {
+    key:         "income-items",
+    label:       "Income Items",
+    short:       "Income Items",
+    description: "Manage income fund objects by source",
+    icon:        BanknotesIcon,          // add to imports below
+    iconBg:      "bg-emerald-100",
+    iconColor:   "text-emerald-600",
+    component:   IncomeItemsTab,
+    },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];

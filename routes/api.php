@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\{
     MdfSnapshotController,
     LEPReportController,
     LepHeaderSettingController,
+    IncomeFundObjectController,
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
@@ -62,6 +63,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::apiResource('departments',               DepartmentController::class);
     Route::apiResource('expense-classifications',   ExpenseClassificationController::class);
     Route::apiResource('expense-class-items',       ExpenseClassItemController::class);
+
+    // ── Income Fund Objects (master list) ─────────────────────────────────────────
+    Route::get ('income-fund-objects/sources', [IncomeFundObjectController::class, 'sources']);
+    Route::apiResource('income-fund-objects',  IncomeFundObjectController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
 
     // ── Personnel & Plantilla ──────────────────────────────────────────────────
     Route::apiResource('personnels', PersonnelController::class);
@@ -227,6 +233,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('consolidated-plantilla',         [LEPReportController::class,        'consolidatedPlantilla']);
         Route::get ('header-settings/{budgetPlanId}', [LepHeaderSettingController::class, 'show']);
         Route::put ('header-settings/{budgetPlanId}', [LepHeaderSettingController::class, 'upsert']);
+
+        Route::post('receipts-program', [LEPReportController::class, 'receiptsProgram']);
+        Route::post('form2', [LEPReportController::class, 'lepForm2']);
+        Route::post('form7', [LEPReportController::class, 'lepForm7']);
     });
 
     // Unified plan read/write (non-bulk)

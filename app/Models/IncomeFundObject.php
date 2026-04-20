@@ -7,13 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 class IncomeFundObject extends Model
 {
     protected $table = 'income_fund_objects';
-    
+
     protected $fillable = [
+        'source',
         'parent_id',
         'code',
         'name',
         'level',
-        'sort_order'
+        'sort_order',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function parent()

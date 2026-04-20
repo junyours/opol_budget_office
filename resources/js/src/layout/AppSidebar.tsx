@@ -95,7 +95,7 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Income Special Account", href: `/department/${deptCode}-fund`, icon: getDeptIcon(user), iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["department-head"] },
         {
           name: "5% Calamity Fund",
-          href: `/admin/${deptCode}-cf`,   
+          href: `/admin/${deptCode}-cf`,
           icon: ShieldCheckIcon,
           iconBg: "bg-red-100",
           iconColor: "text-red-600",
@@ -159,15 +159,10 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
     {
       label: "Reports",
       items: [
-        { name: "LBP Forms 1 to 7", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
+        { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
-    {
-      label: "System",
-      items: [
-        { name: "Settings", href: "/admin/settings", icon: Cog6ToothIcon, iconBg: "bg-gray-100", iconColor: "text-gray-600", roles: ["super-admin", "admin"] },
-      ] as NavItem[],
-    },
+
     {
       label: "HRMO",
       items: [
@@ -184,10 +179,10 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
     },
 
     {
-        label: "Expenditure",
+        label: "Income & Expenditures (ML)",
         items: [
         {
-            name: "Expense & AIP Items",
+            name: "Item Master List",
             href: "/admin/expenditure",
             icon: TableCellsIcon,          // already imported
             iconBg: "bg-amber-100",
@@ -195,6 +190,13 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
             roles: ["super-admin", "admin"],
         },
         ] as NavItem[],
+    },
+
+    {
+      label: "System",
+      items: [
+        { name: "Settings", href: "/admin/settings", icon: Cog6ToothIcon, iconBg: "bg-gray-100", iconColor: "text-gray-600", roles: ["super-admin", "admin"] },
+      ] as NavItem[],
     },
 
     {

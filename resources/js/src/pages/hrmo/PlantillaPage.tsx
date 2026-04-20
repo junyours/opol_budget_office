@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -7,9 +7,9 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/src/components/ui/dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/src/components/ui/dropdown-menu";
+// import {
+//   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+// } from "@/src/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -18,8 +18,8 @@ import {
   Pagination, PaginationContent, PaginationEllipsis, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "@/src/components/ui/pagination";
-import { MoreHorizontalIcon } from "lucide-react";
-import { PlusIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
+// import { MoreHorizontalIcon } from "lucide-react";
+import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { ExcelUploadModal } from './ExcelUploadModal';
 import { LoadingState } from '../common/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -27,6 +27,7 @@ import API from '../../services/api';
 import { Department } from '../../types/api';
 import { cn } from '@/src/lib/utils';
 import { DeptDots } from '@/src/components/ui/DeptDots';
+
 const ITEMS_PER_PAGE = 10;
 
 const PlantillaPage: React.FC = () => {
@@ -52,6 +53,8 @@ const PlantillaPage: React.FC = () => {
   const [togglePosition, setTogglePosition]     = useState<any | null>(null);
   const [confirmCreateOpen, setConfirmCreateOpen] = useState(false);
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; pos: any } | null>(null);
+  const ctxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (selectedDeptId) setCreateForm(p => ({ ...p, dept_id: selectedDeptId })); }, [selectedDeptId]);
   useEffect(() => { if (createDialogOpen) setCreateForm(p => ({ ...p, new_item_number: getNextNewNumber() })); }, [createDialogOpen]);
@@ -74,6 +77,15 @@ const PlantillaPage: React.FC = () => {
 
   useEffect(() => { fetchData(); }, []);
   useEffect(() => { setCurrentPage(1); }, [debouncedSearch, selectedDeptId]);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const handler = (e: MouseEvent) => {
+        if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtxMenu(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+    }, [ctxMenu]);
 
   const getNextNewNumber = (): string => {
     const nums = positions.map(p => p.new_item_number).filter(n => n && !isNaN(parseInt(n))).map(n => parseInt(n));
@@ -146,6 +158,16 @@ const PlantillaPage: React.FC = () => {
       toast.success('Position updated.'); fetchData(); setEditDialogOpen(false); setEditingPosition(null);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
+
+
+  const handleRowClick = (e: React.MouseEvent, pos: any) => {
+    e.preventDefault();
+    const MENU_W = 180, MENU_H = 110;
+    const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
+    const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
+    setCtxMenu({ x, y, pos });
+    };
+
   const confirmToggleActive = async () => {
     if (!togglePosition) return;
     try {
@@ -321,12 +343,17 @@ const PlantillaPage: React.FC = () => {
                     </th>
                   ))}
                   <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-20">Status</th>
-                  <th className="border-b border-gray-200 bg-white px-2 py-2.5 w-12" />
+                  {/* <th className="border-b border-gray-200 bg-white px-2 py-2.5 w-12" /> */}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginated.map(pos => (
-                  <tr key={pos.plantilla_position_id} className="hover:bg-gray-50/60 transition-colors">
+                  <tr
+                    key={pos.plantilla_position_id}
+                    onClick={(e) => handleRowClick(e, pos)}
+                    onContextMenu={(e) => { e.preventDefault(); handleRowClick(e, pos); }}
+                    className="hover:bg-gray-50/80 transition-colors cursor-pointer select-none"
+                    >
                     <td className="px-4 py-2.5 font-mono text-gray-500">{pos.old_item_number || '–'}</td>
                     <td className="px-4 py-2.5 font-mono text-gray-700 font-medium">{pos.new_item_number}</td>
                     <td className="px-4 py-2.5 text-gray-900">{pos.position_title}</td>
@@ -341,21 +368,7 @@ const PlantillaPage: React.FC = () => {
                         {pos.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700">
-                            <MoreHorizontalIcon className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                          <DropdownMenuItem onClick={() => handleEdit(pos)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setTogglePosition(pos); setToggleActiveOpen(true); }}>
-                            {pos.is_active ? 'Deactivate' : 'Activate'}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
+
                   </tr>
                 ))}
               </tbody>
@@ -389,6 +402,43 @@ const PlantillaPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* ── Context Menu ── */}
+{ctxMenu && (
+  <div
+    ref={ctxRef}
+    style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
+    className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[175px] overflow-hidden"
+  >
+    <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
+    <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[155px]">
+        {ctxMenu.pos.new_item_number} — {ctxMenu.pos.position_title.slice(0, 22)}
+      </p>
+    </div>
+    <button
+      onClick={() => { setCtxMenu(null); handleEdit(ctxMenu.pos); }}
+      className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
+    >
+      <PencilSquareIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      Edit Position
+    </button>
+    <button
+      onClick={() => { setCtxMenu(null); setTogglePosition(ctxMenu.pos); setToggleActiveOpen(true); }}
+      className={cn(
+        'flex items-center gap-2.5 w-full px-3 py-2 text-[12px] transition-colors',
+        ctxMenu.pos.is_active
+          ? 'text-amber-700 hover:bg-amber-50'
+          : 'text-emerald-700 hover:bg-emerald-50'
+      )}
+    >
+      {ctxMenu.pos.is_active
+        ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
+        : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
+      }
+    </button>
+  </div>
+)}
 
       {/* ── Dialogs ── */}
 

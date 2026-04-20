@@ -171,6 +171,7 @@ $introBy         = $hdr['introduced_by']       ?? '';
 ══════════════════════════════════════════════════════════ --}}
 
   {{-- Letterhead --}}
+  @if(($report_type ?? '') === 'consolidated_plantilla')
   <div class="lh-province">{{ $province }}</div>
   <div class="lh-muni">{{ $muni }}</div>
   <div class="lh-office">{{ $officeName }}</div>
@@ -249,27 +250,61 @@ $introBy         = $hdr['introduced_by']       ?? '';
     4. Plantilla of Personnel;<br>
     5. Others
   </div>
+  @endif {{-- only consolidated_plantilla gets the ordinance header --}}
 
 {{-- ══════════════════════════════════════════════════════════
      PART I — CONSOLIDATED PLANTILLA OF PERSONNEL
      Continues immediately below — no page break before this
 ══════════════════════════════════════════════════════════ --}}
-@include('reports.lep.consolidated_plantilla_of_personnel', [
-    'sections'            => $sections,
-    'proposed_year'       => $proposed_year,
-    'current_year'        => $current_year,
-    'lep_lbc_current'     => $lep_lbc_current,
-    'lep_lbc_proposed'    => $lep_lbc_proposed,
-    'lep_tranche_current' => $lep_tranche_current,
-    'lep_tranche_proposed'=> $lep_tranche_proposed,
-    'grand_current_total' => $grandCurrentTotal,
-    'grand_proposed_total'=> $grandProposedTotal,
-    'grand_increase'      => $grandIncrease,
-    'signatories'         => $sigs,
-    'peso'                => $peso,
-    'pesoA'               => $pesoA,
-    'muni'                => $muni,
-])
+
+
+
+@if(($report_type ?? '') === 'receipts_program')
+    @include('reports.lep.receipts_program', [
+        'receipt_forms'  => $receipt_forms,
+        'proposed_year'  => $proposed_year,
+        'current_year'   => $current_year,
+        'past_year'      => $past_year,
+        'signatories'    => $signatories,
+    ])
+
+@elseif(($report_type ?? '') === 'lep_form2')
+    @include('reports.lep.lep_form2', [
+        'form2_sections' => $form2_sections,
+        'proposed_year'  => $proposed_year,
+        'current_year'   => $current_year,
+        'past_year'      => $past_year,
+    ])
+
+    @elseif(($report_type ?? '') === 'lep_form7')
+    @include('reports.lep.lep_form7', [
+        'data' => [
+            'year'  => $year,
+            'lgu'   => $lgu,
+            'forms' => $forms,
+        ],
+    ])
+
+@else
+    @include('reports.lep.consolidated_plantilla_of_personnel', [
+        'sections'            => $sections,
+        'proposed_year'       => $proposed_year,
+        'current_year'        => $current_year,
+        'lep_lbc_current'     => $lep_lbc_current,
+        'lep_lbc_proposed'    => $lep_lbc_proposed,
+        'lep_tranche_current' => $lep_tranche_current,
+        'lep_tranche_proposed'=> $lep_tranche_proposed,
+        'grand_current_total' => $grandCurrentTotal,
+        'grand_proposed_total'=> $grandProposedTotal,
+        'grand_increase'      => $grandIncrease,
+        'signatories'         => $sigs,
+        'peso'                => $peso,
+        'pesoA'               => $pesoA,
+        'muni'                => $muni,
+    ])
+
+@endif
+
 
 </div>{{-- /wrap --}}
 </body>

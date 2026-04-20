@@ -132,6 +132,9 @@ class LEPReportController extends Controller
             }
         }
 
+        // ── Income fund totals (for ordinance title amounts) ──────────────────
+        $generalFundProposedTotal = $this->getIncomeFundTotal($budgetPlanId, 'general-fund');
+
         // ── Resolve LBC / tranche info from active plan ───────────────────────
         $lepLbcInfo = $this->resolveLbcInfo($budgetPlanId, $proposedYear);
 
@@ -142,7 +145,7 @@ class LEPReportController extends Controller
             'sections'               => $sections,
             'special_account_totals' => $specialAccountTotals,
             'grand_current_total'    => $grandCurrentTotal,
-            'grand_proposed_total'   => $grandProposedTotal,
+            'grand_proposed_total'   => $generalFundProposedTotal,
             'lep_lbc_current'        => $lepLbcInfo['lbc_current'],
             'lep_lbc_proposed'       => $lepLbcInfo['lbc_proposed'],
             'lep_tranche_current'    => $lepLbcInfo['tranche_current'],
@@ -274,6 +277,53 @@ class LEPReportController extends Controller
 
         return $groups;
     }
+
+    private function getIncomeFundTotal(int $budgetPlanId, string $source): float
+{
+    $nonIncomeParent = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+        ->first(['id']);
+
+    $excludeIds = [];
+    if ($nonIncomeParent) {
+        $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
+        $excludeIds[] = $nonIncomeParent->id;
+    }
+
+    $beginningCashObj = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->whereRaw("LOWER(name) LIKE '%beginning cash%'")
+        ->first(['id']);
+
+    $beginningCash = 0.0;
+    if ($beginningCashObj) {
+        $beginningCash = (float) \DB::table('income_fund_amounts')
+            ->where('budget_plan_id', $budgetPlanId)
+            ->where('income_fund_object_id', $beginningCashObj->id)
+            ->value('proposed_amount');
+    }
+
+    $allObjectIds = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->pluck('id');
+
+    $parentIds = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->whereNotNull('parent_id')
+        ->pluck('parent_id')
+        ->unique();
+
+    $leafIds = $allObjectIds->diff($parentIds)->values();
+
+    $query = \DB::table('income_fund_amounts')
+        ->where('budget_plan_id', $budgetPlanId)
+        ->where('source', $source)
+        ->whereNotIn('income_fund_object_id', $excludeIds)
+        ->whereIn('income_fund_object_id', $leafIds);
+
+    return $beginningCash + (float) $query->sum('proposed_amount');
+}
 
     // ─── Special account income fund totals ────────────────────────────────────
     private function getSpecialAccountTotals(int $budgetPlanId, $specialDepts): array

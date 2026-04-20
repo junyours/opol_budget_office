@@ -105,7 +105,7 @@ table.data-table td {
     border: 1px solid #000;
     padding: 1.5px 3px;
     vertical-align: middle;
-    line-height: 1.5;
+    line-height: 1.2;
     word-break: break-word;
 }
 table.data-table th {
@@ -116,6 +116,10 @@ table.data-table th {
 table.data-table td.r  { text-align: right; }
 table.data-table td.c  { text-align: center; }
 table.data-table td.l  { text-align: left; }
+
+table.data-table tbody tr {
+    line-height: 1.2;
+}
 
 tr.grand-total td { font-weight: bold; }
 
@@ -183,7 +187,8 @@ $introBy         = $hdr['introduced_by']       ?? '';
     {!! $pesoA($totalBudget) !!} COMPRISING THE GENERAL FUND AMOUNTING TO
     {!! $pesoA($generalFundProposed) !!}
     @if(count($saItems))
-      AND THE TOTAL SPECIAL ACCOUNT
+      AND THE TOTAL SPECIAL ACCOUNT AMOUNTING TO
+      {!! $pesoA($saGrandTot) !!}: COMPRISING THE
       @foreach($saItems as $idx => $sa)
         {{ strtoupper($sa['dept_name']) }}
         {!! $pesoA($sa['amount']) !!}{{ !$loop->last ? ';' : '' }}

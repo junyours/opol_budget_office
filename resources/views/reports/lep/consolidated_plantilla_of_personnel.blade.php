@@ -60,23 +60,23 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     <td style="width:11%; padding:0;border:none;"></td>
     <td style="width:11%; padding:0;border:none;"></td>
   </tr>
-  <tr>
+  <tr style="line-height:1.2;">
     <th colspan="2">Item No.</th>
     <th rowspan="2" style="width:27%;">Position Title</th>
     <th rowspan="2" style="width:20%;">Name of Incumbent</th>
-    <th colspan="2">
+    <th colspan="2" style="line-height:1.2;>
       Current Year Authorized Rate / Annum<br>
       <?php if($lep_lbc_current) echo $lep_lbc_current . '<br>'; ?>
       <span style="font-size:6pt;"><?php echo $lep_tranche_current ?? 'No Data'; ?></span>
     </th>
-    <th colspan="2">
+    <th colspan="2" style="line-height:1.2;">
       Budget Year <?php echo $proposed_year; ?> Proposed Rate / Annum<br>
       <?php if($lep_lbc_proposed) echo $lep_lbc_proposed . '<br>'; ?>
       <span style="font-size:6pt;"><?php echo $lep_tranche_proposed ?? 'No Data'; ?></span>
     </th>
     <th rowspan="2" style="width:11%;">Increase/<br>Decrease</th>
   </tr>
-  <tr>
+  <tr style="line-height:1.2;">
     <th style="font-size:6pt;">Old</th>
     <th style="font-size:6pt;">New</th>
     <th style="width:5%;">Grade/<br>Step</th>
@@ -84,7 +84,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     <th style="width:5%;">Grade/<br>Step</th>
     <th style="width:12%;">Amount</th>
   </tr>
-  <tr>
+  <tr style="line-height:1.2;">
     <th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th>
     <th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th><th>(9)</th>
   </tr>
@@ -105,7 +105,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     A. GENERAL FUND
   </div>
 
-  <table class="data-table" style="width:100%; table-layout:fixed; font-size:6.5pt;">
+  <table class="data-table" style="margin-top:4px; width:100% !important; table-layout:fixed; font-size:6.5pt;">
     {!! $tableHeader() !!}
     <tbody>
 
@@ -124,7 +124,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
         </tr>
 
         @forelse($rows as $row)
-        <tr>
+        <tr style="line-height:1.2;">
           <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
           <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
           <td style="word-wrap:break-word;">{{ $row['position_title'] }}</td>
@@ -201,7 +201,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     PART I: CONSOLIDATED PLANTILLA OF PERSONNEL (Continuation)
   </div>
 
-  <table class="data-table" style="width:100%; table-layout:fixed; font-size:6.5pt;">
+  <table class="data-table" style="width:100%; table-layout:fixed; font-size:6pt;">
     {!! $tableHeader() !!}
     <tbody>
 
@@ -248,7 +248,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           </tr>
 
           @forelse($rows as $row)
-          <tr>
+          <tr style="line-height:1.2;">
             <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
             <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
             <td style="word-wrap:break-word;">{{ $row['position_title'] }}</td>
@@ -292,7 +292,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
         @endforeach
 
         {{-- SA section total (only if non-zero) --}}
-        @if($secCurrentTotal > 0 || $secProposedTotal > 0)
+        {{-- @if($secCurrentTotal > 0 || $secProposedTotal > 0)
         <tr class="grand-total">
           <td colspan="4" style="font-size:7pt; padding:2px 4px;">
             TOTAL — {{ $secLabel }}
@@ -303,7 +303,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           <td class="r" style="font-size:7pt;">{!! ($pesoA)($secProposedTotal) !!}</td>
           <td class="r" style="font-size:7pt;">{!! $secIncrease != 0 ? ($pesoA)($secIncrease) : '' !!}</td>
         </tr>
-        @endif
+        @endif --}}
 
       @else
         <tr>

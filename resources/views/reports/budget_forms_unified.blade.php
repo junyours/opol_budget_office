@@ -454,16 +454,20 @@ $maybeBreak = function(
 <tr class="sec-hdr"><td colspan="7">{!! $cls['label'] !!}</td></tr>
 
 @if($type === 'ps')
-@foreach($grp['items'] as $item)
-@php echo $maybeBreak(1, 'Personal Services, (PS) — continued'); $pageRowCount++; @endphp
+@foreach($grp['items'] as $psF1Idx => $item)
+@php
+    echo $maybeBreak(1, 'Personal Services, (PS) — continued');
+    $pageRowCount++;
+    $fmtF1ps = $psF1Idx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
-    <td class="r">{!! $peso($item['past_total']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($item['current_total']) !!}</td>
-    <td class="r">{!! $peso($item['proposed']) !!}</td>
+    <td class="r">{!! (float)$item['past_total']    > 0 ? $fmtF1ps($item['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem1']  > 0 ? $fmtF1ps($item['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem2']  > 0 ? $fmtF1ps($item['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_total'] > 0 ? $fmtF1ps($item['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$item['proposed']      > 0 ? $fmtF1ps($item['proposed'])      : '' !!}</td>
 </tr>
 @endforeach
 @php echo $maybeBreak(1, 'Personal Services, (PS) — continued'); $pageRowCount++; @endphp
@@ -479,16 +483,20 @@ $maybeBreak = function(
 
 @if($type === 'mooe')
 @php $mooeRunning = array_fill_keys($fields5, 0.0); @endphp
-@foreach($mooeItems as $item)
-@php echo $maybeBreak(1, 'Maint. &amp; Other Operating Expenditures, (MOOE) — continued'); $pageRowCount++; @endphp
+@foreach($mooeItems as $mooeF1Idx => $item)
+@php
+    echo $maybeBreak(1, 'Maint. &amp; Other Operating Expenditures, (MOOE) — continued');
+    $pageRowCount++;
+    $fmtF1mooe = $mooeF1Idx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
-    <td class="r">{!! $peso($item['past_total']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($item['current_total']) !!}</td>
-    <td class="r">{!! $peso($item['proposed']) !!}</td>
+    <td class="r">{!! (float)$item['past_total']    > 0 ? $fmtF1mooe($item['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem1']  > 0 ? $fmtF1mooe($item['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem2']  > 0 ? $fmtF1mooe($item['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_total'] > 0 ? $fmtF1mooe($item['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$item['proposed']      > 0 ? $fmtF1mooe($item['proposed'])      : '' !!}</td>
 </tr>
 @php foreach($fields5 as $f) $mooeRunning[$f] += (float)$item[$f]; @endphp
 @endforeach
@@ -504,16 +512,20 @@ $maybeBreak = function(
 @endif
 
 @if($type === 'co')
-@foreach($grp['items'] as $item)
-@php echo $maybeBreak(1, 'Capital Outlay (C.O.) — continued'); $pageRowCount++; @endphp
+@foreach($grp['items'] as $coF1Idx => $item)
+@php
+    echo $maybeBreak(1, 'Capital Outlay (C.O.) — continued');
+    $pageRowCount++;
+    $fmtF1co = $coF1Idx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
-    <td class="r">{!! $peso($item['past_total']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($item['current_total']) !!}</td>
-    <td class="r">{!! $peso($item['proposed']) !!}</td>
+    <td class="r">{!! (float)$item['past_total']    > 0 ? $fmtF1co($item['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem1']  > 0 ? $fmtF1co($item['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem2']  > 0 ? $fmtF1co($item['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_total'] > 0 ? $fmtF1co($item['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$item['proposed']      > 0 ? $fmtF1co($item['proposed'])      : '' !!}</td>
 </tr>
 @endforeach
 @php echo $maybeBreak(1, 'Capital Outlay (C.O.) — continued'); $pageRowCount++; @endphp
@@ -529,16 +541,20 @@ $maybeBreak = function(
 
 @if($type === 'other')
 @php $otherSub = $subTotals($grp); @endphp
-@foreach($grp['items'] as $item)
-@php echo $maybeBreak(1, e($grp['class_name']).' — continued'); $pageRowCount++; @endphp
+@foreach($grp['items'] as $otherF1Idx => $item)
+@php
+    echo $maybeBreak(1, e($grp['class_name']).' — continued');
+    $pageRowCount++;
+    $fmtF1other = $otherF1Idx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $item['name'] }}</td>
     <td class="c">{{ $item['account_code'] }}</td>
-    <td class="r">{!! $peso($item['past_total']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($item['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($item['current_total']) !!}</td>
-    <td class="r">{!! $peso($item['proposed']) !!}</td>
+    <td class="r">{!! (float)$item['past_total']    > 0 ? $fmtF1other($item['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem1']  > 0 ? $fmtF1other($item['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_sem2']  > 0 ? $fmtF1other($item['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$item['current_total'] > 0 ? $fmtF1other($item['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$item['proposed']      > 0 ? $fmtF1other($item['proposed'])      : '' !!}</td>
 </tr>
 @endforeach
 @php echo $maybeBreak(1, e($grp['class_name']).' — continued'); $pageRowCount++; @endphp
@@ -556,34 +572,50 @@ $maybeBreak = function(
 @php $mdfRunning = array_fill_keys($fields5, 0.0); @endphp
 @php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
 <tr><td class="l" colspan="7" style="font-style:italic;padding-left:8pt;font-size:6.5pt;">&nbsp;&nbsp;20% MDF (Unapprop. Bal.)</td></tr>
-@foreach($allMdfLines as $mline)
-@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
+@foreach($allMdfLines as $mdfF1Idx => $mline)
+@php
+    echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued');
+    $pageRowCount++;
+    $fmtF1mdf = ($mdfF1Idx === 0 && count($ldrrmfRows) === 0) || $mdfF1Idx === 0
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    // first MDF line always gets peso sign; subsequent lines plain numbers
+    $fmtF1mdf = $mdfF1Idx === 0
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
     @if($mline['kind'] === 'debt-interest')
     <tr>
         <td class="l" style="padding-left:20pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ $mline['display_name'] }}</td>
         <td class="c">{{ $mline['account_code'] ?? '' }}</td>
-        <td class="r">{!! $num($mline['past_total']) !!}</td>
-        <td class="r">{!! $num($mline['current_sem1']) !!}</td>
-        <td class="r">{!! $num($mline['current_sem2']) !!}</td>
-        <td class="r">{!! $num($mline['current_total']) !!}</td>
-        <td class="r">{!! $num($mline['proposed']) !!}</td>
+        <td class="r">{!! (float)($mline['past_total']    ?? 0) > 0 ? $fmtF1mdf($mline['past_total'])    : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_sem1']  ?? 0) > 0 ? $fmtF1mdf($mline['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_sem2']  ?? 0) > 0 ? $fmtF1mdf($mline['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_total'] ?? 0) > 0 ? $fmtF1mdf($mline['current_total']) : '' !!}</td>
+        <td class="r">{!! (float)($mline['proposed']      ?? 0) > 0 ? $fmtF1mdf($mline['proposed'])      : '' !!}</td>
     </tr>
     @else
     <tr>
         <td class="l">&nbsp;&nbsp;&nbsp;&nbsp;{{ $mline['display_name'] }}</td>
         <td class="c">{{ $mline['account_code'] ?? '' }}</td>
-        <td class="r">{!! $peso($mline['past_total']) !!}</td>
-        <td class="r">{!! $peso($mline['current_sem1']) !!}</td>
-        <td class="r">{!! $peso($mline['current_sem2']) !!}</td>
-        <td class="r">{!! $peso($mline['current_total']) !!}</td>
-        <td class="r">{!! $peso($mline['proposed']) !!}</td>
+        <td class="r">{!! (float)($mline['past_total']    ?? 0) > 0 ? $fmtF1mdf($mline['past_total'])    : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_sem1']  ?? 0) > 0 ? $fmtF1mdf($mline['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_sem2']  ?? 0) > 0 ? $fmtF1mdf($mline['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! (float)($mline['current_total'] ?? 0) > 0 ? $fmtF1mdf($mline['current_total']) : '' !!}</td>
+        <td class="r">{!! (float)($mline['proposed']      ?? 0) > 0 ? $fmtF1mdf($mline['proposed'])      : '' !!}</td>
     </tr>
     @endif
     @php foreach($fields5 as $f) $mdfRunning[$f] += (float)($mline[$f] ?? 0); @endphp
 @endforeach
 
-@foreach($ldrrmfRows as $lr)
-@php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
+@foreach($ldrrmfRows as $ldrF1Idx => $lr)
+@php
+    echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued');
+    $pageRowCount++;
+    $fmtF1ldr = ($ldrF1Idx === 0 && count($allMdfLines) === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     @if($lr['kind'] === 'ldrrmf-70')
     <td class="l" style="padding-left:28pt;">&nbsp;&nbsp;&nbsp;{{ $lr['name'] }}</td>
@@ -591,11 +623,11 @@ $maybeBreak = function(
     <td class="l">&nbsp;&nbsp;&nbsp;&nbsp;{{ $lr['name'] }}</td>
     @endif
     <td class="c">{{ $lr['account_code'] ?? '' }}</td>
-    <td class="r">{!! $peso($lr['past_total']) !!}</td>
-    <td class="r">{!! $peso($lr['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($lr['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($lr['current_total']) !!}</td>
-    <td class="r">{!! $peso($lr['proposed']) !!}</td>
+    <td class="r">{!! (float)$lr['past_total']    > 0 ? $fmtF1ldr($lr['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$lr['current_sem1']  > 0 ? $fmtF1ldr($lr['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$lr['current_sem2']  > 0 ? $fmtF1ldr($lr['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$lr['current_total'] > 0 ? $fmtF1ldr($lr['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$lr['proposed']      > 0 ? $fmtF1ldr($lr['proposed'])      : '' !!}</td>
 </tr>
 @endforeach
 @php echo $maybeBreak(1, 'Budgetary &amp; Statutory Requirements — continued'); $pageRowCount++; @endphp
@@ -611,16 +643,20 @@ $maybeBreak = function(
 
 @if($type === 'aip')
 @php $aipRunning = array_fill_keys($fields5, 0.0); @endphp
-@foreach($aipRows as $aip)
-@php echo $maybeBreak(1, 'Special Purpose Appropriations — continued'); $pageRowCount++; @endphp
+@foreach($aipRows as $aipF1Idx => $aip)
+@php
+    echo $maybeBreak(1, 'Special Purpose Appropriations — continued');
+    $pageRowCount++;
+    $fmtF1aip = $aipF1Idx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+@endphp
 <tr>
     <td class="l">&nbsp;&nbsp;&nbsp;{{ $aip['program_description'] }}</td>
     <td class="c">{{ $aip['aip_reference_code'] }}</td>
-    <td class="r">{!! $peso($aip['past_total']) !!}</td>
-    <td class="r">{!! $peso($aip['current_sem1']) !!}</td>
-    <td class="r">{!! $peso($aip['current_sem2']) !!}</td>
-    <td class="r">{!! $peso($aip['current_total']) !!}</td>
-    <td class="r">{!! $peso($aip['proposed']) !!}</td>
+    <td class="r">{!! (float)$aip['past_total']    > 0 ? $fmtF1aip($aip['past_total'])    : '' !!}</td>
+    <td class="r">{!! (float)$aip['current_sem1']  > 0 ? $fmtF1aip($aip['current_sem1'])  : '' !!}</td>
+    <td class="r">{!! (float)$aip['current_sem2']  > 0 ? $fmtF1aip($aip['current_sem2'])  : '' !!}</td>
+    <td class="r">{!! (float)$aip['current_total'] > 0 ? $fmtF1aip($aip['current_total']) : '' !!}</td>
+    <td class="r">{!! (float)$aip['proposed']      > 0 ? $fmtF1aip($aip['proposed'])      : '' !!}</td>
 </tr>
 @php foreach($fields5 as $f) $aipRunning[$f] += (float)$aip[$f]; @endphp
 @endforeach
@@ -823,15 +859,16 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     @else
     <tr class="sec-hdr"><td colspan="7">Personal Services (PS)</td></tr>
     @endif
-    @foreach($psCK as $item)
+    @foreach($psCK as $psRIdx => $item)
+    @php $fmt2ps = ($psCI === 0 && $psRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
-        <td class="r">{!! $item['past_total']    > 0 ? $pesoA($item['past_total'])    : '' !!}</td>
-        <td class="r">{!! $item['current_sem1']  > 0 ? $pesoA($item['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $item['current_sem2']  > 0 ? $pesoA($item['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $item['current_total'] > 0 ? $pesoA($item['current_total']) : '' !!}</td>
-        <td class="r">{!! $item['proposed']      > 0 ? $pesoA($item['proposed'])      : '' !!}</td>
+        <td class="r">{!! $item['past_total']    > 0 ? $fmt2ps($item['past_total'])    : '' !!}</td>
+        <td class="r">{!! $item['current_sem1']  > 0 ? $fmt2ps($item['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $item['current_sem2']  > 0 ? $fmt2ps($item['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $item['current_total'] > 0 ? $fmt2ps($item['current_total']) : '' !!}</td>
+        <td class="r">{!! $item['proposed']      > 0 ? $fmt2ps($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
     @if($psCI === $psCT - 1)
@@ -883,15 +920,16 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Maintenance &amp; Other Operating Expenditures (MOOE)</td></tr>
     @endif
-    @foreach($mooeCK as $item)
+    @foreach($mooeCK as $mooeRIdx => $item)
+    @php $fmt2mooe = ($mooeCI === 0 && $mooeRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
-        <td class="r">{!! $item['past_total']    > 0 ? $num($item['past_total'])    : '' !!}</td>
-        <td class="r">{!! $item['current_sem1']  > 0 ? $num($item['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $item['current_sem2']  > 0 ? $num($item['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $item['current_total'] > 0 ? $num($item['current_total']) : '' !!}</td>
-        <td class="r">{!! $item['proposed']      > 0 ? $num($item['proposed'])      : '' !!}</td>
+        <td class="r">{!! $item['past_total']    > 0 ? $fmt2mooe($item['past_total'])    : '' !!}</td>
+        <td class="r">{!! $item['current_sem1']  > 0 ? $fmt2mooe($item['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $item['current_sem2']  > 0 ? $fmt2mooe($item['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $item['current_total'] > 0 ? $fmt2mooe($item['current_total']) : '' !!}</td>
+        <td class="r">{!! $item['proposed']      > 0 ? $fmt2mooe($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
     @if($mooeCI === $mooeCT - 1)
@@ -923,15 +961,16 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations / Programs</td></tr>
     @endif
-    @foreach($spCK as $sp)
+    @foreach($spCK as $spRIdx => $sp)
+    @php $fmt2sp = ($spCI === 0 && $spRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
     <tr>
         <td class="l">{{ $sp['program_description'] }}</td>
         <td class="c">{{ $sp['aip_reference_code'] ?? '' }}</td>
-        <td class="r">{!! $sp['past_total']    > 0 ? $num($sp['past_total'])    : '' !!}</td>
-        <td class="r">{!! $sp['current_sem1']  > 0 ? $num($sp['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $sp['current_sem2']  > 0 ? $num($sp['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $sp['current_total'] > 0 ? $num($sp['current_total']) : '' !!}</td>
-        <td class="r">{!! $sp['proposed']      > 0 ? $num($sp['proposed'])      : '' !!}</td>
+        <td class="r">{!! $sp['past_total']    > 0 ? $fmt2sp($sp['past_total'])    : '' !!}</td>
+        <td class="r">{!! $sp['current_sem1']  > 0 ? $fmt2sp($sp['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_sem2']  > 0 ? $fmt2sp($sp['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_total'] > 0 ? $fmt2sp($sp['current_total']) : '' !!}</td>
+        <td class="r">{!! $sp['proposed']      > 0 ? $fmt2sp($sp['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
     @if($spCI === $spCT - 1)
@@ -963,15 +1002,16 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt</td></tr>
     @endif
-    @foreach($capCK as $item)
+    @foreach($capCK as $capRIdx => $item)
+    @php $fmt2cap = ($capCI === 0 && $capRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
-        <td class="r">{!! $item['past_total']    > 0 ? $num($item['past_total'])    : '' !!}</td>
-        <td class="r">{!! $item['current_sem1']  > 0 ? $num($item['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $item['current_sem2']  > 0 ? $num($item['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $item['current_total'] > 0 ? $num($item['current_total']) : '' !!}</td>
-        <td class="r">{!! $item['proposed']      > 0 ? $num($item['proposed'])      : '' !!}</td>
+        <td class="r">{!! $item['past_total']    > 0 ? $fmt2cap($item['past_total'])    : '' !!}</td>
+        <td class="r">{!! $item['current_sem1']  > 0 ? $fmt2cap($item['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $item['current_sem2']  > 0 ? $fmt2cap($item['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $item['current_total'] > 0 ? $fmt2cap($item['current_total']) : '' !!}</td>
+        <td class="r">{!! $item['proposed']      > 0 ? $fmt2cap($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
     @if($capCI === $capCT - 1)
@@ -1089,41 +1129,49 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr><td colspan="9" style="font-weight:bold;padding:2px 4px;">{{ $deptName }}</td></tr>
     </thead>
     <tbody>
-    @forelse($rows3 as $row)
-    <tr>
-        <td class="c" style="width:2%;font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
-        <td class="c" style="width:2%;font-size:6pt;">{{ $row['new_item_number'] }}</td>
-        <td style="word-wrap:break-word;">{{ $row['position_title'] }}</td>
-        <td style="word-wrap:break-word;">
-            {{ $row['incumbent'] }}
-            @if(!empty($row['effective_date_note']))
-                <br><span style="font-size:6pt;color:#555;font-style:italic;">Effictive date {{ $row['effective_date_note'] }}</span>
-            @endif
-        </td>
-        <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_current'] ?? $row['step_proposed'] }}</td>
-<td class="r">{!! $peso($row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0)) !!}</td>
-        <td class="c" style="font-size:6.5pt;">{{ $row['salary_grade'] }}<br>{{ $row['step_proposed'] }}</td>
-        <td class="r">
-            {!! $pesoA($row['proposed_amount'] ?? 0) !!}
-            @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
-                <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
-                    +{!! $pesoA($row['annual_increment']) !!}
-                </span>
-            @endif
-        </td>
-        @php $noCurrent = ($row['current_amount'] <= 0); @endphp
-        <td class="r" style="{{ $row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '') }}">
-        @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
-            {!! $pesoA($row['increase_decrease']) !!}
+    @forelse($rows3 as $rIdx => $row)
+@php
+    $fmt3      = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    $curAmt3   = (float) ($row['current_amount'] ?? 0);
+    $noCurrent = $curAmt3 <= 0;
+@endphp
+<tr>
+    <td class="c" style="width:2%;font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
+    <td class="c" style="width:2%;font-size:6pt;">{{ $row['new_item_number'] }}</td>
+    <td style="word-wrap:break-word;">{{ $row['position_title'] }}</td>
+    <td style="word-wrap:break-word;">
+        {{ $row['incumbent'] }}
+        @if(!empty($row['effective_date_note']))
+            <br><span style="font-size:6pt;color:#555;font-style:italic;">Effective date {{ $row['effective_date_note'] }}</span>
         @endif
-        @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
+    </td>
+    <td class="c" style="font-size:6.5pt;">
+        {{ $row['salary_grade'] }}<br>{{ $row['step_current'] ?? '' }}
+    </td>
+    <td class="r">{!! $curAmt3 > 0 ? $fmt3($curAmt3) : '' !!}</td>
+    <td class="c" style="font-size:6.5pt;">
+        {{ $row['salary_grade'] }}<br>{{ $row['step_proposed'] ?? '' }}
+    </td>
+    <td class="r">
+        {!! $fmt3($row['proposed_amount'] ?? 0) !!}
+        @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
             <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
-                +{!! $pesoA($row['annual_increment']) !!}
+                +{!! $fmt3($row['annual_increment']) !!}
             </span>
         @endif
     </td>
-    </tr>
-    @empty
+    <td class="r" style="{{ $row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '') }}">
+        @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+            {!! $fmt3($row['increase_decrease']) !!}
+        @endif
+        @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
+            <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
+                +{!! $fmt3($row['annual_increment']) !!}
+            </span>
+        @endif
+    </td>
+</tr>
+@empty
     <tr><td colspan="9" class="c" style="padding:6px;">No plantilla positions found.</td></tr>
     @endforelse
     </tbody>

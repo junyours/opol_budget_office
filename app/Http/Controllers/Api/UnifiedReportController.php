@@ -2080,163 +2080,120 @@ return response()->stream(function () use ($zipPath) {
             ?? SalaryStandardVersion::where('is_active', true)->first();
         $currentVersion  = $this->resolveVersionFromSnapshots($currentSnapshotsRaw) ?? $proposedVersion;
 
-        $lbcCurrent     = $currentVersion?->lbc_reference  ?? null;
-        $trancheCurrent = $this->formatTranche($currentVersion);
-        $lbcProposed    = $proposedVersion?->lbc_reference ?? null;
-        $trancheProposed= $this->formatTranche($proposedVersion);
+        $lbcCurrent      = $currentVersion?->lbc_reference  ?? null;
+        $trancheCurrent  = $this->formatTranche($currentVersion);
+        $lbcProposed     = $proposedVersion?->lbc_reference ?? null;
+        $trancheProposed = $this->formatTranche($proposedVersion);
 
-        if ($proposedSnapshots->isEmpty()) {
-            return ['rows' => [], 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcProposed,
-                    'trancheCurrent' => $trancheCurrent, 'trancheProposed' => $trancheProposed];
+        $proposedKeyed    = $proposedSnapshots->keyBy('plantilla_position_id');
+        $currentSnapshots = $currentSnapshotsRaw->keyBy('plantilla_position_id');
+
+        // ── Master list: UNION of both years ──────────────────────────────────
+        // Proposed year drives the list, but we also include positions that
+        // exist in the current year but are gone (or vacant) in the budget year.
+        // This ensures Position A (2026 active, 2027 vacant/missing) still shows.
+        $allPositionIds = $proposedKeyed->keys()
+            ->merge($currentSnapshots->keys())
+            ->unique()
+            ->sortBy(fn ($posId) => (int) (
+                ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
+                    ?->plantillaPosition?->new_item_number
+                ?? ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
+                    ?->plantillaPosition?->old_item_number
+                ?? 9999
+            ))->values();
+
+        if ($allPositionIds->isEmpty()) {
+            return [
+                'rows'            => [],
+                'lbcCurrent'      => $lbcCurrent,
+                'lbcProposed'     => $lbcProposed,
+                'trancheCurrent'  => $trancheCurrent,
+                'trancheProposed' => $trancheProposed,
+            ];
         }
 
-        // $proposedKeyed   = $proposedSnapshots->keyBy('plantilla_position_id');
-        // $currentSnapshots= $currentSnapshotsRaw->keyBy('plantilla_position_id');
+        $rows      = [];
+        $newItemNo = 1;
 
-        // $allPositionIds = $proposedKeyed->keys()
-        //     ->merge($currentSnapshots->keys())->unique()
-        //     ->sortBy(fn ($posId) => (int) (
-        //         ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-        //             ?->plantillaPosition?->new_item_number
-        //         ?? ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-        //             ?->plantillaPosition?->old_item_number
-        //         ?? 9999
-        //     ))->values();
+        foreach ($allPositionIds as $positionId) {
+            $proposed  = $proposedKeyed->get($positionId);   // budget year record (may be null)
+            $current   = $currentSnapshots->get($positionId); // current year record (may be null)
+            $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
 
-        // $rows = [];
-        // $newItemNo = 1;
-        // foreach ($allPositionIds as $positionId) {
-        //     $proposed  = $proposedKeyed->get($positionId);
-        //     $current   = $currentSnapshots->get($positionId);
-        //     $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
-        //     $personnel = $proposed?->personnel ?? $current?->personnel;
+            // ── Incumbent name: ALWAYS from BUDGET YEAR ───────────────────────
+            // If vacant or missing in budget year → "Vacant"
+            // Even if Person A held it in 2026, if 2027 is vacant → show "Vacant"
+            $budgetYearPersonnel = $proposed?->personnel;
+            $incumbentName = 'Vacant';
+            if ($budgetYearPersonnel) {
+                $parts = array_filter([
+                    $budgetYearPersonnel->first_name,
+                    $budgetYearPersonnel->middle_name
+                        ? strtoupper(substr($budgetYearPersonnel->middle_name, 0, 1)) . '.'
+                        : null,
+                    $budgetYearPersonnel->last_name,
+                    $budgetYearPersonnel->name_suffix ?? null,
+                ]);
+                $incumbentName = implode(' ', $parts) ?: 'Vacant';
+            }
 
-        //     $incumbentName = 'Vacant';
-        //     if ($personnel) {
-        //         $parts = array_filter([
-        //             $personnel->first_name  ?? null,
-        //             $personnel->middle_name ? strtoupper(substr($personnel->middle_name, 0, 1)) . '.' : null,
-        //             $personnel->last_name   ?? null,
-        //             $personnel->name_suffix ?? null,
-        //         ]);
-        //         $incumbentName = implode(' ', $parts) ?: 'Vacant';
-        //     }
+            // ── Current year column: ALWAYS from the current year snapshot ─────
+            // These are the ACTUAL 2026 values for that position.
+            // If no current year record exists → null/0 (truly new position).
+            $currentSalaryGrade = $current?->salary_grade ?? null;
+            $currentStep        = $current?->step         ?? null;
+            $currentAmount      = (float) ($current?->annual_rate ?? 0);
 
-        //     // $rows[] = [
-        //     //     'old_item_number'   => $plantilla?->old_item_number ?? null,
-        //     //     'new_item_number'   => $plantilla?->new_item_number ?? (string) $newItemNo,
-        //     //     'position_title'    => $plantilla?->position_title  ?? '',
-        //     //     'incumbent'         => $incumbentName,
-        //     //     // 'effective_date_note' => null,
-        //     //     'effective_date_note' => $proposed?->step_effective_date
-        //     //     ? $proposed->step_effective_date->format('M d, Y')
-        //     //     : null,
-        //     //     'salary_grade'      => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
-        //     //     'step_current'      => $current?->step  ?? 1,
-        //     //     'step_proposed'     => $proposed?->step ?? 1,
-        //     //     'current_amount'    => (float) ($current?->annual_rate  ?? 0),
-        //     //     'proposed_amount'   => (float) ($proposed?->annual_rate ?? 0),
-        //     //     'increase_decrease' => (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
-        //     // ];
-        //     $rows[] = [
-        //     'old_item_number'    => $plantilla?->old_item_number ?? null,
-        //     'new_item_number'    => $plantilla?->new_item_number ?? (string) $newItemNo,
-        //     'position_title'     => $plantilla?->position_title  ?? '',
-        //     'incumbent'          => $incumbentName,
-        //     'effective_date_note' => $proposed?->step_effective_date
-        //         ? $proposed->step_effective_date->format('M d, Y')
-        //         : null,
-        //     'salary_grade'       => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
-        //     'step_current'       => $current?->step  ?? 1,
-        //     'step_proposed'      => $proposed?->step ?? 1,
-        //     'current_amount'     => (float) ($current?->annual_rate  ?? 0),
-        //     'proposed_amount'    => (float) ($proposed?->annual_rate ?? 0),
-        //     'annual_increment'   => $proposed?->annual_increment !== null
-        //         ? (float) $proposed->annual_increment
-        //         : null,
-        //     'increase_decrease'  => (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
-        // ];
-        //     $newItemNo++;
-        // }
+            // ── Budget year column: from proposed snapshot ────────────────────
+            // If position is vacant/missing in budget year → 0
+            $proposedSalaryGrade = $proposed?->salary_grade ?? $currentSalaryGrade; // grade doesn't change
+            $proposedStep        = $proposed?->step         ?? null;
+            $proposedAmount      = (float) ($proposed?->annual_rate ?? 0);
 
-        // return ['rows' => $rows, 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcProposed,
-        //         'trancheCurrent' => $trancheCurrent, 'trancheProposed' => $trancheProposed];
-        $proposedKeyed    = $proposedSnapshots->keyBy('plantilla_position_id');
-$currentSnapshots = $currentSnapshotsRaw->keyBy('plantilla_position_id');
+            // ── Increase/Decrease ─────────────────────────────────────────────
+            // Only meaningful when current year has data.
+            // If position is new (no current record) → 0
+            $increaseDecrease = ($current !== null)
+                ? $proposedAmount - $currentAmount
+                : 0.0;
 
-// ── Same logic as Form3.tsx ────────────────────────────────────────────
-// Master list of positions is driven by the PROPOSED year.
-// If no proposed data, fall back to current year positions only.
-$masterIds = $proposedKeyed->isNotEmpty()
-    ? $proposedKeyed->keys()
-    : $currentSnapshots->keys();
+            $rows[] = [
+                'old_item_number'     => $plantilla?->old_item_number ?? null,
+                'new_item_number'     => $plantilla?->new_item_number ?? (string) $newItemNo,
+                'position_title'      => $plantilla?->position_title  ?? '',
+                'incumbent'           => $incumbentName,
+                'effective_date_note' => $proposed?->step_effective_date
+                    ? $proposed->step_effective_date->format('M d, Y')
+                    : null,
 
-// Sort by new_item_number from whichever snapshot is available
-$masterIds = $masterIds->sortBy(fn ($posId) => (int) (
-    ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-        ?->plantillaPosition?->new_item_number
-    ?? ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-        ?->plantillaPosition?->old_item_number
-    ?? 9999
-))->values();
+                // Separate grade for each column — grade is tied to position not person
+                // but step and amount differ per year
+                'salary_grade'        => $proposedSalaryGrade ?? $currentSalaryGrade,
 
-$rows = [];
-$newItemNo = 1;
-foreach ($masterIds as $positionId) {
-    $proposed  = $proposedKeyed->get($positionId);
-    $current   = $currentSnapshots->get($positionId);
-    $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
+                // Current year (2026) — real values from that year's snapshot
+                'step_current'        => $currentStep,
+                'current_amount'      => $currentAmount,
 
-    // ── Incumbent-change detection ─────────────────────────────────────
-    // If incumbent differs between years, wipe the current-year column
-    // (comparison is meaningless — different person held the position).
-    $incumbentChanged = $proposed && $current
-        && ($proposed->personnel_id !== $current->personnel_id);
+                // Budget year (2027) — proposed values
+                'step_proposed'       => $proposedStep,
+                'proposed_amount'     => $proposedAmount,
 
-    $effectiveCurrent = $incumbentChanged ? null : $current;
+                'annual_increment'    => $proposed?->annual_increment !== null
+                    ? (float) $proposed->annual_increment
+                    : null,
+                'increase_decrease'   => $increaseDecrease,
+            ];
+            $newItemNo++;
+        }
 
-    // ── Incumbent name: always from PROPOSED year ──────────────────────
-    // If proposed is vacant (no personnel), show Vacant even if current had someone.
-    $personnel = $proposed?->personnel ?? (!$proposed ? $current?->personnel : null);
-    $incumbentName = 'Vacant';
-    if ($personnel) {
-        $parts = array_filter([
-            $personnel->first_name  ?? null,
-            $personnel->middle_name ? strtoupper(substr($personnel->middle_name, 0, 1)) . '.' : null,
-            $personnel->last_name   ?? null,
-            $personnel->name_suffix ?? null,
-        ]);
-        $incumbentName = implode(' ', $parts) ?: 'Vacant';
-    }
-
-    $rows[] = [
-        'old_item_number'     => $plantilla?->old_item_number ?? null,
-        'new_item_number'     => $plantilla?->new_item_number ?? (string) $newItemNo,
-        'position_title'      => $plantilla?->position_title  ?? '',
-        'incumbent'           => $incumbentName,
-        'effective_date_note' => $proposed?->step_effective_date
-            ? $proposed->step_effective_date->format('M d, Y')
-            : null,
-        'salary_grade'        => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
-        // Current (blue) column — wiped when incumbent changed
-        'step_current'        => $effectiveCurrent?->step ?? null,
-        'current_amount'      => (float) ($effectiveCurrent?->annual_rate ?? 0),
-        // Proposed (orange) column
-        'step_proposed'       => $proposed?->step ?? 1,
-        'proposed_amount'     => (float) ($proposed?->annual_rate ?? 0),
-        'annual_increment'    => $proposed?->annual_increment !== null
-            ? (float) $proposed->annual_increment
-            : null,
-        // Diff is 0 when incumbent changed — no meaningful baseline
-        'increase_decrease'   => $incumbentChanged
-            ? 0
-            : (float) ($proposed?->annual_rate ?? 0) - (float) ($current?->annual_rate ?? 0),
-    ];
-    $newItemNo++;
-}
-
-return ['rows' => $rows, 'lbcCurrent' => $lbcCurrent, 'lbcProposed' => $lbcProposed,
-        'trancheCurrent' => $trancheCurrent, 'trancheProposed' => $trancheProposed];
+        return [
+            'rows'            => $rows,
+            'lbcCurrent'      => $lbcCurrent,
+            'lbcProposed'     => $lbcProposed,
+            'trancheCurrent'  => $trancheCurrent,
+            'trancheProposed' => $trancheProposed,
+        ];
     }
 
     private function buildForm4($proposedPlan, Department $dept): array

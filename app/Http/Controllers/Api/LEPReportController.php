@@ -174,41 +174,52 @@ class LEPReportController extends Controller
             $proposedKeyed    = $proposedSnapshots->keyBy('plantilla_position_id');
             $currentSnapshots = $currentSnapshotsRaw->keyBy('plantilla_position_id');
 
-            $masterIds = $proposedKeyed->isNotEmpty()
-                ? $proposedKeyed->keys()
-                : $currentSnapshots->keys();
-
-            $masterIds = $masterIds->sortBy(fn ($posId) => (int) (
-                ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-                    ?->plantillaPosition?->new_item_number
-                ?? ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
-                    ?->plantillaPosition?->old_item_number
-                ?? 9999
-            ))->values();
+            // ── Master list: UNION of both years ──────────────────────────────
+            $allPositionIds = $proposedKeyed->keys()
+                ->merge($currentSnapshots->keys())
+                ->unique()
+                ->sortBy(fn ($posId) => (int) (
+                    ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
+                        ?->plantillaPosition?->new_item_number
+                    ?? ($proposedKeyed->get($posId) ?? $currentSnapshots->get($posId))
+                        ?->plantillaPosition?->old_item_number
+                    ?? 9999
+                ))->values();
 
             $rows      = [];
             $newItemNo = 1;
 
-            foreach ($masterIds as $positionId) {
+            foreach ($allPositionIds as $positionId) {
                 $proposed  = $proposedKeyed->get($positionId);
                 $current   = $currentSnapshots->get($positionId);
                 $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
 
-                $incumbentChanged = $proposed && $current
-                    && ($proposed->personnel_id !== $current->personnel_id);
-                $effectiveCurrent = $incumbentChanged ? null : $current;
-
-                $personnel     = $proposed?->personnel ?? (!$proposed ? $current?->personnel : null);
+                // ── Name: always from budget year ─────────────────────────────
+                $budgetYearPersonnel = $proposed?->personnel;
                 $incumbentName = 'Vacant';
-                if ($personnel) {
+                if ($budgetYearPersonnel) {
                     $parts = array_filter([
-                        $personnel->first_name  ?? null,
-                        $personnel->middle_name ? strtoupper(substr($personnel->middle_name, 0, 1)) . '.' : null,
-                        $personnel->last_name   ?? null,
-                        $personnel->name_suffix ?? null,
+                        $budgetYearPersonnel->first_name,
+                        $budgetYearPersonnel->middle_name
+                            ? strtoupper(substr($budgetYearPersonnel->middle_name, 0, 1)) . '.'
+                            : null,
+                        $budgetYearPersonnel->last_name,
+                        $budgetYearPersonnel->name_suffix ?? null,
                     ]);
                     $incumbentName = implode(' ', $parts) ?: 'Vacant';
                 }
+
+                // ── Current year: real 2026 snapshot values ───────────────────
+                $currentStep   = $current?->step        ?? null;
+                $currentAmount = (float) ($current?->annual_rate ?? 0);
+
+                // ── Budget year: proposed snapshot values ─────────────────────
+                $proposedStep   = $proposed?->step       ?? null;
+                $proposedAmount = (float) ($proposed?->annual_rate ?? 0);
+
+                $increaseDecrease = ($current !== null)
+                    ? $proposedAmount - $currentAmount
+                    : 0.0;
 
                 $rows[] = [
                     'old_item_number'     => $plantilla?->old_item_number ?? null,
@@ -219,16 +230,14 @@ class LEPReportController extends Controller
                         ? $proposed->step_effective_date->format('M d, Y')
                         : null,
                     'salary_grade'        => $proposed?->salary_grade ?? $current?->salary_grade ?? null,
-                    'step_current'        => $effectiveCurrent?->step ?? null,
-                    'current_amount'      => (float) ($effectiveCurrent?->annual_rate ?? 0),
-                    'step_proposed'       => $proposed?->step ?? 1,
-                    'proposed_amount'     => (float) ($proposed?->annual_rate ?? 0),
+                    'step_current'        => $currentStep,
+                    'current_amount'      => $currentAmount,
+                    'step_proposed'       => $proposedStep,
+                    'proposed_amount'     => $proposedAmount,
                     'annual_increment'    => $proposed?->annual_increment !== null
                         ? (float) $proposed->annual_increment
                         : null,
-                    'increase_decrease'   => $incumbentChanged
-                        ? 0
-                        : (float) ($proposed?->annual_rate ?? 0) - (float) ($effectiveCurrent?->annual_rate ?? 0),
+                    'increase_decrease'   => $increaseDecrease,
                 ];
                 $newItemNo++;
             }

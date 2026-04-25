@@ -139,11 +139,16 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
               <br><span style="font-size:5.5pt;color:#444;font-style:italic;">Effective date {{ $row['effective_date_note'] }}</span>
             @endif
           </td>
-          <td class="c" style="font-size:6pt;">
+          @php
+            // Use ONLY the real current year amount — never fall back to proposed
+            $curAmt    = (float) ($row['current_amount'] ?? 0);
+            $noCurrent = $curAmt <= 0;
+        @endphp
+        <td class="c" style="font-size:6pt;">
             {{ $row['salary_grade'] ?? '' }}<br>
             {{ $row['step_current'] ?? '' }}
-          </td>
-          <td class="r">{!! $fmt($curAmt) !!}</td>
+        </td>
+        <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
           <td class="c" style="font-size:6pt;">
             {{ $row['salary_grade'] ?? '' }}<br>
             {{ $row['step_proposed'] ?? '' }}
@@ -151,17 +156,17 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           <td class="r">
             {!! $fmt($row['proposed_amount'] ?? 0) !!}
             @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
-              <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
+                <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
-          </td>
-          <td class="r">
+            </td>
+          <td class="r" style="{{ !$noCurrent && isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
             @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
-              {!! $fmt($row['increase_decrease']) !!}
+                {!! $fmt($row['increase_decrease']) !!}
             @endif
             @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
-              <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
+                <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
-          </td>
+            </td>
         </tr>
         @empty
         <tr><td colspan="9" class="c" style="padding:4px;font-style:italic;color:#666;">No plantilla positions on file.</td></tr>
@@ -265,28 +270,33 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
                 <br><span style="font-size:5.5pt;color:#444;font-style:italic;">Effective date {{ $row['effective_date_note'] }}</span>
               @endif
             </td>
+            @php
+                // Use ONLY the real current year amount — never fall back to proposed
+                $curAmt    = (float) ($row['current_amount'] ?? 0);
+                $noCurrent = $curAmt <= 0;
+            @endphp
             <td class="c" style="font-size:6pt;">
-              {{ $row['salary_grade'] ?? '' }}<br>
-              {{ $row['step_current'] ?? '' }}
+                {{ $row['salary_grade'] ?? '' }}<br>
+                {{ $row['step_current'] ?? '' }}
             </td>
-            <td class="r">{!! $fmt($curAmt) !!}</td>
+            <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
             <td class="c" style="font-size:6pt;">
               {{ $row['salary_grade'] ?? '' }}<br>
               {{ $row['step_proposed'] ?? '' }}
             </td>
             <td class="r">
-              {!! $fmt($row['proposed_amount'] ?? 0) !!}
-              @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
-                <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
-              @endif
+            {!! $fmt($row['proposed_amount'] ?? 0) !!}
+            @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
+                <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
+            @endif
             </td>
-            <td class="r">
-              @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+            <td class="r" style="{{ !$noCurrent && isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
+            @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
                 {!! $fmt($row['increase_decrease']) !!}
-              @endif
-              @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
-                <br><span style="font-size:5.5pt;font-style:italic;">+{!! $fmt($row['annual_increment']) !!}</span>
-              @endif
+            @endif
+            @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
+                <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
+            @endif
             </td>
           </tr>
           @empty

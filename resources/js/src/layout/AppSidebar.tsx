@@ -130,20 +130,6 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Summary of Expenditures", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
-    // {
-    //   label: "Plans",
-    //   items: [
-    //     { name: "Special Purpose & Annual Plans", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", roles: ["super-admin", "admin"] },
-    //   ] as NavItem[],
-    // },
-    // {
-    //   label: "Workbook",
-    //   items: [
-    //     { name: "General Funds",           href: "/admin/object-of-expenditures", icon: TableCellsIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
-    //     { name: "Special Accounts",        href: "/admin/special-accounts",       icon: CreditCardIcon, iconBg: "bg-rose-100",   iconColor: "text-rose-600",   roles: ["super-admin", "admin"] },
-
-    //   ] as NavItem[],
-    // },
     {
       label: "Debt Services",
       items: [
@@ -162,7 +148,6 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
-
     {
       label: "HRMO",
       items: [
@@ -177,28 +162,12 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         { name: "Department Reports", href: "/department/reports", icon: DocumentTextIcon, iconBg: "bg-green-100", iconColor: "text-green-600", roles: ["department-head"] },
       ] as NavItem[],
     },
-
-    {
-        label: "Income & Expenditures (ML)",
-        items: [
-        {
-            name: "Item Master List",
-            href: "/admin/expenditure",
-            icon: TableCellsIcon,          // already imported
-            iconBg: "bg-amber-100",
-            iconColor: "text-amber-600",
-            roles: ["super-admin", "admin"],
-        },
-        ] as NavItem[],
-    },
-
     {
       label: "System",
       items: [
         { name: "Settings", href: "/admin/settings", icon: Cog6ToothIcon, iconBg: "bg-gray-100", iconColor: "text-gray-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
-
     {
       label: "Settings",
       items: [{
@@ -210,8 +179,6 @@ const buildNavGroups = (user: User | null, eligible: boolean) => {
         roles: ["department-head"],
       }] as NavItem[],
     },
-
-
   ];
 };
 
@@ -241,6 +208,11 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const [showLogout, setShowLogout] = useState(false);
   const [animKey,    setAnimKey]    = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (label: string) =>
+    setOpenGroups(prev => ({ ...prev, [label]: prev[label] === false ? true : false }));
+  const isGroupOpen = (label: string) => openGroups[label] !== false;
 
   const typedUser = user as User | null;
   const eligible  = useMemo(() => isEligibleDepartment(typedUser), [typedUser]);
@@ -268,9 +240,7 @@ export function AppSidebar() {
     navigate("/", { replace: true });
   };
 
-  // ── Build a flat list of every visible nav item in render order ──────────
-  // This gives each item a stable sequential index (0-based) regardless of
-  // how many groups or role-filtered items exist, so stagger is always uniform.
+  // Flat list for stagger animation slots
   const flatItems = useMemo(() => {
     const list: { groupLabel: string; item: NavItem }[] = [];
     navGroups.forEach(group => {
@@ -280,8 +250,6 @@ export function AppSidebar() {
     return list;
   }, [navGroups, typedUser]);
 
-  // Returns inline style for a given sequential slot (0-based).
-  // Each slot steps by 35ms; max visible delay capped at ~600ms.
   const staggerStyle = (slot: number): React.CSSProperties => ({
     opacity: 0,
     transform: "translateX(-8px)",
@@ -337,19 +305,31 @@ export function AppSidebar() {
         }
         .sb-icon-tile svg { width: 13px; height: 13px; }
         .sb-section-label {
-          font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-          color: hsl(240 3.8% 65%); padding: 0 8px; margin-bottom: 2px; display: block;
+          font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+          color: hsl(240 5.9% 26%); padding: 0 8px; margin-bottom: 2px; display: block;
         }
         [data-collapsible=icon] .sb-user-btn[data-sidebar="menu-button"] {
           width: 100% !important; height: auto !important;
           padding: 0 !important; justify-content: flex-start !important;
         }
+        .sb-group-toggle {
+          display: flex; align-items: center; justify-content: space-between;
+          width: 100%; padding: 3px 8px; border-radius: 6px;
+          background: transparent; border: none; cursor: pointer;
+          transition: background .12s ease;
+        }
+        .sb-group-toggle:hover { background: hsl(240 4.8% 95.9%); }
+        .sb-group-children {
+          padding-left: 10px; border-left: 1px solid hsl(240 4.8% 91%);
+          margin-left: 11px; margin-top: 2px;
+          display: flex; flex-direction: column; gap: 1px;
+        }
       `}</style>
 
-      <Sidebar collapsible="icon" className="border-r border-zinc-200 bg-white">
+      <Sidebar collapsible="icon" className="border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#1a1a19]">
 
         {/* ══ HEADER ══════════════════════════════════════ */}
-        <SidebarHeader className="px-3 pt-4 pb-3 border-b border-zinc-100">
+        <SidebarHeader className="px-3 pt-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
 
           {/* Logo row — slot 0 */}
           <div
@@ -382,11 +362,6 @@ export function AppSidebar() {
             <Badge variant="outline" className={cn("self-start text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5", rc.badge)}>
               {rc.label}
             </Badge>
-            {/* {typedUser?.role === "department-head" && deptName && (
-              <Badge variant="outline" className="self-start text-[10px] font-normal text-zinc-500 bg-zinc-50 border-zinc-200 px-2 py-0.5 normal-case tracking-normal">
-                {deptName}
-              </Badge>
-            )} */}
           </div>
 
         </SidebarHeader>
@@ -394,56 +369,100 @@ export function AppSidebar() {
         {/* ══ NAV ═════════════════════════════════════════ */}
         <SidebarContent className="px-2 py-3">
           {(() => {
-            // Track which flat index we're on as we iterate groups
+            // FIX: use a ref-like object so flatIdx is incremented exactly once per item,
+            // not once in the expanded block AND once in the collapsed block.
             let flatIdx = 0;
 
             return navGroups.map(group => {
               const items = group.items.filter(it => it.roles.includes(typedUser?.role ?? ""));
               if (!items.length) return null;
 
-              // Slot for the section label = current flatIdx position
               const labelSlot = navItemSlot(flatIdx);
+              const open      = isGroupOpen(group.label);
+
+              // Still increment flatIdx by item count so label slots stay correct
+              flatIdx += items.length;
 
               return (
-                <SidebarGroup key={group.label} className="p-0 mb-3">
+                <SidebarGroup key={group.label} className="p-0 mb-2">
 
-                  {/* Section label */}
-                  <span
+                  {/* ── Collapsible group header (expanded sidebar) ── */}
+                  <button
                     key={`lbl-${group.label}-${animKey}`}
-                    className="sb-section-label group-data-[collapsible=icon]:hidden"
+                    className="sb-group-toggle group-data-[collapsible=icon]:hidden"
                     style={staggerStyle(labelSlot)}
+                    onClick={() => toggleGroup(group.label)}
                   >
-                    {group.label}
-                  </span>
+                    <span className="sb-section-label" style={{ margin: 0, padding: 0 }}>
+                      {group.label}
+                    </span>
+                    <svg
+                      style={{
+                        width: 10, height: 10, flexShrink: 0,
+                        color: 'hsl(240 3.8% 65%)',
+                        transition: 'transform .15s ease',
+                        transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+                      }}
+                      fill="none" viewBox="0 0 24 24"
+                      stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
 
-                  <SidebarMenu className="gap-0.5">
-                    {items.map(item => {
-                      const Icon = item.icon;
-                      const active = isActive(item.href);
-                      // Each item gets the next sequential slot
-                      flatIdx++;
-                      const itemSlot = navItemSlot(flatIdx);
+                  {/* ── Expanded: items only rendered when group is open ── */}
+                  {open && (
+                    <div className="sb-group-children group-data-[collapsible=icon]:hidden">
+                      <SidebarMenu className="gap-0.5">
+                        {items.map((item, i) => {
+                          const Icon   = item.icon;
+                          const active = isActive(item.href);
 
-                      return (
-                        <SidebarMenuItem key={`${item.name}-${animKey}`}>
-                          <SidebarMenuButton asChild tooltip={item.name}>
-                            <button
-                              onClick={() => navigate(item.href)}
-                              className={cn("sb-btn", active && "active")}
-                              style={staggerStyle(itemSlot)}
-                            >
-                              <span className={cn("sb-icon-tile", item.iconBg)}>
-                                <Icon className={item.iconColor} />
-                              </span>
-                              <span className="sb-label-text group-data-[collapsible=icon]:hidden truncate">
-                                {item.name}
-                              </span>
-                            </button>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
+                          return (
+                            <SidebarMenuItem key={`exp-${item.name}-${animKey}`}>
+                              <SidebarMenuButton asChild tooltip={item.name}>
+                                <button
+                                  onClick={() => navigate(item.href)}
+                                  className={cn("sb-btn", active && "active")}
+                                  style={staggerStyle(i)}
+                                >
+                                  <span className={cn("sb-icon-tile", item.iconBg)}>
+                                    <Icon className={item.iconColor} />
+                                  </span>
+                                  <span className="sb-label-text truncate">{item.name}</span>
+                                </button>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          );
+                        })}
+                      </SidebarMenu>
+                    </div>
+                  )}
+
+                  {/* ── Collapsed / icon-only: always rendered, hidden via CSS ── */}
+                  <div className="hidden group-data-[collapsible=icon]:block">
+                    <SidebarMenu className="gap-0.5">
+                      {items.map((item) => {
+                        const Icon   = item.icon;
+                        const active = isActive(item.href);
+
+                        return (
+                          <SidebarMenuItem key={`col-${item.name}-${animKey}`}>
+                            <SidebarMenuButton asChild tooltip={item.name}>
+                              <button
+                                onClick={() => navigate(item.href)}
+                                className={cn("sb-btn", active && "active")}
+                              >
+                                <span className={cn("sb-icon-tile", item.iconBg)}>
+                                  <Icon className={item.iconColor} />
+                                </span>
+                              </button>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </div>
 
                 </SidebarGroup>
               );
@@ -452,7 +471,7 @@ export function AppSidebar() {
         </SidebarContent>
 
         {/* ══ FOOTER ══════════════════════════════════════ */}
-        <SidebarFooter className="p-2 border-t border-zinc-100">
+        <SidebarFooter className="p-2 border-t border-zinc-100 dark:border-zinc-800">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>

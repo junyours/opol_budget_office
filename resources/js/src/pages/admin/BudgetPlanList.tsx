@@ -25,14 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../components/ui/dropdown-menu";
-import { MoreHorizontalIcon } from "lucide-react";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
@@ -70,9 +62,7 @@ const BudgetPlanList: React.FC = () => {
   // ── Activate confirm ───────────────────────────────────────────────────────
   const [activateTarget, setActivateTarget] = useState<BudgetPlanWithOpen | null>(null);
 
-  // ── Close submissions (is_open → false) ───────────────────────────────────
-  // Step 1: show warning with list of draft depts
-  // Step 2: admin clicks OK → close + auto-submit
+  // ── Close submissions ──────────────────────────────────────────────────────
   const [closeTarget, setCloseTarget]     = useState<BudgetPlanWithOpen | null>(null);
   const [draftDepts, setDraftDepts]       = useState<DraftDept[]>([]);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
@@ -101,7 +91,7 @@ const BudgetPlanList: React.FC = () => {
     if (!newYear) return;
     setCreating(true);
     try {
-      const res  = await API.post("/budget-plans", { year: newYear, is_active: newActive });
+      const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive });
       const created = res.data.data;
       const deptCount = created.department_plans?.length ?? 0;
       toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);
@@ -172,7 +162,6 @@ const BudgetPlanList: React.FC = () => {
   // ── is_open toggle ─────────────────────────────────────────────────────────
 
   const handleToggleOpen = async (plan: BudgetPlanWithOpen) => {
-    // Reopening is instant — no warning needed
     if (!plan.is_open) {
       try {
         await API.put(`/budget-plans/${plan.budget_plan_id}`, { is_open: true });
@@ -184,7 +173,6 @@ const BudgetPlanList: React.FC = () => {
       return;
     }
 
-    // Closing → fetch draft departments first to show warning
     setLoadingDrafts(true);
     setCloseTarget(plan);
     try {
@@ -201,7 +189,7 @@ const BudgetPlanList: React.FC = () => {
     if (!closeTarget) return;
     setClosingPlan(true);
     try {
-      const res = await API.post(`/budget-plans/${closeTarget.budget_plan_id}/close`);
+      const res       = await API.post(`/budget-plans/${closeTarget.budget_plan_id}/close`);
       const autoCount = res.data.data?.auto_submitted?.length ?? 0;
       toast.success(
         autoCount > 0
@@ -226,7 +214,7 @@ const BudgetPlanList: React.FC = () => {
     <div className="p-6">
 
       {/* ── Page Header ── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Budget Administration
@@ -234,6 +222,9 @@ const BudgetPlanList: React.FC = () => {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
             Budget Plans
           </h1>
+          <p className="text-xs text-gray-400 mt-1">
+            Manage annual budget plans and department submission windows.
+          </p>
         </div>
         <Button
           size="sm"
@@ -250,30 +241,51 @@ const BudgetPlanList: React.FC = () => {
         {plans.length === 0 ? (
           <div className="text-center py-14 text-gray-400 text-sm">
             No budget plans yet.{" "}
-            <button onClick={() => setCreateOpen(true)} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
+            >
               Create the first one
             </button>
           </div>
         ) : (
+          <>
           <table className="w-full text-[12px] border-collapse">
             <thead>
               <tr>
-                <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-24">Year</th>
-                <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Status</th>
-                <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Submissions</th>
-                <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Dept. Plans</th>
-                <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Created</th>
-                <th className="border-b border-gray-200 bg-white px-2 py-2.5 text-center align-bottom w-12" />
+                {["Year", "Status", "Submissions", "Dept. Plans", "Created"].map((h, i) => (
+                  <th
+                    key={i}
+                    className="border-b border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {plans.map(plan => {
                 const deptCount = (plan as any).department_plans?.length ?? "–";
                 return (
-                  <tr key={plan.budget_plan_id} className={cn("hover:bg-gray-50/60 transition-colors", plan.is_active && "bg-emerald-50/30")}>
-
+                  <tr
+                    key={plan.budget_plan_id}
+                    onClick={() => openEdit(plan)}
+                    className={cn(
+                      "hover:bg-gray-50/80 transition-colors cursor-pointer select-none",
+                      plan.is_active && "bg-emerald-50/30"
+                    )}
+                  >
                     {/* Year */}
-                    <td className="px-4 py-3 font-semibold text-gray-900 tabular-nums text-sm">{plan.year}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900 tabular-nums text-sm">{plan.year}</span>
+                        {plan.is_active && (
+                          <span className="text-[9px] font-semibold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
                     {/* Active status */}
                     <td className="px-4 py-3">
@@ -283,12 +295,15 @@ const BudgetPlanList: React.FC = () => {
                           Active
                         </span>
                       ) : (
-                        <span className="text-[11px] text-gray-400 font-medium">Inactive</span>
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
+                          Inactive
+                        </span>
                       )}
                     </td>
 
-                    {/* is_open toggle */}
-                    <td className="px-4 py-3">
+                    {/* is_open toggle — stop propagation so row click doesn't fire */}
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={plan.is_open}
@@ -304,7 +319,7 @@ const BudgetPlanList: React.FC = () => {
                         </span>
                       </div>
                       {!plan.is_active && (
-                        <span className="text-[10px] text-gray-300">Active plan only</span>
+                        <span className="text-[10px] text-gray-300 mt-0.5 block">Active plan only</span>
                       )}
                     </td>
 
@@ -312,37 +327,20 @@ const BudgetPlanList: React.FC = () => {
                     <td className="px-4 py-3 text-gray-500 tabular-nums">{deptCount}</td>
 
                     {/* Created */}
-                    <td className="px-4 py-3 text-gray-400">
-                      {new Date(plan.created_at).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-2 py-2.5 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700">
-                            <MoreHorizontalIcon className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem onClick={() => openEdit(plan)}>Edit Status</DropdownMenuItem>
-                          {/* {!plan.is_active && (
-                            <DropdownMenuItem onClick={() => {
-                              const hasActive = plans.some(p => p.is_active);
-                              if (hasActive) setActivateTarget(plan);
-                              else doActivate(plan.budget_plan_id);
-                            }}>
-                              Set as Active
-                            </DropdownMenuItem>
-                          )} */}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <td className="px-4 py-3 text-gray-400 text-[11px]">
+                      {new Date(plan.created_at).toLocaleDateString("en-PH", {
+                        year: "numeric", month: "short", day: "numeric",
+                      })}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          <div className="px-4 py-2.5 border-t border-gray-100">
+            <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p>
+          </div>
+          </>
         )}
       </div>
 
@@ -369,8 +367,15 @@ const BudgetPlanList: React.FC = () => {
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-600">Fiscal Year <span className="text-red-400">*</span></Label>
-              <Input type="number" value={newYear} onChange={e => setNewYear(parseInt(e.target.value))} className="h-9 text-sm font-mono" />
+              <Label className="text-xs font-semibold text-gray-600">
+                Fiscal Year <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                type="number"
+                value={newYear}
+                onChange={e => setNewYear(parseInt(e.target.value))}
+                className="h-9 text-sm font-mono"
+              />
             </div>
             <div className="flex items-center justify-between py-1">
               <div>
@@ -388,9 +393,24 @@ const BudgetPlanList: React.FC = () => {
             )}
           </div>
           <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
-            <Button size="sm" className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800" onClick={handleCreate} disabled={creating || !newYear}>
-              {creating ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating…</> : "Create Plan"}
+            <Button
+              variant="outline" size="sm"
+              className="h-8 text-xs border-gray-200"
+              onClick={() => setCreateOpen(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
+              onClick={handleCreate}
+              disabled={creating || !newYear}
+            >
+              {creating
+                ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating…</>
+                : "Create Plan"
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -401,21 +421,40 @@ const BudgetPlanList: React.FC = () => {
         <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
             <DialogTitle className="text-[15px] font-semibold text-gray-900">Edit Budget Plan</DialogTitle>
-            <DialogDescription className="text-xs text-gray-400 mt-0.5">Budget Plan Year {editPlan?.year}</DialogDescription>
+            <DialogDescription className="text-xs text-gray-400 mt-0.5">
+              Budget Plan Year {editPlan?.year}
+            </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-600">Active</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{editActive ? "This plan is active" : "This plan is inactive"}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {editActive ? "This plan is active" : "This plan is inactive"}
+                </p>
               </div>
               <Switch checked={editActive} onCheckedChange={setEditActive} />
             </div>
           </div>
           <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
-            <Button size="sm" className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800" onClick={handleSaveEdit} disabled={saving}>
-              {saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</> : "Save"}
+            <Button
+              variant="outline" size="sm"
+              className="h-8 text-xs border-gray-200"
+              onClick={() => setEditOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
+              onClick={handleSaveEdit}
+              disabled={saving}
+            >
+              {saving
+                ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</>
+                : "Save"
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -425,16 +464,24 @@ const BudgetPlanList: React.FC = () => {
       <AlertDialog open={!!activateTarget} onOpenChange={o => { if (!o) setActivateTarget(null); }}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[15px] font-semibold">Activate Budget Plan Year {activateTarget?.year}?</AlertDialogTitle>
+            <AlertDialogTitle className="text-[15px] font-semibold">
+              Activate Budget Plan Year {activateTarget?.year}?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-500">
               <span className="font-medium text-amber-600">FY {plans.find(p => p.is_active)?.year}</span> will be deactivated.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel asChild><Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button></AlertDialogCancel>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
+            </AlertDialogCancel>
             <AlertDialogAction asChild>
-              <Button size="sm" className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
-                onClick={() => activateTarget && doActivate(activateTarget.budget_plan_id)} disabled={saving}>
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
+                onClick={() => activateTarget && doActivate(activateTarget.budget_plan_id)}
+                disabled={saving}
+              >
                 {saving ? "Activating…" : "Activate"}
               </Button>
             </AlertDialogAction>
@@ -455,7 +502,6 @@ const BudgetPlanList: React.FC = () => {
                   Department heads will no longer be able to submit their plans.
                   All remaining <span className="font-medium text-gray-700">draft plans will be auto-submitted</span>.
                 </p>
-
                 {loadingDrafts ? (
                   <div className="flex items-center gap-2 text-gray-400 text-[12px]">
                     <span className="w-3 h-3 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
@@ -471,7 +517,6 @@ const BudgetPlanList: React.FC = () => {
                         {draftDepts.length} total
                       </span>
                     </div>
-                    {/* Scrollable list — caps at ~200px so dialog never overflows */}
                     <ul className="overflow-y-auto max-h-[200px] divide-y divide-amber-100">
                       {draftDepts.map(d => (
                         <li key={d.dept_budget_plan_id} className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-amber-700">

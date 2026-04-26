@@ -23,6 +23,10 @@ class DebtObligationController extends Controller
      *  – current_interest    (10) interest_due  for THIS budget_plan_id  (editable)
      *  – current_total       (11) (9) + (10)
      *  – balance_principal   (12) principal_amount − (6) − (9)
+     *
+     * Also returns per-plan obligation amounts (past year):
+     *  – obligation_principal_amount  stored on the past budget plan's payment row
+     *  – obligation_interest_amount   stored on the past budget plan's payment row
      */
     public function index(Request $request): JsonResponse
     {
@@ -30,14 +34,18 @@ class DebtObligationController extends Controller
 
         $obligations = DebtObligation::orderBy('sort_order')->orderBy('obligation_id')->get();
 
-        // Fetch the budget plan to know its year (for ordering "previous")
         $currentPlan = $budgetPlanId ? BudgetPlan::find($budgetPlanId) : null;
 
-        $data = $obligations->map(function (DebtObligation $ob) use ($budgetPlanId, $currentPlan) {
+        // Resolve past plan (year - 1) if current plan is known
+        $pastPlan = null;
+        if ($currentPlan) {
+            $pastYear = (int) $currentPlan->year - 1;
+            $pastPlan = BudgetPlan::where('year', $pastYear)->first();
+        }
 
-            // ── Previous payments: all plan IDs that are NOT the current one ──────
-            // We treat "previous" as every payment row whose budget_plan_id != current.
-            // If you want strict year ordering, you can join budget_plans and filter by year.
+        $data = $obligations->map(function (DebtObligation $ob) use ($budgetPlanId, $currentPlan, $pastPlan) {
+
+            // ── Previous payments ─────────────────────────────────────────────────
             $prevQuery = $ob->payments();
             if ($budgetPlanId) {
                 $prevQuery = $prevQuery->where('budget_plan_id', '!=', $budgetPlanId);
@@ -54,36 +62,58 @@ class DebtObligationController extends Controller
                 ? $ob->payments()->where('budget_plan_id', $budgetPlanId)->first()
                 : null;
 
-            $curPrincipal = (float) ($currentPayment->principal_due ?? 0);
-            $curInterest  = (float) ($currentPayment->interest_due  ?? 0);
-            $curTotal     = $curPrincipal + $curInterest;
+            $curPrincipal     = (float) ($currentPayment->principal_due  ?? 0);
+            $curInterest      = (float) ($currentPayment->interest_due   ?? 0);
+            $curPrincipalSem1 = (float) ($currentPayment->principal_sem1 ?? 0);
+            $curPrincipalSem2 = (float) ($currentPayment->principal_sem2 ?? 0);
+            $curInterestSem1  = (float) ($currentPayment->interest_sem1  ?? 0);
+            $curInterestSem2  = (float) ($currentPayment->interest_sem2  ?? 0);
+            $curTotal         = $curPrincipal + $curInterest;
+
+            // ── Past year payment (for obligation columns) ────────────────────────
+            $pastPayment = $pastPlan
+                ? $ob->payments()->where('budget_plan_id', $pastPlan->budget_plan_id)->first()
+                : null;
+
+            $obligationPrincipal = (float) ($pastPayment->obligation_principal_amount ?? 0);
+            $obligationInterest  = (float) ($pastPayment->obligation_interest_amount  ?? 0);
 
             // ── Balance (12) ──────────────────────────────────────────────────────
             $balance = (float) $ob->principal_amount - $prevPrincipal - $curPrincipal;
 
             return [
                 'obligation_id'      => $ob->obligation_id,
-                'creditor'           => $ob->creditor,           // (1)
-                'date_contracted'    => $ob->date_contracted,    // (2)
-                'term'               => $ob->term,               // (3)
-                'principal_amount'   => (float) $ob->principal_amount, // (4)
-                'purpose'            => $ob->purpose,            // (5)
+                'creditor'           => $ob->creditor,
+                'date_contracted'    => $ob->date_contracted,
+                'term'               => $ob->term,
+                'principal_amount'   => (float) $ob->principal_amount,
+                'purpose'            => $ob->purpose,
 
-                // Derived / read-only
-                'previous_principal' => $prevPrincipal,          // (6)
-                'previous_interest'  => $prevInterest,           // (7)
-                'previous_total'     => $prevTotal,              // (8)
+                // Previous (read-only)
+                'previous_principal' => $prevPrincipal,
+                'previous_interest'  => $prevInterest,
+                'previous_total'     => $prevTotal,
 
-                // Editable for current budget plan
-                'current_principal'  => $curPrincipal,           // (9)
-                'current_interest'   => $curInterest,            // (10)
-                'current_total'      => $curTotal,               // (11)
+                // Current year (editable)
+                'current_principal'      => $curPrincipal,
+                'current_interest'       => $curInterest,
+                'current_total'          => $curTotal,
+                'current_principal_sem1' => $curPrincipalSem1,
+                'current_principal_sem2' => $curPrincipalSem2,
+                'current_interest_sem1'  => $curInterestSem1,
+                'current_interest_sem2'  => $curInterestSem2,
 
-                // Derived
-                'balance_principal'  => $balance,                // (12)
+                // Past year obligation (editable)
+                'obligation_principal'   => $obligationPrincipal,
+                'obligation_interest'    => $obligationInterest,
+                'obligation_total'       => $obligationPrincipal + $obligationInterest,
 
                 // Meta
+                'balance_principal'  => $balance,
                 'payment_id'         => $currentPayment?->payment_id,
+                'past_payment_id'    => $pastPayment?->payment_id,
+                'past_plan_id'       => $pastPlan?->budget_plan_id,
+                'past_plan_missing'  => $pastPlan === null,
                 'is_active'          => $ob->is_active,
                 'sort_order'         => $ob->sort_order,
             ];
@@ -91,29 +121,40 @@ class DebtObligationController extends Controller
 
         // ── Column totals ─────────────────────────────────────────────────────────
         $totals = [
-            'principal_amount'   => $data->sum('principal_amount'),
-            'previous_principal' => $data->sum('previous_principal'),
-            'previous_interest'  => $data->sum('previous_interest'),
-            'previous_total'     => $data->sum('previous_total'),
-            'current_principal'  => $data->sum('current_principal'),
-            'current_interest'   => $data->sum('current_interest'),
-            'current_total'      => $data->sum('current_total'),
-            'balance_principal'  => $data->sum('balance_principal'),
+            'principal_amount'       => $data->sum('principal_amount'),
+            'previous_principal'     => $data->sum('previous_principal'),
+            'previous_interest'      => $data->sum('previous_interest'),
+            'previous_total'         => $data->sum('previous_total'),
+            'current_principal'      => $data->sum('current_principal'),
+            'current_interest'       => $data->sum('current_interest'),
+            'current_total'          => $data->sum('current_total'),
+            'current_principal_sem1' => $data->sum('current_principal_sem1'),
+            'current_principal_sem2' => $data->sum('current_principal_sem2'),
+            'current_interest_sem1'  => $data->sum('current_interest_sem1'),
+            'current_interest_sem2'  => $data->sum('current_interest_sem2'),
+            'obligation_principal'   => $data->sum('obligation_principal'),
+            'obligation_interest'    => $data->sum('obligation_interest'),
+            'obligation_total'       => $data->sum('obligation_total'),
+            'balance_principal'      => $data->sum('balance_principal'),
         ];
 
         return response()->json([
             'data'    => $data,
             'totals'  => $totals,
             'budget_plan' => $currentPlan ? [
-                'budget_plan_id'   => $currentPlan->budget_plan_id,
-                'year' => $currentPlan->year,
+                'budget_plan_id' => $currentPlan->budget_plan_id,
+                'year'           => $currentPlan->year,
             ] : null,
+            'past_plan' => $pastPlan ? [
+                'budget_plan_id' => $pastPlan->budget_plan_id,
+                'year'           => $pastPlan->year,
+            ] : null,
+            'past_plan_missing' => $pastPlan === null,
         ]);
     }
 
     /**
      * POST /api/debt-obligations
-     * Create a new obligation (parent row only; no payment yet).
      */
     public function store(Request $request): JsonResponse
     {
@@ -142,7 +183,6 @@ class DebtObligationController extends Controller
 
     /**
      * PUT /api/debt-obligations/{id}
-     * Update the parent obligation fields.
      */
     public function update(Request $request, int $id): JsonResponse
     {
@@ -165,7 +205,6 @@ class DebtObligationController extends Controller
 
     /**
      * DELETE /api/debt-obligations/{id}
-     * Soft-delete.
      */
     public function destroy(int $id): JsonResponse
     {
@@ -181,7 +220,7 @@ class DebtObligationController extends Controller
     /**
      * POST /api/debt-obligations/{id}/payment
      *
-     * Upsert the payment row for obligation + budget_plan_id.
+     * Upsert the current-year payment row.
      * Body: { budget_plan_id, principal_due, interest_due }
      */
     public function upsertPayment(Request $request, int $id): JsonResponse
@@ -189,7 +228,7 @@ class DebtObligationController extends Controller
         $ob = DebtObligation::findOrFail($id);
 
         $validated = $request->validate([
-            'budget_plan_id' => 'required|integer|exists:budget_plans,id',
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
             'principal_due'  => 'required|numeric|min:0',
             'interest_due'   => 'required|numeric|min:0',
         ]);
@@ -211,7 +250,7 @@ class DebtObligationController extends Controller
     /**
      * POST /api/debt-obligations/payments/bulk
      *
-     * Bulk-upsert payments for multiple obligations in one request.
+     * Bulk-upsert current-year payments.
      * Body: { budget_plan_id, items: [{ obligation_id, principal_due, interest_due }] }
      */
     public function bulkUpsertPayments(Request $request): JsonResponse
@@ -240,5 +279,110 @@ class DebtObligationController extends Controller
         });
 
         return response()->json(['message' => 'Payments saved successfully']);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // New: save sem1 for current year (principal or interest)
+    // POST /api/debt-obligations/{id}/save-sem1
+    //
+    // Body: { budget_plan_id, type: "principal"|"interest", sem1_amount }
+    //
+    // Behaviour:
+    //   - sem1 is clamped to the corresponding *_due value (total)
+    //   - sem2 = due - sem1  (auto-computed and stored)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function saveSem1(Request $request, int $id): JsonResponse
+    {
+        $ob = DebtObligation::findOrFail($id);
+
+        $v = $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+            'type'           => 'required|in:principal,interest',
+            'sem1_amount'    => 'required|numeric|min:0',
+        ]);
+
+        $payment = DebtPayment::firstOrNew([
+            'obligation_id'  => $ob->obligation_id,
+            'budget_plan_id' => $v['budget_plan_id'],
+        ]);
+
+        if ($v['type'] === 'principal') {
+            $total = (float) $payment->principal_due;
+            $sem1  = min(max((float) $v['sem1_amount'], 0), $total);
+            $sem2  = max(0.0, $total - $sem1);
+            $payment->principal_sem1 = $sem1;
+            $payment->principal_sem2 = $sem2;
+        } else {
+            $total = (float) $payment->interest_due;
+            $sem1  = min(max((float) $v['sem1_amount'], 0), $total);
+            $sem2  = max(0.0, $total - $sem1);
+            $payment->interest_sem1 = $sem1;
+            $payment->interest_sem2 = $sem2;
+        }
+
+        $payment->save();
+
+        return response()->json([
+            'data' => [
+                'payment_id'      => $payment->payment_id,
+                'type'            => $v['type'],
+                'sem1_amount'     => $v['type'] === 'principal' ? $payment->principal_sem1 : $payment->interest_sem1,
+                'sem2_amount'     => $v['type'] === 'principal' ? $payment->principal_sem2 : $payment->interest_sem2,
+                'total'           => $v['type'] === 'principal' ? $payment->principal_due  : $payment->interest_due,
+            ],
+        ]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // New: save past-year obligation amounts (principal or interest)
+    // POST /api/debt-obligations/{id}/save-obligation
+    //
+    // Body: { past_plan_id, type: "principal"|"interest", obligation_amount }
+    //
+    // Rules:
+    //   - past_plan_id must exist as a budget plan
+    //   - Saves to the payment row keyed on (obligation_id, past_plan_id)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function saveObligation(Request $request, int $id): JsonResponse
+    {
+        $ob = DebtObligation::findOrFail($id);
+
+        $v = $request->validate([
+            'past_plan_id'       => 'required|integer',
+            'type'               => 'required|in:principal,interest',
+            'obligation_amount'  => 'required|numeric|min:0',
+        ]);
+
+        $pastPlan = BudgetPlan::find($v['past_plan_id']);
+        if (! $pastPlan) {
+            return response()->json([
+                'message' => "Budget plan for the past year does not exist. "
+                    . "Please create it first before entering obligation amounts.",
+            ], 422);
+        }
+
+        $payment = DebtPayment::firstOrNew([
+            'obligation_id'  => $ob->obligation_id,
+            'budget_plan_id' => $pastPlan->budget_plan_id,
+        ]);
+
+        if ($v['type'] === 'principal') {
+            $payment->obligation_principal_amount = (float) $v['obligation_amount'];
+        } else {
+            $payment->obligation_interest_amount = (float) $v['obligation_amount'];
+        }
+
+        $payment->save();
+
+        return response()->json([
+            'data' => [
+                'payment_id'                  => $payment->payment_id,
+                'type'                        => $v['type'],
+                'obligation_principal_amount' => (float) $payment->obligation_principal_amount,
+                'obligation_interest_amount'  => (float) $payment->obligation_interest_amount,
+            ],
+        ]);
     }
 }

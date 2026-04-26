@@ -1591,4 +1591,190 @@ private function renderLepForm7(array $data): string
         'special_account_totals' => ['items' => [], 'grand_total' => 0.0], // ← add this
     ]))->render();
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILE: additions to LEPReportController.php
+//
+// 1. Add these two methods anywhere alongside the other form methods
+//    (e.g. after lepForm7 / before the private helper section).
+//
+// 2. The private buildOneForm6 and resolveSourceKey helpers are already in
+//    UnifiedReportController — copy them as shown below, OR (better) call
+//    them from a shared trait.  The copy below is self-contained.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ────────────────────────────────────────────────────────────────────────────
+// POST /api/reports/lep/form6
+//
+// Body params:
+//   budget_plan_id  int     (required)
+//   filter          string  (optional)  'all' | 'general-fund' | 'occ' | 'pm' | 'sh'
+//   download        bool    (optional)
+// ────────────────────────────────────────────────────────────────────────────
+    public function lepForm6(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+            'filter'         => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $filter = $request->input('filter', 'all');
+            $data   = $this->buildLepForm6Data((int) $request->budget_plan_id, $filter);
+            $html   = $this->renderLepForm6($data);
+            $pdf    = $this->makePdf($html, 'portrait');
+
+            $suffix = $filter === 'all' ? '' : ('_' . strtoupper($filter));
+
+            return $this->pdfResponse(
+                $pdf,
+                "LEP_Form6_StatutoryObligations{$suffix}_FY{$data['year']}.pdf",
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ── Data builder ──────────────────────────────────────────────────────────────
+    private function buildLepForm6Data(int $budgetPlanId, string $filter = 'all'): array
+    {
+        $plan = \App\Models\BudgetPlan::findOrFail($budgetPlanId);
+        $year = (int) $plan->year;
+
+        // All templates ordered
+        $templates = \App\Models\Form6Template::orderBy('sort_order')->get();
+
+        // Special account departments
+        $specialDepts = \App\Models\Department::with('category')
+            ->get()
+            ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts');
+
+        $forms = [];
+
+        // ── General Fund ──────────────────────────────────────────────────────────
+        if ($filter === 'all' || $filter === 'general-fund') {
+            $forms[] = $this->buildOneLepForm6(
+                $budgetPlanId,
+                'general-fund',
+                $templates,
+                label:     'General Fund',
+                isSpecial: false,
+            );
+        }
+
+        // ── Special Accounts ──────────────────────────────────────────────────────
+        foreach ($specialDepts as $dept) {
+            $source = $this->resolveSourceKey($dept);
+            if ($filter !== 'all' && $filter !== $source) continue;
+
+            $forms[] = $this->buildOneLepForm6(
+                $budgetPlanId,
+                $source,
+                $templates,
+                label:     $dept->dept_name . ', (' . $dept->dept_abbreviation . ')',
+                isSpecial: true,
+            );
+        }
+
+        return [
+            'year'  => $year,
+            'lgu'   => strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
+            'forms' => $forms,
+        ];
+    }
+
+    // ── Single-source block builder ───────────────────────────────────────────────
+    private function buildOneLepForm6(
+        int    $budgetPlanId,
+        string $source,
+        \Illuminate\Support\Collection $templates,
+        string $label,
+        bool   $isSpecial,
+    ): array {
+        // Load saved amounts keyed by template id
+        $items = \App\Models\Form6Item::where('budget_plan_id', $budgetPlanId)
+            ->where('source', $source)
+            ->get()
+            ->keyBy('form6_template_id');
+
+        // Build flat row array (mirrors UnifiedReportController::buildOneForm6)
+        $rows = $templates->map(fn (\App\Models\Form6Template $tpl) => [
+            'form6_template_id' => $tpl->form6_template_id,
+            'code'              => $tpl->code,
+            'label'             => $tpl->label,
+            'parent_code'       => $tpl->parent_code,
+            'sort_order'        => $tpl->sort_order,
+            'show_peso_sign'    => (bool) $tpl->show_peso_sign,
+            'is_section'        => (bool) $tpl->is_section,
+            'is_computed'       => (bool) $tpl->is_computed,
+            'level'             => (int)  $tpl->level,
+            'amount'            => $items->get($tpl->form6_template_id)
+                                    ? (float) $items->get($tpl->form6_template_id)->amount
+                                    : 0.0,
+        ])->values()->toArray();
+
+        // Collect parent codes (so we can detect leaf vs parent at blade level)
+        $parentCodes   = array_filter(array_column($rows, 'parent_code'));
+        $parentCodeSet = array_flip($parentCodes);
+
+        $rowsByCode = collect($rows)->keyBy('code');
+        $computed   = [];
+
+        $computeAmt = function (array $r) use (&$computed, &$computeAmt, $rowsByCode, $rows): float {
+            if (isset($computed[$r['code']])) return $computed[$r['code']];
+            if ($r['is_computed']) {
+                $children = array_filter($rows, fn ($c) => $c['parent_code'] === $r['code']);
+                $sum = 0.0;
+                foreach ($children as $child) {
+                    $childRow = $rowsByCode->get($child['code']);
+                    if ($childRow) $sum += $computeAmt($childRow);
+                }
+                $computed[$r['code']] = $sum > 0 ? $sum : (float) $r['amount'];
+                return $computed[$r['code']];
+            }
+            $computed[$r['code']] = (float) $r['amount'];
+            return $computed[$r['code']];
+        };
+
+        foreach ($rows as $r) { $computeAmt($r); }
+
+        // Grand total: sum of non-section, non-parent leaf rows
+        $grandTotal = 0.0;
+        foreach ($rows as $r) {
+            if ($r['is_section'])                  continue;
+            if (isset($parentCodeSet[$r['code']])) continue;
+            $grandTotal += $computed[$r['code']] ?? (float) $r['amount'];
+        }
+
+        return [
+            'label'       => $label,
+            'source'      => $source,
+            'is_special'  => $isSpecial,
+            'rows'        => $rows,
+            'grand_total' => $grandTotal,
+        ];
+    }
+
+    // ── Renderer ──────────────────────────────────────────────────────────────────
+    private function renderLepForm6(array $data): string
+    {
+        $this->clearViewCache();
+        return view('reports.lep.lepreport', array_merge([
+            'report_type'            => 'lep_form6',
+            'data'                   => $data,
+            'year'                   => $data['year'],
+            'lgu'                    => $data['lgu'],
+            'forms'                  => $data['forms'],
+            'proposed_year'          => $data['year'],
+            // Stubs required by lepreport.blade.php header section
+            'header'                 => [],
+            'signatories'            => [],
+            'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+            'grand_current_total'    => 0.0,
+            'grand_proposed_total'   => 0.0,
+        ]))->render();
+    }
 }

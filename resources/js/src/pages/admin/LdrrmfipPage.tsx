@@ -535,8 +535,8 @@ useEffect(() => {
               </tbody>
 
               <tfoot>
-                <tr className="bg-gray-100 border-t-2 border-gray-200">
-                  <td colSpan={6} className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                <tr className="bg-gray-900 border-t-2 border-gray-200">
+                  <td colSpan={6} className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-200">
                     Total {group.name}
                   </td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-700 border-l border-gray-200">{enPH(group.subtotal_mooe)}</td>

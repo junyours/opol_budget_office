@@ -276,6 +276,11 @@ $introBy         = $hdr['introduced_by']       ?? '';
         'past_year'      => $past_year,
     ])
 
+    @elseif(($report_type ?? '') === 'lep_form6')
+      @include('reports.lep.lep_form6', [
+          'data' => ['year' => $year ?? 0, 'lgu' => $lgu ?? '', 'forms' => $forms ?? []],
+      ])
+
     @elseif(($report_type ?? '') === 'lep_form7')
     @include('reports.lep.lep_form7', [
         'data' => [

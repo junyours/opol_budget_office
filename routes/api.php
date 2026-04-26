@@ -179,6 +179,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('department-budget-plans/{budget_plan}/plantilla-assignments/bulk', [DepartmentBudgetPlanController::class, 'bulkSavePlantillaAssignments']);
         Route::post('debt-obligations/{obligation}/payment',              [DebtObligationController::class, 'upsertPayment']);
         Route::post('debt-obligations/payments/bulk',                     [DebtObligationController::class, 'bulkUpsertPayments']);
+        Route::post('debt-obligations/{obligation}/save-sem1',    [DebtObligationController::class, 'saveSem1']);
+        Route::post('debt-obligations/{obligation}/save-obligation', [DebtObligationController::class, 'saveObligation']);
         Route::post('form6/init',            [Form6Controller::class, 'init']);
         Route::post('form6/bulk',            [Form6Controller::class, 'bulk']);
         Route::post('form6/sync-from-ps',    [Form6Controller::class, 'syncFromPs']);
@@ -233,6 +235,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
         Route::post('receipts-program', [LEPReportController::class, 'receiptsProgram']);
         Route::post('form2', [LEPReportController::class, 'lepForm2']);
+        Route::post('form6', [LEPReportController::class, 'lepForm6']);
         Route::post('form7', [LEPReportController::class, 'lepForm7']);
     });
 

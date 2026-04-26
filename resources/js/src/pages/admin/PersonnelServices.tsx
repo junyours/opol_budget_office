@@ -659,7 +659,7 @@ const PersonnelServices: React.FC = () => {
     const rows = departmentRows[cDeptId] || [];
     // const rows = departmentRows[cDeptId] || [];
     //if (rows.length === 0) { toast.warning('No personnel data to save.'); return; }
-    
+
     setSaving(true);
     const savePromise = (async () => {
       // await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
@@ -1121,23 +1121,24 @@ const PersonnelServices: React.FC = () => {
                           )}
 
                           {/* ── Row 4: Combined total (orange) ── */}
-                          {ir && (
+                          {/* ── Row 4: Combined total (orange) ── */}
+                            {ir && (
                             <TableRow
-                              className="bg-orange-50 ps-animate-step-row [&>td]:border-t-2 [&>td]:border-b-2 [&>td]:border-orange-300"
-                              style={{ animationDelay: `${Math.min(idx, 8) * 30 + 100}ms` }}
-                              key={`orange-${tabAnimKey}-${row.positionId}`}
+                                className="bg-orange-50 ps-animate-step-row [&>td]:border-t-2 [&>td]:border-b-2 [&>td]:border-orange-300"
+                                style={{ animationDelay: `${Math.min(idx, 8) * 30 + 100}ms` }}
+                                key={`orange-${tabAnimKey}-${row.positionId}`}
                             >
-                              <TableCell colSpan={4} className="py-2 pl-4 text-sm text-orange-800 font-extrabold tracking-wide">
+                                <TableCell colSpan={4} className="py-2 pl-4 text-sm text-orange-800 font-extrabold tracking-wide">
                                 ∑ Combined ({row.baseMonths}mo Step {row.baseStep} + {ir.incrementMonths}mo Step {ir.step})
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{row.salaryGrade}</TableCell>
-                              <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedMonthly)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedMonthly)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedAnnual)}</TableCell>
-                              <TableCell className="text-right font-extrabold font-mono text-sm bg-orange-200 text-orange-900 py-2">{fmt(row.rowTotal)}</TableCell>
-                              <TableCell className="py-2" />
+                                </TableCell>
+                                <TableCell className="text-center font-mono text-sm font-extrabold text-orange-800 py-2">{row.salaryGrade}</TableCell>
+                                <TableCell className="text-center font-mono text-sm font-extrabold text-orange-800 py-2">{ir.step}</TableCell>
+                                <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedMonthly)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedAnnual)}</TableCell>
+                                <TableCell className="text-right font-extrabold font-mono text-sm bg-orange-200 text-orange-900 py-2">{fmt(row.rowTotal)}</TableCell>
+                                <TableCell className="py-2" />
                             </TableRow>
-                          )}
+                            )}
 
                         </React.Fragment>
                       );
@@ -1158,26 +1159,40 @@ const PersonnelServices: React.FC = () => {
                     </TableFooter>
                   )} */}
                   {allRows.length > 0 && (
-                    <TableFooter>
-                      <TableRow className="bg-muted/30 font-semibold border-t-2 border-muted">
-                        <TableCell colSpan={4} className="text-right text-xs uppercase tracking-wide pr-4">Department Total</TableCell>
-                        <TableCell />
-                        <TableCell />
-                        <TableCell className="text-right font-mono">{fmt(toNumber(totals.savedMonthly))}</TableCell>
-                        <TableCell className="text-right font-mono">{fmt(cb('annualRate', 'incr_annual'))}</TableCell>
-                        <TableCell className="text-right font-bold bg-purple-100 font-mono">{fmt(toNumber(totals.rowTotal))}</TableCell>
-                        <TableCell className="text-center">
-                          <button
-                            onClick={() => setDeptDetailDept(dept.dept_id)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all duration-150 hover:scale-110 active:scale-95"
-                            title="View department totals breakdown"
-                          >
-                            <EyeIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  )}
+  <TableFooter>
+    <TableRow className="bg-gray-900 hover:bg-gray-900 border-t-2 border-muted">
+      {/* Label */}
+      <TableCell colSpan={4} className="bg-gray-900 text-gray-200 text-right text-xs uppercase tracking-widest pr-4">
+        Department Total
+      </TableCell>
+      {/* Grade & Step — empty spacers */}
+      <TableCell className="bg-gray-900" />
+      <TableCell className="bg-gray-900" />
+      {/* Monthly — blue tint (mirrors "current year" in MDF) */}
+      <TableCell className="text-right font-mono bg-blue-950/20 border-blue-900/40 text-blue-300">
+        {fmt(toNumber(totals.savedMonthly))}
+      </TableCell>
+      {/* Annual — blue tint */}
+      <TableCell className="text-right font-mono bg-blue-950/20 border-blue-900/40 text-blue-300">
+        {fmt(cb('annualRate', 'incr_annual'))}
+      </TableCell>
+      {/* Total — orange tint (mirrors "budget year / proposed" in MDF) */}
+      <TableCell className="text-right font-bold font-mono bg-orange-950/20 border-orange-900/40 text-orange-300">
+        {fmt(toNumber(totals.rowTotal))}
+      </TableCell>
+      {/* Eye button */}
+      <TableCell className="bg-gray-900 text-center">
+        <button
+          onClick={() => setDeptDetailDept(dept.dept_id)}
+          className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-600 hover:bg-gray-700 transition-all duration-150 hover:scale-110 active:scale-95"
+          title="View department totals breakdown"
+        >
+          <EyeIcon className="w-3.5 h-3.5" />
+        </button>
+      </TableCell>
+    </TableRow>
+  </TableFooter>
+)}
                 </Table>
               </div>
 

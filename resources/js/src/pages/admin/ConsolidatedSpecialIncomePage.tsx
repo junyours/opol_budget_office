@@ -220,10 +220,10 @@ export default function ConsolidatedSpecialIncomePage() {
           </Card>
         ))}
         {/* Grand total card — dark */}
-        <Card className="bg-gray-900 border-gray-800">
+        <Card >
           <CardContent className="pt-4 pb-3 px-4 flex flex-col gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Grand Total</p>
-            <p className="text-[15px] font-bold font-mono tabular-nums text-white leading-tight">
+            <p className="text-[15px] font-bold font-mono tabular-nums text-gray-900 leading-tight">
               ₱ {fmt(grand_total)}
             </p>
           </CardContent>
@@ -316,7 +316,7 @@ export default function ConsolidatedSpecialIncomePage() {
           </div>
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 mb-1">Estimated Income</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-white">
+            <p className="text-2xl font-bold font-mono tabular-nums text-orange-300">
               ₱ {fmt(grand_total)}
             </p>
           </div>

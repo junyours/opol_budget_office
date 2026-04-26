@@ -28,6 +28,8 @@ import {
   ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
+import { useLocation } from 'react-router-dom';
+import { refreshSubmittedCount } from "@/src/hooks/useSubmittedPlanCount";
 
 // ─── Panel entrance animation ─────────────────────────────────────────────────
 const PANEL_CSS = `
@@ -152,6 +154,7 @@ function DeptAvatar({
 const LBPForms: React.FC = () => {
   useEffect(() => { ensurePanelAnim(); }, []);
   const { user } = useAuth();
+    const location = useLocation();
   const isAdmin = user?.role === 'admin';
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
@@ -211,6 +214,19 @@ const LBPForms: React.FC = () => {
   }, [activePlanId, selectedPlanId]);
 
   useEffect(() => { if (activePlanId) fetchAll(); }, [activePlanId]);
+
+  const locationState = location.state as { deptId?: number } | null;
+
+    useEffect(() => {
+    const incoming = locationState?.deptId;
+    if (!incoming || !deptPlans.length) return;
+    const match = deptPlans.find(p => p.dept_id === incoming);
+    if (match) {
+        setSelectedPlanId(match.dept_budget_plan_id);
+        setPanelKey(k => k + 1);
+        window.history.replaceState({}, '');
+    }
+    }, [deptPlans, locationState?.deptId]);
 
   // ── Fetch past year plans for the selected department ─────────────────────
   // Extracted so it can be called independently (e.g. after an item update)
@@ -273,31 +289,59 @@ const LBPForms: React.FC = () => {
   }, [selectedPlan, activePlan, fetchAll]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const handleApprove = async () => {
-    if (!approveTarget) return;
-    setActing(true);
-    try {
-      await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
-      toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
-      setApproveTarget(null);
-      fetchAll();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to approve.');
-    } finally { setActing(false); }
-  };
+//   const handleApprove = async () => {
+//     if (!approveTarget) return;
+//     setActing(true);
+//     try {
+//       await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
+//       toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
+//       setApproveTarget(null);
+//       fetchAll();
+//     } catch (err: any) {
+//       toast.error(err?.response?.data?.message ?? 'Failed to approve.');
+//     } finally { setActing(false); }
+//   };
 
-  const handleReject = async () => {
-    if (!rejectTarget) return;
-    setActing(true);
-    try {
-      await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
-      toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
-      setRejectTarget(null);
-      fetchAll();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
-    } finally { setActing(false); }
-  };
+//   const handleReject = async () => {
+//     if (!rejectTarget) return;
+//     setActing(true);
+//     try {
+//       await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
+//       toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
+//       setRejectTarget(null);
+//       fetchAll();
+//     } catch (err: any) {
+//       toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
+//     } finally { setActing(false); }
+//   };
+
+const handleApprove = async () => {
+  if (!approveTarget) return;
+  setActing(true);
+  try {
+    await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
+    toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
+    setApproveTarget(null);
+    fetchAll();
+    refreshSubmittedCount(); // ← add this
+  } catch (err: any) {
+    toast.error(err?.response?.data?.message ?? 'Failed to approve.');
+  } finally { setActing(false); }
+};
+
+const handleReject = async () => {
+  if (!rejectTarget) return;
+  setActing(true);
+  try {
+    await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
+    toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
+    setRejectTarget(null);
+    fetchAll();
+    refreshSubmittedCount(); // ← add this
+  } catch (err: any) {
+    toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
+  } finally { setActing(false); }
+};
 
   // ── Filtered list ──────────────────────────────────────────────────────────
 //   const filteredPlans = useMemo(() => {

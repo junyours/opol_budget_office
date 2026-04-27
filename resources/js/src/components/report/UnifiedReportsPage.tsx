@@ -3446,7 +3446,7 @@ const LEP_FORM_DEFS: ReadonlyArray<{
 }> = [
   {
     id:          'consolidated_plantilla',
-    label:       'Consolidated Plantilla of Personnel',
+    label:       'PART I — Consolidated Plantilla of Personnel',
     desc:        'All departments — General Fund + Special Accounts',
     orientation: 'portrait',
     endpoint:    '/reports/lep/consolidated-plantilla',
@@ -3455,8 +3455,8 @@ const LEP_FORM_DEFS: ReadonlyArray<{
   },
   {
     id:          'receipts_program',
-    label:       'Receipts Program',
-    desc:        'Part II — General Fund & Special Accounts income',
+    label:       'Part II — Receipts Program',
+    desc:        'General Fund & Special Accounts income',
     orientation: 'portrait',
     endpoint:    '/reports/lep/receipts-program',
     needsDept:   false,
@@ -3464,8 +3464,8 @@ const LEP_FORM_DEFS: ReadonlyArray<{
   },
   {
     id:          'lep_form2',
-    label:       'Appropriations by Office',
-    desc:        'Part III — Programmed Appropriation & Obligation by Object of Expenditures',
+    label:       'Part III — Appropriations by Office',
+    desc:        'Programmed Appropriation & Obligation by Object of Expenditures',
     orientation: 'portrait',
     endpoint:    '/reports/lep/form2',
     needsDept:   true,

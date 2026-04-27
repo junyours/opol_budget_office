@@ -388,11 +388,11 @@ export default function Login() {
                           e.preventDefault();
                           toast("Password assistance", {
                             description: "Please contact your Budget Officer to reset your password.",
-                            icon: <ShieldCheck className="w-4 h-4 text-blue-700" />,
+                            icon: <ShieldCheck className="w-4 h-4 text-gray-900" />,
                             duration: 5000,
                           });
                         }}
-                        className="text-sm text-blue-500 hover:text-blue-700 transition-colors hover:underline underline-offset-4"
+                        className=" text-sm text-blue-500 hover:text-blue-700 transition-colors hover:underline underline-offset-4"
                       >
                         Forgot password?
                       </a>

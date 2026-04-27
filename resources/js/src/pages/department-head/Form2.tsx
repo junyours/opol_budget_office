@@ -1600,11 +1600,10 @@ const Form2: React.FC<Form2Props> = ({
                                                 //         : item.pastSem2;
                                                 const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 const sem1Editable =
-                                                    canEditSem1 &&
+                                                    isAdmin &&
+                                                    isEditable &&
                                                     past > 0 &&
-                                                    ((isAdmin &&
-                                                        !!pastYearPlan) ||
-                                                        (!isAdmin && past > 0));
+                                                    !!pastYearPlan;
 
                                                 return (
                                                     <tr
@@ -2118,7 +2117,7 @@ const Form2: React.FC<Form2Props> = ({
                                             )}
 
                                             <td className={cn(TD_CUR, "border-l border-blue-100")}>
-                                                {isEditable ? (
+                                                {isEditable && isAdmin ? (
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"

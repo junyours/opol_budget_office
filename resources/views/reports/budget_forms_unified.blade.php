@@ -1116,9 +1116,9 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr>
             <th style="font-size:6pt">Old</th>
             <th style="font-size:6pt">New</th>
-            <th width="4%" >Grade/<br/>Salary</th>
+            <th width="4%" >Grade/<br/>Step</th>
             <th width="15%">Amount</th>
-            <th width="4%">Grade/<br/>Salary</th>
+            <th width="4%">Grade/<br/>Step</th>
             <th width="15%">Amount</th>
         </tr>
         <tr>

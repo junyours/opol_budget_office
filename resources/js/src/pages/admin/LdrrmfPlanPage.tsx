@@ -56,13 +56,19 @@ interface LdrrmfItem {
 }
 
 interface SpecialAccountSection {
-  source:      string;
-  dept_name:   string;
-  label:       string;
-  past:        PastData;
-  current:     CurrentData;
-  budget_year: BudgetYearData;
-  items:       LdrrmfItem[];
+  source:               string;
+  dept_name:            string;
+  label:                string;
+  past:                 PastData;
+  current:              CurrentData;
+  budget_year:          BudgetYearData;
+  items:                LdrrmfItem[];
+  qrf_past_obligation:  number;
+  qrf_current_sem1:     number;
+  qrf_current_sem2:     number;
+  qrf_current_total:    number;
+  qrf_past_plan_id:     number | null;
+  qrf_current_plan_id:  number | null;
 }
 
 interface GrandTotal {
@@ -204,39 +210,53 @@ export default function LdrrmfPlanPage() {
     parseFloat(s.replace(/,/g, "")) || 0;
 
   const handleAmountChange = (key: string, raw: string) => {
-    const digits    = raw.replace(/[^0-9.]/g, "");
-    const num       = parseFloat(digits) || 0;
-    const formatted = num === 0 ? digits : Math.floor(num).toLocaleString("en-PH");
-    setEditingValues(prev => ({ ...prev, [key]: digits === "" ? "" : formatted }));
-  };
+  const digits    = raw.replace(/[^0-9.]/g, "");
+  const num       = parseFloat(digits) || 0;
+  const formatted = num === 0 ? digits : Math.floor(num).toLocaleString("en-PH");
+  setEditingValues(prev => ({ ...prev, [key]: digits === "" ? "" : formatted }));
+};
+
+const handleAmountFocus = (key: string, currentValue: number) => {
+  if (editingValues[key] === undefined) {
+    setEditingValues(prev => ({ ...prev, [key]: currentValue === 0 ? "" : Math.floor(currentValue).toLocaleString("en-PH") }));
+  }
+};
 
   const handleSem1Blur = async (
-    key: string,
-    item: LdrrmfItem,
-    source: string,
-    currentPlanId: number | null
-  ) => {
-    if (!currentPlanId) return;
-    const raw   = editingValues[key] ?? "";
-    const value = parseInput(raw);
-    setEditingValues(prev => { const n = { ...prev }; delete n[key]; return n; });
+  key: string,
+  item: LdrrmfItem,
+  source: string,
+  currentPlanId: number | null
+) => {
+  if (!currentPlanId) return;
+  if (editingValues[key] === undefined) return;
+  const raw   = editingValues[key];
+  const value = parseInput(raw);
+  setEditingValues(prev => { const n = { ...prev }; delete n[key]; return n; });
+  if (value === Math.floor(item.sem1_amount)) return;
     setSavingKeys(prev => new Set(prev).add(key));
-    try {
-      await API.patch(`/ldrrmfip/upsert-year-amounts`, {
-        budget_plan_id:    currentPlanId,
-        source,
-        description:       item.description,
-        ldrrmfip_category_id: item.ldrrmfip_item_id, // passed for upsert lookup — backend uses description+source+plan
-        sem1_amount:       value,
-      });
-      // Reload the whole report to reflect new sem2 = total - sem1
-      const res = await API.get("/ldrrmf-plan");
-      setReport(res.data.data ?? null);
-    } catch {
-      toast.error("Failed to save Sem 1 amount.");
-    } finally {
-      setSavingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
-    }
+    const promise = (async () => {
+  await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+  budget_plan_id: currentPlanId,
+  source,
+  description:    item.description,
+  sem1_amount:    value,
+});
+  const res = await API.get("/ldrrmf-plan");
+  setReport(res.data.data ?? null);
+})();
+toast.promise(promise, {
+  loading: "Saving…",
+  success: `${item.description} saved`,
+  error:   "Failed to save Sem 1 amount.",
+});
+try {
+  await promise;
+} catch {
+  /* handled by toast */
+} finally {
+  setSavingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+}
   };
 
   const handleObligationBlur = async (
@@ -376,35 +396,145 @@ export default function LdrrmfPlanPage() {
                     </tr>
 
                     {/* ── 30% QRF row ──────────────────────────────────── */}
-                    <tr className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-4 py-3 border-r border-gray-100 text-[12px]">
-                        <span className="text-gray-900 font-medium">30% Quick Response Fund (QRF)</span>
-                        <span className="ml-1.5 text-[9.5px] text-blue-400 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 font-semibold align-middle">
-                          derived
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 border-r border-gray-100 text-center text-gray-300 text-[11px]">—</td>
-                      {/* Past */}
-                      <td className="px-3 py-3 border-r border-l border-green-100 text-right font-mono tabular-nums text-[12px] text-blue-600 bg-green-50/40">
-                        {fmtPeso(sa.past.qrf_30)}
-                      </td>
-                      {/* Current sem1 */}
-                      <td className="px-3 py-3 border-r border-l border-blue-100 text-right font-mono tabular-nums text-[12px] text-blue-600 bg-blue-50/40">
-                        {fmtAbs(sa.current.qrf_30_sem1)}
-                      </td>
-                      {/* Current sem2 */}
-                      <td className="px-3 py-3 border-r border-blue-100 text-right font-mono tabular-nums text-[12px] text-blue-600 bg-blue-50/40">
-                        {fmtAbs(sa.current.qrf_30_sem2)}
-                      </td>
-                      {/* Current total */}
-                      <td className="px-3 py-3 border-r border-blue-100 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-blue-50/40">
-                        {fmtPeso(sa.current.qrf_30_total)}
-                      </td>
-                      {/* Budget year */}
-                      <td className="px-3 py-3 border-r border-l border-orange-100 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-orange-50/40">
-                        {fmtPeso(sa.budget_year.qrf_30)}
-                      </td>
-                    </tr>
+                    {(() => {
+                      const qrfObligKey      = `qrf-oblig-${sa.source}`;
+                      const qrfSem1Key       = `qrf-sem1-${sa.source}`;
+                      const isQrfObligSaving = savingKeys.has(qrfObligKey);
+                      const isQrfSem1Saving  = savingKeys.has(qrfSem1Key);
+
+                      const qrfObligDisplay = editingValues[qrfObligKey] !== undefined
+                        ? editingValues[qrfObligKey]
+                        : fmtInput(sa.qrf_past_obligation);
+
+                      const qrfSem1Display = editingValues[qrfSem1Key] !== undefined
+                        ? editingValues[qrfSem1Key]
+                        : fmtInput(sa.qrf_current_sem1);
+
+                      const qrfSem1Live  = editingValues[qrfSem1Key] !== undefined
+                        ? parseInput(editingValues[qrfSem1Key])
+                        : sa.qrf_current_sem1;
+                      const qrfSem2Live  = Math.max(0, Math.floor((sa.qrf_current_sem1 + sa.qrf_current_sem2) - qrfSem1Live));
+                      const qrfTotalLive = sa.qrf_current_total;
+
+                      return (
+                        <tr className="hover:bg-gray-50/60 transition-colors">
+                          <td className="px-4 py-3 border-r border-gray-100 text-[12px]">
+                            <span className="text-gray-900 font-medium">30% Quick Response Fund (QRF)</span>
+                            <span className="ml-1.5 text-[9.5px] text-blue-400 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 font-semibold align-middle">
+                              derived
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 border-r border-gray-100 text-center text-gray-300 text-[11px]">—</td>
+
+                          {/* Past — editable obligation */}
+                          <td className="px-1.5 py-1.5 border-r border-l border-green-100 bg-green-50/30">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={qrfObligDisplay}
+                              placeholder="–"
+                              disabled={isQrfObligSaving}
+                              className={cn(
+                                "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                                isQrfObligSaving
+                                  ? "text-gray-400 cursor-wait opacity-50"
+                                  : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
+                              )}
+                              onFocus={() => handleAmountFocus(qrfObligKey, sa.qrf_past_obligation)}
+                              onChange={e => handleAmountChange(qrfObligKey, e.target.value)}
+                              onBlur={async () => {
+                                if (!past_plan_id) return;
+                                if (editingValues[qrfObligKey] === undefined) return;
+                                const raw = editingValues[qrfObligKey];
+                                setEditingValues(prev => { const n = { ...prev }; delete n[qrfObligKey]; return n; });
+                                const value = parseInput(raw);
+                                if (value === Math.floor(sa.qrf_past_obligation)) return;
+                                setSavingKeys(prev => new Set(prev).add(qrfObligKey));
+                                const promise = (async () => {
+                                  await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                                    budget_plan_id:    past_plan_id,
+                                    source:            sa.source,
+                                    description:       '__QRF_30__',
+                                    obligation_amount: value,
+                                  });
+                                  const res = await API.get("/ldrrmf-plan");
+                                  setReport(res.data.data ?? null);
+                                })();
+                                toast.promise(promise, {
+                                  loading: "Saving…",
+                                  success: "QRF obligation saved",
+                                  error:   "Failed to save QRF obligation.",
+                                });
+                                try { await promise; } catch { /* handled */ } finally {
+                                  setSavingKeys(prev => { const n = new Set(prev); n.delete(qrfObligKey); return n; });
+                                }
+                              }}
+                            />
+                          </td>
+
+                          {/* Current sem1 — editable */}
+                          <td className="px-1.5 py-1.5 border-r border-l border-blue-100 bg-blue-50/30">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={qrfSem1Display}
+                              placeholder="–"
+                              disabled={isQrfSem1Saving}
+                              className={cn(
+                                "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                                isQrfSem1Saving
+                                  ? "text-gray-400 cursor-wait opacity-50"
+                                  : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+                              )}
+                              onFocus={() => handleAmountFocus(qrfSem1Key, sa.qrf_current_sem1)}
+                              onChange={e => handleAmountChange(qrfSem1Key, e.target.value)}
+                              onBlur={async () => {
+                                if (!current_plan_id) return;
+                                if (editingValues[qrfSem1Key] === undefined) return;
+                                const raw = editingValues[qrfSem1Key];
+                                setEditingValues(prev => { const n = { ...prev }; delete n[qrfSem1Key]; return n; });
+                                const value = parseInput(raw);
+                                if (value === Math.floor(sa.qrf_current_sem1)) return;
+                                setSavingKeys(prev => new Set(prev).add(qrfSem1Key));
+                                const promise = (async () => {
+                                  await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                                    budget_plan_id: current_plan_id,
+                                    source:         sa.source,
+                                    description:    '__QRF_30__',
+                                    sem1_amount:    value,
+                                  });
+                                  const res = await API.get("/ldrrmf-plan");
+                                  setReport(res.data.data ?? null);
+                                })();
+                                toast.promise(promise, {
+                                  loading: "Saving…",
+                                  success: "QRF Sem 1 saved",
+                                  error:   "Failed to save QRF Sem 1.",
+                                });
+                                try { await promise; } catch { /* handled */ } finally {
+                                  setSavingKeys(prev => { const n = new Set(prev); n.delete(qrfSem1Key); return n; });
+                                }
+                              }}
+                            />
+                          </td>
+
+                          {/* Current sem2 — read-only, calculated */}
+                          <td className="px-3 py-2 border-r border-blue-100 text-right font-mono tabular-nums text-[11.5px] text-gray-500 bg-blue-50/20">
+                            {qrfSem2Live > 0 ? qrfSem2Live.toLocaleString("en-PH") : "–"}
+                          </td>
+
+                          {/* Current total — read-only */}
+                          <td className="px-3 py-2 border-r border-blue-100 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-blue-50/40">
+                            {qrfTotalLive > 0 ? Math.floor(qrfTotalLive).toLocaleString("en-PH") : "–"}
+                          </td>
+
+                          {/* Budget year — always derived, read-only */}
+                          <td className="px-3 py-3 border-r border-l border-orange-100 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-orange-50/40">
+                            {fmtPeso(sa.budget_year.qrf_30)}
+                          </td>
+                        </tr>
+                      );
+                    })()}
 
                     {/* ── 70% Preparedness section label ────────────────── */}
                     <tr className="bg-gray-50/60">
@@ -434,7 +564,12 @@ export default function LdrrmfPlanPage() {
                       </tr>
                     ) : (
                       sa.items.map((item) => {
-                        const sem1Key  = `${sa.source}-${item.ldrrmfip_item_id}`;
+                        const sem1Key      = `${sa.source}-${item.ldrrmfip_item_id}`;
+                        const obligKey     = `oblig-${sa.source}-${item.ldrrmfip_item_id}`;
+                        const isObligSaving = savingKeys.has(obligKey);
+                        const obligDisplay  = editingValues[obligKey] !== undefined
+                        ? editingValues[obligKey]
+                        : fmtInput(item.obligation_amount);
                         const isSaving = savingKeys.has(sem1Key);
                         const sem1Display = editingValues[sem1Key] !== undefined
                           ? editingValues[sem1Key]
@@ -448,53 +583,55 @@ export default function LdrrmfPlanPage() {
                             </td>
                             <td className="px-3 py-2 border-r border-gray-100 text-center text-gray-300">—</td>
 
-                            {/* Past year — obligation_amount (editable) */}
-                            {/* Past year — obligation_amount (editable, controlled) */}
-                            {(() => {
-                              const obligKey     = `oblig-${sa.source}-${item.ldrrmfip_item_id}`;
-                              const isObligSaving = savingKeys.has(obligKey);
-                              const obligDisplay  = editingValues[obligKey] !== undefined
-                                ? editingValues[obligKey]
-                                : fmtInput(item.obligation_amount);
-                              return (
-                                <td className="px-1.5 py-1.5 border-r border-l border-green-100 bg-green-50/30">
-                                  <input
-                                    type="text"
-                                    value={obligDisplay}
-                                    placeholder="–"
-                                    disabled={isObligSaving}
-                                    className={cn(
-                                      "w-full text-right font-mono text-[11.5px] bg-transparent border-0 outline-none rounded px-1.5 py-0.5 placeholder-gray-300",
-                                      isObligSaving
-                                        ? "text-gray-400 cursor-wait"
-                                        : "text-gray-700 focus:bg-green-50 focus:ring-1 focus:ring-green-300"
-                                    )}
-                                    onChange={e => handleAmountChange(obligKey, e.target.value)}
-                                    onBlur={async () => {
-                                      if (!past_plan_id) return;
-                                      const raw   = editingValues[obligKey] ?? "";
-                                      const value = parseInput(raw);
-                                      setEditingValues(prev => { const n = { ...prev }; delete n[obligKey]; return n; });
-                                      setSavingKeys(prev => new Set(prev).add(obligKey));
-                                      try {
-                                        await API.patch(`/ldrrmfip/upsert-year-amounts`, {
-                                          budget_plan_id:    past_plan_id,
-                                          source:            sa.source,
-                                          description:       item.description,
-                                          obligation_amount: value,
-                                        });
-                                        const res = await API.get("/ldrrmf-plan");
-                                        setReport(res.data.data ?? null);
-                                      } catch {
-                                        toast.error("Failed to save obligation amount.");
-                                      } finally {
-                                        setSavingKeys(prev => { const n = new Set(prev); n.delete(obligKey); return n; });
-                                      }
-                                    }}
-                                  />
-                                </td>
-                              );
-                            })()}
+                            {/* Past Year — obligation_amount (editable) */}
+                            <td className="px-1.5 py-1.5 border-r border-l border-green-100 bg-green-50/30">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={obligDisplay}
+                                placeholder="–"
+                                disabled={isObligSaving}
+                               className={cn(
+  "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+  isObligSaving
+    ? "text-gray-400 cursor-wait opacity-50"
+    : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
+)}
+                                onFocus={() => handleAmountFocus(obligKey, item.obligation_amount)}
+onChange={e => handleAmountChange(obligKey, e.target.value)}
+onBlur={async () => {
+  if (!past_plan_id) return;
+  if (editingValues[obligKey] === undefined) return;
+  const raw = editingValues[obligKey];
+  setEditingValues(prev => { const n = { ...prev }; delete n[obligKey]; return n; });
+  const value = parseInput(raw);
+  if (value === Math.floor(item.obligation_amount)) return;
+  setSavingKeys(prev => new Set(prev).add(obligKey));
+  const promise = (async () => {
+    await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+      budget_plan_id:    past_plan_id,
+      source:            sa.source,
+      description:       item.description,
+      obligation_amount: value,
+    });
+    const res = await API.get("/ldrrmf-plan");
+    setReport(res.data.data ?? null);
+  })();
+  toast.promise(promise, {
+    loading: "Saving…",
+    success: `${item.description} saved`,
+    error:   "Failed to save obligation amount.",
+  });
+  try {
+    await promise;
+  } catch {
+    /* handled by toast */
+  } finally {
+    setSavingKeys(prev => { const n = new Set(prev); n.delete(obligKey); return n; });
+  }
+}}
+                            />
+                            </td>
 
                             {/* Current sem1 — editable */}
                             <td className="px-1.5 py-1.5 border-r border-l border-blue-100 bg-blue-50/30">
@@ -504,13 +641,15 @@ export default function LdrrmfPlanPage() {
                                 placeholder="–"
                                 disabled={isSaving}
                                 className={cn(
-                                  "w-full text-right font-mono text-[11.5px] bg-transparent border-0 outline-none rounded px-1.5 py-0.5 placeholder-gray-300",
-                                  isSaving
-                                    ? "text-gray-400 cursor-wait"
-                                    : "text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-300"
-                                )}
-                                onChange={e => handleAmountChange(sem1Key, e.target.value)}
-                                onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
+  "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+  isSaving
+    ? "text-gray-400 cursor-wait opacity-50"
+    : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+)}
+                                inputMode="numeric"
+                                onFocus={() => handleAmountFocus(sem1Key, item.sem1_amount)}
+onChange={e => handleAmountChange(sem1Key, e.target.value)}
+onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
                               />
                             </td>
 

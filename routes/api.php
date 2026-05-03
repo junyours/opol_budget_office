@@ -138,6 +138,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get  ('ldrrmfip/sources',        [LdrrmfipController::class, 'sources']);
     Route::get  ('ldrrmfip/previous-items', [LdrrmfipController::class, 'previousItems']);
     Route::get  ('ldrrmfip/summary',        [LdrrmfipController::class, 'summary']);
+    Route::patch('ldrrmfip/upsert-year-amounts', [LdrrmfipController::class, 'upsertYearAmounts']);
     Route::apiResource('ldrrmfip', LdrrmfipController::class)
         ->parameters(['ldrrmfip' => 'ldrrmfip'])
         ->only(['index', 'store', 'update', 'destroy']);
@@ -190,7 +191,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('form6-special/sync-from-ps',    [Form6SpecialController::class, 'syncFromPs']);
         Route::post('form6-special/sync-from-other', [Form6SpecialController::class, 'syncFromOther']);
         Route::post('/ps-computation/save',          [PsComputationController::class, 'save']);
-        Route::patch('ldrrmfip/upsert-year-amounts', [LdrrmfipController::class, 'upsertYearAmounts']);
+        // Route::patch('ldrrmfip/upsert-year-amounts', [LdrrmfipController::class, 'upsertYearAmounts']);
         Route::post('gad-entries/bulk',              [GADEntryController::class, 'bulk']);
         Route::post('gad-entries/reorder',           [GADEntryController::class, 'reorder']);
         Route::post('mdf-funds/save-proposed',       [MDFFundController::class, 'saveProposed']);

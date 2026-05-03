@@ -99,9 +99,9 @@ $num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(round(abs($n)), 0
     <tr>
         <td class="l" style="padding-left:8px; font-weight:bold;">30% Quick Response Fund (QRF)</td>
         <td class="c">&nbsp;</td>
-        <td class="r">{!! $num($_src['past']['qrf_30']) !!}</td>
-        <td class="r">{!! $num($_src['current']['qrf_30_sem1']) !!}</td>
-        <td class="r">{!! $num($_src['current']['qrf_30_sem2']) !!}</td>
+        <td class="r">{!! $pesoA($_src['past']['qrf_30']) !!}</td>
+        <td class="r">{!! $pesoA($_src['current']['qrf_30_sem1']) !!}</td>
+        <td class="r">{!! $pesoA($_src['current']['qrf_30_sem2']) !!}</td>
         <td class="r">{!! $pesoA($_src['current']['qrf_30_total']) !!}</td>
         <td class="r">{!! $pesoA($_src['budget_year']['qrf_30']) !!}</td>
     </tr>

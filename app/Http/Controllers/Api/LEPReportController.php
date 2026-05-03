@@ -947,12 +947,13 @@ class LEPReportController extends Controller
         };
 
         $compute70 = fn (?int $bpId): float => $bpId
-            ? (float) \DB::table('ldrrmfip_items')
-                ->where('budget_plan_id', $bpId)
-                ->where('source', $source)
-                ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
-                ->value('grand')
-            : 0.0;
+    ? (float) \DB::table('ldrrmfip_items')
+        ->where('budget_plan_id', $bpId)
+        ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
+        ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
+        ->value('grand')
+    : 0.0;
 
         $past5  = $computeCalamityFund($pastBpId);
         $curr5  = $computeCalamityFund($currentBpId);
@@ -1842,37 +1843,66 @@ private function buildLepConsolidatedCalamity5Data(int $budgetPlanId): array
 
         // ── Items ─────────────────────────────────────────────────────────
         $budgetItems = LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
-            ->where('source', $source)
-            ->with('category')
-            ->orderBy('ldrrmfip_item_id')
-            ->get();
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->with('category')
+    ->orderBy('ldrrmfip_item_id')
+    ->get()
+    ->keyBy('description');
 
-        $pastItems = $pastPlan
-            ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
-                ->where('source', $source)->get()->keyBy('description')
-            : collect();
+$pastItems = $pastPlan
+    ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
+        ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
+        ->get()
+        ->keyBy('description')
+    : collect();
 
-        $currentItems = $currentPlan
-            ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
-                ->where('source', $source)->get()->keyBy('description')
-            : collect();
+$currentItems = $currentPlan
+    ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
+        ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
+        ->with('category')
+        ->orderBy('ldrrmfip_item_id')
+        ->get()
+    : collect();
 
-        $items = $budgetItems->map(fn ($i) => [
-            'ldrrmfip_item_id'    => $i->ldrrmfip_item_id,
-            'description'         => $i->description,
-            'category_name'       => $i->category?->name,
-            'implementing_office' => $i->implementing_office,
-            // Past year — obligation_amount (matching Form 2 pattern)
-            'obligation_amount'   => (float) ($pastItems->get($i->description)?->obligation_amount ?? 0),
-            // Current year
-            'sem1_amount'         => (float) ($currentItems->get($i->description)?->sem1_amount    ?? 0),
-            'sem2_amount'         => (float) ($currentItems->get($i->description)?->sem2_amount    ?? 0),
-            'total_amount'        => (float) ($currentItems->get($i->description)?->total_amount   ?? 0),
-            // Budget year
-            'mooe'                => (float) $i->mooe,
-            'co'                  => (float) $i->co,
-            'total'               => (float) $i->total,
-        ])->values()->toArray();
+// Union of all descriptions across all three years
+$allDescriptions = $currentItems->pluck('description')
+    ->merge($budgetItems->keys())
+    ->merge($pastItems->keys())
+    ->unique()
+    ->values();
+
+$currentItemsByDesc = $currentItems->keyBy('description');
+
+$items = $allDescriptions->map(function ($desc) use (
+    $budgetItems, $pastItems, $currentItemsByDesc
+) {
+    $budgetItem  = $budgetItems->get($desc);
+    $pastItem    = $pastItems->get($desc);
+    $currentItem = $currentItemsByDesc->get($desc);
+
+    $meta = $budgetItem ?? $currentItem ?? $pastItem;
+    if (!$meta) return null;
+
+    return [
+        'ldrrmfip_item_id'    => $budgetItem?->ldrrmfip_item_id ?? $currentItem?->ldrrmfip_item_id,
+        'description'         => $desc,
+        'category_name'       => $meta->category?->name ?? null,
+        'implementing_office' => $meta->implementing_office ?? 'LDRRMO',
+        // Past year — obligation_amount
+        'obligation_amount'   => (float) ($pastItem?->obligation_amount  ?? 0),
+        // Current year
+        'sem1_amount'         => (float) ($currentItem?->sem1_amount     ?? 0),
+        'sem2_amount'         => (float) ($currentItem?->sem2_amount     ?? 0),
+        'total_amount'        => (float) ($currentItem?->total_amount    ?? 0),
+        // Budget year — 0 if item doesn't exist in budget year yet
+        'mooe'                => (float) ($budgetItem?->mooe             ?? 0),
+        'co'                  => (float) ($budgetItem?->co               ?? 0),
+        'total'               => (float) ($budgetItem?->total_amount     ?? 0),
+    ];
+})->filter()->values()->toArray();
 
         $sections[] = [
             'source'      => $source,
@@ -1914,14 +1944,21 @@ private function buildLepSACalamityPast(?int $planId, string $source): array
 
     $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
         ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
         ->selectRaw('COALESCE(SUM(obligation_amount), 0) as grand')
         ->value('grand');
 
+    // Use stored QRF obligation if entered, otherwise derive it
+    $qrfItem    = LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->where('description', '__QRF_30__')
+        ->first();
+    $qrf30      = $qrfItem ? (float) $qrfItem->obligation_amount : 0.0;
+
     $calamityFund = $this->computeCalamityFundLep($planId, $source);
-    $reserved30   = round($calamityFund - $total70, 2);
 
     return [
-        'qrf_30'          => max(0, $reserved30),
+        'qrf_30'          => $qrf30,
         'preparedness_70' => round($total70, 2),
         'total_5pct'      => round($calamityFund, 2),
     ];
@@ -1937,30 +1974,39 @@ private function buildLepSACalamityCurrent(?int $planId, string $source): array
     ];
     if (!$planId) return $empty;
 
-    $calamity   = $this->computeCalamityFundLep($planId, $source);
-    $total70    = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-        ->where('source', $source)->selectRaw('COALESCE(SUM(total_amount), 0) as grand')->value('grand');
-    $reserved30 = $calamity - $total70;
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')->value('grand');
 
-    $sem1Total  = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-        ->where('source', $source)->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')->value('grand');
-    $sem2Total  = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-        ->where('source', $source)->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')->value('grand');
+$sem1Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')->value('grand');
 
-    $sem1Calamity = round($sem1Total + ($reserved30 * ($sem1Total / max($total70, 1))), 2);
-    $sem2Calamity = round($calamity - $sem1Calamity, 2);
+$sem2Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')->value('grand');
 
-    return [
-        'qrf_30_sem1'   => round($sem1Calamity * 0.30, 2),
-        'qrf_30_sem2'   => round($sem2Calamity * 0.30, 2),
-        'qrf_30_total'  => round($reserved30, 2),
-        'prep_70_sem1'  => round($sem1Total, 2),
-        'prep_70_sem2'  => round($sem2Total, 2),
-        'prep_70_total' => round($total70, 2),
-        'total_sem1'    => round($sem1Calamity, 2),
-        'total_sem2'    => round($sem2Calamity, 2),
-        'total_5pct'    => round($calamity, 2),
-    ];
+$total5pct  = $total70 > 0 ? round($total70 / 0.70, 2) : 0;
+$reserved30 = round($total5pct * 0.30, 2);
+
+$ratio     = $total70 > 0 ? ($sem1Total / $total70) : 0;
+$qrf30Sem1 = round($reserved30 * $ratio, 2);
+$qrf30Sem2 = round($reserved30 - $qrf30Sem1, 2);
+
+return [
+    'qrf_30_sem1'   => $qrf30Sem1,
+    'qrf_30_sem2'   => $qrf30Sem2,
+    'qrf_30_total'  => $reserved30,
+    'prep_70_sem1'  => round($sem1Total, 2),
+    'prep_70_sem2'  => round($sem2Total, 2),
+    'prep_70_total' => round($total70, 2),
+    'total_sem1'    => round($sem1Total + $qrf30Sem1, 2),
+    'total_sem2'    => round($sem2Total + $qrf30Sem2, 2),
+    'total_5pct'    => $total5pct,
+];
 }
 
 // ── Budget year: mooe + co ────────────────────────────────────────────────
@@ -1969,7 +2015,9 @@ private function buildLepSACalamityBudget(?int $planId, string $source): array
     if (!$planId) return ['qrf_30' => 0, 'preparedness_70' => 0, 'total_5pct' => 0];
 
     $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-        ->where('source', $source)->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')->value('grand');
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')->value('grand');
 
     $calamityFund = $this->computeCalamityFundLep($planId, $source);
     $reserved30   = $calamityFund - $total70;

@@ -124,13 +124,17 @@ class LdrrmfPlanController extends BaseApiController
             // ── Items per year (description-keyed for matching across years) ───────────
 $budgetItems = LdrrmfipItem::where('budget_plan_id', $activePlan->budget_plan_id)
     ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
     ->with('category')
     ->orderBy('ldrrmfip_item_id')
-    ->get();
+    ->get()
+    ->keyBy('description');
 
 $pastItems = $pastPlan
     ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
         ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
+        ->with('category')
         ->get()
         ->keyBy('description')
     : collect();
@@ -138,26 +142,60 @@ $pastItems = $pastPlan
 $currentItems = $currentPlan
     ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
         ->where('source', $source)
+        ->where('description', '!=', '__QRF_30__')
+        ->with('category')
+        ->orderBy('ldrrmfip_item_id')
         ->get()
-        ->keyBy('description')
     : collect();
 
-$items = $budgetItems->map(fn ($i) => [
-    'ldrrmfip_item_id'    => $i->ldrrmfip_item_id,
-    'description'         => $i->description,
-    'category_name'       => $i->category?->name,
-    'implementing_office' => $i->implementing_office,
-    // Past year
-    'obligation_amount'   => (float) ($pastItems->get($i->description)?->obligation_amount ?? 0),
-    // Current year
-    'sem1_amount'         => (float) ($currentItems->get($i->description)?->sem1_amount   ?? 0),
-    'sem2_amount'         => (float) ($currentItems->get($i->description)?->sem2_amount   ?? 0),
-    'total_amount'        => (float) ($currentItems->get($i->description)?->total_amount  ?? 0),
-    // Budget year — mooe + co
-    'mooe'                => (float) $i->mooe,
-    'co'                  => (float) $i->co,
-    'total'               => (float) $i->total,
-])->values();
+// Union of all descriptions across all three years so nothing is lost
+$allDescriptions = $currentItems->pluck('description')
+    ->merge($budgetItems->keys())
+    ->merge($pastItems->keys())
+    ->unique()
+    ->values();
+
+$currentItemsByDesc = $currentItems->keyBy('description');
+
+$items = $allDescriptions->map(function ($desc) use (
+    $budgetItems, $pastItems, $currentItemsByDesc
+) {
+    $budgetItem   = $budgetItems->get($desc);
+    $pastItem     = $pastItems->get($desc);
+    $currentItem  = $currentItemsByDesc->get($desc);
+
+    // Use budget item for metadata if available, else fall back to current item
+    // Use budget item for metadata if available, else current, else past
+    $meta = $budgetItem ?? $currentItem ?? $pastItem;
+    if (!$meta) return null;
+
+    return [
+        'ldrrmfip_item_id'    => $budgetItem?->ldrrmfip_item_id ?? $currentItem?->ldrrmfip_item_id ?? $pastItem?->ldrrmfip_item_id,
+        'description'         => $desc,
+        'category_name'       => $meta->category?->name ?? null,
+        'implementing_office' => $meta->implementing_office ?? 'LDRRMO',
+        // Past year — obligation_amount
+        'obligation_amount'   => (float) ($pastItem?->obligation_amount ?? 0),
+        // Current year
+        'sem1_amount'         => (float) ($currentItem?->sem1_amount  ?? 0),
+        'sem2_amount'         => (float) ($currentItem?->sem2_amount  ?? 0),
+        'total_amount'        => (float) ($currentItem?->total_amount ?? 0),
+        // Budget year — mooe + co (0 if item doesn't exist in budget year yet)
+        'mooe'                => (float) ($budgetItem?->mooe         ?? 0),
+'co'                  => (float) ($budgetItem?->co           ?? 0),
+'total'               => (float) ($budgetItem?->total_amount ?? 0),
+    ];
+})->filter()->values();
+
+// Read QRF stored amounts for editable past/current columns
+$qrfPastItem    = $pastPlan
+    ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
+        ->where('source', $source)->where('description', '__QRF_30__')->first()
+    : null;
+$qrfCurrentItem = $currentPlan
+    ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
+        ->where('source', $source)->where('description', '__QRF_30__')->first()
+    : null;
 
 $sections[] = [
     'source'      => $source,
@@ -167,6 +205,12 @@ $sections[] = [
     'current'     => $currentData,
     'budget_year' => $budgetData,
     'items'       => $items,
+    'qrf_past_obligation' => (float) ($qrfPastItem?->obligation_amount ?? 0),
+'qrf_current_sem1'    => (float) ($qrfCurrentItem?->sem1_amount    ?? 0),
+'qrf_current_sem2'    => (float) ($currentData['qrf_30_total'] - ($qrfCurrentItem?->sem1_amount ?? 0)),
+'qrf_current_total'   => (float) $currentData['qrf_30_total'],
+'qrf_past_plan_id'    => $pastPlan?->budget_plan_id,
+'qrf_current_plan_id' => $currentPlan?->budget_plan_id,
 ];
         }
 
@@ -260,9 +304,10 @@ $sections[] = [
         }
 
         $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-            ->where('source', $source)
-            ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
-            ->value('grand');
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
+    ->value('grand');
 
         $calamityFund = $this->computeCalamityFund($planId, $source);
         $reserved30   = $calamityFund - $total70;
@@ -286,19 +331,28 @@ $sections[] = [
 
         $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
             ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
             ->selectRaw('COALESCE(SUM(obligation_amount), 0) as grand')
             ->value('grand');
 
+        $qrfItem = LdrrmfipItem::where('budget_plan_id', $planId)
+            ->where('source', $source)
+            ->where('description', '__QRF_30__')
+            ->first();
+        $qrf30 = $qrfItem ? (float) $qrfItem->obligation_amount : 0.0;
+
         $calamityFund = $this->computeCalamityFund($planId, $source);
-        $reserved30   = $calamityFund - $total70;
 
         return [
-            'qrf_30'          => round($reserved30,  2),
+            'qrf_30'          => $qrf30,
             'preparedness_70' => round($total70,      2),
             'total_5pct'      => round($calamityFund, 2),
             'calamity_fund'   => round($calamityFund, 2),
         ];
     }
+
+    /**
+     * Get current year data with sem1/sem2 split.
 
     /**
      * Get current year data with sem1/sem2 split.
@@ -318,44 +372,46 @@ $sections[] = [
 
         // Get the 5% calamity fund total for current year
         // Get the 5% calamity fund total for current year
-        $calamity = $this->computeCalamityFund($planId, $source);
-        $total70  = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-            ->where('source', $source)
-            ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
-            ->value('grand');
-        $reserved30 = $calamity - $total70;
+        // total_amount = current year total per item (sem1 + sem2)
+$total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
+    ->value('grand');
 
-        // sem1/sem2 come directly from the items' sem1_amount / sem2_amount columns
-        $sem1Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-            ->where('source', $source)
-            ->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')
-            ->value('grand');
+$sem1Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')
+    ->value('grand');
 
-        $sem2Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
-            ->where('source', $source)
-            ->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')
-            ->value('grand');
+$sem2Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+    ->where('source', $source)
+    ->where('description', '!=', '__QRF_30__')
+    ->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')
+    ->value('grand');
 
-        // QRF (30%) and Prep (70%) rows split proportionally from calamity fund
-        $sem1Calamity = round($sem1Total + ($reserved30 * ($sem1Total / max($total70, 1))), 2);
-        $sem2Calamity = round($calamity - $sem1Calamity, 2);
+// QRF 30% is derived proportionally from the 70% item totals
+// total_5pct = total70 / 0.70,  reserved30 = total_5pct * 0.30
+$total5pct  = $total70 > 0 ? round($total70 / 0.70, 2) : 0;
+$reserved30 = round($total5pct * 0.30, 2);
 
-        $qrf30Sem1  = round($sem1Calamity * 0.30, 2);
-        $qrf30Sem2  = round($sem2Calamity * 0.30, 2);
-        $prep70Sem1 = round($sem1Total, 2);
-        $prep70Sem2 = round($sem2Total, 2);
+// QRF sem split: proportional to 70% sem split ratio
+$ratio      = $total70 > 0 ? ($sem1Total / $total70) : 0;
+$qrf30Sem1  = round($reserved30 * $ratio, 2);
+$qrf30Sem2  = round($reserved30 - $qrf30Sem1, 2);
 
-        return [
-            'qrf_30_sem1'   => $qrf30Sem1,
-            'qrf_30_sem2'   => $qrf30Sem2,
-            'qrf_30_total'  => round($reserved30, 2),
-            'prep_70_sem1'  => $prep70Sem1,
-            'prep_70_sem2'  => $prep70Sem2,
-            'prep_70_total' => round($total70, 2),
-            'total_sem1'    => round($sem1Calamity, 2),
-            'total_sem2'    => round($sem2Calamity, 2),
-            'total_5pct'    => round($calamity, 2),
-        ];
+return [
+    'qrf_30_sem1'   => $qrf30Sem1,
+    'qrf_30_sem2'   => $qrf30Sem2,
+    'qrf_30_total'  => $reserved30,
+    'prep_70_sem1'  => round($sem1Total, 2),
+    'prep_70_sem2'  => round($sem2Total, 2),
+    'prep_70_total' => round($total70, 2),
+    'total_sem1'    => round($sem1Total + $qrf30Sem1, 2),
+    'total_sem2'    => round($sem2Total + $qrf30Sem2, 2),
+    'total_5pct'    => $total5pct,
+];
     }
 
     /**

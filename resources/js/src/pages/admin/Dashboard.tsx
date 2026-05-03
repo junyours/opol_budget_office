@@ -43,7 +43,7 @@ import {
 } from "../../hooks/useDashboardQueries";
 
 import { BudgetAreaChart } from "@/src/components/charts/BudgetAreaChart";
-import { BreakdownCard } from "@/src/components/cards/BreakDownCard";
+import { BreakdownCard } from "@/src/components/cards/BreakdownCard";
 
 const getInitials = (d: Department) =>
   (d.dept_abbreviation ?? d.dept_name).slice(0, 2).toUpperCase();

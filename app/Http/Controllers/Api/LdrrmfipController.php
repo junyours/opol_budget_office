@@ -176,19 +176,22 @@ class LdrrmfipController extends BaseApiController
 
         $userId = $request->user()?->user_id;
 
-        $item = LdrrmfipItem::create([
-            ...$validated,
-            'implementing_office' => $validated['implementing_office'] ?? 'LDRRMO',
-            'funding_source'      => $validated['funding_source']      ?? 'LDRRMF',
-            'mooe'                => $validated['mooe']              ?? 0,
-            'co'                  => $validated['co']                ?? 0,
-            'obligation_amount'   => $validated['obligation_amount'] ?? 0,
-            'sem1_amount'         => $validated['sem1_amount']       ?? 0,
-            'sem2_amount'         => $validated['sem2_amount']       ?? 0,
-            'total_amount'        => $validated['total_amount']      ?? 0,
-            'created_by'          => $userId,
-            'updated_by'          => $userId,
-        ]);
+        $mooe = $validated['mooe'] ?? 0;
+$co   = $validated['co']   ?? 0;
+
+$item = LdrrmfipItem::create([
+    ...$validated,
+    'implementing_office' => $validated['implementing_office'] ?? 'LDRRMO',
+    'funding_source'      => $validated['funding_source']      ?? 'LDRRMF',
+    'mooe'                => $mooe,
+    'co'                  => $co,
+    'obligation_amount'   => $validated['obligation_amount'] ?? 0,
+    'sem1_amount'         => $validated['sem1_amount']       ?? 0,
+    'sem2_amount'         => $validated['sem2_amount']       ?? 0,
+    'total_amount'        => $mooe + $co,
+    'created_by'          => $userId,
+    'updated_by'          => $userId,
+]);
 
         return $this->success($item->load('category'), 201);
     }
@@ -226,8 +229,17 @@ class LdrrmfipController extends BaseApiController
                 return response()->json(['message' => 'Duplicate item description in this category.'], 422);
             }
         }
+$mooe = $validated['mooe'] ?? $ldrrmfip->mooe;
+$co   = $validated['co']   ?? $ldrrmfip->co;
 
-        $ldrrmfip->update([...$validated, 'updated_by' => $request->user()?->user_id]);
+$ldrrmfip->update([
+    ...$validated,
+    'mooe'         => $mooe,
+    'co'           => $co,
+    'total_amount' => $mooe + $co,
+    'updated_by'   => $request->user()?->user_id,
+]);
+
 
         return $this->success($ldrrmfip->fresh()->load('category'));
     }
@@ -465,5 +477,5 @@ class LdrrmfipController extends BaseApiController
 
         return $this->success($item->fresh());
     }
-    
+
 }

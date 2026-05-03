@@ -1415,7 +1415,7 @@ private function getGfFundTotals(int $budgetPlanId): array
         $request->validate([
             'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
             'forms'          => 'required|array|min:1',
-            'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5,pscomputation',
+            'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5,consolidated_sa_income,pscomputation',
             // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5',
             // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20',
         ]);
@@ -1568,6 +1568,13 @@ private function getGfFundTotals(int $budgetPlanId): array
                         $sectionSA . "5pct_CalamityFund_{$saAbbr}_FY{$year}.pdf",
                         $this->makePdf($html, 'landscape')
                     );
+                }
+
+                if (in_array('consolidated_sa_income', $forms)) {
+                    $data = $this->buildConsolidatedSaIncomeData($bpId);
+                    $html = $this->renderHtml('consolidated_sa_income', $data);
+                    $zip->addFromString($sectionGF . "ConsolidatedEstimatedIncome_SA_FY{$year}.pdf",
+                        $this->makePdf($html, 'landscape'));
                 }
 
                 if (!empty($deptForms)) {
@@ -2759,5 +2766,335 @@ return response()->stream(function () use ($zipPath) {
         $files = glob($viewsDir . DIRECTORY_SEPARATOR . '*.php');
         if ($files) foreach ($files as $f) @unlink($f);
     }
+
+
+    /////////////////////
+
+    public function consolidatedCalamity5PDF(Request $request)
+{
+    $request->validate([
+        'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+    ]);
+
+    try {
+        $this->clearViewCache();
+        $data = $this->buildConsolidatedCalamity5Data((int) $request->budget_plan_id);
+        $html = $this->renderHtml('consolidated_calamity5', $data);
+        $pdf  = $this->makePdf($html, 'landscape'); // landscape — many columns
+        return $this->pdfResponse(
+            $pdf,
+            "5pct_CalamityFund_SA_Consolidated_FY{$data['year']}.pdf",
+            $request->boolean('download')
+        );
+    } catch (\Throwable $e) {
+        return $this->errorResponse($e);
+    }
+}
+
+// ── Data builder ──────────────────────────────────────────────────────────
+private function buildConsolidatedCalamity5Data(int $budgetPlanId): array
+{
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
+    $year = (int) $plan->year;
+
+    $pastYear    = $year - 2;
+    $currentYear = $year - 1;
+
+    $pastPlan    = BudgetPlan::where('year', $pastYear)->first();
+    $currentPlan = BudgetPlan::where('year', $currentYear)->first();
+
+    // ── Special Account departments only ──────────────────────────────────
+    $specialDepts = Department::with('category')
+        ->get()
+        ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts')
+        ->values();
+
+    $sections = [];
+
+    foreach ($specialDepts as $dept) {
+        $source = $this->sourceKeyForDept($dept);
+
+        // ── Past year summary (obligation_amount) ─────────────────────────
+        $pastData = $this->buildSACalamityYearSummary(
+            $pastPlan?->budget_plan_id,
+            $source,
+            'obligation_amount'   // ← past year uses OBLIGATION, not budget
+        );
+
+        // ── Current year summary (total_amount with sem1/sem2 split) ──────
+        $currentData = $this->buildSACalamityCurrentYear(
+            $currentPlan?->budget_plan_id,
+            $source
+        );
+
+        // ── Budget year summary (mooe + co = total) ───────────────────────
+        $budgetData = $this->buildSACalamityBudgetYear(
+            $budgetPlanId,
+            $source
+        );
+
+        // ── Items for ALL three years, keyed by description ───────────────
+        $budgetItems = LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
+            ->where('source', $source)
+            ->with('category')
+            ->orderBy('ldrrmfip_item_id')
+            ->get();
+
+        $pastItems = $pastPlan
+            ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
+                ->where('source', $source)
+                ->get()
+                ->keyBy('description')
+            : collect();
+
+        $currentItems = $currentPlan
+            ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
+                ->where('source', $source)
+                ->get()
+                ->keyBy('description')
+            : collect();
+
+        $items = $budgetItems->map(fn ($i) => [
+            'ldrrmfip_item_id'    => $i->ldrrmfip_item_id,
+            'description'         => $i->description,
+            'category_name'       => $i->category?->name,
+            'implementing_office' => $i->implementing_office,
+            // Past year — obligation_amount (what was actually obligated/spent)
+            'obligation_amount'   => (float) ($pastItems->get($i->description)?->obligation_amount ?? 0),
+            // Current year
+            'sem1_amount'         => (float) ($currentItems->get($i->description)?->sem1_amount    ?? 0),
+            'sem2_amount'         => (float) ($currentItems->get($i->description)?->sem2_amount    ?? 0),
+            'total_amount'        => (float) ($currentItems->get($i->description)?->total_amount   ?? 0),
+            // Budget year — mooe + co
+            'mooe'                => (float) $i->mooe,
+            'co'                  => (float) $i->co,
+            'total'               => (float) $i->total,  // appended attribute = mooe + co
+        ])->values()->toArray();
+
+        $sections[] = [
+            'source'      => $source,
+            'dept_name'   => $dept->dept_name,
+            'dept_abbr'   => strtoupper($dept->dept_abbreviation ?? ''),
+            'dept_label'  => 'Mun. Eco. Entrpse., ' . strtoupper($dept->dept_name),
+            'label'       => strtoupper($dept->dept_abbreviation ?? $dept->dept_name),
+            'past'        => $pastData,
+            'current'     => $currentData,
+            'budget_year' => $budgetData,
+            'items'       => $items,
+        ];
+    }
+
+    // ── Grand totals across all SA sources ────────────────────────────────
+    $grandTotal = [
+        'past'          => array_sum(array_column(array_column($sections, 'past'),    'total_5pct')),
+        'current_sem1'  => array_sum(array_column(array_column($sections, 'current'), 'total_sem1')),
+        'current_sem2'  => array_sum(array_column(array_column($sections, 'current'), 'total_sem2')),
+        'current_total' => array_sum(array_column(array_column($sections, 'current'), 'total_5pct')),
+        'budget_year'   => array_sum(array_column(array_column($sections, 'budget_year'), 'total_5pct')),
+    ];
+
+    return [
+        'year'        => $year,
+        'past_year'   => $pastYear,
+        'current_year'=> $currentYear,
+        'lgu'         => strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
+        'sources'     => $sections,
+        'grand_total' => $grandTotal,
+        'signatories' => $this->buildSignatories(),
+    ];
+}
+
+// ── Past-year summary (uses obligation_amount for 70% total) ──────────────
+private function buildSACalamityYearSummary(?int $planId, string $source, string $amountField = 'obligation_amount'): array
+{
+    if (!$planId) {
+        return ['qrf_30' => 0, 'preparedness_70' => 0, 'total_5pct' => 0];
+    }
+
+    // Sum of obligation_amount for past year items
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw("COALESCE(SUM({$amountField}), 0) as grand")
+        ->value('grand');
+
+    $calamityFund = $this->computeCalamity5Fund($planId, $source);
+    $reserved30   = round($calamityFund - $total70, 2);
+
+    return [
+        'qrf_30'          => max(0, $reserved30),
+        'preparedness_70' => round($total70, 2),
+        'total_5pct'      => round($calamityFund, 2),
+    ];
+}
+
+// ── Current-year data (sem1 / sem2 / total split) ─────────────────────────
+private function buildSACalamityCurrentYear(?int $planId, string $source): array
+{
+    $empty = [
+        'qrf_30_sem1'  => 0, 'qrf_30_sem2'  => 0, 'qrf_30_total'  => 0,
+        'prep_70_sem1' => 0, 'prep_70_sem2' => 0, 'prep_70_total' => 0,
+        'total_sem1'   => 0, 'total_sem2'   => 0, 'total_5pct'    => 0,
+    ];
+
+    if (!$planId) return $empty;
+
+    $calamity = $this->computeCalamity5Fund($planId, $source);
+
+    // 70% total from current-year items (total_amount)
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
+        ->value('grand');
+    $reserved30 = $calamity - $total70;
+
+    // sem1/sem2 from current items
+    $sem1Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')
+        ->value('grand');
+
+    $sem2Total = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')
+        ->value('grand');
+
+    // QRF split proportionally
+    $sem1Calamity = round($sem1Total + ($reserved30 * ($sem1Total / max($total70, 1))), 2);
+    $sem2Calamity = round($calamity - $sem1Calamity, 2);
+    $qrf30Sem1    = round($sem1Calamity * 0.30, 2);
+    $qrf30Sem2    = round($sem2Calamity * 0.30, 2);
+
+    return [
+        'qrf_30_sem1'   => $qrf30Sem1,
+        'qrf_30_sem2'   => $qrf30Sem2,
+        'qrf_30_total'  => round($reserved30, 2),
+        'prep_70_sem1'  => round($sem1Total, 2),
+        'prep_70_sem2'  => round($sem2Total, 2),
+        'prep_70_total' => round($total70, 2),
+        'total_sem1'    => round($sem1Calamity, 2),
+        'total_sem2'    => round($sem2Calamity, 2),
+        'total_5pct'    => round($calamity, 2),
+    ];
+}
+
+// ── Budget-year summary (mooe + co) ──────────────────────────────────────
+private function buildSACalamityBudgetYear(?int $planId, string $source): array
+{
+    if (!$planId) {
+        return ['qrf_30' => 0, 'preparedness_70' => 0, 'total_5pct' => 0];
+    }
+
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
+        ->value('grand');
+
+    $calamityFund = $this->computeCalamity5Fund($planId, $source);
+    $reserved30   = $calamityFund - $total70;
+
+    return [
+        'qrf_30'          => round(max(0, $reserved30), 2),
+        'preparedness_70' => round($total70, 2),
+        'total_5pct'      => round($calamityFund, 2),
+    ];
+}
+
+
+// POST /api/reports/unified/consolidated-sa-income-pdf
+public function consolidatedSaIncomePDF(Request $request)
+{
+    $request->validate([
+        'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+    ]);
+
+    try {
+        $this->clearViewCache();
+        $data = $this->buildConsolidatedSaIncomeData((int) $request->budget_plan_id);
+        $html = $this->renderHtml('consolidated_sa_income', $data);
+        $pdf  = $this->makePdf($html, 'landscape');
+        return $this->pdfResponse(
+            $pdf,
+            "ConsolidatedEstimatedIncome_SA_FY{$data['year']}.pdf",
+            $request->boolean('download')
+        );
+    } catch (\Throwable $e) {
+        return $this->errorResponse($e);
+    }
+}
+
+private function buildConsolidatedSaIncomeData(int $budgetPlanId): array
+{
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
+    $year = (int) $plan->year;
+
+    // Special Account departments only
+    $specialDepts = Department::with('category')
+        ->get()
+        ->filter(fn ($d) =>
+            strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts'
+        )
+        ->values();
+
+    $departments = [];
+
+    foreach ($specialDepts as $dept) {
+        $source = $this->sourceKeyForDept($dept);
+
+        // Get all leaf income fund objects for this source that have values
+        $objects = \DB::table('income_fund_objects as ifo')
+            ->leftJoin('income_fund_amounts as ifa', function ($join) use ($budgetPlanId, $source) {
+                $join->on('ifa.income_fund_object_id', '=', 'ifo.id')
+                     ->where('ifa.budget_plan_id', $budgetPlanId)
+                     ->where('ifa.source', $source);
+            })
+            ->where('ifo.source', $source)
+            ->where('ifo.is_active', true)
+            // leaf nodes only — no children
+            ->whereNotExists(function ($q) {
+                $q->select(\DB::raw(1))
+                  ->from('income_fund_objects as child')
+                  ->whereColumn('child.parent_id', 'ifo.id');
+            })
+            ->orderBy('ifo.sort_order')
+            ->select(
+                'ifo.id as object_id',
+                'ifo.name',
+                'ifa.proposed_amount as amount'
+            )
+            ->get();
+
+        // Only include objects with a value > 0
+        $columns = $objects
+            ->filter(fn ($o) => (float)($o->amount ?? 0) > 0)
+            ->map(fn ($o) => [
+                'object_id' => $o->object_id,
+                'name'      => $o->name,
+                'amount'    => (float) $o->amount,
+            ])
+            ->values()
+            ->toArray();
+
+        $total = array_sum(array_column($columns, 'amount'));
+
+        $departments[] = [
+            'dept_id'    => $dept->dept_id,
+            'dept_name'  => strtoupper($dept->dept_name),
+            'dept_abbr'  => strtoupper($dept->dept_abbreviation ?? ''),
+            'source'     => $source,
+            'columns'    => $columns,
+            'total'      => $total,
+        ];
+    }
+
+    $grandTotal = array_sum(array_column($departments, 'total'));
+
+    return [
+        'year'        => $year,
+        'lgu'         => strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
+        'departments' => $departments,
+        'grand_total' => $grandTotal,
+    ];
+}
+
 
 }

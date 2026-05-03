@@ -220,6 +220,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('form7pdf',         [UnifiedReportController::class, 'form7PDF']);
         Route::post('mdf20pdf',         [UnifiedReportController::class, 'mdf20PDF']);
         Route::post('calamity5pdf',     [UnifiedReportController::class, 'calamity5PDF']);
+        // Route::post('consolidated-calamity5pdf', [UnifiedReportController::class, 'consolidatedCalamity5PDF']);
+        Route::post('consolidated-sa-income-pdf', [UnifiedReportController::class, 'consolidatedSaIncomePDF']);
         Route::post('pscomputationpdf', [UnifiedReportController::class, 'psComputationPDF']);
         Route::post('summary',          [UnifiedReportController::class, 'summary']);
         Route::post('generate-all',     [UnifiedReportController::class, 'generateAll']);
@@ -237,6 +239,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('form2', [LEPReportController::class, 'lepForm2']);
         Route::post('form6', [LEPReportController::class, 'lepForm6']);
         Route::post('form7', [LEPReportController::class, 'lepForm7']);
+
+        Route::post('consolidated-calamity5', [LEPReportController::class, 'lepConsolidatedCalamity5']);
     });
 
     // Unified plan read/write (non-bulk)

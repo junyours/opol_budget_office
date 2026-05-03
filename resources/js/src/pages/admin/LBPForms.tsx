@@ -653,7 +653,7 @@ const filteredPlans = useMemo(() => {
             </div>
 
             {/* Forms area */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ isolation: 'auto' }}>
               {loadingPast ? (
                 <div className="space-y-3">
                   <Skeleton className="h-10 w-72 rounded-lg" />

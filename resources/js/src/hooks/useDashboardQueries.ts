@@ -91,7 +91,7 @@ async function fetchDeptExpenditures(
         };
       })
       .filter((r: DeptExpenditure) => r.total > 0)
-      .sort((a: DeptExpenditure, b: DeptExpenditure) => b.total - a.total);
+      .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
   } catch {
     return [];
   }

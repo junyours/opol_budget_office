@@ -7,14 +7,21 @@ use App\Models\BudgetPlan;
 use App\Models\BudgetPlanForm3Assignment;
 use App\Models\Department;
 use App\Models\DepartmentBudgetPlan;
+use App\Models\DepartmentCategory;
 use App\Models\IncomeFundAmount;
 use App\Models\IncomeFundObject;
 use App\Models\PlantillaPosition;
 use App\Models\SalaryGradeStep;
 use App\Models\SalaryStandardVersion;
+use App\Models\BudgetPlanForm2Item;
+use App\Models\DeptBpForm4Item;
+use App\Models\Form6Template;
+use App\Models\Form6Item;
+use App\Models\LdrrmfipItem;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * LEPReportController
@@ -61,7 +68,7 @@ class LEPReportController extends Controller
 
         $header = $this->getLepHeaderSettings($budgetPlanId, $activePlan);
 
-        $specialCategoryId = \App\Models\DepartmentCategory::whereRaw(
+        $specialCategoryId = DepartmentCategory::whereRaw(
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
@@ -457,7 +464,7 @@ class LEPReportController extends Controller
         $currentPlan = BudgetPlan::where('year', $currentYear)->first();
         $pastPlan    = BudgetPlan::where('year', $pastYear)->first();
 
-        $specialCategoryId = \App\Models\DepartmentCategory::whereRaw(
+        $specialCategoryId = DepartmentCategory::whereRaw(
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
@@ -508,13 +515,13 @@ class LEPReportController extends Controller
         ?int   $currentBpId,
         ?int   $pastBpId
     ): array {
-        $objects = \App\Models\IncomeFundObject::where('source', $source)
+        $objects = IncomeFundObject::where('source', $source)
             ->orderBy('sort_order')
             ->get();
 
         $loadAmounts = function (?int $bpId) use ($source): array {
             if (!$bpId) return [];
-            return \App\Models\IncomeFundAmount::where('budget_plan_id', $bpId)
+            return IncomeFundAmount::where('budget_plan_id', $bpId)
                 ->where('source', $source)
                 ->get()
                 ->keyBy('income_fund_object_id')
@@ -675,7 +682,7 @@ class LEPReportController extends Controller
         $currentPlan = BudgetPlan::where('year', $currentYear)->first();
         $pastPlan    = BudgetPlan::where('year', $pastYear)->first();
 
-        $specialCategoryId = \App\Models\DepartmentCategory::whereRaw(
+        $specialCategoryId = DepartmentCategory::whereRaw(
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
@@ -742,7 +749,7 @@ class LEPReportController extends Controller
 
     // ── Build dept groups ─────────────────────────────────────────────────
     private function buildLepForm2DeptGroups(
-        \Illuminate\Support\Collection $depts,
+        Collection $depts,
         int  $proposedBpId,
         ?int $currentBpId,
         ?int $pastBpId,
@@ -814,12 +821,12 @@ class LEPReportController extends Controller
             if (!$expenseItem) continue;
 
             $currentItem = $currentPlan
-                ? \App\Models\BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
+                ? BudgetPlanForm2Item::where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
                     ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
                 : null;
 
             $pastItem = $pastPlan
-                ? \App\Models\BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
+                ? BudgetPlanForm2Item::where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
                     ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
                 : null;
 
@@ -835,18 +842,18 @@ class LEPReportController extends Controller
             ];
         }
 
-        $proposedAip = \App\Models\DeptBpForm4Item::with('aipProgram')
+        $proposedAip = DeptBpForm4Item::with('aipProgram')
             ->where('dept_budget_plan_id', $proposedPlan->dept_budget_plan_id)
             ->get()->keyBy('aip_program_id');
 
         $currentAip = $currentPlan
-            ? \App\Models\DeptBpForm4Item::with('aipProgram')
+            ? DeptBpForm4Item::with('aipProgram')
                 ->where('dept_budget_plan_id', $currentPlan->dept_budget_plan_id)
                 ->get()->keyBy('aip_program_id')
             : collect();
 
         $pastAip = $pastPlan
-            ? \App\Models\DeptBpForm4Item::with('aipProgram')
+            ? DeptBpForm4Item::with('aipProgram')
                 ->where('dept_budget_plan_id', $pastPlan->dept_budget_plan_id)
                 ->get()->keyBy('aip_program_id')
             : collect();
@@ -1641,14 +1648,14 @@ private function renderLepForm7(array $data): string
     // ── Data builder ──────────────────────────────────────────────────────────────
     private function buildLepForm6Data(int $budgetPlanId, string $filter = 'all'): array
     {
-        $plan = \App\Models\BudgetPlan::findOrFail($budgetPlanId);
+        $plan = BudgetPlan::findOrFail($budgetPlanId);
         $year = (int) $plan->year;
 
         // All templates ordered
-        $templates = \App\Models\Form6Template::orderBy('sort_order')->get();
+        $templates = Form6Template::orderBy('sort_order')->get();
 
         // Special account departments
-        $specialDepts = \App\Models\Department::with('category')
+        $specialDepts = Department::with('category')
             ->get()
             ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts');
 
@@ -1690,18 +1697,18 @@ private function renderLepForm7(array $data): string
     private function buildOneLepForm6(
         int    $budgetPlanId,
         string $source,
-        \Illuminate\Support\Collection $templates,
+        Collection $templates,
         string $label,
         bool   $isSpecial,
     ): array {
         // Load saved amounts keyed by template id
-        $items = \App\Models\Form6Item::where('budget_plan_id', $budgetPlanId)
+        $items = Form6Item::where('budget_plan_id', $budgetPlanId)
             ->where('source', $source)
             ->get()
             ->keyBy('form6_template_id');
 
         // Build flat row array (mirrors UnifiedReportController::buildOneForm6)
-        $rows = $templates->map(fn (\App\Models\Form6Template $tpl) => [
+        $rows = $templates->map(fn (Form6Template $tpl) => [
             'form6_template_id' => $tpl->form6_template_id,
             'code'              => $tpl->code,
             'label'             => $tpl->label,
@@ -1777,4 +1784,241 @@ private function renderLepForm7(array $data): string
             'grand_proposed_total'   => 0.0,
         ]))->render();
     }
+
+
+    // ── POST /api/reports/lep/consolidated-calamity5 ─────────────────────────
+public function lepConsolidatedCalamity5(Request $request)
+{
+    $request->validate([
+        'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+    ]);
+
+    try {
+        $this->clearViewCache();
+        $data = $this->buildLepConsolidatedCalamity5Data((int) $request->budget_plan_id);
+        $html = $this->renderLepConsolidatedCalamity5($data);
+        $pdf  = $this->makePdf($html, 'portrait');
+
+        return $this->pdfResponse(
+            $pdf,
+            "LEP_5pct_CalamityFund_SA_Consolidated_FY{$data['year']}.pdf",
+            $request->boolean('download')
+        );
+    } catch (\Throwable $e) {
+        return $this->errorResponse($e);
+    }
+}
+
+// ── Data builder (mirrors UnifiedReportController::buildConsolidatedCalamity5Data) ──
+private function buildLepConsolidatedCalamity5Data(int $budgetPlanId): array
+{
+    $plan = BudgetPlan::findOrFail($budgetPlanId);
+    $year = (int) $plan->year;
+
+    $pastYear    = $year - 2;
+    $currentYear = $year - 1;
+
+    $pastPlan    = BudgetPlan::where('year', $pastYear)->first();
+    $currentPlan = BudgetPlan::where('year', $currentYear)->first();
+
+    $specialDepts = Department::with('category')
+        ->get()
+        ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts')
+        ->values();
+
+    $sections = [];
+
+    foreach ($specialDepts as $dept) {
+        $source = $this->resolveSourceKey($dept);
+
+        // ── Past year: obligation_amount ──────────────────────────────────
+        $pastData = $this->buildLepSACalamityPast($pastPlan?->budget_plan_id, $source);
+
+        // ── Current year: total_amount with sem1/sem2 ─────────────────────
+        $currentData = $this->buildLepSACalamityCurrent($currentPlan?->budget_plan_id, $source);
+
+        // ── Budget year: mooe + co ────────────────────────────────────────
+        $budgetData = $this->buildLepSACalamityBudget($budgetPlanId, $source);
+
+        // ── Items ─────────────────────────────────────────────────────────
+        $budgetItems = LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
+            ->where('source', $source)
+            ->with('category')
+            ->orderBy('ldrrmfip_item_id')
+            ->get();
+
+        $pastItems = $pastPlan
+            ? LdrrmfipItem::where('budget_plan_id', $pastPlan->budget_plan_id)
+                ->where('source', $source)->get()->keyBy('description')
+            : collect();
+
+        $currentItems = $currentPlan
+            ? LdrrmfipItem::where('budget_plan_id', $currentPlan->budget_plan_id)
+                ->where('source', $source)->get()->keyBy('description')
+            : collect();
+
+        $items = $budgetItems->map(fn ($i) => [
+            'ldrrmfip_item_id'    => $i->ldrrmfip_item_id,
+            'description'         => $i->description,
+            'category_name'       => $i->category?->name,
+            'implementing_office' => $i->implementing_office,
+            // Past year — obligation_amount (matching Form 2 pattern)
+            'obligation_amount'   => (float) ($pastItems->get($i->description)?->obligation_amount ?? 0),
+            // Current year
+            'sem1_amount'         => (float) ($currentItems->get($i->description)?->sem1_amount    ?? 0),
+            'sem2_amount'         => (float) ($currentItems->get($i->description)?->sem2_amount    ?? 0),
+            'total_amount'        => (float) ($currentItems->get($i->description)?->total_amount   ?? 0),
+            // Budget year
+            'mooe'                => (float) $i->mooe,
+            'co'                  => (float) $i->co,
+            'total'               => (float) $i->total,
+        ])->values()->toArray();
+
+        $sections[] = [
+            'source'      => $source,
+            'dept_name'   => $dept->dept_name,
+            'dept_abbr'   => strtoupper($dept->dept_abbreviation ?? ''),
+            'dept_title_label'  => 'Mun. Eco. Entrpse., ' . strtoupper($dept->dept_name),
+            'dept_total_label'  => strtoupper($dept->dept_name),
+            'label'       => strtoupper($dept->dept_abbreviation ?? $dept->dept_name),
+            'past'        => $pastData,
+            'current'     => $currentData,
+            'budget_year' => $budgetData,
+            'items'       => $items,
+        ];
+    }
+
+    $grandTotal = [
+        'past'          => array_sum(array_column(array_column($sections, 'past'),        'total_5pct')),
+        'current_sem1'  => array_sum(array_column(array_column($sections, 'current'),     'total_sem1')),
+        'current_sem2'  => array_sum(array_column(array_column($sections, 'current'),     'total_sem2')),
+        'current_total' => array_sum(array_column(array_column($sections, 'current'),     'total_5pct')),
+        'budget_year'   => array_sum(array_column(array_column($sections, 'budget_year'), 'total_5pct')),
+    ];
+
+    return [
+        'year'         => $year,
+        'past_year'    => $pastYear,
+        'current_year' => $currentYear,
+        'lgu'          => strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
+        'sources'      => $sections,
+        'grand_total'  => $grandTotal,
+        'signatories'  => $this->buildSignatories(),
+    ];
+}
+
+// ── Past: obligation_amount for 70%, calamityFund for total ──────────────
+private function buildLepSACalamityPast(?int $planId, string $source): array
+{
+    if (!$planId) return ['qrf_30' => 0, 'preparedness_70' => 0, 'total_5pct' => 0];
+
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(obligation_amount), 0) as grand')
+        ->value('grand');
+
+    $calamityFund = $this->computeCalamityFundLep($planId, $source);
+    $reserved30   = round($calamityFund - $total70, 2);
+
+    return [
+        'qrf_30'          => max(0, $reserved30),
+        'preparedness_70' => round($total70, 2),
+        'total_5pct'      => round($calamityFund, 2),
+    ];
+}
+
+// ── Current: total_amount + sem1/sem2 split ───────────────────────────────
+private function buildLepSACalamityCurrent(?int $planId, string $source): array
+{
+    $empty = [
+        'qrf_30_sem1' => 0, 'qrf_30_sem2' => 0, 'qrf_30_total' => 0,
+        'prep_70_sem1'=> 0, 'prep_70_sem2'=> 0, 'prep_70_total'=> 0,
+        'total_sem1'  => 0, 'total_sem2'  => 0, 'total_5pct'   => 0,
+    ];
+    if (!$planId) return $empty;
+
+    $calamity   = $this->computeCalamityFundLep($planId, $source);
+    $total70    = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)->selectRaw('COALESCE(SUM(total_amount), 0) as grand')->value('grand');
+    $reserved30 = $calamity - $total70;
+
+    $sem1Total  = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')->value('grand');
+    $sem2Total  = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)->selectRaw('COALESCE(SUM(sem2_amount), 0) as grand')->value('grand');
+
+    $sem1Calamity = round($sem1Total + ($reserved30 * ($sem1Total / max($total70, 1))), 2);
+    $sem2Calamity = round($calamity - $sem1Calamity, 2);
+
+    return [
+        'qrf_30_sem1'   => round($sem1Calamity * 0.30, 2),
+        'qrf_30_sem2'   => round($sem2Calamity * 0.30, 2),
+        'qrf_30_total'  => round($reserved30, 2),
+        'prep_70_sem1'  => round($sem1Total, 2),
+        'prep_70_sem2'  => round($sem2Total, 2),
+        'prep_70_total' => round($total70, 2),
+        'total_sem1'    => round($sem1Calamity, 2),
+        'total_sem2'    => round($sem2Calamity, 2),
+        'total_5pct'    => round($calamity, 2),
+    ];
+}
+
+// ── Budget year: mooe + co ────────────────────────────────────────────────
+private function buildLepSACalamityBudget(?int $planId, string $source): array
+{
+    if (!$planId) return ['qrf_30' => 0, 'preparedness_70' => 0, 'total_5pct' => 0];
+
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $planId)
+        ->where('source', $source)->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')->value('grand');
+
+    $calamityFund = $this->computeCalamityFundLep($planId, $source);
+    $reserved30   = $calamityFund - $total70;
+
+    return [
+        'qrf_30'          => round(max(0, $reserved30), 2),
+        'preparedness_70' => round($total70, 2),
+        'total_5pct'      => round($calamityFund, 2),
+    ];
+}
+
+// ── Calamity fund calculator (5% of Total Available Resources) ────────────
+// Mirrors UnifiedReportController::computeCalamity5Fund()
+private function computeCalamityFundLep(int $planId, string $source): float
+{
+    $nonIncomeParent = \DB::table('income_fund_objects')
+        ->where('source', $source)
+        ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+        ->first(['id']);
+
+    $excludeIds = [];
+    if ($nonIncomeParent) {
+        $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
+        $excludeIds[] = $nonIncomeParent->id;
+    }
+
+    $query = \DB::table('income_fund_amounts')
+        ->where('budget_plan_id', $planId)
+        ->where('source', $source);
+
+    if (!empty($excludeIds)) {
+        $query->whereNotIn('income_fund_object_id', $excludeIds);
+    }
+
+    return round((float) $query->sum('proposed_amount') * 0.05, 2);
+}
+
+// ── Renderer ──────────────────────────────────────────────────────────────
+private function renderLepConsolidatedCalamity5(array $data): string
+{
+    $this->clearViewCache();
+    return view('reports.lep.lepreport', array_merge($data, [
+        'report_type'            => 'lep_consolidated_calamity5',
+        'proposed_year'          => $data['year'],
+        'header'                 => [],
+        'signatories'            => $data['signatories'],
+        'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+        'grand_current_total'    => 0.0,
+        'grand_proposed_total'   => 0.0,
+    ]))->render();
+}
 }

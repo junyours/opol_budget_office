@@ -290,6 +290,17 @@ $introBy         = $hdr['introduced_by']       ?? '';
         ],
     ])
 
+    @elseif(($report_type ?? '') === 'lep_consolidated_calamity5')
+    @include('reports.lep.consolidated_calamity5', ['data' => $data ?? [
+        'year'         => $year         ?? ($proposed_year ?? 0),
+        'past_year'    => $past_year    ?? (($proposed_year ?? 0) - 2),
+        'current_year' => $current_year ?? (($proposed_year ?? 0) - 1),
+        'lgu'          => $lgu          ?? '',
+        'sources'      => $sources      ?? [],
+        'grand_total'  => $grand_total  ?? [],
+        'signatories'  => $signatories  ?? [],
+    ]])
+
 @else
     @include('reports.lep.consolidated_plantilla_of_personnel', [
         'sections'            => $sections,

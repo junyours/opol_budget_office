@@ -22,7 +22,7 @@
 /* ═══════════════════════════════════════════════════════
    PAGE SIZE + MARGINS
 ═══════════════════════════════════════════════════════ */
-@if(isset($mode) && ($mode === 'form5' || $mode === 'calamity5'))
+@if(isset($mode) && in_array($mode, ['form5', 'calamity5',  'consolidated_sa_income']))
 @page { size: 13in 8.5in landscape; margin: 0; }
 @else
 @page { size: 8.5in 13in portrait;  margin: 0; }
@@ -37,7 +37,7 @@ html, body {
     font-size: 7pt;
     color: #000;
 }
-@if(isset($mode) && ($mode === 'form5' || $mode === 'calamity5'))
+@if(isset($mode) && in_array($mode, ['form5', 'calamity5',  'consolidated_sa_income']))
 body {
     margin-top:    76pt;
     margin-bottom: 36pt;
@@ -1191,8 +1191,8 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
   <tr>
     <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
       Prepared by:
-      <span class="sig-name">{{ $dr['dept_head']['name'] }}</span>
-      <span class="sig-title">{{ $dr['dept_head']['title'] }}</span>
+      <span class="sig-name">{{ $signatories['hrmo']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['hrmo']['title'] }}</span>
     </td>
     <td style="border-left:none solid #000;border-right:none solid #000;text-align:center;vertical-align:top;width:34%;padding:8px 6px 18px;">
       Reviewed by:
@@ -2946,7 +2946,192 @@ $summary    = $cal5['summary'];
 @endforeach {{-- allForms5 --}}
 {{-- end calamity5 --}}
 
+
+
+
+
+
+
+@elseif($mode === 'consolidated_sa_income')
+@php
+    $csiYear  = $data['year'];
+    $csiLgu   = $data['lgu'];
+    $csiDepts = $data['departments'];
+    $csiGrand = $data['grand_total'];
+
+    $csiMaxCols = 0;
+    foreach ($csiDepts as $d) {
+        if (count($d['columns']) > $csiMaxCols) {
+            $csiMaxCols = count($d['columns']);
+        }
+    }
+    if ($csiMaxCols < 1) $csiMaxCols = 1;
+
+    $csiDataColWidth = round(69 / $csiMaxCols, 2);
+
+    // No decimals, blank when zero
+    $csiNum = fn(float $n): string =>
+        $n == 0 ? '-' : number_format($n, 0);
+
+    // With peso sign, no decimals
+    $csiPeso = fn(float $n): string =>
+        $n == 0 ? '-' : $pesoSign . number_format($n, 0);
+
+    // Always with peso sign (for totals)
+    $csiPesoA = fn(float $n): string =>
+        $pesoSign . number_format($n, 0);
+@endphp
+
+<div class="page">
+
+<div style="text-align:center; font-weight:bold; font-size:9pt; margin-bottom:1px;">
+    CONSOLIDATED ESTIMATED INCOME
+</div>
+<div style="text-align:center; font-weight:bold; font-size:8.5pt; margin-bottom:1px;">
+    SPECIAL ACCOUNT, CY {{ $csiYear }}
+</div>
+<div style="text-align:center; font-size:8pt; margin-bottom:6px;">
+    MUNICIPALITY : <span style="text-decoration:underline; font-weight:bold;">{{ $csiLgu }}</span>
+</div>
+
+<table style="width:100%; border-collapse:collapse; font-size:7pt; table-layout:fixed;">
+    <colgroup>
+        <col style="width:18%;">
+        @for ($csiC = 0; $csiC < $csiMaxCols; $csiC++)
+        <col style="width:{{ $csiDataColWidth }}%;">
+        @endfor
+        <col style="width:13%;">
+    </colgroup>
+
+    <tbody>
+
+    @foreach($csiDepts as $csiDIdx => $csiDept)
+    @php
+        $csiCols    = $csiDept['columns'];
+        $csiColCnt  = count($csiCols);
+        $csiPadCols = $csiMaxCols - $csiColCnt;
+        $csiIsFirst = ($csiDIdx === 0);
+    @endphp
+
+    {{-- ── Row A: column sub-headers for this dept ── --}}
+    <tr>
+        <td style="border:1px solid #000; padding:2px 3px;">&nbsp;</td>
+
+        @foreach($csiCols as $csiCol)
+        <td style="border:1px solid #000; padding:2px 4px; text-align:center;
+                   font-weight:bold; font-size:6.5pt; vertical-align:bottom;
+                   word-wrap:break-word; white-space:normal;">
+            {{ $csiCol['name'] }}
+        </td>
+        @endforeach
+
+        @for ($csiP = 0; $csiP < $csiPadCols; $csiP++)
+        <td style="border:1px solid #000; padding:2px 3px;">&nbsp;</td>
+        @endfor
+
+        <td style="border:1px solid #000; padding:2px 4px; text-align:center;
+                   font-weight:bold; font-size:6.5pt; vertical-align:bottom;">
+            @if($csiIsFirst) Total @endif
+        </td>
+    </tr>
+
+    {{-- ── Row B: dept name + amounts ── --}}
+    <tr>
+        <td style="border:1px solid #000; padding:3px 5px; font-weight:bold;
+                   text-align:center; vertical-align:middle;
+                   word-wrap:break-word; white-space:normal;">
+            {{ $csiDept['dept_name'] }}
+        </td>
+
+        @foreach($csiCols as $csiColIdx => $csiCol)
+        <td style="border:1px solid #000; padding:2px 5px; text-align:right;
+                   vertical-align:middle;">
+            {{-- First amount cell gets peso sign, rest are plain numbers --}}
+            @if($csiColIdx === 0)
+                {!! $csiPeso((float)$csiCol['amount']) !!}
+            @else
+                {!! $csiNum((float)$csiCol['amount']) !!}
+            @endif
+        </td>
+        @endforeach
+
+        @for ($csiP = 0; $csiP < $csiPadCols; $csiP++)
+        <td style="border:1px solid #000; padding:2px 5px; text-align:center;
+                   vertical-align:middle;">-</td>
+        @endfor
+
+        {{-- Total cell always gets peso sign --}}
+        <td style="border:1px solid #000; padding:2px 6px; text-align:right;
+                   font-weight:bold; vertical-align:middle;">
+            {!! $csiPesoA((float)$csiDept['total']) !!}
+        </td>
+    </tr>
+
+    @endforeach {{-- depts --}}
+
+    {{-- ── Grand Total row ── --}}
+    <tr>
+        <td colspan="{{ $csiMaxCols + 1 }}"
+            style="border:1px solid #000; text-align:right; font-weight:bold;
+                   padding:4px 8px; font-size:7.5pt;">
+            Grand Total
+        </td>
+        <td style="border:1px solid #000; text-align:right; font-weight:bold;
+                   padding:4px 6px; font-size:7.5pt;">
+            {!! $csiPesoA((float)$csiGrand) !!}
+        </td>
+    </tr>
+
+    </tbody>
+</table>
+
+
+{{-- Signature block — 3 signatories in one line, Approved centered below --}}
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+  <tr>
+    <td style="border:1px solid #000;border-bottom:none;border-top:none;padding:4px 6px 2px 6px;">
+      <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+        <tr>
+          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:4px 6px 6px;">
+            Certified Correct : Local Finance Committee
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:34%;padding:4px 6px 6px;">
+            &nbsp;
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:4px 0 6px 6px;">
+            &nbsp;
+          </td>
+        </tr>
+        <tr>
+          <td style="border:none;text-align:center;vertical-align:top;padding:0 6px 6px;">
+            <span class="sig-name">{{ $signatories['treasurer']['name'] ?? '' }}</span>
+            <span class="sig-title">{{ $signatories['treasurer']['title'] ?? '' }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;padding:0 6px 6px;">
+            <span class="sig-name">{{ $signatories['budget_officer']['name'] ?? '' }}</span>
+            <span class="sig-title">{{ $signatories['budget_officer']['title'] ?? '' }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;padding:0 0 6px 6px;">
+            <span class="sig-name">{{ $signatories['mpdc']['name'] ?? '' }}</span>
+            <span class="sig-title">{{ $signatories['mpdc']['title'] ?? '' }}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:4px 6px 18px;">
+      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
+      <span class="sig-name">{{ $signatories['mayor']['name'] ?? '' }}</span>
+      <span class="sig-title">{{ $signatories['mayor']['title'] ?? '' }}</span>
+    </td>
+  </tr>
+</table>
+
+</div>{{-- end .page --}}
+
 @endif {{-- end mode dispatch --}}
+
 
 </div>{{-- end .wrap --}}
 </body>

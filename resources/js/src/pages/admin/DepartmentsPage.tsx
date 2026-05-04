@@ -883,19 +883,30 @@ const DepartmentsPage: React.FC = () => {
       if (form.special_provisions) fd.append("special_provisions", form.special_provisions);
       if (logoFileRef.current)     fd.append("logo",               logoFileRef.current);
 
-      const token = localStorage.getItem("token");
-      const url   = editingDept ? `/api/departments/${editingDept.dept_id}` : "/api/departments";
-      if (editingDept) fd.append("_method", "PUT");
+    //   const token = localStorage.getItem("token");
+    //   const url   = editingDept ? `/api/departments/${editingDept.dept_id}` : "/api/departments";
+    //   if (editingDept) fd.append("_method", "PUT");
 
-      const res = await fetch(url, {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        body:    fd,
-      });
+    //   const res = await fetch(url, {
+    //     method:  "POST",
+    //     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    //     body:    fd,
+    //   });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message ?? "Request failed");
+    //   if (!res.ok) {
+    //     const err = await res.json();
+    //     throw new Error(err.message ?? "Request failed");
+    //   }
+
+    if (editingDept) {
+        fd.append("_method", "PUT");
+        await API.post(`/departments/${editingDept.dept_id}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        await API.post(`/departments`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
 
       toast.success(editingDept ? "Department updated." : "Department created.");

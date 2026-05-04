@@ -92,17 +92,9 @@ const DepartmentSettings: React.FC = () => {
       fd.append("special_provisions", specialProvisions);
       if (logoFileRef.current) fd.append("logo", logoFileRef.current);
 
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/departments/${dept.dept_id}`, {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        body:    fd,
+      await API.post(`/departments/${dept.dept_id}?_method=PUT`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message ?? "Update failed");
-      }
 
       toast.success("Department updated successfully.");
       logoFileRef.current = null;

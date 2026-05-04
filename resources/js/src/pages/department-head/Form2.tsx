@@ -423,12 +423,10 @@ const Form2: React.FC<Form2Props> = ({
             });
         });
 
+        // Items already in the current (2027) plan
         const merged: ItemWithMeta[] = plan.items.map((planItem) => {
             const past = pastData.get(planItem.expense_item_id) ?? {
-                total: 0,
-                sem1: 0,
-                sem2: 0,
-                itemId: 0,
+                total: 0, sem1: 0, sem2: 0, itemId: 0,
             };
             const obl = obligationData.get(planItem.expense_item_id);
             return {
@@ -442,6 +440,31 @@ const Form2: React.FC<Form2Props> = ({
                 pastItemId: past.itemId || undefined,
                 recommendation: (planItem as any).recommendation ?? null,
             };
+        });
+
+        // Past year items that are NOT yet in the current plan — show with 0 proposed
+        const currentExpenseItemIds = new Set(plan.items.map((i) => i.expense_item_id));
+        pastYearPlan?.items.forEach((pastItem) => {
+            if (currentExpenseItemIds.has(pastItem.expense_item_id)) return;
+            if ((Number(pastItem.total_amount) || 0) === 0) return; // skip zero-amount past items
+            const obl = obligationData.get(pastItem.expense_item_id);
+            merged.push({
+                dept_bp_form2_item_id: 0,
+                dept_budget_plan_id: plan.dept_budget_plan_id,
+                expense_item_id: pastItem.expense_item_id,
+                total_amount: 0,
+                sem1_amount: 0,
+                sem2_amount: 0,
+                expense_item: expenseItemMap.get(pastItem.expense_item_id),
+                pastTotal: Number(pastItem.total_amount) || 0,
+                pastSem1: Number((pastItem as any).sem1_amount) || 0,
+                pastSem2: Number((pastItem as any).sem2_amount) || 0,
+                pastObligation: obl?.amount ?? 0,
+                pastObligationItemId: obl?.itemId,
+                pastItemId: pastItem.dept_bp_form2_item_id || undefined,
+                recommendation: null,
+            } as ItemWithMeta);
+        
         });
 
         setItems(merged);

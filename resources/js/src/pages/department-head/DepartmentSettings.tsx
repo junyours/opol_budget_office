@@ -85,16 +85,13 @@ const DepartmentSettings: React.FC = () => {
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("_method",            "PUT");
       fd.append("dept_name",          dept.dept_name);
       fd.append("dept_category_id",   dept.dept_category_id?.toString() ?? "");
       fd.append("mandate",            mandate);
       fd.append("special_provisions", specialProvisions);
       if (logoFileRef.current) fd.append("logo", logoFileRef.current);
 
-      await API.post(`/departments/${dept.dept_id}?_method=PUT`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await API.put(`/departments/${dept.dept_id}`, fd);
 
       toast.success("Department updated successfully.");
       logoFileRef.current = null;

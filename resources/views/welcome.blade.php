@@ -5,7 +5,7 @@
     <title>Municipal Budget Office</title>
 
     <!-- Add favicon links -->
-    <link rel="icon" type="image/png" href="/opol.png" />
+    <link rel="icon" type="image/png" href="/images/opol.png" />
     <link rel="shortcut icon" href="/images/opol.png" type="image/x-icon" />
 
     @viteReactRefresh

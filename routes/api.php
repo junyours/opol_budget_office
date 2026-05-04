@@ -58,6 +58,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::apiResource('users',                     UserController::class);
     Route::apiResource('department-categories',     DepartmentCategoryController::class);
     Route::apiResource('departments',               DepartmentController::class);
+    Route::post('departments/{department}/upload',  [DepartmentController::class, 'update']);
+
     Route::apiResource('expense-classifications',   ExpenseClassificationController::class);
     Route::apiResource('expense-class-items',       ExpenseClassItemController::class);
 

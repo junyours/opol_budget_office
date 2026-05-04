@@ -508,16 +508,19 @@ const Form2: React.FC<Form2Props> = ({
     const getDraftValue = useCallback(
         (id: number, field: DraftField, raw: number) => {
             const key = `${id}_${field}`;
-            return inputDraft.has(key) ? inputDraft.get(key)! : comma(raw);
+            if (inputDraft.has(key)) return inputDraft.get(key)!;
+            if (field === "obligation") return raw === 0 ? "" : raw.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return comma(raw);
         },
         [inputDraft],
     );
 
     const setDraft = useCallback((key: string, digits: string) => {
+        const isDecimalKey = !key.startsWith("aip_") && key.endsWith("_obligation");
         setInputDraft((prev) =>
             new Map(prev).set(
                 key,
-                digits === "" ? "" : Number(digits).toLocaleString("en-US"),
+                digits === "" ? "" : isDecimalKey ? digits : Number(digits).toLocaleString("en-US"),
             ),
         );
     }, []);
@@ -530,10 +533,15 @@ const Form2: React.FC<Form2Props> = ({
         });
     }, []);
 
+    // const parseDigits = (rawValue: string): number => {
+    //     const digits = rawValue.replace(/[^0-9]/g, "");
+    //     return digits === "" ? 0 : parseInt(digits, 10);
+    // };
+
     const parseDigits = (rawValue: string): number => {
-        const digits = rawValue.replace(/[^0-9]/g, "");
-        return digits === "" ? 0 : parseInt(digits, 10);
-    };
+    const digits = rawValue.replace(/[^0-9.]/g, "");
+    return digits === "" ? 0 : parseFloat(digits);
+};
 
     // ── Handlers: proposed amount ─────────────────────────────────────────────
 
@@ -1183,9 +1191,12 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleCommaInput = useCallback(
         (id: number, field: DraftField, rawValue: string) => {
-            const digits = rawValue.replace(/[^0-9]/g, "");
+            const isDecimalField = field === "obligation";
+            const digits = isDecimalField
+                ? rawValue.replace(/[^0-9.]/g, "")
+                : rawValue.replace(/[^0-9]/g, "");
             setDraft(`${id}_${field}`, digits);
-            const num = digits === "" ? 0 : parseInt(digits, 10);
+            const num = digits === "" ? 0 : isDecimalField ? parseFloat(digits) : parseInt(digits, 10);
             if (field === "proposed")
                 setItems((prev) =>
                     prev.map((i) =>

@@ -900,7 +900,8 @@ const DepartmentsPage: React.FC = () => {
     //   }
 
     if (editingDept) {
-        await API.put(`/departments/${editingDept.dept_id}`, fd);
+        fd.append("_method", "PUT");
+        await API.post(`/departments/${editingDept.dept_id}/upload`, fd);
       } else {
         await API.post(`/departments`, fd);
       }

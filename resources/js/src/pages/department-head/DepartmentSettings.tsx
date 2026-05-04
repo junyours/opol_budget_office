@@ -46,6 +46,7 @@ const DepartmentSettings: React.FC = () => {
   const fileInputRef                              = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting]               = useState(false);
   const [dirty, setDirty]                         = useState(false);
+  const [logoVersion, setLogoVersion]             = useState(() => Date.now());
 
   useEffect(() => {
     const deptId = (user as any)?.dept_id;
@@ -63,7 +64,7 @@ const DepartmentSettings: React.FC = () => {
       setMandate(found?.mandate ?? "");
       setSpecialProvisions(found?.special_provisions ?? "");
     //   setLogoPreview(found?.logo ? `/storage/${found.logo}` : null);
-        setLogoPreview(found?.logo ? `/storage/${found.logo}?t=${Date.now()}` : null);
+        setLogoPreview(found?.logo ? `/storage/${found.logo}?t=${logoVersion}` : null);
 } catch {
       toast.error("Failed to load department details.");
     } finally {
@@ -98,6 +99,7 @@ const DepartmentSettings: React.FC = () => {
       logoFileRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
       setDirty(false);
+      setLogoVersion(Date.now());
       fetchDepartment(dept.dept_id);
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update department.");

@@ -729,6 +729,7 @@ const DepartmentsPage: React.FC = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef                   = useRef<File | null>(null);
   const [submitting, setSubmitting]   = useState(false);
+  const [logoVersion, setLogoVersion] = useState(() => Date.now());
 
   // ── Delete confirm ────────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
@@ -906,6 +907,7 @@ const DepartmentsPage: React.FC = () => {
 
       toast.success(editingDept ? "Department updated." : "Department created.");
       setModalOpen(false);
+      setLogoVersion(Date.now());
       fetchDepartments();
     } catch (err: any) {
       toast.error(err.message ?? "Operation failed.");
@@ -1085,7 +1087,7 @@ const DepartmentsPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <Avatar className="h-8 w-8 rounded-lg border border-gray-100">
                         {/* <AvatarImage src={dept.logo ? `/storage/${dept.logo}` : undefined} alt={dept.dept_name} /> */}
-                        <AvatarImage src={dept.logo ? `/storage/${dept.logo}?t=${Date.now()}` : undefined} alt={dept.dept_name} />
+                        <AvatarImage src={dept.logo ? `/storage/${dept.logo}?t=${logoVersion}` : undefined} alt={dept.dept_name} />
                         <AvatarFallback className="rounded-lg bg-gray-100 text-gray-600 text-[10px] font-semibold">
                           {getInitials(dept)}
                         </AvatarFallback>

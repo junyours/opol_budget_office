@@ -1084,7 +1084,8 @@ const DepartmentsPage: React.FC = () => {
                   >
                     <td className="px-4 py-3">
                       <Avatar className="h-8 w-8 rounded-lg border border-gray-100">
-                        <AvatarImage src={dept.logo ? `/storage/${dept.logo}` : undefined} alt={dept.dept_name} />
+                        {/* <AvatarImage src={dept.logo ? `/storage/${dept.logo}` : undefined} alt={dept.dept_name} /> */}
+                        <AvatarImage src={dept.logo ? `/storage/${dept.logo}?t=${Date.now()}` : undefined} alt={dept.dept_name} />
                         <AvatarFallback className="rounded-lg bg-gray-100 text-gray-600 text-[10px] font-semibold">
                           {getInitials(dept)}
                         </AvatarFallback>

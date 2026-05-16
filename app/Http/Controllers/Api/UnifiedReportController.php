@@ -98,7 +98,8 @@ class UnifiedReportController extends Controller
             'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
             'department'     => 'required|string',
             'forms'          => 'required|array|min:1',
-            'forms.*'        => 'in:form2,form3,form4',
+            // 'forms.*'        => 'in:form2,form3,form4',
+            'forms.*'        => 'in:form2,form2a,form3,form4',
         ]);
         try {
             $this->clearViewCache();
@@ -1427,7 +1428,8 @@ private function getGfFundTotals(int $budgetPlanId): array
         $request->validate([
             'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
             'forms'          => 'required|array|min:1',
-            'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5,consolidated_sa_income,pscomputation',
+            // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5,consolidated_sa_income,pscomputation',
+            'forms.*' => 'in:form1,form2,form2a,form3,form4,form5,form6,form7,summary,mdf20,calamity5,consolidated_sa_income,pscomputation',
             // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20,calamity5',
             // 'forms.*' => 'in:form1,form2,form3,form4,form5,form6,form7,summary,mdf20',
         ]);
@@ -1446,7 +1448,8 @@ private function getGfFundTotals(int $budgetPlanId): array
                 throw new \RuntimeException('Cannot create ZIP archive.');
             }
 
-            $deptForms = array_values(array_intersect($forms, ['form2', 'form3', 'form4']));
+            // $deptForms = array_values(array_intersect($forms, ['form2', 'form3', 'form4']));
+            $deptForms = array_values(array_intersect($forms, ['form2', 'form2a', 'form3', 'form4']));
 
             // ── Section 1: General Fund ───────────────────────────────────
             $sectionGF = '01_GeneralFund/';
@@ -1829,11 +1832,16 @@ return response()->stream(function () use ($zipPath) {
             // if (in_array('form2', $forms)) $report['form2'] = $this->buildForm2($proposedPlan, $currentPlan, $pastPlan);
             // if (in_array('form3', $forms)) $report['form3'] = $this->buildForm3($proposedPlan, $currentPlan, $currentYear, $proposedYear);
             // if (in_array('form4', $forms)) $report['form4'] = $this->buildForm4($proposedPlan, $dept);
-            if (in_array('form2', $forms)) $report['form2'] = $this->buildForm2($proposedPlan, $currentPlan, $pastPlan);
+            // if (in_array('form2', $forms)) $report['form2'] = $this->buildForm2($proposedPlan, $currentPlan, $pastPlan);
+            // if (in_array('form3', $forms)) $report['form3'] = $this->buildForm3($proposedPlan, $currentPlan, $currentYear, $proposedYear);
+            // if (in_array('form4', $forms)) $report['form4'] = $this->buildForm4($proposedPlan, $dept);
+            if (in_array('form2', $forms) || in_array('form2a', $forms)) $report['form2'] = $this->buildForm2($proposedPlan, $currentPlan, $pastPlan);
             if (in_array('form3', $forms)) $report['form3'] = $this->buildForm3($proposedPlan, $currentPlan, $currentYear, $proposedYear);
             if (in_array('form4', $forms)) $report['form4'] = $this->buildForm4($proposedPlan, $dept);
 
-            if (in_array('form2', $forms) &&
+            // if (in_array('form2', $forms) &&
+            //     strtolower(trim($dept->category?->dept_category_name ?? '')) === 'special accounts') {
+            if ((in_array('form2', $forms) || in_array('form2a', $forms)) &&
                 strtolower(trim($dept->category?->dept_category_name ?? '')) === 'special accounts') {
                 $source = $this->sourceKeyForDept($dept);
                 $report['ldrrmf_2a'] = $this->buildLdrrmfForm2aRows(

@@ -757,17 +757,15 @@ $pastYear     = $dr['past_year'];
 
 
 
-
 {{-- ── FORM 2 ── --}}
-@if(in_array('form2', $forms) && isset($dr['form2']))
+@if((in_array('form2', $forms) || in_array('form2a', $forms)) && isset($dr['form2']))
 @php
 $form2     = $dr['form2'];
 $lgu       = strtoupper($budgetPlan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL');
 
-// ── FIX: strip "OFFICE OF THE " prefix if the dept_name already includes it
-// This prevents "OFFICE OF THE OFFICE OF THE MUNICIPAL MAYOR"
 $rawDeptName = strtoupper($dept->dept_name);
 $deptName    = preg_replace('/^OFFICE\s+OF\s+THE\s+/i', '', $rawDeptName);
+$fullDeptName = $rawDeptName; // preserves full name including "OFFICE OF THE"
 
 $items     = $form2['items'];
 $spItems   = $form2['specialPrograms'];
@@ -802,14 +800,7 @@ $ppProp   = $sumCol($ppItems,   'proposed');
 $capItems = count($ppItems) > 0 ? $ppItems : $coItems;
 $capProp  = count($ppItems) > 0 ? $ppProp  : $coProp;
 
-// ── Form 2 totals — regular items ONLY (no AIP / special programs) ──────
-$grandPast    = $sumCol($items, 'past_total');
-$grandSem1    = $sumCol($items, 'current_sem1');
-$grandSem2    = $sumCol($items, 'current_sem2');
-$grandCurrent = $sumCol($items, 'current_total');
-$grandProp    = $psProp + $mooeProp + $capProp;   // ← AIP intentionally excluded
-
-// ── Form 2A — special program subtotals ─────────────────────────────────
+// ── AIP / Special Program subtotals ─────────────────────────────────────
 $spPast    = $sumCol($spItems, 'past_total');
 $spSem1    = $sumCol($spItems, 'current_sem1');
 $spSem2    = $sumCol($spItems, 'current_sem2');
@@ -832,17 +823,28 @@ if (!empty($dr['ldrrmf_2a'])) {
     }
 }
 
-// ── Form 2A Grand Total = Form 2 totals + AIP subtotals + LDRRMF ────────
-$grandTotalPast    = $grandPast    + $spPast    + $ldrrmfPast;
-$grandTotalSem1    = $grandSem1   + $spSem1    + $ldrrmfSem1;
-$grandTotalSem2    = $grandSem2   + $spSem2    + $ldrrmfSem2;
-$grandTotalCurrent = $grandCurrent + $spCurrent + $ldrrmfCurrent;
-$grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
+// ── Regular items totals (PS + MOOE + Capital) ───────────────────────────
+$regularPast    = $sumCol($items, 'past_total');
+$regularSem1    = $sumCol($items, 'current_sem1');
+$regularSem2    = $sumCol($items, 'current_sem2');
+$regularCurrent = $sumCol($items, 'current_total');
+$regularProp    = $psProp + $mooeProp + $capProp;
+
+// ── Grand Total = regular + AIP + LDRRMF ────────────────────────────────
+$grandTotalPast    = $regularPast    + $spPast    + $ldrrmfPast;
+$grandTotalSem1    = $regularSem1    + $spSem1    + $ldrrmfSem1;
+$grandTotalSem2    = $regularSem2    + $spSem2    + $ldrrmfSem2;
+$grandTotalCurrent = $regularCurrent + $spCurrent + $ldrrmfCurrent;
+$grandTotalProp    = $regularProp    + $spProp    + $ldrrmfProposed;
+
+$showForm2  = in_array('form2',  $forms);
+$showForm2A = in_array('form2a', $forms);
 @endphp
 
 {{-- ════════════════════════════════════════════════════════════════════ --}}
-{{-- FORM 2 PAGE                                                          --}}
+{{-- FORM 2 PAGE — only rendered when form2 is selected                   --}}
 {{-- ════════════════════════════════════════════════════════════════════ --}}
+@if($showForm2)
 <div class="page">
 <div class="form-no">LBP Form No. 2</div>
 <div class="doc-title">
@@ -1016,14 +1018,116 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
     @endforeach
     @endif {{-- /capItems --}}
 
-    {{-- ── Form 2 Total Appropriations — regular items ONLY, NO AIP ───── --}}
+    {{-- ── Special Purpose Appropriations / AIP Programs (inline in Form 2) ── --}}
+    @if(count($spItems) > 0)
+    @php $spC2 = array_chunk($spItems, 30); $spCT2 = count($spC2); @endphp
+    @foreach($spC2 as $spCI2 => $spCK2)
+
+    @if($spCI2 > 0)
+    </tbody></table></div>{{-- end page --}}
+    <div class="page">
+    <table class="data-table" style="width:100%; table-layout:fixed;">
+    <tbody>
+    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations — continued</td></tr>
+    @else
+    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations</td></tr>
+    @endif
+
+    @foreach($spCK2 as $spRIdx2 => $sp)
+    @php
+    $fmt2sp = ($spCI2 === 0 && $spRIdx2 === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    @endphp
+    <tr>
+        <td class="l">{{ $sp['aip_reference_code'] ?? '' }} {{ $sp['program_description'] }}</td>
+        <td class="c">1000-1-03-{{ $loop->iteration < 10 ? '00'.$loop->iteration : '0'.$loop->iteration }}</td>
+        <td class="r">{!! $sp['past_total']    > 0 ? $fmt2sp($sp['past_total'])    : '' !!}</td>
+        <td class="r">{!! $sp['current_sem1']  > 0 ? $fmt2sp($sp['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_sem2']  > 0 ? $fmt2sp($sp['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_total'] > 0 ? $fmt2sp($sp['current_total']) : '' !!}</td>
+        <td class="r">{!! $sp['proposed']      > 0 ? $fmt2sp($sp['proposed'])      : '' !!}</td>
+    </tr>
+    @endforeach
+
+    @if($spCI2 === $spCT2 - 1)
+    <tr class="subtotal">
+        <td colspan="2" class="l">Total Special Purpose Appropriations</td>
+        <td class="r">{!! $pesoA($spPast)    !!}</td>
+        <td class="r">{!! $pesoA($spSem1)    !!}</td>
+        <td class="r">{!! $pesoA($spSem2)    !!}</td>
+        <td class="r">{!! $pesoA($spCurrent) !!}</td>
+        <td class="r">{!! $pesoA($spProp)    !!}</td>
+    </tr>
+    @endif
+    @endforeach
+    @endif {{-- /spItems in form2 --}}
+
+    {{-- ── LDRRMF inline in Form 2 (for SA depts) ────────────────────── --}}
+    @if(!empty($dr['ldrrmf_2a']))
+    @php
+        $ldrrmfRows2a = $dr['ldrrmf_2a'];
+        $qrfRow       = collect($ldrrmfRows2a)->firstWhere('kind', 'qrf');
+        $prepRows     = collect($ldrrmfRows2a)->where('kind', 'preparedness')->values();
+        $prepSubtotal = $prepRows->sum('proposed');
+        $qrfAmount    = (float) ($qrfRow['proposed'] ?? 0);
+        $ldrrmfTotal  = $qrfAmount + $prepSubtotal;
+    @endphp
+    <tr class="sec-hdr">
+        <td colspan="7">NON-OFFICE : 5% Local Disaster Risk Reduction Management Fund (LDRRMF)</td>
+    </tr>
+
+    @if($qrfRow)
+    <tr>
+        <td class="l"><strong>30% Quick Response Fund (QRF)</strong> — {{ $qrfRow['note'] ?? 'QRF — Standby Trust Fund' }}</td>
+        <td class="c">{{ $qrfRow['account_code'] ?? '9000-2-01-001' }}</td>
+        <td class="r">{!! $qrfRow['past_total']    > 0 ? $pesoA($qrfRow['past_total'])    : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_sem1']  > 0 ? $pesoA($qrfRow['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_sem2']  > 0 ? $pesoA($qrfRow['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_total'] > 0 ? $pesoA($qrfRow['current_total']) : '' !!}</td>
+        <td class="r">{!! $qrfAmount > 0 ? $pesoA($qrfAmount) : '' !!}</td>
+    </tr>
+    @endif
+
+    @if($prepRows->count() > 0)
+    <tr>
+        <td class="l"><strong>70% Pre-Disaster Activities (JMC 2013-1, R.A. 10121)</strong></td>
+        <td class="c"></td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+    </tr>
+    @foreach($prepRows as $prepRow)
+    <tr>
+        <td class="l" style="padding-left:14pt;">· {{ $prepRow['description'] }}</td>
+        <td class="c">{{ $prepRow['account_code'] ?? '' }}</td>
+        <td class="r">{!! $prepRow['past_total']    > 0 ? number_format((float)$prepRow['past_total'],    0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem1']  > 0 ? number_format((float)$prepRow['current_sem1'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem2']  > 0 ? number_format((float)$prepRow['current_sem2'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_total'] > 0 ? number_format((float)$prepRow['current_total'], 0) : '' !!}</td>
+        <td class="r">{!! $prepRow['proposed']      > 0 ? number_format((float)$prepRow['proposed'],      0) : '' !!}</td>
+    </tr>
+    @endforeach
+    <tr class="subtotal">
+        <td colspan="2" class="l">Total 70% Pre-Disaster Preparedness</td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+        <td class="r">{!! $pesoA($prepSubtotal) !!}</td>
+    </tr>
+    @endif
+
+    <tr class="subtotal">
+        <td colspan="2" class="l">Total 5% LDRRMF</td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+        <td class="r">{!! $pesoA($ldrrmfTotal) !!}</td>
+    </tr>
+    @endif {{-- /ldrrmf inline --}}
+
+    {{-- ── Form 2 Grand Total (ALL items: regular + AIP + LDRRMF) ────── --}}
     <tr class="grand-total">
-        <td colspan="2" class="l">Total Appropriations — OFFICE OF THE {{ $deptName }}</td>
-        <td class="r">{!! $pesoA($grandPast)    !!}</td>
-        <td class="r">{!! $pesoA($grandSem1)    !!}</td>
-        <td class="r">{!! $pesoA($grandSem2)    !!}</td>
-        <td class="r">{!! $pesoA($grandCurrent) !!}</td>
-        <td class="r">{!! $pesoA($grandProp)    !!}</td>
+        <td colspan="2" class="l">GRAND TOTAL FOR {{ $fullDeptName }}</td>
+        <td class="r">{!! $pesoA($grandTotalPast)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalSem1)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalSem2)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalCurrent) !!}</td>
+        <td class="r">{!! $pesoA($grandTotalProp)    !!}</td>
     </tr>
 
     </tbody>
@@ -1050,15 +1154,17 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
   </tr>
 </table>
 </div>{{-- /Form 2 page --}}
+@endif {{-- /showForm2 --}}
 
 {{-- ════════════════════════════════════════════════════════════════════ --}}
-{{-- FORM 2A — Special Purpose Appropriations / Programs                  --}}
+{{-- FORM 2A — Standalone Special Purpose Appropriations                   --}}
+{{-- Only rendered when form2a checkbox is selected                       --}}
 {{-- ════════════════════════════════════════════════════════════════════ --}}
-@if(count($spItems) > 0 || !empty($dr['ldrrmf_2a']))
+@if($showForm2A && (count($spItems) > 0 || !empty($dr['ldrrmf_2a'])))
 <div class="page">
 <div class="form-no">LBP Form No. 2A</div>
 <div class="doc-title">
-    Programmed Appropriation and Obligation by Object of Expenditures<br>
+    Programmed Appropriation Special Purpose Appropriations<br>
     LGU : <u>{{ $lgu }}</u>
 </div>
 <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
@@ -1066,13 +1172,13 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
 <table class="data-table" style="width:100%; table-layout:fixed;">
     <thead>
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:11%;padding:0;border:none;"></td>
             <td style="width:13%;padding:0;border:none;"></td>
-            <td style="width:13%;padding:0;border:none;"></td>
-            <td style="width:26%;padding:0;border:none;"></td>
+            <td style="width:25%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:9%;padding:0;border:none;"></td>
-            <td style="width:9%;padding:0;border:none;"></td>
-            <td style="width:9%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
@@ -1116,7 +1222,7 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
     </tr>
     @endforeach
     <tr class="subtotal">
-        <td colspan="3" class="l">Sub-Total Special Purpose Appropriations</td>
+        <td colspan="3" class="l">Total Special Purpose Appropriations</td>
         <td class="r">{!! $pesoA($spPast)    !!}</td>
         <td class="r">{!! $pesoA($spSem1)    !!}</td>
         <td class="r">{!! $pesoA($spSem2)    !!}</td>
@@ -1128,87 +1234,67 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
     {{-- ── LDRRMF Section ──────────────────────────────────────────────── --}}
     @if(!empty($dr['ldrrmf_2a']))
     @php
-        $ldrrmfRows2a = $dr['ldrrmf_2a'];
-        $qrfRow       = collect($ldrrmfRows2a)->firstWhere('kind', 'qrf');
-        $prepRows     = collect($ldrrmfRows2a)->where('kind', 'preparedness')->values();
-        $prepSubtotal = $prepRows->sum('proposed');
-        $qrfAmount    = (float) ($qrfRow['proposed'] ?? 0);
-        $ldrrmfTotal  = $qrfAmount + $prepSubtotal;
+        $ldrrmfRows2aB = $dr['ldrrmf_2a'];
+        $qrfRowB       = collect($ldrrmfRows2aB)->firstWhere('kind', 'qrf');
+        $prepRowsB     = collect($ldrrmfRows2aB)->where('kind', 'preparedness')->values();
+        $prepSubtotalB = $prepRowsB->sum('proposed');
+        $qrfAmountB    = (float) ($qrfRowB['proposed'] ?? 0);
+        $ldrrmfTotalB  = $qrfAmountB + $prepSubtotalB;
     @endphp
     <tr class="sec-hdr">
         <td colspan="8">NON-OFFICE : 5% Local Disaster Risk Reduction Management Fund (LDRRMF)</td>
     </tr>
 
-    @if($qrfRow)
+    @if($qrfRowB)
     <tr>
-        <td class="c">{{ $qrfRow['account_code'] ?? '9000-2-01-001' }}</td>
-        <td class="c">{{ $qrfRow['sector'] ?? 'General Public Services' }}</td>
+        <td class="c">{{ $qrfRowB['account_code'] ?? '9000-2-01-001' }}</td>
+        <td class="c">{{ $qrfRowB['sector'] ?? 'General Public Services' }}</td>
         <td class="l">
             <strong>30% Quick Response Fund (QRF)</strong>
-            — {{ $qrfRow['note'] ?? 'QRF — Standby Trust Fund' }}
+            — {{ $qrfRowB['note'] ?? 'QRF — Standby Trust Fund' }}
         </td>
-        <td class="r">{!! $qrfRow['past_total']    > 0 ? $pesoA($qrfRow['past_total'])    : '' !!}</td>
-        <td class="r">{!! $qrfRow['current_sem1']  > 0 ? $pesoA($qrfRow['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $qrfRow['current_sem2']  > 0 ? $pesoA($qrfRow['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $qrfRow['current_total'] > 0 ? $pesoA($qrfRow['current_total']) : '' !!}</td>
-        <td class="r">{!! $qrfAmount > 0 ? $pesoA($qrfAmount) : '' !!}</td>
+        <td class="r">{!! $qrfRowB['past_total']    > 0 ? $pesoA($qrfRowB['past_total'])    : '' !!}</td>
+        <td class="r">{!! $qrfRowB['current_sem1']  > 0 ? $pesoA($qrfRowB['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $qrfRowB['current_sem2']  > 0 ? $pesoA($qrfRowB['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $qrfRowB['current_total'] > 0 ? $pesoA($qrfRowB['current_total']) : '' !!}</td>
+        <td class="r">{!! $qrfAmountB > 0 ? $pesoA($qrfAmountB) : '' !!}</td>
     </tr>
     @endif
 
-    @if($prepRows->count() > 0)
+    @if($prepRowsB->count() > 0)
     <tr>
         <td class="c"></td>
         <td class="c"></td>
         <td class="l">
             <strong>70% Pre-Disaster Activities (JMC 2013-1, R.A. 10121)</strong>
         </td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
     </tr>
-    @foreach($prepRows as $prepRow)
+    @foreach($prepRowsB as $prepRowB)
     <tr>
-        <td class="c">{{ $prepRow['account_code'] ?? '' }}</td>
-        <td class="c">{{ $prepRow['sector'] ?? '' }}</td>
-        <td class="l" style="padding-left:14pt;">· {{ $prepRow['description'] }}</td>
-        <td class="r">{!! $prepRow['past_total']    > 0 ? number_format((float)$prepRow['past_total'],    0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_sem1']  > 0 ? number_format((float)$prepRow['current_sem1'],  0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_sem2']  > 0 ? number_format((float)$prepRow['current_sem2'],  0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_total'] > 0 ? number_format((float)$prepRow['current_total'], 0) : '' !!}</td>
-        <td class="r">{!! $prepRow['proposed']      > 0 ? number_format((float)$prepRow['proposed'],      0) : '' !!}</td>
+        <td class="c">{{ $prepRowB['account_code'] ?? '' }}</td>
+        <td class="c">{{ $prepRowB['sector'] ?? '' }}</td>
+        <td class="l" style="padding-left:14pt;">· {{ $prepRowB['description'] }}</td>
+        <td class="r">{!! $prepRowB['past_total']    > 0 ? number_format((float)$prepRowB['past_total'],    0) : '' !!}</td>
+        <td class="r">{!! $prepRowB['current_sem1']  > 0 ? number_format((float)$prepRowB['current_sem1'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRowB['current_sem2']  > 0 ? number_format((float)$prepRowB['current_sem2'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRowB['current_total'] > 0 ? number_format((float)$prepRowB['current_total'], 0) : '' !!}</td>
+        <td class="r">{!! $prepRowB['proposed']      > 0 ? number_format((float)$prepRowB['proposed'],      0) : '' !!}</td>
     </tr>
     @endforeach
     <tr class="subtotal">
         <td colspan="3" class="l">Total 70% Pre-Disaster Preparedness</td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r">{!! $pesoA($prepSubtotal) !!}</td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+        <td class="r">{!! $pesoA($prepSubtotalB) !!}</td>
     </tr>
     @endif
 
     <tr class="subtotal">
         <td colspan="3" class="l">Total 5% LDRRMF</td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r">{!! $pesoA($ldrrmfTotal) !!}</td>
+        <td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+        <td class="r">{!! $pesoA($ldrrmfTotalB) !!}</td>
     </tr>
     @endif {{-- /ldrrmf_2a --}}
-
-    {{-- ── Form 2A Grand Total = Form 2 + AIP + LDRRMF ────────────────── --}}
-    <tr class="grand-total">
-        <td colspan="3" class="l">GRAND TOTAL FOR OFFICE OF THE {{ $deptName }}</td>
-        <td class="r">{!! $pesoA($grandTotalPast)    !!}</td>
-        <td class="r">{!! $pesoA($grandTotalSem1)    !!}</td>
-        <td class="r">{!! $pesoA($grandTotalSem2)    !!}</td>
-        <td class="r">{!! $pesoA($grandTotalCurrent) !!}</td>
-        <td class="r">{!! $pesoA($grandTotalProp)    !!}</td>
-    </tr>
 
     </tbody>
 </table>
@@ -1234,9 +1320,12 @@ $grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
   </tr>
 </table>
 </div>{{-- /Form 2A page --}}
-@endif {{-- /form2A --}}
+@endif {{-- /showForm2A --}}
 
-@endif {{-- /form2 --}}
+@endif {{-- /form2 or form2a --}}
+
+
+
 
 {{-- ── FORM 3 ── --}}
 @if(in_array('form3', $forms) && isset($dr['form3']))

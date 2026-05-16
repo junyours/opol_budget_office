@@ -22,13 +22,26 @@ import { Input } from '@/src/components/ui/input';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
+// import {
+//   MagnifyingGlassIcon,
+//   CheckCircleIcon,
+//   ArrowUturnLeftIcon,
+// } from '@heroicons/react/24/outline';
 import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ArrowUturnLeftIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ExclamationTriangleIcon,
+  MinusIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
+
+// import { useNotifications } from '@/src/hooks/useNotifications';
+import { useNotificationStore } from '@/src/store/useNotificationStore';
+
 import { refreshSubmittedCount } from "@/src/hooks/useSubmittedPlanCount";
 
 // ─── Panel entrance animation ─────────────────────────────────────────────────
@@ -49,6 +62,182 @@ function ensurePanelAnim() {
   document.head.appendChild(el);
   _panelAnimInjected = true;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const fmt   = (n: number) => Math.round(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+const fmtP  = (n: number) => `₱${fmt(n)}`;
+const pctOf = (base: number, diff: number) =>
+  base === 0 ? (diff === 0 ? 0 : 100) : (diff / base) * 100;
+
+// ─── Budget Comparison Banner ─────────────────────────────────────────────────
+
+// ─── Budget Comparison Banner ─────────────────────────────────────────────────
+
+interface BudgetComparisonBannerProps {
+  plan:         DepartmentBudgetPlan;
+  pastYearPlan: DepartmentBudgetPlan | null;
+}
+
+const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+  const [pastAipTotal,    setPastAipTotal]    = useState(0);
+  const [currentAipTotal, setCurrentAipTotal] = useState(0);
+  const [aipLoading,      setAipLoading]      = useState(true);
+
+  useEffect(() => {
+    setAipLoading(true);
+    const currentReq = API.get('/form4-items', {
+      params: { budget_plan_id: plan.dept_budget_plan_id },
+    });
+    const pastReq = pastYearPlan
+      ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
+      : Promise.resolve({ data: { data: [] as any[] } });
+
+    Promise.all([currentReq, pastReq])
+      .then(([curRes, pastRes]) => {
+        const curItems:  any[] = curRes.data.data  ?? [];
+        const pastItems: any[] = pastRes.data.data ?? [];
+        setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
+        setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
+      })
+      .catch(console.error)
+      .finally(() => setAipLoading(false));
+  }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
+
+  const pastForm2Total = useMemo(
+    () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+    [pastYearPlan],
+  );
+  const currentForm2Total = useMemo(
+    () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+    [plan.items],
+  );
+
+  const pastTotal    = pastForm2Total    + pastAipTotal;
+  const currentTotal = currentForm2Total + currentAipTotal;
+  const diff         = currentTotal - pastTotal;
+  const diffPct      = pctOf(pastTotal, diff);
+  const threshold    = pastTotal * 1.1;
+  const isOver       = currentTotal > threshold;
+  const prevYear     = Number(plan.budget_plan?.year) - 1;
+  const currYear     = plan.budget_plan?.year;
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+
+      {/* ── Appropriation card (blue) ── */}
+      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400">
+          Appropriation {prevYear}
+        </span>
+        {aipLoading ? (
+          <span className="h-5 w-28 rounded bg-blue-100 animate-pulse" />
+        ) : pastTotal === 0 ? (
+          <span className="text-[14px] font-semibold text-blue-400">No data</span>
+        ) : (
+          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-blue-700">
+            {fmtP(pastTotal)}
+          </span>
+        )}
+        <span className="text-[11px] text-blue-300">Prior year</span>
+      </div>
+
+      {/* Arrow */}
+      <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
+
+      {/* ── Proposed card (orange or red if over) ── */}
+      <div className={cn(
+        'flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border',
+        isOver
+          ? 'bg-red-50 border-red-200'
+          : 'bg-orange-50 border-orange-200',
+      )}>
+        <span className={cn(
+          'text-[10px] font-semibold uppercase tracking-widest',
+          isOver ? 'text-red-400' : 'text-orange-400',
+        )}>
+          Proposed {currYear}
+        </span>
+        {aipLoading ? (
+          <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
+        ) : (
+          <span className={cn(
+            'text-[18px] font-bold font-mono tabular-nums leading-tight',
+            isOver ? 'text-red-700' : 'text-orange-700',
+          )}>
+            {fmtP(currentTotal)}
+          </span>
+        )}
+        <span className={cn(
+          'text-[11px]',
+          isOver ? 'text-red-300' : 'text-orange-300',
+        )}>
+          Current proposal
+        </span>
+      </div>
+
+      {/* ── Inc / Dec chip ── */}
+      {!aipLoading && pastTotal > 0 && (
+        <div className={cn(
+          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium flex-shrink-0 border',
+          isOver        ? 'bg-red-50 border-red-200 text-red-600'
+          : diff > 0    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+          : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
+          :               'bg-gray-100 border-gray-200 text-gray-500',
+        )}>
+          {diff > 0
+            ? <ArrowTrendingUpIcon   className="w-3.5 h-3.5" />
+            : diff < 0
+            ? <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
+            : <MinusIcon            className="w-3.5 h-3.5" />
+          }
+          <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
+          <span className="opacity-60">
+            ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+          </span>
+        </div>
+      )}
+
+      <div className="flex-1" />
+
+      {/* ── Status message ── */}
+      {!aipLoading && (
+        <div className="flex items-start gap-2 flex-shrink-0">
+          {isOver ? (
+            <>
+              <ExclamationTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[12px] font-medium text-red-600">
+                  Exceeds 10% ceiling
+                </span>
+                <span className="text-[11px] text-gray-400">
+                  Max allowed:{' '}
+                  <span className="font-mono font-medium text-red-500">{fmtP(threshold)}</span>
+                </span>
+              </div>
+            </>
+          ) : pastTotal === 0 ? (
+            <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
+          ) : (
+            <>
+              <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[12px] font-medium text-emerald-600">
+                  Within 10% ceiling
+                </span>
+                <span className="text-[11px] text-gray-400">
+                  Max allowed:{' '}
+                  <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; badge: string; dot: string; activeBadge: string }> = {
@@ -155,6 +344,9 @@ const LBPForms: React.FC = () => {
   useEffect(() => { ensurePanelAnim(); }, []);
   const { user } = useAuth();
     const location = useLocation();
+    // const { notifications, markRead } = useNotifications();
+    const notifications = useNotificationStore(s => s.notifications);
+  const markRead      = useNotificationStore(s => s.markRead);
   const isAdmin = user?.role === 'admin';
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
@@ -217,6 +409,17 @@ const LBPForms: React.FC = () => {
 
   const locationState = location.state as { deptId?: number } | null;
 
+    // useEffect(() => {
+    // const incoming = locationState?.deptId;
+    // if (!incoming || !deptPlans.length) return;
+    // const match = deptPlans.find(p => p.dept_id === incoming);
+    // if (match) {
+    //     setSelectedPlanId(match.dept_budget_plan_id);
+    //     setPanelKey(k => k + 1);
+    //     window.history.replaceState({}, '');
+    // }
+    // }, [deptPlans, locationState?.deptId]);
+
     useEffect(() => {
     const incoming = locationState?.deptId;
     if (!incoming || !deptPlans.length) return;
@@ -224,6 +427,7 @@ const LBPForms: React.FC = () => {
     if (match) {
         setSelectedPlanId(match.dept_budget_plan_id);
         setPanelKey(k => k + 1);
+        markDeptNotificationsRead(incoming); // ← only this line added
         window.history.replaceState({}, '');
     }
     }, [deptPlans, locationState?.deptId]);
@@ -259,11 +463,25 @@ const LBPForms: React.FC = () => {
     fetchPastPlans(selectedPlan.dept_id);
   }, [selectedPlanId]); // intentionally only on selectedPlanId to avoid loop
 
-  const handleSelectPlan = (id: number) => {
+//   const handleSelectPlan = (id: number) => {
+//     if (id === selectedPlanId) return;
+//     setSelectedPlanId(id);
+//     setPanelKey(k => k + 1);
+//   };
+
+const markDeptNotificationsRead = useCallback((deptId: number) => {
+    notifications
+        .filter(n => n.dept_id === deptId)
+        .forEach(n => markRead(n.id));
+}, [notifications, markRead]);
+
+const handleSelectPlan = (id: number) => {
     if (id === selectedPlanId) return;
     setSelectedPlanId(id);
     setPanelKey(k => k + 1);
-  };
+    const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
+    if (plan) markDeptNotificationsRead(plan.dept_id);
+};
 
   // ── Called by Form2 when an item is saved ─────────────────────────────────
   // Refreshes BOTH the past year plans (so obligation amounts reappear)
@@ -659,8 +877,16 @@ const filteredPlans = useMemo(() => {
                   <Skeleton className="h-10 w-72 rounded-lg" />
                   <Skeleton className="h-64 w-full rounded-xl" />
                 </div>
-              ) : (
-                <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
+            //   ) : (
+            //     <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
+            ) : (
+                <>
+                  <BudgetComparisonBanner
+                    plan={selectedPlan}
+                    pastYearPlan={pastYearPlan}
+                  />
+
+                  <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
                   <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 mb-4">
                     <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
                       Form 2 — Expenditures
@@ -697,7 +923,10 @@ const filteredPlans = useMemo(() => {
                   <TabsContent value="4">
                     <Form4 plan={selectedPlan} isEditable={isAdmin} />
                   </TabsContent>
-                </Tabs>
+                {/* </Tabs>
+              )} */}
+              </Tabs>
+                </>
               )}
             </div>
           </div>

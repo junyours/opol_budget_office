@@ -13,7 +13,7 @@
 // }
 
 // export interface UseBudgetTotalsResult {
-//   totals:  BudgetTotals;
+//   totals:  BudgetTotals;useBudgetTotals
 //   loading: boolean;
 // }
 

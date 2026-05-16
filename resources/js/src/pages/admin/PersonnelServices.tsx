@@ -29,6 +29,7 @@ import {
   type PsSettings,
 } from './PersonnelServicesSettings';
 import { DeptDots } from '@/src/components/ui/DeptDots';
+import { usePsSettings } from '@/src/hooks/usePsSettings';
 
 
 // ── Animation styles injected once ───────────────────────────────────────────
@@ -236,7 +237,7 @@ const ALLOWANCE_TO_EXPENSE_ITEM: Record<string, string[]> = {
   terminalLeave:       ['Terminal Leave Benefits'],
 };
 
-const LS_SETTINGS_KEY = 'ps_settings_v3';
+// const LS_SETTINGS_KEY = 'ps_settings_v3';
 const LS_EDITS_KEY    = 'ps_edits';
 
 function lsGet<T>(key: string, fallback: T): T {
@@ -315,17 +316,17 @@ function useDebounce<T>(value: T, delay: number): T {
   return d;
 }
 
-function mergeWithDefaults(saved: Partial<PsSettings>): PsSettings {
-  return {
-    ...DEFAULT_SETTINGS, ...saved,
-    ra:                 (saved.ra                 ?? DEFAULT_SETTINGS.ra).map(r => ({ ...r })),
-    subsistence_depts:  (saved.subsistence_depts  ?? DEFAULT_SETTINGS.subsistence_depts).map(d => ({ ...d })),
-    laundry_depts:      (saved.laundry_depts       ?? DEFAULT_SETTINGS.laundry_depts).map(d => ({ ...d })),
-    magna_carta1_depts: (saved.magna_carta1_depts  ?? DEFAULT_SETTINGS.magna_carta1_depts).map(d => ({ ...d })),
-    magna_carta2_depts: (saved.magna_carta2_depts  ?? DEFAULT_SETTINGS.magna_carta2_depts).map(d => ({ ...d })),
-    magna_carta_rate:   saved.magna_carta_rate     ?? DEFAULT_SETTINGS.magna_carta_rate,
-  };
-}
+// function mergeWithDefaults(saved: Partial<PsSettings>): PsSettings {
+//   return {
+//     ...DEFAULT_SETTINGS, ...saved,
+//     ra:                 (saved.ra                 ?? DEFAULT_SETTINGS.ra).map(r => ({ ...r })),
+//     subsistence_depts:  (saved.subsistence_depts  ?? DEFAULT_SETTINGS.subsistence_depts).map(d => ({ ...d })),
+//     laundry_depts:      (saved.laundry_depts       ?? DEFAULT_SETTINGS.laundry_depts).map(d => ({ ...d })),
+//     magna_carta1_depts: (saved.magna_carta1_depts  ?? DEFAULT_SETTINGS.magna_carta1_depts).map(d => ({ ...d })),
+//     magna_carta2_depts: (saved.magna_carta2_depts  ?? DEFAULT_SETTINGS.magna_carta2_depts).map(d => ({ ...d })),
+//     magna_carta_rate:   saved.magna_carta_rate     ?? DEFAULT_SETTINGS.magna_carta_rate,
+//   };
+// }
 
 function getAssignmentDate(assign: ApiAssignment): Date | null {
   const raw = assign.assignment_date ?? assign.effective_date;
@@ -417,7 +418,8 @@ const PersonnelServices: React.FC = () => {
   // Track tab changes for re-triggering row animations
   const [tabAnimKey, setTabAnimKey] = useState(0);
 
-  const [settings, setSettings] = useState<PsSettings>(() => mergeWithDefaults(lsGet<Partial<PsSettings>>(LS_SETTINGS_KEY, {})));
+//   const [settings, setSettings] = useState<PsSettings>(() => mergeWithDefaults(lsGet<Partial<PsSettings>>(LS_SETTINGS_KEY, {})));
+const { settings, setSettings, loading: settingsLoading, save: saveSettings } = usePsSettings();
   const [edits,    setEdits]    = useState<Record<number, RowEdit>>(() => lsGet(LS_EDITS_KEY, {} as Record<number, RowEdit>));
 
   const [searchRaw,    setSearchRaw] = useState<Record<string, string>>({});
@@ -430,7 +432,12 @@ const PersonnelServices: React.FC = () => {
 
   const setTabPage   = (tab: string, p: number) => setPageMap(prev => ({ ...prev, [tab]: p }));
   const setTabSearch = (tab: string, val: string) => { setSearchRaw(prev => ({ ...prev, [tab]: val })); setTabPage(tab, 1); };
-  const handleSettingsChange = (s: PsSettings) => { setSettings(s); lsSet(LS_SETTINGS_KEY, s); };
+//   const handleSettingsChange = (s: PsSettings) => { setSettings(s); lsSet(LS_SETTINGS_KEY, s); };
+const handleSettingsChange = async (s: PsSettings) => {
+    setSettings(s);                  // optimistic update
+    try { await saveSettings(s); }
+    catch { /* toast already shown by caller if needed */ }
+};
   const handleEditChange = (posId: number, field: keyof RowEdit, value: number) => {
     setEdits(prev => {
       const next = { ...prev, [posId]: { ...(prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0 }), [field]: value } };
@@ -751,8 +758,9 @@ const PersonnelServices: React.FC = () => {
     try { await savePromise; } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
-  if (planLoading || matrixLoading || loading) return <LoadingState />;
-  if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
+//   if (planLoading || matrixLoading || loading) return <LoadingState />;
+if (planLoading || matrixLoading || loading || settingsLoading) return <LoadingState />;
+if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
   if (!activeVersion) return <div className="p-8 text-center text-yellow-600">No active salary version found.</div>;
 
   const cDeptId   = parseInt(activeTab);

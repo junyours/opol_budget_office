@@ -42,6 +42,9 @@ use App\Http\Controllers\Api\{
     LEPReportController,
     LepHeaderSettingController,
     IncomeFundObjectController,
+    NotificationController,
+    DatabaseBackupController,
+    PsSettingController,
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
@@ -78,6 +81,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::apiResource('salary-standard-versions', SalaryStandardVersionController::class);
     Route::apiResource('salary-grade-steps',        SalaryGradeStepController::class);
     Route::post('salary-standard-versions/{version}/activate', [SalaryStandardVersionController::class, 'activate']);
+    Route::put('salary-standard-versions/{version}/with-steps', [SalaryStandardVersionController::class, 'updateWithSteps']);
 
     // ── Budget Plans ───────────────────────────────────────────────────────────
     Route::get ('budget-plans/active',                          [BudgetPlanController::class, 'active']);
@@ -135,6 +139,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::delete('/mdf-snapshots', [MdfSnapshotController::class, 'destroy']);
     Route::get ('/ps-computation/debug', [PsComputationController::class, 'debug']);
     Route::get ('/ps-computation',       [PsComputationController::class, 'index']);
+    Route::get('/ps-settings',           [PsSettingController::class, 'show']);
+    Route::put('/ps-settings',           [PsSettingController::class, 'update']);
 
     Route::get  ('ldrrmfip/categories',     [LdrrmfipController::class, 'categories']);
     Route::get  ('ldrrmfip/sources',        [LdrrmfipController::class, 'sources']);
@@ -163,6 +169,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // but these override the outer 'throttle:api' for their specific routes.
     // ════════════════════════════════════════════════════════════════════════════
 
+
+    Route::get('/database/info', [DatabaseBackupController::class, 'info']);
     // ── File Uploads (5/min) ───────────────────────────────────────────────────
     Route::middleware('throttle:uploads')->group(function () {
         Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
@@ -170,6 +178,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
             'department-budget-plans/{department_budget_plan}/upload-obligations',
             [DepartmentBudgetPlanController::class, 'uploadObligations']
         );
+        Route::post('/database/backup',  [DatabaseBackupController::class, 'backup']);
+        Route::post('/database/restore', [DatabaseBackupController::class, 'restore']);
     });
 
     // ── Bulk Writes (20/min) ───────────────────────────────────────────────────
@@ -258,4 +268,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::put   ("{$slug}-plan/{upItem}", [UnifiedPlanItemController::class, 'update']) ->defaults('planType', $type);
         Route::delete("{$slug}-plan/{upItem}", [UnifiedPlanItemController::class, 'destroy'])->defaults('planType', $type);
     }
+
+    Route::get   ('/notifications',              [NotificationController::class, 'index']);
+Route::post  ('/notifications/read-all',     [NotificationController::class, 'markAllRead']);
+Route::post  ('/notifications/{id}/read',    [NotificationController::class, 'markRead']);
+Route::delete('/notifications/clear-read',   [NotificationController::class, 'clearRead']);
+
 });

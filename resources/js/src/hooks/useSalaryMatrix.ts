@@ -11,9 +11,9 @@ export function useSalaryMatrix() {
   const { data: versions = [], isLoading: versionsLoading } = useQuery<SalaryStandardVersion[]>({
     queryKey: ['salary-standard-versions'],
     queryFn:  () => API.get('/salary-standard-versions').then(r => r.data?.data ?? []),
-    staleTime:            0,
-    refetchOnMount:       true,
-    refetchOnWindowFocus: true,
+    staleTime:            5 * 60 * 1000, // 5 minutes — tranche rarely changes
+    refetchOnMount:       false,
+    refetchOnWindowFocus: false,
   });
 
   const activeVersion = versions.find(v => v.is_active) ?? null;
@@ -27,9 +27,9 @@ export function useSalaryMatrix() {
         params: { salary_standard_version_id: activeVersion!.salary_standard_version_id },
       }).then(r => r.data?.data?.map((s: any) => ({ ...s, amount: s.salary })) ?? []),
     enabled:              !!activeVersion,
-    staleTime:            0,
-    refetchOnMount:       true,
-    refetchOnWindowFocus: true,
+    staleTime:            5 * 60 * 1000, // 5 minutes
+    refetchOnMount:       false,
+    refetchOnWindowFocus: false,
   });
 
   // Call this after activating a tranche or uploading a new one to immediately

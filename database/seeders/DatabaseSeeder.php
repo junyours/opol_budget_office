@@ -43,7 +43,8 @@ class DatabaseSeeder extends Seeder
             // PlantillaAssignmentSeeder::class,
             // SalaryGradeStepSeeder::class,
             // DepartmentPlantillaBudgetSeeder::class,
-            
+            PsSettingSeeder::class,
+
         ]);
     }
 }

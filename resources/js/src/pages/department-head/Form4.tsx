@@ -74,6 +74,8 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [loading, setLoading]                   = useState(true);
   const [seeding, setSeeding]                   = useState(false);
 
+//    const [validProgramIds, setValidProgramIds] = useState<Set<number>>(new Set());
+
   const [modalOpen, setModalOpen]             = useState(false);
   const [modalMode, setModalMode]             = useState<ModalMode>('choose');
   const [editingItem, setEditingItem]         = useState<DepartmentBudgetPlanForm4Item | null>(null);
@@ -115,9 +117,10 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
     [items]
   );
 
-  useEffect(() => {
-    Promise.all([fetchItems(), fetchExistingPrograms()]).then(() => setLoading(false));
-  }, [plan.dept_budget_plan_id]);
+//   useEffect(() => {
+//     Promise.all([fetchItems(), fetchExistingPrograms()]).then(() => setLoading(false));
+//   }, [plan.dept_budget_plan_id]);
+
 
   const fetchItems = async () => {
     try {
@@ -136,6 +139,63 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
     }
   };
 
+  // Fetches form4 items from appropriation year (year-1) and obligation year (year-2)
+  // and returns the set of aip_program_ids that have actual amounts.
+  // Only programs with a non-zero total_amount in appropriation year
+  // OR a non-zero obligation_amount in obligation year are considered valid to seed.
+//   const fetchPastYearItems = async (): Promise<Set<number>> => {
+//     const year   = Number(plan.budget_plan?.year);
+//     const deptId = plan.dept_id;
+//     if (!year || !deptId) return new Set();
+
+//     try {
+//       const [appPlanRes, oblPlanRes] = await Promise.allSettled([
+//         API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 1}`),
+//         API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 2}`),
+//       ]);
+
+//       const validIds = new Set<number>();
+
+//       // Appropriation year — check total_amount > 0
+//       if (appPlanRes.status === 'fulfilled') {
+//         const appPlanId = appPlanRes.value.data.data?.dept_budget_plan_id;
+//         if (appPlanId) {
+//           const res = await API.get('/form4-items', { params: { budget_plan_id: appPlanId } });
+//           for (const item of (res.data.data ?? [])) {
+//             if ((parseFloat(item.total_amount) || 0) > 0) {
+//               validIds.add(item.aip_program_id);
+//             }
+//           }
+//         }
+//       }
+
+//       // Obligation year — check obligation_amount > 0
+//       if (oblPlanRes.status === 'fulfilled') {
+//         const oblPlanId = oblPlanRes.value.data.data?.dept_budget_plan_id;
+//         if (oblPlanId) {
+//           const res = await API.get('/form4-items', { params: { budget_plan_id: oblPlanId } });
+//           for (const item of (res.data.data ?? [])) {
+//             if ((parseFloat(item.obligation_amount) || 0) > 0) {
+//               validIds.add(item.aip_program_id);
+//             }
+//           }
+//         }
+//       }
+
+//       return validIds;
+//     } catch {
+//       return new Set();
+//     }
+//   };
+
+useEffect(() => {
+    const init = async () => {
+      await Promise.all([fetchItems(), fetchExistingPrograms()]);
+      setLoading(false);
+    };
+    init();
+  }, [plan.dept_budget_plan_id]);
+
   const fetchExistingPrograms = async () => {
     if (!plan.dept_id) return;
     try {
@@ -146,17 +206,77 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
     }
   };
 
-  const seedPastPrograms = async (
+//   const seedPastPrograms = async (
+//     currentItems: DepartmentBudgetPlanForm4Item[],
+//     programs: AIPProgram[]
+//   ) => {
+//     if (currentItems.length > 0) return;
+//     const toAdd = programs.filter(p => p.is_active);
+const seedPastPrograms = async (
     currentItems: DepartmentBudgetPlanForm4Item[],
-    programs: AIPProgram[]
+    programs:     AIPProgram[],
   ) => {
     if (currentItems.length > 0) return;
-    const toAdd = programs.filter(p => p.is_active);
-    if (toAdd.length === 0) return;
+    const year   = Number(plan.budget_plan?.year);
+    const deptId = plan.dept_id;
+    if (!year || !deptId) return;
+
     setSeeding(true);
     try {
+      // Fetch appropriation year (year-1) form4 items with total_amount > 0
+      const [appPlanRes, oblPlanRes] = await Promise.allSettled([
+        API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 1}`),
+        API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 2}`),
+      ]);
+
+      // Collect valid programs from both past years
+      const seedMap = new Map<number, {
+        aip_program_id:      number;
+        aip_reference_code:  string | null;
+        program_description: string;
+      }>();
+
+      // Appropriation year — include if total_amount > 0
+      if (appPlanRes.status === 'fulfilled') {
+        const appPlanId = appPlanRes.value.data.data?.dept_budget_plan_id;
+        if (appPlanId) {
+          const res = await API.get('/form4-items', { params: { budget_plan_id: appPlanId } });
+          for (const item of (res.data.data ?? [])) {
+            if ((parseFloat(item.total_amount) || 0) > 0) {
+              seedMap.set(item.aip_program_id, {
+                aip_program_id:      item.aip_program_id,
+                aip_reference_code:  item.aip_reference_code  ?? null,
+                program_description: item.program_description ?? '',
+              });
+            }
+          }
+        }
+      }
+
+      // Obligation year — include if obligation_amount > 0
+      // Obligation year — include if total_amount > 0 OR obligation_amount > 0
+      if (oblPlanRes.status === 'fulfilled') {
+        const oblPlanId = oblPlanRes.value.data.data?.dept_budget_plan_id;
+        if (oblPlanId) {
+          const res = await API.get('/form4-items', { params: { budget_plan_id: oblPlanId } });
+          for (const item of (res.data.data ?? [])) {
+            const hasTotal       = (parseFloat(item.total_amount)       || 0) > 0;
+            const hasObligation  = (parseFloat(item.obligation_amount)   || 0) > 0;
+            if ((hasTotal || hasObligation) && !seedMap.has(item.aip_program_id)) {
+              seedMap.set(item.aip_program_id, {
+                aip_program_id:      item.aip_program_id,
+                aip_reference_code:  item.aip_reference_code  ?? null,
+                program_description: item.program_description ?? '',
+              });
+            }
+          }
+        }
+      }
+
+      if (seedMap.size === 0) return;
+
       await Promise.all(
-        toAdd.map(p =>
+        Array.from(seedMap.values()).map(p =>
           API.post('/form4-items', {
             budget_plan_id:      plan.dept_budget_plan_id,
             aip_program_id:      p.aip_program_id,
@@ -168,8 +288,9 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
           }).catch(() => {})
         )
       );
+
       await fetchItems();
-      toast.info(`Pre-filled ${toAdd.length} AIP program(s) from past plans. Set your amounts to complete.`);
+      toast.info(`Pre-filled ${seedMap.size} AIP program(s) from past plans. Set your amounts to complete.`);
     } catch (err) {
       console.error('Seeding past programs failed', err);
     } finally {
@@ -177,7 +298,12 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
     }
   };
 
-  useEffect(() => {
+//   useEffect(() => {
+//     if (loading) return;
+//     seedPastPrograms(items, existingPrograms);
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [loading]);
+useEffect(() => {
     if (loading) return;
     seedPastPrograms(items, existingPrograms);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -359,7 +359,7 @@ $rptHead = function() use ($pastYear, $currYear, $propYear): string {
  * Each data row = 1, sec-hdr = 1, subtotal = 1, repeated thead = 3.
  * When count + next row would exceed PAGE_ROWS, break page first.
  */
-$PAGE_ROWS    = 40;
+$PAGE_ROWS    = 60;
 $pageRowCount = 0;
 
 $maybeBreak = function(
@@ -755,15 +755,24 @@ $currentYear  = $dr['current_year'];
 $pastYear     = $dr['past_year'];
 @endphp
 
+
+
+
 {{-- ── FORM 2 ── --}}
 @if(in_array('form2', $forms) && isset($dr['form2']))
 @php
 $form2     = $dr['form2'];
 $lgu       = strtoupper($budgetPlan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL');
-$deptName  = strtoupper($dept->dept_name);
+
+// ── FIX: strip "OFFICE OF THE " prefix if the dept_name already includes it
+// This prevents "OFFICE OF THE OFFICE OF THE MUNICIPAL MAYOR"
+$rawDeptName = strtoupper($dept->dept_name);
+$deptName    = preg_replace('/^OFFICE\s+OF\s+THE\s+/i', '', $rawDeptName);
+
 $items     = $form2['items'];
 $spItems   = $form2['specialPrograms'];
 
+// ── Bucket items by classification ──────────────────────────────────────
 $psItems   = $bucket($items, 'personal services');
 $mooeItems = $bucket($items, 'maintenance and other operating expenses');
 $coItems   = $bucket($items, 'capital outlay');
@@ -771,30 +780,75 @@ $ppItems   = array_merge(
     $bucket($items, 'property, plant and equipment'),
     $bucket($items, 'prop/plant/eqpt')
 );
-$known = ['personal services','maintenance and other operating expenses',
-          'capital outlay','property, plant and equipment','prop/plant/eqpt'];
-$otherItems = array_values(array_filter($items,
-    fn($i) => !in_array(strtolower(trim($i['classification'])), $known)));
+$known = [
+    'personal services',
+    'maintenance and other operating expenses',
+    'capital outlay',
+    'property, plant and equipment',
+    'prop/plant/eqpt',
+];
+$otherItems = array_values(array_filter(
+    $items,
+    fn($i) => !in_array(strtolower(trim($i['classification'])), $known)
+));
 
+// ── Proposed subtotals per section ──────────────────────────────────────
 $psProp   = $sumCol($psItems,   'proposed');
 $mooeProp = $sumCol($mooeItems, 'proposed');
 $coProp   = $sumCol($coItems,   'proposed');
 $ppProp   = $sumCol($ppItems,   'proposed');
-$spProp   = $sumCol($spItems,   'proposed');
 
+// Capital section: prefer PP&E if present, else CO
 $capItems = count($ppItems) > 0 ? $ppItems : $coItems;
 $capProp  = count($ppItems) > 0 ? $ppProp  : $coProp;
 
-$grandPast    = $sumCol($items,'past_total')    + $sumCol($spItems,'past_total');
-$grandSem1    = $sumCol($items,'current_sem1')  + $sumCol($spItems,'current_sem1');
-$grandSem2    = $sumCol($items,'current_sem2')  + $sumCol($spItems,'current_sem2');
-$grandCurrent = $sumCol($items,'current_total') + $sumCol($spItems,'current_total');
-$grandProp    = $psProp + $mooeProp + $capProp + $spProp;
+// ── Form 2 totals — regular items ONLY (no AIP / special programs) ──────
+$grandPast    = $sumCol($items, 'past_total');
+$grandSem1    = $sumCol($items, 'current_sem1');
+$grandSem2    = $sumCol($items, 'current_sem2');
+$grandCurrent = $sumCol($items, 'current_total');
+$grandProp    = $psProp + $mooeProp + $capProp;   // ← AIP intentionally excluded
+
+// ── Form 2A — special program subtotals ─────────────────────────────────
+$spPast    = $sumCol($spItems, 'past_total');
+$spSem1    = $sumCol($spItems, 'current_sem1');
+$spSem2    = $sumCol($spItems, 'current_sem2');
+$spCurrent = $sumCol($spItems, 'current_total');
+$spProp    = $sumCol($spItems, 'proposed');
+
+// ── LDRRMF totals (if present) ──────────────────────────────────────────
+$ldrrmfProposed = 0;
+$ldrrmfPast     = 0;
+$ldrrmfSem1     = 0;
+$ldrrmfSem2     = 0;
+$ldrrmfCurrent  = 0;
+if (!empty($dr['ldrrmf_2a'])) {
+    foreach ($dr['ldrrmf_2a'] as $_lr) {
+        $ldrrmfProposed += (float) ($_lr['proposed']      ?? 0);
+        $ldrrmfPast     += (float) ($_lr['past_total']    ?? 0);
+        $ldrrmfSem1     += (float) ($_lr['current_sem1']  ?? 0);
+        $ldrrmfSem2     += (float) ($_lr['current_sem2']  ?? 0);
+        $ldrrmfCurrent  += (float) ($_lr['current_total'] ?? 0);
+    }
+}
+
+// ── Form 2A Grand Total = Form 2 totals + AIP subtotals + LDRRMF ────────
+$grandTotalPast    = $grandPast    + $spPast    + $ldrrmfPast;
+$grandTotalSem1    = $grandSem1   + $spSem1    + $ldrrmfSem1;
+$grandTotalSem2    = $grandSem2   + $spSem2    + $ldrrmfSem2;
+$grandTotalCurrent = $grandCurrent + $spCurrent + $ldrrmfCurrent;
+$grandTotalProp    = $grandProp   + $spProp    + $ldrrmfProposed;
 @endphp
 
+{{-- ════════════════════════════════════════════════════════════════════ --}}
+{{-- FORM 2 PAGE                                                          --}}
+{{-- ════════════════════════════════════════════════════════════════════ --}}
 <div class="page">
 <div class="form-no">LBP Form No. 2</div>
-<div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
+<div class="doc-title">
+    Programmed Appropriation and Obligation by Object of Expenditures<br>
+    LGU : <u>{{ $lgu }}</u>
+</div>
 <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
 
 <table class="data-table" style="width:100%; table-layout:fixed;">
@@ -820,47 +874,34 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
             <th width="9%">2nd Semester<br>(Estimate)</th>
             <th width="9%">Total</th>
         </tr>
-        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
+        <tr>
+            <th>(1)</th><th>(2)</th><th>(3)</th>
+            <th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th>
+        </tr>
     </thead>
     <tbody>
 
-    @php
-    $f2Head = function() use ($pastYear, $currentYear, $proposedYear): string {
-        return '
-        <tr>
-            <th rowspan="2">Object of Expenditures</th>
-            <th rowspan="2" width="10%">Account Code</th>
-            <th rowspan="2" width="12%">Past Year<br>(Actual)<br>'.$pastYear.'</th>
-            <th colspan="3">Current Year (Estimate) '.$currentYear.'</th>
-            <th rowspan="2" width="12%">'.$proposedYear.'<br>Budget Year<br>(Proposed)</th>
-        </tr>
-        <tr>
-            <th width="9%">1st Semester<br>(Actual)</th>
-            <th width="9%">2nd Semester<br>(Estimate)</th>
-            <th width="9%">Total</th>
-        </tr>
-        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
-        ';
-    };
-    @endphp
-
+    {{-- ── Personal Services ───────────────────────────────────────────── --}}
     @if(count($psItems) > 0)
     @php $psC = array_chunk($psItems, 30); $psCT = count($psC); @endphp
     @foreach($psC as $psCI => $psCK)
+
     @if($psCI > 0)
     </tbody></table></div>{{-- end page --}}
     <div class="page">
-    <div class="form-no">LBP Form No. 2</div>
-    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
-    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
     <table class="data-table" style="width:100%; table-layout:fixed;">
-    <thead>{!! $f2Head() !!}</thead><tbody>
+    <tbody>
     <tr class="sec-hdr"><td colspan="7">Personal Services (PS) — continued</td></tr>
     @else
     <tr class="sec-hdr"><td colspan="7">Personal Services (PS)</td></tr>
     @endif
+
     @foreach($psCK as $psRIdx => $item)
-    @php $fmt2ps = ($psCI === 0 && $psRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
+    @php
+    $fmt2ps = ($psCI === 0 && $psRIdx === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -871,57 +912,41 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $fmt2ps($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+
     @if($psCI === $psCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total Personal Services</td>
-        <td class="r">{!! $pesoA($sumCol($psItems,'past_total')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($psItems,'current_sem1')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($psItems,'current_sem2')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($psItems,'current_total')) !!}</td>
+        <td class="r">{!! $pesoA($sumCol($psItems, 'past_total'))    !!}</td>
+        <td class="r">{!! $pesoA($sumCol($psItems, 'current_sem1'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($psItems, 'current_sem2'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($psItems, 'current_total')) !!}</td>
         <td class="r">{!! $pesoA($psProp) !!}</td>
     </tr>
     @endif
     @endforeach
-    @endif
+    @endif {{-- /psItems --}}
 
+    {{-- ── MOOE ─────────────────────────────────────────────────────────── --}}
     @if(count($mooeItems) > 0)
     @php $mooeC = array_chunk($mooeItems, 30); $mooeCT = count($mooeC); @endphp
     @foreach($mooeC as $mooeCI => $mooeCK)
+
     @if($mooeCI > 0)
     </tbody></table></div>{{-- end page --}}
     <div class="page">
     <table class="data-table" style="width:100%; table-layout:fixed;">
-    <thead>
-        <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
-            <td style="width:30%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-        </tr>
-        <tr>
-            <th rowspan="2">Object of Expenditures</th>
-            <th rowspan="2" width="10%">Account Code</th>
-            <th rowspan="2" width="12%">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
-            <th colspan="3">Current Year (Estimate) {{ $currentYear }}</th>
-            <th rowspan="2" width="12%">{{ $proposedYear }}<br>Budget Year<br>(Proposed)</th>
-        </tr>
-        <tr>
-            <th width="9%">1st Semester<br>(Actual)</th>
-            <th width="9%">2nd Semester<br>(Estimate)</th>
-            <th width="9%">Total</th>
-        </tr>
-        <tr><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th></tr>
-    </thead>
+    <tbody>
     <tr class="sec-hdr"><td colspan="7">Maintenance &amp; Other Operating Expenditures (MOOE) — continued</td></tr>
     @else
-    {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Maintenance &amp; Other Operating Expenditures (MOOE)</td></tr>
     @endif
+
     @foreach($mooeCK as $mooeRIdx => $item)
-    @php $fmt2mooe = ($mooeCI === 0 && $mooeRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
+    @php
+    $fmt2mooe = ($mooeCI === 0 && $mooeRIdx === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -932,78 +957,41 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $fmt2mooe($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+
     @if($mooeCI === $mooeCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total MOOE</td>
-        <td class="r">{!! $pesoA($sumCol($mooeItems,'past_total')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($mooeItems,'current_sem1')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($mooeItems,'current_sem2')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($mooeItems,'current_total')) !!}</td>
+        <td class="r">{!! $pesoA($sumCol($mooeItems, 'past_total'))    !!}</td>
+        <td class="r">{!! $pesoA($sumCol($mooeItems, 'current_sem1'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($mooeItems, 'current_sem2'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($mooeItems, 'current_total')) !!}</td>
         <td class="r">{!! $pesoA($mooeProp) !!}</td>
     </tr>
     @endif
     @endforeach
-    @endif
+    @endif {{-- /mooeItems --}}
 
-    @if(count($spItems) > 0)
-    @php $spC = array_chunk($spItems, 30); $spCT = count($spC); @endphp
-    @foreach($spC as $spCI => $spCK)
-    @if($spCI > 0)
-    </tbody></table></div>{{-- end page --}}
-    <div class="page">
-    <div class="form-no">LBP Form No. 2</div>
-    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
-    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
-    <table class="data-table" style="width:100%; table-layout:fixed;">
-    <thead>{!! $f2Head() !!}</thead><tbody>
-    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations / Programs — continued</td></tr>
-    @else
-    {!! $f2Head() !!}
-    <tr class="sec-hdr"><td colspan="7">Special Purpose Appropriations / Programs</td></tr>
-    @endif
-    @foreach($spCK as $spRIdx => $sp)
-    @php $fmt2sp = ($spCI === 0 && $spRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
-    <tr>
-        <td class="l">{{ $sp['program_description'] }}</td>
-        <td class="c">{{ $sp['aip_reference_code'] ?? '' }}</td>
-        <td class="r">{!! $sp['past_total']    > 0 ? $fmt2sp($sp['past_total'])    : '' !!}</td>
-        <td class="r">{!! $sp['current_sem1']  > 0 ? $fmt2sp($sp['current_sem1'])  : '' !!}</td>
-        <td class="r">{!! $sp['current_sem2']  > 0 ? $fmt2sp($sp['current_sem2'])  : '' !!}</td>
-        <td class="r">{!! $sp['current_total'] > 0 ? $fmt2sp($sp['current_total']) : '' !!}</td>
-        <td class="r">{!! $sp['proposed']      > 0 ? $fmt2sp($sp['proposed'])      : '' !!}</td>
-    </tr>
-    @endforeach
-    @if($spCI === $spCT - 1)
-    <tr class="subtotal">
-        <td colspan="2" class="l">Sub-Total for Spcl Prog/Prcts</td>
-        <td class="r">{!! $pesoA($sumCol($spItems,'past_total')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($spItems,'current_sem1')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($spItems,'current_sem2')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($spItems,'current_total')) !!}</td>
-        <td class="r">{!! $pesoA($spProp) !!}</td>
-    </tr>
-    @endif
-    @endforeach
-    @endif
-
+    {{-- ── Capital / PP&E ──────────────────────────────────────────────── --}}
     @if(count($capItems) > 0)
     @php $capC = array_chunk($capItems, 30); $capCT = count($capC); @endphp
     @foreach($capC as $capCI => $capCK)
+
     @if($capCI > 0)
     </tbody></table></div>{{-- end page --}}
     <div class="page">
-    <div class="form-no">LBP Form No. 2</div>
-    <div class="doc-title">Programmed Appropriation and Obligation by Object of Expenditures<br>LGU : <u>{{ $lgu }}</u></div>
-    <div class="office-label">OFFICE OF THE {{ $deptName }}</div>
     <table class="data-table" style="width:100%; table-layout:fixed;">
-    <thead>{!! $f2Head() !!}</thead><tbody>
+    <tbody>
     <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt — continued</td></tr>
     @else
-    {!! $f2Head() !!}
     <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt</td></tr>
     @endif
+
     @foreach($capCK as $capRIdx => $item)
-    @php $fmt2cap = ($capCI === 0 && $capRIdx === 0) ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0); @endphp
+    @php
+    $fmt2cap = ($capCI === 0 && $capRIdx === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
         <td class="c">{{ $item['account_code'] }}</td>
@@ -1014,30 +1002,34 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
         <td class="r">{!! $item['proposed']      > 0 ? $fmt2cap($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+
     @if($capCI === $capCT - 1)
     <tr class="subtotal">
         <td colspan="2" class="l">Total Prop/Plant/Eqpt</td>
-        <td class="r">{!! $pesoA($sumCol($capItems,'past_total')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($capItems,'current_sem1')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($capItems,'current_sem2')) !!}</td>
-        <td class="r">{!! $pesoA($sumCol($capItems,'current_total')) !!}</td>
+        <td class="r">{!! $pesoA($sumCol($capItems, 'past_total'))    !!}</td>
+        <td class="r">{!! $pesoA($sumCol($capItems, 'current_sem1'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($capItems, 'current_sem2'))  !!}</td>
+        <td class="r">{!! $pesoA($sumCol($capItems, 'current_total')) !!}</td>
         <td class="r">{!! $pesoA($capProp) !!}</td>
     </tr>
     @endif
     @endforeach
-    @endif
+    @endif {{-- /capItems --}}
 
+    {{-- ── Form 2 Total Appropriations — regular items ONLY, NO AIP ───── --}}
     <tr class="grand-total">
-        <td colspan="2" class="l">GRAND TOTAL FOR {{ $deptName }}</td>
-        <td class="r">{!! $pesoA($grandPast) !!}</td>
-        <td class="r">{!! $pesoA($grandSem1) !!}</td>
-        <td class="r">{!! $pesoA($grandSem2) !!}</td>
+        <td colspan="2" class="l">Total Appropriations — OFFICE OF THE {{ $deptName }}</td>
+        <td class="r">{!! $pesoA($grandPast)    !!}</td>
+        <td class="r">{!! $pesoA($grandSem1)    !!}</td>
+        <td class="r">{!! $pesoA($grandSem2)    !!}</td>
         <td class="r">{!! $pesoA($grandCurrent) !!}</td>
-        <td class="r">{!! $pesoA($grandProp) !!}</td>
+        <td class="r">{!! $pesoA($grandProp)    !!}</td>
     </tr>
+
     </tbody>
 </table>
 
+{{-- Signature block --}}
 <table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;border:1px solid #000;">
   <tr>
     <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
@@ -1057,7 +1049,193 @@ $grandProp    = $psProp + $mooeProp + $capProp + $spProp;
     </td>
   </tr>
 </table>
+</div>{{-- /Form 2 page --}}
+
+{{-- ════════════════════════════════════════════════════════════════════ --}}
+{{-- FORM 2A — Special Purpose Appropriations / Programs                  --}}
+{{-- ════════════════════════════════════════════════════════════════════ --}}
+@if(count($spItems) > 0 || !empty($dr['ldrrmf_2a']))
+<div class="page">
+<div class="form-no">LBP Form No. 2A</div>
+<div class="doc-title">
+    Programmed Appropriation and Obligation by Object of Expenditures<br>
+    LGU : <u>{{ $lgu }}</u>
 </div>
+<div class="office-label">OFFICE OF THE {{ $deptName }}</div>
+
+<table class="data-table" style="width:100%; table-layout:fixed;">
+    <thead>
+        <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:13%;padding:0;border:none;"></td>
+            <td style="width:13%;padding:0;border:none;"></td>
+            <td style="width:26%;padding:0;border:none;"></td>
+            <td style="width:10%;padding:0;border:none;"></td>
+            <td style="width:9%;padding:0;border:none;"></td>
+            <td style="width:9%;padding:0;border:none;"></td>
+            <td style="width:9%;padding:0;border:none;"></td>
+            <td style="width:11%;padding:0;border:none;"></td>
+        </tr>
+        <tr>
+            <th rowspan="2">AIP Reference</th>
+            <th rowspan="2">Sector</th>
+            <th rowspan="2">Program / Project / Activity</th>
+            <th rowspan="2">Past Year<br>(Actual)<br>{{ $pastYear }}</th>
+            <th colspan="3">Current Year (Estimate) {{ $currentYear }}</th>
+            <th rowspan="2">{{ $proposedYear }}<br>Budget Year<br>(Proposed)</th>
+        </tr>
+        <tr>
+            <th>1st Semester<br>(Actual)</th>
+            <th>2nd Semester<br>(Estimate)</th>
+            <th>Total</th>
+        </tr>
+        <tr>
+            <th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th>
+            <th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th>
+        </tr>
+    </thead>
+    <tbody>
+
+    {{-- ── Special Purpose Appropriations / AIP Programs ───────────────── --}}
+    @if(count($spItems) > 0)
+    <tr class="sec-hdr"><td colspan="8">Special Purpose Appropriations / Programs</td></tr>
+    @foreach($spItems as $spRIdx => $sp)
+    @php
+    $fmt2a = ($spRIdx === 0)
+        ? $pesoA
+        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    @endphp
+    <tr>
+        <td class="c">{{ $sp['aip_reference_code'] ?? '' }}</td>
+        <td class="c">{{ $sp['sector'] ?? '' }}</td>
+        <td class="l">{{ $sp['program_description'] }}</td>
+        <td class="r">{!! $sp['past_total']    > 0 ? $fmt2a($sp['past_total'])    : '' !!}</td>
+        <td class="r">{!! $sp['current_sem1']  > 0 ? $fmt2a($sp['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_sem2']  > 0 ? $fmt2a($sp['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $sp['current_total'] > 0 ? $fmt2a($sp['current_total']) : '' !!}</td>
+        <td class="r">{!! $sp['proposed']      > 0 ? $fmt2a($sp['proposed'])      : '' !!}</td>
+    </tr>
+    @endforeach
+    <tr class="subtotal">
+        <td colspan="3" class="l">Sub-Total Special Purpose Appropriations</td>
+        <td class="r">{!! $pesoA($spPast)    !!}</td>
+        <td class="r">{!! $pesoA($spSem1)    !!}</td>
+        <td class="r">{!! $pesoA($spSem2)    !!}</td>
+        <td class="r">{!! $pesoA($spCurrent) !!}</td>
+        <td class="r">{!! $pesoA($spProp)    !!}</td>
+    </tr>
+    @endif {{-- /spItems --}}
+
+    {{-- ── LDRRMF Section ──────────────────────────────────────────────── --}}
+    @if(!empty($dr['ldrrmf_2a']))
+    @php
+        $ldrrmfRows2a = $dr['ldrrmf_2a'];
+        $qrfRow       = collect($ldrrmfRows2a)->firstWhere('kind', 'qrf');
+        $prepRows     = collect($ldrrmfRows2a)->where('kind', 'preparedness')->values();
+        $prepSubtotal = $prepRows->sum('proposed');
+        $qrfAmount    = (float) ($qrfRow['proposed'] ?? 0);
+        $ldrrmfTotal  = $qrfAmount + $prepSubtotal;
+    @endphp
+    <tr class="sec-hdr">
+        <td colspan="8">NON-OFFICE : 5% Local Disaster Risk Reduction Management Fund (LDRRMF)</td>
+    </tr>
+
+    @if($qrfRow)
+    <tr>
+        <td class="c">{{ $qrfRow['account_code'] ?? '9000-2-01-001' }}</td>
+        <td class="c">{{ $qrfRow['sector'] ?? 'General Public Services' }}</td>
+        <td class="l">
+            <strong>30% Quick Response Fund (QRF)</strong>
+            — {{ $qrfRow['note'] ?? 'QRF — Standby Trust Fund' }}
+        </td>
+        <td class="r">{!! $qrfRow['past_total']    > 0 ? $pesoA($qrfRow['past_total'])    : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_sem1']  > 0 ? $pesoA($qrfRow['current_sem1'])  : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_sem2']  > 0 ? $pesoA($qrfRow['current_sem2'])  : '' !!}</td>
+        <td class="r">{!! $qrfRow['current_total'] > 0 ? $pesoA($qrfRow['current_total']) : '' !!}</td>
+        <td class="r">{!! $qrfAmount > 0 ? $pesoA($qrfAmount) : '' !!}</td>
+    </tr>
+    @endif
+
+    @if($prepRows->count() > 0)
+    <tr>
+        <td class="c"></td>
+        <td class="c"></td>
+        <td class="l">
+            <strong>70% Pre-Disaster Activities (JMC 2013-1, R.A. 10121)</strong>
+        </td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+    </tr>
+    @foreach($prepRows as $prepRow)
+    <tr>
+        <td class="c">{{ $prepRow['account_code'] ?? '' }}</td>
+        <td class="c">{{ $prepRow['sector'] ?? '' }}</td>
+        <td class="l" style="padding-left:14pt;">· {{ $prepRow['description'] }}</td>
+        <td class="r">{!! $prepRow['past_total']    > 0 ? number_format((float)$prepRow['past_total'],    0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem1']  > 0 ? number_format((float)$prepRow['current_sem1'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem2']  > 0 ? number_format((float)$prepRow['current_sem2'],  0) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_total'] > 0 ? number_format((float)$prepRow['current_total'], 0) : '' !!}</td>
+        <td class="r">{!! $prepRow['proposed']      > 0 ? number_format((float)$prepRow['proposed'],      0) : '' !!}</td>
+    </tr>
+    @endforeach
+    <tr class="subtotal">
+        <td colspan="3" class="l">Total 70% Pre-Disaster Preparedness</td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r">{!! $pesoA($prepSubtotal) !!}</td>
+    </tr>
+    @endif
+
+    <tr class="subtotal">
+        <td colspan="3" class="l">Total 5% LDRRMF</td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r"></td>
+        <td class="r">{!! $pesoA($ldrrmfTotal) !!}</td>
+    </tr>
+    @endif {{-- /ldrrmf_2a --}}
+
+    {{-- ── Form 2A Grand Total = Form 2 + AIP + LDRRMF ────────────────── --}}
+    <tr class="grand-total">
+        <td colspan="3" class="l">GRAND TOTAL FOR OFFICE OF THE {{ $deptName }}</td>
+        <td class="r">{!! $pesoA($grandTotalPast)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalSem1)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalSem2)    !!}</td>
+        <td class="r">{!! $pesoA($grandTotalCurrent) !!}</td>
+        <td class="r">{!! $pesoA($grandTotalProp)    !!}</td>
+    </tr>
+
+    </tbody>
+</table>
+
+{{-- Signature block --}}
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;border:1px solid #000;">
+  <tr>
+    <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
+      Prepared by:
+      <span class="sig-name">{{ $dr['dept_head']['name'] }}</span>
+      <span class="sig-title">{{ $dr['dept_head']['title'] }}</span>
+    </td>
+    <td style="border-left:none;border-right:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 18px;">
+      Reviewed by:
+      <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+    </td>
+    <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
+      Approved:
+      <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
+    </td>
+  </tr>
+</table>
+</div>{{-- /Form 2A page --}}
+@endif {{-- /form2A --}}
+
 @endif {{-- /form2 --}}
 
 {{-- ── FORM 3 ── --}}

@@ -10,36 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function login(Request $request)
+    {
+        $validated = $request->validate([
+            'username' => 'required',
+            'password' => 'required',
+        ]);
 
-
-    // public function login(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'username' => 'required',
-    //         'password' => 'required',
-    //     ]);
-
-    //     $user = User::with('department')
-    //         ->where('username', $validated['username'])
-    //         ->first();
-
-        public function login(Request $request)
-        {
-            $validated = $request->validate([
-                'username' => 'required',
-                'password' => 'required',
-            ]);
-
-            try {
-                $user = User::with('department')
-                    ->where('username', $validated['username'])
-                    ->first();
-            } catch (\Exception $e) {
-                \Log::error('Login DB error: ' . $e->getMessage());
-                return response()->json([
-                    'message' => 'Unable to process login. Please try again later.',
-                ], 503);
-            }
+        try {
+            $user = User::with('department')
+                ->where('username', $validated['username'])
+                ->first();
+        } catch (\Exception $e) {
+            \Log::error('Login DB error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Unable to process login. Please try again later.',
+            ], 503);
+        }
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -53,17 +40,15 @@ class AuthController extends Controller
             ]);
         }
 
+        // Clean up only THIS user's expired tokens on login
+        $user->tokens()->where('expires_at', '<', now())->delete();
+
         return response()->json([
-            'user' => $user,
-            'token' => $user->createToken('auth-token')->plainTextToken,
+            'user'  => $user,
+            'token' => $user->createToken('auth-token')->plainTextToken, // expiry handled by sanctum.php
         ]);
     }
 
-    // public function logout(Request $request)
-    // {
-    //     $request->user()->currentAccessToken()->delete();
-    //     return response()->json(['message' => 'Logged out successfully']);
-    // }
     public function logout(Request $request)
     {
         $request->user()->tokens()->where('id', $request->user()->currentAccessToken()->id)->delete();

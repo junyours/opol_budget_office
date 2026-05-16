@@ -23,7 +23,7 @@ class UserController extends BaseApiController
 
         $validated = $request->validate([
             'username' => 'required|unique:users,username',
-            'password' => 'required|min:6',
+            'password' => 'required|min:8',
             'fname' => 'required',
             'mname' => 'nullable',
             'lname' => 'required',

@@ -20,6 +20,7 @@ const UserAccountPage          = React.lazy(() => import('./UserAccountPage'));
 const ExpenseItemsPage         = React.lazy(() => import('./ExpenseClassItemsPage'));
 const IncomeItemsPage          = React.lazy(() => import('./IncomeItemsTab'));
 const AIPProgramsPage          = React.lazy(() => import('./AipProgramsTab'));
+const SystemPage                = React.lazy(() => import('./SystemPage'));
 
 // ── Tab groups ────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,17 @@ const TAB_GROUPS: TabGroup[] = [
         description: 'Manage user accounts',
         icon: UsersIcon, iconBg: 'bg-blue-100', iconColor: 'text-blue-600',
         component: UserAccountPage,
+      },
+    ],
+  },
+  {
+    group: 'System',
+    tabs: [
+      {
+        key: 'system', label: 'System Management', short: 'System',
+        description: 'Maintenance and system tasks',
+        icon: WrenchScrewdriverIcon, iconBg: 'bg-red-100', iconColor: 'text-red-600',
+        component: SystemPage,
       },
     ],
   },

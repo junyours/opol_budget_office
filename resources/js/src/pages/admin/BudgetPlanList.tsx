@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
 import { PlusIcon } from "@heroicons/react/24/outline";
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 
@@ -67,6 +68,29 @@ const BudgetPlanList: React.FC = () => {
   const [draftDepts, setDraftDepts]       = useState<DraftDept[]>([]);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [closingPlan, setClosingPlan]     = useState(false);
+
+  const queryClient = useQueryClient();
+
+//   const invalidateActivePlanDependents = () => {
+//   queryClient.invalidateQueries({ queryKey: ['budget-plan-active'] });
+//   queryClient.invalidateQueries({ queryKey: ['budget-plans'] });
+//   queryClient.invalidateQueries({ queryKey: ['dept-budget-plans'] });
+//   queryClient.invalidateQueries({ queryKey: ['dept-budget-plans-all'] });
+//   queryClient.invalidateQueries({ queryKey: ['income-funds-all'] });
+//   queryClient.invalidateQueries({ queryKey: ['income-fund'] });
+//   queryClient.invalidateQueries({ queryKey: ['dept-expenditures'] });
+//   queryClient.invalidateQueries({ queryKey: ['special-account-exp'] });
+//   queryClient.invalidateQueries({ queryKey: ['mdf-fund'] });
+//   queryClient.invalidateQueries({ queryKey: ['ldrrmf-summary'] });
+//   // nuclear option — invalidate everything if still stale
+//   queryClient.invalidateQueries({ queryKey: ['budget-totals'] });
+// };
+const invalidateActivePlanDependents = () => {
+  // Wipe the entire cache — active plan change affects everything.
+  // refetchOnMount: false means wiped queries only re-fetch when
+  // the user actually visits that page, not all at once.
+  queryClient.clear();
+};
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -130,6 +154,7 @@ const BudgetPlanList: React.FC = () => {
       try {
         await API.put(`/budget-plans/${editPlan.budget_plan_id}`, { is_active: false });
         toast.success("Budget plan deactivated.");
+        invalidateActivePlanDependents();
         setEditOpen(false);
         fetchPlans();
       } catch {
@@ -150,6 +175,7 @@ const BudgetPlanList: React.FC = () => {
     try {
       await API.post(`/budget-plans/${planId}/activate`);
       toast.success("Budget plan activated.");
+      invalidateActivePlanDependents();
       fetchPlans();
     } catch {
       toast.error("Failed to activate.");

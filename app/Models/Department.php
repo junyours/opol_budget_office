@@ -43,4 +43,6 @@ class Department extends Model
     {
         return $this->hasMany(DepartmentBudgetPlan::class, 'dept_id', 'dept_id');
     }
+
+    
 }

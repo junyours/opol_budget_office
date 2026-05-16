@@ -464,7 +464,7 @@ const Form2: React.FC<Form2Props> = ({
                 pastItemId: pastItem.dept_bp_form2_item_id || undefined,
                 recommendation: null,
             } as ItemWithMeta);
-        
+
         });
 
         setItems(merged);
@@ -1343,6 +1343,15 @@ const Form2: React.FC<Form2Props> = ({
     );
     const calamityTotal = calamityData?.calamity_fund ?? 0;
 
+    // const aipObligationTotal = useMemo(
+    //     () =>
+    //         aipItems.reduce(
+    //             (s, i) => s + ((i as any).obligation_amount ?? 0),
+    //             0,
+    //         ),
+    //     [aipItems],
+    // );
+
     const aipObligationTotal = useMemo(
         () =>
             aipItems.reduce(
@@ -1352,9 +1361,44 @@ const Form2: React.FC<Form2Props> = ({
         [aipItems],
     );
 
+    // ── AIP appropriation-year subtotals (needed for grand-total blue columns) ─
+    const aipAppSem1 = useMemo(
+        () => aipItems.reduce((s, i) => s + ((i as any).app_sem1 ?? 0), 0),
+        [aipItems],
+    );
+    const aipAppSem2 = useMemo(
+        () => aipItems.reduce((s, i) => s + ((i as any).app_sem2 ?? 0), 0),
+        [aipItems],
+    );
+    const aipAppTotal = useMemo(
+        () => aipItems.reduce((s, i) => s + ((i as any).app_total ?? 0), 0),
+        [aipItems],
+    );
+
+    // const grandFinal = useMemo(
+    //     () => ({
+    //         ...grandTotals,
+    //         proposed:
+    //             grandTotals.proposed +
+    //             aipTotal +
+    //             (isSpecialAccount ? calamityTotal : 0),
+    //         obligation: grandTotals.obligation + aipObligationTotal,
+    //     }),
+    //     [
+    //         grandTotals,
+    //         aipTotal,
+    //         aipObligationTotal,
+    //         isSpecialAccount,
+    //         calamityTotal,
+    //     ],
+    // );
     const grandFinal = useMemo(
         () => ({
             ...grandTotals,
+            // Add AIP appropriation-year amounts into the blue Appropriation columns
+            pastSem1:  grandTotals.pastSem1  + aipAppSem1,
+            pastSem2:  grandTotals.pastSem2  + aipAppSem2,
+            pastTotal: grandTotals.pastTotal + aipAppTotal,
             proposed:
                 grandTotals.proposed +
                 aipTotal +
@@ -1364,6 +1408,9 @@ const Form2: React.FC<Form2Props> = ({
         [
             grandTotals,
             aipTotal,
+            aipAppSem1,
+            aipAppSem2,
+            aipAppTotal,
             aipObligationTotal,
             isSpecialAccount,
             calamityTotal,
@@ -1697,12 +1744,12 @@ const Form2: React.FC<Form2Props> = ({
                                                         </td>
 
                                                         {isAdmin && (
-                                                            <td
-                                                                className={cn(
-                                                                    TD_APP,
-                                                                    "border-l border-blue-100",
-                                                                )}
-                                                            >
+    <td
+        className={cn(
+            TD_APP,
+            "border-l border-green-100",
+        )}
+    >
                                                                 <input
                                                                     type="text"
                                                                     inputMode="numeric"
@@ -1745,12 +1792,12 @@ const Form2: React.FC<Form2Props> = ({
                                                         )}
 
                                                         <td
-                                                            className={cn(
-                                                                TD_APP,
-                                                                "border-l border-blue-100",
-                                                            )}
-                                                        >
-                                                            {sem1Editable ? (
+    className={cn(
+        TD_CUR,
+        "border-l border-blue-100",
+    )}
+>
+    {sem1Editable ? (
                                                                 <input
                                                                     type="text"
                                                                     inputMode="numeric"
@@ -1959,15 +2006,15 @@ const Form2: React.FC<Form2Props> = ({
                                                     Total {label}
                                                 </td>
                                                 {isAdmin && (
-                                                    <td
-                                                        className={cn(
-                                                            TD_M,
-                                                            "font-semibold border-l border-blue-100",
-                                                            C_APP_SUB,
-                                                        )}
-                                                    >
-                                                        {(() => {
-                                                            const clsObl =
+    <td
+        className={cn(
+            TD_M,
+            "font-semibold border-l border-green-100",
+            C_APP_SUB,
+        )}
+    >
+        {(() => {
+            const clsObl =
                                                                 cls.items.reduce(
                                                                     (s, i) =>
                                                                         s +
@@ -2121,7 +2168,7 @@ const Form2: React.FC<Form2Props> = ({
                                                 <td
                                                     className={cn(
                                                         TD_APP,
-                                                        "border-l border-blue-100",
+                                                        "border-l border-green-100",
                                                     )}
                                                 >
                                                     <input
@@ -2279,13 +2326,14 @@ const Form2: React.FC<Form2Props> = ({
                                         Total Special Programs
                                     </td>
                                     {isAdmin && (
-                                        <td
-                                            className={cn(
-                                                TD_M,
-                                                "font-semibold border-l border-blue-100 bg-gray-100",
-                                            )}
-                                        >
-                                            {aipObligationTotal === 0
+    <td
+        className={cn(
+            TD_M,
+            "font-semibold border-l border-green-100",
+            C_APP_SUB,
+        )}proposed
+    >
+        {aipObligationTotal === 0
                                                 ? "–"
                                                 : fmtP(aipObligationTotal)}
                                         </td>

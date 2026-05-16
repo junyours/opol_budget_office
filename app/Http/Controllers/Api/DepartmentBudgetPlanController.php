@@ -16,6 +16,10 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
+use App\Models\User;
+use App\Notifications\BudgetProposalSubmitted;
+use App\Notifications\BudgetProposalApproved;
+use App\Notifications\BudgetProposalReturned;
 
 class DepartmentBudgetPlanController extends BaseApiController
 {
@@ -136,43 +140,111 @@ class DepartmentBudgetPlanController extends BaseApiController
         return $this->success(['message' => 'Deleted']);
     }
 
+    // public function submit(DepartmentBudgetPlan $department_budget_plan)
+    // {
+    //     $this->authorize('submit', $department_budget_plan);
+
+    //     $parentPlan = $department_budget_plan->budgetPlan;
+    //     if ($parentPlan && !$parentPlan->is_open) {
+    //         return response()->json([
+    //             'message' => 'Submissions are closed for this budget plan. Please contact the Budget Officer.',
+    //         ], 422);
+    //     }
+
+    //     if ($department_budget_plan->status !== 'draft') {
+    //         return response()->json(['message' => 'Only draft plans can be submitted.'], 422);
+    //     }
+
+    //     $department_budget_plan->update(['status' => 'submitted']);
+    //     return $this->success(['message' => 'Submitted successfully.']);
+    // }
+
+    // public function approve(DepartmentBudgetPlan $department_budget_plan)
+    // {
+    //     $this->authorize('approve', $department_budget_plan);
+
+    //     if ($department_budget_plan->status !== 'submitted') {
+    //         return response()->json(['message' => 'Only submitted plans can be approved.'], 422);
+    //     }
+
+    //     $department_budget_plan->update(['status' => 'approved']);
+    //     return $this->success(['message' => 'Approved successfully.']);
+    // }
+
+    // public function reject(DepartmentBudgetPlan $department_budget_plan)
+    // {
+    //     $this->authorize('reject', $department_budget_plan);
+    //     $department_budget_plan->update(['status' => 'draft']);
+    //     return $this->success(['message' => 'Returned to draft.']);
+    // }
+
     public function submit(DepartmentBudgetPlan $department_budget_plan)
-    {
-        $this->authorize('submit', $department_budget_plan);
+{
+    $this->authorize('submit', $department_budget_plan);
 
-        $parentPlan = $department_budget_plan->budgetPlan;
-        if ($parentPlan && !$parentPlan->is_open) {
-            return response()->json([
-                'message' => 'Submissions are closed for this budget plan. Please contact the Budget Officer.',
-            ], 422);
-        }
-
-        if ($department_budget_plan->status !== 'draft') {
-            return response()->json(['message' => 'Only draft plans can be submitted.'], 422);
-        }
-
-        $department_budget_plan->update(['status' => 'submitted']);
-        return $this->success(['message' => 'Submitted successfully.']);
+    $parentPlan = $department_budget_plan->budgetPlan;
+    if ($parentPlan && !$parentPlan->is_open) {
+        return response()->json([
+            'message' => 'Submissions are closed for this budget plan. Please contact the Budget Officer.',
+        ], 422);
     }
 
-    public function approve(DepartmentBudgetPlan $department_budget_plan)
-    {
-        $this->authorize('approve', $department_budget_plan);
-
-        if ($department_budget_plan->status !== 'submitted') {
-            return response()->json(['message' => 'Only submitted plans can be approved.'], 422);
-        }
-
-        $department_budget_plan->update(['status' => 'approved']);
-        return $this->success(['message' => 'Approved successfully.']);
+    if ($department_budget_plan->status !== 'draft') {
+        return response()->json(['message' => 'Only draft plans can be submitted.'], 422);
     }
 
-    public function reject(DepartmentBudgetPlan $department_budget_plan)
-    {
-        $this->authorize('reject', $department_budget_plan);
-        $department_budget_plan->update(['status' => 'draft']);
-        return $this->success(['message' => 'Returned to draft.']);
+    $department_budget_plan->update(['status' => 'submitted']);
+
+    // ── Notify admins ─────────────────────────────────────────────────────
+    $department_budget_plan->load('department', 'budgetPlan');
+    $admins = User::whereIn('role', ['admin', 'super-admin'])->get();
+    \Notification::send($admins, new BudgetProposalSubmitted($department_budget_plan));
+    // ─────────────────────────────────────────────────────────────────────
+
+    return $this->success(['message' => 'Submitted successfully.']);
+}
+
+public function approve(DepartmentBudgetPlan $department_budget_plan)
+{
+    $this->authorize('approve', $department_budget_plan);
+
+    if ($department_budget_plan->status !== 'submitted') {
+        return response()->json(['message' => 'Only submitted plans can be approved.'], 422);
     }
+
+    $department_budget_plan->update(['status' => 'approved']);
+
+    // ── Notify department head ────────────────────────────────────────────
+    $department_budget_plan->load('department', 'budgetPlan');
+    $deptHead = User::where('dept_id', $department_budget_plan->dept_id)
+                    ->where('role', 'department-head')
+                    ->first();
+    if ($deptHead) {
+        $deptHead->notify(new BudgetProposalApproved($department_budget_plan));
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    return $this->success(['message' => 'Approved successfully.']);
+}
+
+public function reject(DepartmentBudgetPlan $department_budget_plan)
+{
+    $this->authorize('reject', $department_budget_plan);
+
+    $department_budget_plan->update(['status' => 'draft']);
+
+    // ── Notify department head ────────────────────────────────────────────
+    $department_budget_plan->load('department', 'budgetPlan');
+    $deptHead = User::where('dept_id', $department_budget_plan->dept_id)
+                    ->where('role', 'department-head')
+                    ->first();
+    if ($deptHead) {
+        $deptHead->notify(new BudgetProposalReturned($department_budget_plan));
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    return $this->success(['message' => 'Returned to draft.']);
+}
 
     public function findByDeptAndYear($dept_id, $year)
     {

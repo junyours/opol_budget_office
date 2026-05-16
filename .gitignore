@@ -22,10 +22,3 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-
-# Uploaded files — ignore contents but keep folder structure via .gitkeep
-/storage/app/public/avatars/*
-!/storage/app/public/avatars/.gitkeep
-
-/storage/app/public/departments/*
-!/storage/app/public/departments/.gitkeep

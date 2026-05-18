@@ -529,7 +529,7 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({
             <div className="flex flex-col gap-0.5 items-end">
               <div className="flex items-center gap-1.5">
                 <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                <span className="text-[12px] font-medium text-emerald-600">Within guidance ceiling</span>
+                <span className="text-[12px] font-medium text-emerald-600">Within 10% Appropriation Ceiling</span>
               </div>
               <span className="text-[11px] text-gray-400 leading-snug">
                 Suggested limit:{' '}

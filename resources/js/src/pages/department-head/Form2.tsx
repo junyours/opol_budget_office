@@ -1728,6 +1728,7 @@ const Form2: React.FC<Form2Props> = ({
                                                                     item.dept_bp_form2_item_id >
                                                                         0 && (
                                                                         <button
+                                                                        tabIndex={-1}
                                                                             onClick={() =>
                                                                                 handleDeleteItem(
                                                                                     item.dept_bp_form2_item_id,
@@ -2331,7 +2332,7 @@ const Form2: React.FC<Form2Props> = ({
             TD_M,
             "font-semibold border-l border-green-100",
             C_APP_SUB,
-        )}proposed
+        )}
     >
         {aipObligationTotal === 0
                                                 ? "–"

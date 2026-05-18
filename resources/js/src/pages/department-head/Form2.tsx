@@ -1828,7 +1828,7 @@ const Form2: React.FC<Form2Props> = ({
                                                                         item.expense_item_id,
                                                                     )}
                                                                     className={
-                                                                        inputAppCls
+                                                                        inputCurCls
                                                                     }
                                                                 />
                                                             ) : (
@@ -1857,7 +1857,7 @@ const Form2: React.FC<Form2Props> = ({
                                                         </td>
                                                         <td
                                                             className={cn(
-                                                                TD_APP,
+                                                                TD_CUR,
                                                                 "text-gray-600",
                                                             )}
                                                         >
@@ -2032,7 +2032,7 @@ const Form2: React.FC<Form2Props> = ({
                                                     className={cn(
                                                         TD_M,
                                                         "font-semibold text-gray-700 border-l",
-                                                        C_APP_SUB,
+                                                        C_CUR_SUB,
                                                     )}
                                                 >
                                                     {fmtP(clsSem1)}
@@ -2041,7 +2041,7 @@ const Form2: React.FC<Form2Props> = ({
                                                     className={cn(
                                                         TD_M,
                                                         "font-semibold text-gray-700",
-                                                        C_APP_SUB,
+                                                        C_CUR_SUB,
                                                     )}
                                                 >
                                                     {fmtP(clsSem2)}
@@ -2050,7 +2050,7 @@ const Form2: React.FC<Form2Props> = ({
                                                     className={cn(
                                                         TD_M,
                                                         "font-semibold text-gray-700",
-                                                        C_APP_SUB,
+                                                        C_CUR_SUB,
                                                     )}
                                                 >
                                                     {fmtP(clsPast)}
@@ -2215,7 +2215,7 @@ const Form2: React.FC<Form2Props> = ({
                                                             handleAipCommaBlur(id, "sem1")
                                                         }
                                                         disabled={savingAipSem1.has(id)}
-                                                        className={inputAppCls}
+                                                        className={inputCurCls}
                                                     />
                                                 ) : (
                                                     <span className="text-gray-600">
@@ -2498,7 +2498,7 @@ const Form2: React.FC<Form2Props> = ({
                                             </td>
                                             <td
                                                 className={cn(
-                                                    TD_APP,
+                                                    TD_CUR,
                                                     "text-blue-200",
                                                 )}
                                             >

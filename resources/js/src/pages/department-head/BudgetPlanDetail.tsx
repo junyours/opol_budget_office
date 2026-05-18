@@ -517,7 +517,7 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({
             <>
               <ExclamationTriangleIcon className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                <div className="flex flex-col gap-0.5 items-end">
-                <span className="text-[12px] font-medium text-amber-600">Above guidance ceiling</span>
+                <span className="text-[12px] font-medium text-amber-600">Above 10% Appropriation Ceiling</span>
                 <span className="text-[11px] text-gray-400 leading-snug">
                   Suggested limit:{' '}
                   <span className="font-mono font-semibold text-gray-700 text-[14px]">{fmtP(threshold)}</span>

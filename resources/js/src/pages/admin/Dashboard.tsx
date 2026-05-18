@@ -537,7 +537,7 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </p>
-              <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
+              <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
                 Overview
               </h1>
             </div>

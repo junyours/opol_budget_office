@@ -474,7 +474,7 @@ export default function PsComputation() {
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] text-gray-400">Municipality of Opol, Misamis Oriental</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">PS Computation</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">PS Computation</h1>
         </div>
 
         {/* Inline legend */}

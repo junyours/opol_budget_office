@@ -777,7 +777,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
         style={{ animationDelay: '0ms' }}
       >
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Personnel Services</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Personnel Services</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Budget Year: <span className="font-medium">{activePlan.year}</span>
             {activeTab && (() => {

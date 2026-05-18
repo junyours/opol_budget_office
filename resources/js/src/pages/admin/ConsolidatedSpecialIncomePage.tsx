@@ -191,7 +191,7 @@ export default function ConsolidatedSpecialIncomePage() {
           <span className="text-gray-300 text-[10px]">·</span>
           <span className="text-[10px] font-medium text-gray-400">Municipality of Opol, Misamis Oriental</span> */}
         </div>
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+        <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
           Consolidated Special Account Income
         </h1>
         {/* <p className="text-sm text-gray-400 mt-0.5">

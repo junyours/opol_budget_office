@@ -837,7 +837,7 @@ export default function MDFFund() {
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">20% Municipal Development Fund</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">20% Municipal Development Fund</h1>
         </div>
         {/* Sync button removed — debt items auto-sync on page load via server */}
       </div>

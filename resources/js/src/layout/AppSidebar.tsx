@@ -671,7 +671,7 @@
                 { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin"] },
                 { name: "Income Funds",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin"] },
                 { name: "SA Income Consolidated", href: "/admin/consolidated-special-income", icon: TableCellsIcon,      iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin"] },
-                { name: "PS Abstract",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin"] },
+                { name: "Personnel Services",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin"] },
                 { name: "Obligations & Budget",   href: "/admin/lbp-form6",                   icon: DocumentTextIcon,    iconBg: "bg-teal-100",    iconColor: "text-teal-600",    roles: ["super-admin", "admin"] },
                 { name: "Allocation by Sector",   href: "/admin/lbp-form7",                   icon: TableCellsIcon,      iconBg: "bg-indigo-100",  iconColor: "text-indigo-600",  roles: ["super-admin", "admin"] },
                 { name: "PS Computation",         href: "/admin/ps-computation",              icon: CalculatorIcon,      iconBg: "bg-sky-100",     iconColor: "text-sky-600",     roles: ["super-admin", "admin"] },

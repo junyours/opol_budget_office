@@ -134,7 +134,7 @@ export default function SummaryOfExpenditures() {
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] font-medium text-gray-400">FY {year}</span>
           </div> */}
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Summary of Expenditures</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Summary of Expenditures</h1>
           {/* <p className="text-[11px] text-gray-400 mt-0.5">Municipal Budget Office · Opol, Misamis Oriental · CY {year}</p> */}
         </div>
       </div>

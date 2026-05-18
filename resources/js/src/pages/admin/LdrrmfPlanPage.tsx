@@ -294,7 +294,7 @@ try {
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+        <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
           5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) —{" "}
           <span className="text-gray-500 font-normal text-xl">JMC 2013-1, RA-10121</span>
         </h1>

@@ -245,7 +245,7 @@ const invalidateActivePlanDependents = () => {
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Budget Administration
           </span>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
             Budget Plans
           </h1>
           <p className="text-xs text-gray-400 mt-1">

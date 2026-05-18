@@ -631,7 +631,7 @@ useEffect(() => {
       <span className="text-gray-300 text-[10px]">·</span>
       <span className="text-[10px] font-semibold text-gray-500">Budget Year {year}</span>
     </div>
-    <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
+    <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
       LOCAL DISASTER RISK REDUCTION & MANAGEMENT FUND INVESTMENT PLAN
     </h1>
   </div>

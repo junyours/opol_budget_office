@@ -514,7 +514,7 @@ export default function Form5() {
             {/* <span className="text-gray-300 text-[10px]">·</span> */}
             {/* <span className="text-[10px] font-medium text-gray-400">FY {budgetYear}</span> */}
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Statement of Indebtedness</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Statement of Indebtedness</h1>
         </div>
         <div className="flex items-center gap-2.5">
           {saving && (

@@ -213,7 +213,7 @@ const Form6: React.FC = () => {
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] font-medium text-gray-400">FY {budgetYear}</span>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
             Statement of Statutory and Contractual Obligations and Budgetary Requirements
           </h1>
           <p className="text-[12px] text-gray-500 mt-0.5">LGU : OPOL, MISAMIS ORIENTAL</p>

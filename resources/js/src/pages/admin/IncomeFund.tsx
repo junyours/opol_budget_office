@@ -2160,11 +2160,11 @@ const savePastObligation = useCallback(
             }
 
             if (row.isSubtotal) {
-              return (
-                <tr key={row.id} className="bg-gray-50">
-                  <td className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 font-semibold text-gray-700 text-[11px] border-r border-gray-200" style={{ paddingLeft: indent + 16 }}>
-                    {row.name}
-                   </td>
+  return (
+    <tr key={row.id} className="bg-gray-50">
+      <td className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 font-bold text-gray-800 text-[13px] border-r border-gray-200" style={{ paddingLeft: indent + 16 }}>
+        {row.name}
+      </td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem1)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem2)}</td>

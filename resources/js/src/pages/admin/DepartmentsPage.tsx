@@ -899,13 +899,19 @@ const DepartmentsPage: React.FC = () => {
     //     throw new Error(err.message ?? "Request failed");
     //   }
 
+    // if (editingDept) {
+    //     fd.append("_method", "PUT");
+    //     // await API.post(`/departments/${editingDept.dept_id}/upload`, fd);
+    //     await API.post(`/departments/${editingDept.dept_id}`, fd);
+    //   } else {
+    //     await API.post(`/departments`, fd);
+    //   }
+
     if (editingDept) {
-        fd.append("_method", "PUT");
-        // await API.post(`/departments/${editingDept.dept_id}/upload`, fd);
-        await API.post(`/departments/${editingDept.dept_id}`, fd);
-      } else {
-        await API.post(`/departments`, fd);
-      }
+  await API.post(`/departments/${editingDept.dept_id}/upload`, fd);
+} else {
+  await API.post(`/departments`, fd);
+}
 
       toast.success(editingDept ? "Department updated." : "Department created.");
       setModalOpen(false);

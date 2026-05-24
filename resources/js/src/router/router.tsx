@@ -4,6 +4,7 @@ import {
   Navigate,
   Outlet,
   RouterProvider,
+  useLocation,
 } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
@@ -137,6 +138,7 @@ const ExpenditurePage = React.lazy(
      () => import("../pages/admin/ExpenditurePage")
    );
 
+
 /* ------------------ Suspense Wrapper ------------------ */
 
 const Lazy = (Component: React.LazyExoticComponent<any>) => (
@@ -147,6 +149,18 @@ const Lazy = (Component: React.LazyExoticComponent<any>) => (
 
 /* ------------------ Guest Route ------------------ */
 
+// const GuestRoute = () => {
+//   const { user, loading } = useAuth();
+
+//   if (loading) return <LoadingState />;
+
+//   if (user) {
+//     return <Navigate to="/dashboard" replace />;
+//   }
+
+//   return <Outlet />;
+// };
+
 const GuestRoute = () => {
   const { user, loading } = useAuth();
 
@@ -154,21 +168,35 @@ const GuestRoute = () => {
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
-  }
+    }
 
   return <Outlet />;
 };
 
 /* ------------------ Protected Route ------------------ */
 
+// const ProtectedRoute = () => {
+//   const { user, loading } = useAuth();
+
+//   if (loading) return <LoadingState />;
+
+//   if (!user) {
+//     return <Navigate to="/login" replace />;
+//   }
+
+//   return <Outlet />;
+// };
 const ProtectedRoute = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) return <LoadingState />;
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+
+
 
   return <Outlet />;
 };
@@ -206,6 +234,7 @@ const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+
       {
         element: <MainLayout />,
         children: [
@@ -222,6 +251,10 @@ const router = createBrowserRouter([
             path: "profile",
             element: Lazy(ProfilePage),
           },
+        //   {
+        //     path: "pin-setup",
+        //     element: Lazy(PinSetup),
+        //     },
 
           {
             path: "department-budget-plans/:id",
@@ -229,10 +262,30 @@ const router = createBrowserRouter([
           },
 
 
+           /* ---------------- LDRRMO ---------------- */
+
+          {
+            element: <RoleRoute roles={["admin", "super-admin", "viewer", "admin-ldrrmo"]} />,
+            children: [
+              {
+                path: "admin/ldrrmfip",
+                element: Lazy(LdrrmfipPage),
+              },
+              {
+                path: "admin/ldrrmf-plan",
+                element: Lazy(LdrrmfPlanPage),
+              },
+              {
+                path: "admin/ldrrmf-reports",
+                element: Lazy(UnifiedReportsPage),
+              },
+            ],
+          },
+
           /* ---------------- ADMIN ---------------- */
 
           {
-            element: <RoleRoute roles={["admin", "super-admin"]} />,
+            element: <RoleRoute roles={["admin", "super-admin", "viewer"]} />,
             children: [
               {
                 path: "admin/tranche",
@@ -314,21 +367,10 @@ const router = createBrowserRouter([
                 path: "hrmo/plantilla-of-personnel",
                 element: Lazy(PlantillaOfPersonnelPage),
               },
-              {
-                path: "admin/settings",
-                element: Lazy(SettingsPage),
-              },
+
               {
                 path: "admin/ps-computation",
                 element: Lazy(PsComputation),
-              },
-              {
-                path: "admin/ldrrmfip",
-                element: Lazy(LdrrmfipPage),
-              },
-              {
-                path: "admin/ldrrmf-plan",
-                element: Lazy(LdrrmfPlanPage),
               },
               {
                 path: "admin/gad",
@@ -418,6 +460,32 @@ const router = createBrowserRouter([
               },
             ],
           },
+          /* ---------------- Admin ---------------- */
+            {
+            element: <RoleRoute roles={["admin", "super-admin"]} />,
+                children: [
+                    {
+                    path: "admin/settings",
+                    element: Lazy(SettingsPage),
+                },
+
+                ],
+            },
+
+            /**  ---------------  LDRRMO ---------------------**/
+//             {
+//     element: <RoleRoute roles={["admin-ldrrmo"]} />,
+//     children: [
+//         {
+//             path: "admin/ldrrmfip",
+//             element: Lazy(LdrrmfipPage),
+//         },
+//         {
+//             path: "admin/ldrrmf-plan",
+//             element: Lazy(LdrrmfPlanPage),
+//         },
+//     ],
+// },
         ],
       },
     ],

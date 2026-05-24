@@ -805,7 +805,7 @@ private function buildOneCalamity5(
         ->value('grand');
 
     $calamityFund = $this->computeCalamity5Fund($budgetPlanId, $source);
-    $reserved30   = round($calamityFund - $total70, 2);
+    $reserved30   = round($calamityFund * 0.30, 2);
 
     return [
         'label'      => $label,

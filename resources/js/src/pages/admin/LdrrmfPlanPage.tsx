@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { CheckCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useAuth } from "@/src/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,9 @@ export default function LdrrmfPlanPage() {
   // ── Inline sem1 editing state — MUST be before any early return ──────────
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
   const [savingKeys,    setSavingKeys]    = useState<Set<string>>(new Set());
+
+  const { user: authUser } = useAuth(); // add this import at the top too
+const canEdit = ['admin', 'super-admin', 'admin-ldrrmo'].includes(authUser?.role ?? '');
 
   if (loading) return <LoadingState />;
   if (!report) return (
@@ -433,11 +437,14 @@ try {
                               inputMode="numeric"
                               value={qrfObligDisplay}
                               placeholder="–"
-                              disabled={isQrfObligSaving}
+                              disabled={isQrfObligSaving || !canEdit}
+                              readOnly={!canEdit}
                               className={cn(
                                 "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
                                 isQrfObligSaving
                                   ? "text-gray-400 cursor-wait opacity-50"
+                                  : !canEdit
+                                  ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
                                   : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
                               )}
                               onFocus={() => handleAmountFocus(qrfObligKey, sa.qrf_past_obligation)}
@@ -479,11 +486,14 @@ try {
                               inputMode="numeric"
                               value={qrfSem1Display}
                               placeholder="–"
-                              disabled={isQrfSem1Saving}
+                              disabled={isQrfSem1Saving || !canEdit}
+                              readOnly={!canEdit}
                               className={cn(
                                 "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
                                 isQrfSem1Saving
                                   ? "text-gray-400 cursor-wait opacity-50"
+                                  : !canEdit
+                                  ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
                                   : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
                               )}
                               onFocus={() => handleAmountFocus(qrfSem1Key, sa.qrf_current_sem1)}
@@ -590,11 +600,14 @@ try {
                                 inputMode="numeric"
                                 value={obligDisplay}
                                 placeholder="–"
-                                disabled={isObligSaving}
+                                disabled={isObligSaving || !canEdit}
+                                readOnly={!canEdit}
                                className={cn(
   "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
   isObligSaving
     ? "text-gray-400 cursor-wait opacity-50"
+    : !canEdit
+    ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
     : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
 )}
                                 onFocus={() => handleAmountFocus(obligKey, item.obligation_amount)}
@@ -639,11 +652,14 @@ onBlur={async () => {
                                 type="text"
                                 value={sem1Display}
                                 placeholder="–"
-                                disabled={isSaving}
+                                disabled={isSaving || !canEdit}
+                                readOnly={!canEdit}
                                 className={cn(
   "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-0.5 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
   isSaving
     ? "text-gray-400 cursor-wait opacity-50"
+    : !canEdit
+    ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
     : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
 )}
                                 inputMode="numeric"

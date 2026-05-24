@@ -641,11 +641,18 @@ const roleBadge: Record<string, string> = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
 function getAvatarUrl(avatar?: string | null): string | null {
   if (!avatar) return null;
   if (avatar.startsWith("http")) return avatar;
-  // avatar is stored as "avatars/filename.jpg" → served at /storage/avatars/filename.jpg
   return `/storage/${avatar}`;
+}
+
+// Mirrors the cache key used in Login.tsx so the login avatar list
+// shows the updated photo without waiting for a new login.
+function updateLoginAvatarCache(userId: number, src: string) {
+  try { localStorage.setItem(`avatar_cache_${userId}`, src); } catch {}
 }
 
 // ─── component ────────────────────────────────────────────────────────────────
@@ -842,8 +849,27 @@ export default function ProfilePage() {
 
       // Update in-memory user context with the stored relative path so that
       // getAvatarUrl() can reconstruct the URL anywhere in the app.
+      // Update in-memory user context with the stored relative path so that
+      // getAvatarUrl() can reconstruct the URL anywhere in the app.
       if (newAvatarPath) {
-        setUser((prev) => (prev ? { ...prev, avatar: newAvatarPath } : prev));
+        setUser((prev) => {
+          if (!prev) return prev;
+          // Also update the login avatar cache so the accounts list
+          // on the login screen shows the new photo immediately.
+        //   const { saveAvatarToCache } = (() => {
+        //     const AVATAR_CACHE_KEY = (id: number) => `avatar_cache_${id}`;
+        //     return {
+        //       saveAvatarToCache: (userId: number, src: string) => {
+        //         try { localStorage.setItem(AVATAR_CACHE_KEY(userId), src); } catch {}
+        //       },
+        //     };
+        //   })();
+        //   if (resolvedUrl) saveAvatarToCache(prev.user_id, resolvedUrl);
+        if (resolvedUrl) {
+            try { localStorage.setItem(`avatar_cache_${prev.user_id}`, resolvedUrl); } catch {}
+          }
+          return { ...prev, avatar: newAvatarPath };
+        });
       }
     } catch {
       // On failure: revert to whatever the server-side avatar currently is.

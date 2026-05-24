@@ -48,8 +48,12 @@ use App\Http\Controllers\Api\{
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
+// Route::prefix('auth')->middleware('throttle:login')->group(function () {
+//     Route::post('/login', [AuthController::class, 'login']);
+// });
 Route::prefix('auth')->middleware('throttle:login')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login',         [AuthController::class, 'login']);
+    Route::post('/login-pin',     [AuthController::class, 'loginWithPin']);
 });
 
 // ── Authenticated Routes (standard API rate limit) ─────────────────────────────

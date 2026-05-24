@@ -27,6 +27,7 @@ class AuthServiceProvider extends ServiceProvider
         BudgetPlanForm2Item::class               => BudgetPlanItemPolicy::class,
         BudgetPlan::class                        => BudgetPlanPolicy::class,
         DepartmentBudgetPlan::class              => DepartmentBudgetPlanPolicy::class,
+        \App\Models\LdrrmfipItem::class          => \App\Policies\LdrrmfipPolicy::class,
     ];
 
     /**

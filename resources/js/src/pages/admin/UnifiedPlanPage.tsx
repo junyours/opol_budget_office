@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { LoadingState } from "@/src/pages/common/LoadingState";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { useAuth } from "@/src/hooks/useAuth";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
@@ -525,8 +526,8 @@ function DeptSelect({ departments, value, onChange }: {
   );
 }
 
-function EditableCell({ value, onSave, multiline = false }: {
-  value:string; onSave:(v:string)=>void; multiline?:boolean;
+function EditableCell({ value, onSave, multiline = false, readOnly = false }: {
+  value:string; onSave:(v:string)=>void; multiline?:boolean; readOnly?:boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -535,6 +536,13 @@ function EditableCell({ value, onSave, multiline = false }: {
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
   const commit = () => { setEditing(false); if (draft !== value) onSave(draft); };
   const cls = "w-full text-[12px] border rounded-md px-2 py-1.5 bg-white border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200";
+  if (readOnly) {
+    return (
+      <div className="min-h-[28px] px-1.5 py-0.5 text-[12px] leading-snug break-words text-gray-600">
+        {value || <span className="text-gray-300">—</span>}
+      </div>
+    );
+  }
   if (editing) {
     return multiline
       ? <textarea ref={ref} value={draft} rows={2} style={{ resize: "vertical", minHeight: 48 }}
@@ -553,10 +561,17 @@ function EditableCell({ value, onSave, multiline = false }: {
   );
 }
 
-function AmountCell({ value, onSave }: { value:number; onSave:(v:number)=>void }) {
+function AmountCell({ value, onSave, readOnly = false }: { value:number; onSave:(v:number)=>void; readOnly?:boolean }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value === 0 ? "" : fmt(value));
   useEffect(() => { if (!editing) setDraft(value === 0 ? "" : fmt(value)); }, [value, editing]);
+  if (readOnly) {
+    return (
+      <div className={cn("text-right text-[12px] font-mono tabular-nums px-1.5 py-0.5 min-h-[28px] flex items-center justify-end", value === 0 ? "text-gray-300" : "text-gray-700")}>
+        {value === 0 ? "—" : fmt(value)}
+      </div>
+    );
+  }
   return editing
     ? <input type="text" inputMode="decimal" autoFocus value={draft}
         onChange={e => setDraft(fmtW(e.target.value))}
@@ -971,6 +986,8 @@ function ItemDialog({ open, onOpenChange, initialForm, departments, aipPrograms,
 
 export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
+  const { user } = useAuth();
+  const isViewer = user?.role === "viewer";
   const { variant } = meta;
   const isFund = variant === "fund";
   const isNutr = variant === "nutrition";
@@ -1207,20 +1224,24 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
           <p className="text-sm text-gray-400 mt-0.5">{meta.subtitle}</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-          <Button size="sm" variant="outline" onClick={downloadTemplate}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-            <ArrowDownTrayIcon className="w-3.5 h-3.5" /> Download Template
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-            <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Import Excel
-          </Button>
-          <Button size="sm" onClick={openAdd}
-            className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white">
-            <PlusIcon className="w-3.5 h-3.5" /> Add Item
-          </Button>
-        </div>
+  <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+  <Button size="sm" variant="outline" onClick={downloadTemplate}
+    className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+    <ArrowDownTrayIcon className="w-3.5 h-3.5" /> Download Template
+  </Button>
+  {!isViewer && (
+    <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}
+      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+      <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Import Excel
+    </Button>
+  )}
+  {!isViewer && (
+    <Button size="sm" onClick={openAdd}
+      className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white">
+      <PlusIcon className="w-3.5 h-3.5" /> Add Item
+    </Button>
+  )}
+</div>
       </div>
 
       {/* ── Stat cards ─────────────────────────────────────────────────────── */}
@@ -1419,7 +1440,9 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
                 {items.length === 0 ? (
                   <tr><td colSpan={20} className="py-14 text-center text-gray-400 text-sm">
                     No items yet.{" "}
-                    <button onClick={openAdd} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Add the first item</button>
+{!isViewer && (
+  <button onClick={openAdd} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Add the first item</button>
+)}
                   </td></tr>
                 ) : items.map((item, idx) => {
                   // Subtotal row
@@ -1451,13 +1474,13 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
                           <span className="font-mono text-[11px] text-gray-600">{item.aip_reference_code || <span className="text-gray-300">—</span>}</span>
                         </td>
                       )}
-                      {isSect && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.sector ?? ""} onSave={v => handleUpdate(item.up_item_id, "sector", v)} /></td>}
+                      {isSect && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.sector ?? ""} onSave={v => handleUpdate(item.up_item_id, "sector", v)} readOnly={isViewer} /></td>}
                       <td className="border-r border-gray-100 px-2 py-1.5 align-top font-medium text-gray-900">
-                        <EditableCell value={item.program_description ?? ""} onSave={v => handleUpdate(item.up_item_id, "program_description", v)} multiline />
+                        <EditableCell value={item.program_description ?? ""} onSave={v => handleUpdate(item.up_item_id, "program_description", v)} multiline readOnly={isViewer} />
                       </td>
-                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_issue ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_issue", v)} multiline /></td>}
-                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_activity ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_activity", v)} multiline /></td>}
-                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_target ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_target", v)} /></td>}
+                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_issue ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_issue", v)} multiline readOnly={isViewer} /></td>}
+                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_activity ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_activity", v)} multiline readOnly={isViewer} /></td>}
+                      {isNutr && <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.nutrition_target ?? ""} onSave={v => handleUpdate(item.up_item_id, "nutrition_target", v)} readOnly={isViewer} /></td>}
                       <td className="border-r border-gray-100 px-2 py-1.5 align-top">
                         {item.implementing_office
                           ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200">{item.implementing_office}</span>
@@ -1472,26 +1495,26 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
                         </td>
                       )}
                       {!isNutr && <>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.start_date ?? ""} onSave={v => handleUpdate(item.up_item_id, "start_date", v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.completion_date ?? ""} onSave={v => handleUpdate(item.up_item_id, "completion_date", v)} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.start_date ?? ""} onSave={v => handleUpdate(item.up_item_id, "start_date", v)} readOnly={isViewer} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.completion_date ?? ""} onSave={v => handleUpdate(item.up_item_id, "completion_date", v)} readOnly={isViewer} /></td>
                       </>}
                       {isSect && <>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.target_output_aip ?? ""} onSave={v => handleUpdate(item.up_item_id, "target_output_aip", v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.target_output_ab ?? ""} onSave={v => handleUpdate(item.up_item_id, "target_output_ab", v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.aip_amount} onSave={v => handleUpdate(item.up_item_id, "aip_amount", v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.ab_amount}  onSave={v => handleUpdate(item.up_item_id, "ab_amount",  v)} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.target_output_aip ?? ""} onSave={v => handleUpdate(item.up_item_id, "target_output_aip", v)} readOnly={isViewer} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top text-gray-500"><EditableCell value={item.target_output_ab ?? ""} onSave={v => handleUpdate(item.up_item_id, "target_output_ab", v)} readOnly={isViewer} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.aip_amount} onSave={v => handleUpdate(item.up_item_id, "aip_amount", v)} readOnly={isViewer} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.ab_amount}  onSave={v => handleUpdate(item.up_item_id, "ab_amount",  v)} readOnly={isViewer}/></td>
                       </>}
                       {(isFund || isNutr) && <>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.ps_amount}   onSave={v => handleUpdate(item.up_item_id, "ps_amount",   v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.mooe_amount} onSave={v => handleUpdate(item.up_item_id, "mooe_amount", v)} /></td>
-                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.co_amount}   onSave={v => handleUpdate(item.up_item_id, "co_amount",   v)} /></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.ps_amount}   onSave={v => handleUpdate(item.up_item_id, "ps_amount",   v)} readOnly={isViewer}/></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.mooe_amount} onSave={v => handleUpdate(item.up_item_id, "mooe_amount", v)} readOnly={isViewer}/></td>
+                        <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.co_amount}   onSave={v => handleUpdate(item.up_item_id, "co_amount",   v)} readOnly={isViewer}/></td>
                         <td className="border-r border-gray-100 px-3 py-2 align-top text-right font-mono tabular-nums text-gray-700 font-semibold">
                           {item.total_amount > 0 ? fmt(item.total_amount) : <span className="text-gray-300">—</span>}
                         </td>
                       </>}
-                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.cc_adaptation} onSave={v => handleUpdate(item.up_item_id, "cc_adaptation", v)} /></td>
-                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.cc_mitigation}  onSave={v => handleUpdate(item.up_item_id, "cc_mitigation",  v)} /></td>
-                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.cc_typology_code ?? ""} onSave={v => handleUpdate(item.up_item_id, "cc_typology_code", v)} /></td>
+                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.cc_adaptation} onSave={v => handleUpdate(item.up_item_id, "cc_adaptation", v)} readOnly={isViewer}/></td>
+                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><AmountCell value={item.cc_mitigation}  onSave={v => handleUpdate(item.up_item_id, "cc_mitigation",  v)} readOnly={isViewer}/></td>
+                      <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={item.cc_typology_code ?? ""} onSave={v => handleUpdate(item.up_item_id, "cc_typology_code", v)} readOnly={isViewer} /></td>
                       <td className="px-1.5 py-1.5 align-top">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1500,9 +1523,16 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem className="text-xs" onClick={() => openEdit(item)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => setDeleteTarget(item)}>Delete</DropdownMenuItem>
-                          </DropdownMenuContent>
+  {!isViewer && (
+    <DropdownMenuItem className="text-xs" onClick={() => openEdit(item)}>Edit</DropdownMenuItem>
+  )}
+  {!isViewer && (
+    <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => setDeleteTarget(item)}>Delete</DropdownMenuItem>
+  )}
+  {isViewer && (
+    <DropdownMenuItem disabled className="text-gray-400 text-xs">View only</DropdownMenuItem>
+  )}
+</DropdownMenuContent>
                         </DropdownMenu>
                       </td>
                     </tr>

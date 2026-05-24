@@ -94,8 +94,9 @@ const DepartmentSettings: React.FC = () => {
       if (logoFileRef.current) fd.append("logo", logoFileRef.current);
 
     //   await API.put(`/departments/${dept.dept_id}`, fd);
-    fd.append("_method", "PUT");
-      await API.post(`/departments/${dept.dept_id}/upload`, fd);
+    // fd.append("_method", "PUT");
+    //   await API.post(`/departments/${dept.dept_id}/upload`, fd);
+    await API.post(`/departments/${dept.dept_id}/upload`, fd);
 
       toast.success("Department updated successfully.");
       logoFileRef.current = null;

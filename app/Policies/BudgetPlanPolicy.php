@@ -10,17 +10,25 @@ class BudgetPlanPolicy
     /**
      * Determine whether the user can view any models.
      */
+    // public function viewAny(User $user): bool
+    // {
+    //     return in_array($user->role, ['admin', 'super-admin', 'department-head']);
+    // }
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'super-admin', 'department-head']);
+        return in_array($user->role, ['admin', 'super-admin', 'department-head', 'viewer', 'admin-ldrrmo']);
     }
 
     /**
      * Determine whether the user can view the model.
      */
+    // public function view(User $user, BudgetPlan $budgetPlan): bool
+    // {
+    //     return in_array($user->role, ['admin', 'super-admin', 'department-head']);
+    // }
     public function view(User $user, BudgetPlan $budgetPlan): bool
     {
-        return in_array($user->role, ['admin', 'super-admin', 'department-head']);
+        return in_array($user->role, ['admin', 'super-admin', 'department-head', 'viewer', 'admin-ldrrmo']);
     }
 
     /**

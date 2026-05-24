@@ -29,6 +29,7 @@ import { PlusIcon } from "@heroicons/react/24/outline";
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
+import { useAuth } from "../../hooks/useAuth";
 
 // ─── Extended type ────────────────────────────────────────────────────────────
 
@@ -70,6 +71,9 @@ const BudgetPlanList: React.FC = () => {
   const [closingPlan, setClosingPlan]     = useState(false);
 
   const queryClient = useQueryClient();
+
+  const { user } = useAuth();
+    const isViewer = user?.role === 'viewer';
 
 //   const invalidateActivePlanDependents = () => {
 //   queryClient.invalidateQueries({ queryKey: ['budget-plan-active'] });
@@ -252,14 +256,24 @@ const invalidateActivePlanDependents = () => {
             Manage annual budget plans and department submission windows.
           </p>
         </div>
-        <Button
+        {/* <Button
           size="sm"
           onClick={() => setCreateOpen(true)}
           className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white"
         >
           <PlusIcon className="w-3.5 h-3.5" />
           New Budget Plan
-        </Button>
+        </Button> */}
+        {!isViewer && (
+  <Button
+    size="sm"
+    onClick={() => setCreateOpen(true)}
+    className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white"
+  >
+    <PlusIcon className="w-3.5 h-3.5" />
+    New Budget Plan
+  </Button>
+)}
       </div>
 
       {/* ── Table ── */}
@@ -279,7 +293,8 @@ const invalidateActivePlanDependents = () => {
           <table className="w-full text-[12px] border-collapse">
             <thead>
               <tr>
-                {["Year", "Status", "Submissions", "Dept. Plans", "Created"].map((h, i) => (
+                {/* {["Year", "Status", "Submissions", "Dept. Plans", "Created"].map((h, i) => ( */}
+                {["Year", "Status", ...(!isViewer ? ["Submissions"] : []), "Dept. Plans", "Created"].map((h, i) => (
                   <th
                     key={i}
                     className="border-b border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide"
@@ -293,14 +308,23 @@ const invalidateActivePlanDependents = () => {
               {plans.map(plan => {
                 const deptCount = (plan as any).department_plans?.length ?? "–";
                 return (
-                  <tr
-                    key={plan.budget_plan_id}
-                    onClick={() => openEdit(plan)}
-                    className={cn(
-                      "hover:bg-gray-50/80 transition-colors cursor-pointer select-none",
-                      plan.is_active && "bg-emerald-50/30"
-                    )}
-                  >
+                //   <tr
+                //     key={plan.budget_plan_id}
+                //     onClick={() => openEdit(plan)}
+                //     className={cn(
+                //       "hover:bg-gray-50/80 transition-colors cursor-pointer select-none",
+                //       plan.is_active && "bg-emerald-50/30"
+                //     )}
+                //   >
+                <tr
+  key={plan.budget_plan_id}
+  onClick={() => !isViewer && openEdit(plan)}
+  className={cn(
+    !isViewer && "hover:bg-gray-50/80 cursor-pointer select-none",
+    plan.is_active && "bg-emerald-50/30",
+    "transition-colors"
+  )}
+>
                     {/* Year */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -329,7 +353,7 @@ const invalidateActivePlanDependents = () => {
                     </td>
 
                     {/* is_open toggle — stop propagation so row click doesn't fire */}
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    {/* <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={plan.is_open}
@@ -347,7 +371,28 @@ const invalidateActivePlanDependents = () => {
                       {!plan.is_active && (
                         <span className="text-[10px] text-gray-300 mt-0.5 block">Active plan only</span>
                       )}
-                    </td>
+                    </td> */}
+                    {!isViewer && (
+  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+    <div className="flex items-center gap-2">
+      <Switch
+        checked={plan.is_open}
+        onCheckedChange={() => handleToggleOpen(plan)}
+        disabled={!plan.is_active}
+        className="data-[state=checked]:bg-blue-600"
+      />
+      <span className={cn(
+        "text-[11px] font-medium",
+        plan.is_open ? "text-blue-600" : "text-gray-400"
+      )}>
+        {plan.is_open ? "Open" : "Closed"}
+      </span>
+    </div>
+    {!plan.is_active && (
+      <span className="text-[10px] text-gray-300 mt-0.5 block">Active plan only</span>
+    )}
+  </td>
+)}
 
                     {/* Dept count */}
                     <td className="px-4 py-3 text-gray-500 tabular-nums">{deptCount}</td>
@@ -364,7 +409,10 @@ const invalidateActivePlanDependents = () => {
             </tbody>
           </table>
           <div className="px-4 py-2.5 border-t border-gray-100">
-            <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p>
+            {/* <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p> */}
+            {!isViewer && (
+  <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p>
+)}
           </div>
           </>
         )}

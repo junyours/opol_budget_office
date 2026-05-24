@@ -13,7 +13,13 @@ class ProfileController extends BaseApiController
      * GET /api/profile
      * Returns the authenticated user with their department.
      */
-    public function show(Request $request)
+    // public function show(Request $request)
+    // {
+    //     return $this->success(
+    //         $request->user()->load('department')
+    //     );
+    // }
+   public function show(Request $request)
     {
         return $this->success(
             $request->user()->load('department')
@@ -34,6 +40,7 @@ class ProfileController extends BaseApiController
             'lname'    => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $user->user_id . ',user_id',
         ]);
+
 
         $user->update($validated);
 

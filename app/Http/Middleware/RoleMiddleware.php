@@ -28,9 +28,19 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
+    // public function handle(Request $request, Closure $next, string $role): Response
+    // {
+    //     if (!$request->user() || $request->user()->role !== $role) {
+    //         abort(403, 'Unauthorized');
+    //     }
+
+    //     return $next($request);
+    // }
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        if (!$request->user() || $request->user()->role !== $role) {
+        $allowedRoles = explode('|', $role);
+
+        if (!$request->user() || !in_array($request->user()->role, $allowedRoles)) {
             abort(403, 'Unauthorized');
         }
 

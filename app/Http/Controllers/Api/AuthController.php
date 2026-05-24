@@ -43,9 +43,45 @@ class AuthController extends Controller
         // Clean up only THIS user's expired tokens on login
         $user->tokens()->where('expires_at', '<', now())->delete();
 
+        // return response()->json([
+        //     'user'  => $user,
+        //     'token' => $user->createToken('auth-token')->plainTextToken, // expiry handled by sanctum.php
+        // ]);
+
         return response()->json([
             'user'  => $user,
-            'token' => $user->createToken('auth-token')->plainTextToken, // expiry handled by sanctum.php
+            'token' => $user->createToken('auth-token')->plainTextToken,
+        ]);
+    }
+
+
+
+    public function loginWithPin(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id'  => 'required|integer',
+            'password' => 'required|string',
+        ]);
+
+        $user = User::with('department')->find($validated['user_id']);
+
+        if (!$user) {
+            return response()->json(['message' => 'Account not found.'], 422);
+        }
+
+        if (!$user->is_active) {
+            return response()->json(['message' => 'Account is deactivated.'], 403);
+        }
+
+        if (!Hash::check($validated['password'], $user->password)) {
+            return response()->json(['message' => 'Incorrect password.'], 422);
+        }
+
+        $user->tokens()->where('expires_at', '<', now())->delete();
+
+        return response()->json([
+            'user'  => $user,
+            'token' => $user->createToken('auth-token')->plainTextToken,
         ]);
     }
 

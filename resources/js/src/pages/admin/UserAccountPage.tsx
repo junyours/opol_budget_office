@@ -65,6 +65,8 @@ const ROLE_OPTIONS = [
   { value: 'admin',           label: 'Budget Officer' },
   { value: 'department-head', label: 'Department Head' },
   { value: 'admin-hrmo',      label: 'HRMO' },
+  { value: 'admin-ldrrmo',    label: 'LDRRMO' },
+  { value: 'viewer',          label: 'Viewer' },
 ] as const;
 
 const ROLE_BADGE: Record<string, string> = {
@@ -72,6 +74,8 @@ const ROLE_BADGE: Record<string, string> = {
   'admin':           'text-blue-700 bg-blue-50 border-blue-200',
   'department-head': 'text-emerald-700 bg-emerald-50 border-emerald-200',
   'admin-hrmo':      'text-orange-700 bg-orange-50 border-orange-200',
+  'admin-ldrrmo': 'text-red-700 bg-red-50 border-red-200',
+  'viewer':          'text-slate-700 bg-slate-50 border-slate-200',
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -79,6 +83,8 @@ const ROLE_LABEL: Record<string, string> = {
   'admin':           'Budget Officer',
   'department-head': 'Department Head',
   'admin-hrmo':      'HRMO',
+  'admin-ldrrmo': 'LDRRMO',
+  'viewer':          'Viewer',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -581,6 +587,7 @@ const UserAccountPage: React.FC = () => {
               <SelectItem key={r.value} value={r.value} className="text-xs">{r.label}</SelectItem>
             ))}
             <SelectItem value="super-admin" className="text-xs">Super Admin</SelectItem>
+<SelectItem value="viewer"      className="text-xs">Viewer</SelectItem>
           </SelectContent>
         </Select>
 

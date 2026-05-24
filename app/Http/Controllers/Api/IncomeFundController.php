@@ -14,16 +14,15 @@ use Illuminate\Support\Facades\DB;
 class IncomeFundController extends Controller
 {
     protected function getUserSource($requestSource = null)
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        // If source is provided in request and user is admin, use that source
-        if ($requestSource && ($user->role === 'admin' || $user->role === 1 || $user->role === 'super-admin')) {
-            return $requestSource;
-        }
+    if ($requestSource && in_array($user->role, ['admin', 'super-admin', 'viewer'])) {
+        return $requestSource;
+    }
 
-        // For non-admin users, determine source based on department
-        if ($user->role === 'department-head' || $user->role === 2) {
+    // For non-admin users, determine source based on department
+    if ($user->role === 'department-head' || $user->role === 2) {
             $department = $user->department;
 
             if (!$department) {

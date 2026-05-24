@@ -257,6 +257,8 @@ export default function LdrrmfipPage() {
   //   }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
   // }, []);
   const { user } = useAuth();
+// const isViewer = user?.role === "viewer";
+const isViewer = !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
 
 useEffect(() => {
   Promise.all([
@@ -448,21 +450,23 @@ useEffect(() => {
                       <span className="text-[12px] font-semibold text-gray-700 uppercase tracking-wide">
                         {group.name}
                       </span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm" variant="outline"
-                            className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
-                            onClick={() => { setActiveSource(source); openAdd(group.ldrrmfip_category_id); }}
-                          >
-                            <PlusIcon className="w-3.5 h-3.5" />
-                            Add Item
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="left" className="text-xs">
-                          Add item in {group.name}
-                        </TooltipContent>
-                      </Tooltip>
+                      {!isViewer && (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        size="sm" variant="outline"
+        className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
+        onClick={() => { setActiveSource(source); openAdd(group.ldrrmfip_category_id); }}
+      >
+        <PlusIcon className="w-3.5 h-3.5" />
+        Add Item
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent side="left" className="text-xs">
+      Add item in {group.name}
+    </TooltipContent>
+  </Tooltip>
+)}
                     </div>
                   </td>
                 </tr>
@@ -500,21 +504,27 @@ useEffect(() => {
                     >
                       <td className="px-3 py-2.5 text-gray-800 leading-snug border-r border-gray-100">
                         <div className="flex items-center justify-between gap-1">
-                          <button
-                            className="text-left hover:text-blue-600 transition-colors leading-snug"
-                            onClick={() => { setActiveSource(source); openEdit(item); }}
-                            title="Click to edit"
-                          >
-                            {item.description}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item)}
-                            className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
-                            title="Remove"
-                          >
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+  {isViewer ? (
+    <span className="leading-snug">{item.description}</span>
+  ) : (
+    <button
+      className="text-left hover:text-blue-600 transition-colors leading-snug"
+      onClick={() => { setActiveSource(source); openEdit(item); }}
+      title="Click to edit"
+    >
+      {item.description}
+    </button>
+  )}
+  {!isViewer && (
+    <button
+      onClick={() => handleDelete(item)}
+      className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+      title="Remove"
+    >
+      <TrashIcon className="w-3.5 h-3.5" />
+    </button>
+  )}
+</div>
                       </td>
                       <td className="px-3 py-2.5 text-gray-600 text-center border-r border-gray-100">{item.implementing_office}</td>
                       <td className="px-3 py-2.5 text-gray-600 text-center border-r border-gray-100">{item.starting_date ?? "–"}</td>
@@ -550,56 +560,73 @@ useEffect(() => {
         ))}
 
         {/* ── Summary footer ──────────────────────────────────────────────── */}
-        {summary && (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <table className="w-full text-[12.5px] border-collapse">
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-3 text-gray-700">
-                    <span className="font-semibold text-gray-900">A.</span>{" "}
-                    Total (70% of the 5% CF, Preparedness Fund for CY{year})
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono tabular-nums font-bold text-gray-900 w-52">
-                    {peso(summary.total_70pct)}
-                  </td>
-                </tr>
+        {/* ── Summary footer ──────────────────────────────────────────────── */}
+        {summary && (() => {
+          const calamityFund  = summary.calamity_fund;
+          const qrf30         = calamityFund * 0.30;
+          const predis70limit = calamityFund * 0.70;
+          const allocated     = summary.total_70pct;
 
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-3 text-gray-700">
-                    <span className="font-semibold text-gray-900">B.</span>{" "}
-                    Total Reserved for Actual Calamity (30%) for Calendar Year {year}
-                    <span className="ml-1.5 text-[10.5px] text-gray-400">(C − A)</span>
-                  </td>
-                  <td className={cn(
-                    "px-5 py-3 text-right font-mono tabular-nums font-bold w-52",
-                    summary.reserved_30 < 0 ? "text-red-600" : "text-gray-900"
-                  )}>
-                    {summary.reserved_30 < 0
-                      ? `-₱ ${Math.round(Math.abs(summary.reserved_30)).toLocaleString("en-PH")}`
-                      : peso(summary.reserved_30)
-                    }
-                  </td>
-                </tr>
+          return (
+            <>
+              {allocated > predis70limit && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                  <p className="text-[11px] font-semibold text-red-700">
+                    Over budget by ₱ {(allocated - predis70limit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — allocated items exceed the 70% Pre-Disaster ceiling.
+                  </p>
+                </div>
+              )}
 
-                <tr className="bg-blue-50/40 border-t border-blue-100">
-                  <td className="px-5 py-3">
-                    <span className="font-semibold text-gray-900">C.</span>{" "}
-                    <span className="text-gray-700">Total 5% Calamity Fund Reserved for CY{year}</span>{" "}
-                    <span className="inline-flex items-center gap-1 ml-1.5 text-[10px] font-semibold
-                      bg-blue-100 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5 align-middle">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block flex-none" />
-                      derived · 5% of {srcObj.type === "general" ? "General Fund" : srcObj.label}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono tabular-nums font-bold text-blue-600 w-52">
-                    {peso(summary.calamity_fund)}
-                  </td>
-                </tr>
-              </tbody>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-[12.5px] border-collapse">
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-5 py-3 text-gray-700">
+                        <span className="font-semibold text-gray-900">A.</span>{" "}
+                        Total (70% of the 5% CF, Preparedness Fund for CY{year})
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums font-bold w-52">
+                        <span className={cn(allocated > predis70limit ? "text-red-600" : "text-gray-900")}>
+                          ₱ {allocated.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="block text-[10px] text-gray-400 font-normal">
+                          limit: ₱ {predis70limit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                    </tr>
 
-            </table>
-          </div>
-        )}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-5 py-3 text-gray-700">
+                        <span className="font-semibold text-gray-900">B.</span>{" "}
+                        Total Reserved for Actual Calamity (30%) for Calendar Year {year}
+                        <span className="ml-1.5 text-[10.5px] text-gray-400">(30% of C)</span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums font-bold text-gray-900 w-52">
+                        ₱ {qrf30.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+
+                    <tr className="bg-blue-50/40 border-t border-blue-100">
+                      <td className="px-5 py-3">
+                        <span className="font-semibold text-gray-900">C.</span>{" "}
+                        <span className="text-gray-700">Total 5% Calamity Fund Reserved for CY{year}</span>{" "}
+                        <span className="inline-flex items-center gap-1 ml-1.5 text-[10px] font-semibold
+                          bg-blue-100 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5 align-middle">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block flex-none" />
+                          derived · 5% of {srcObj.type === "general" ? "General Fund" : srcObj.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums font-bold text-blue-600 w-52">
+                        ₱ {calamityFund.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </div>
     );
   };
@@ -635,15 +662,15 @@ useEffect(() => {
       LOCAL DISASTER RISK REDUCTION & MANAGEMENT FUND INVESTMENT PLAN
     </h1>
   </div>
-  {activePlanId && (
-    <LdrrmfipUpload
-      activePlanId={activePlanId}
-      activeSource={activeSource}
-      sources={sources}
-      categories={categories}
-      onSuccess={() => fetchSource(activeSource)}
-    />
-  )}
+  {activePlanId && !isViewer && (
+  <LdrrmfipUpload
+    activePlanId={activePlanId}
+    activeSource={activeSource}
+    sources={sources}
+    categories={categories}
+    onSuccess={() => fetchSource(activeSource)}
+  />
+)}
 </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}

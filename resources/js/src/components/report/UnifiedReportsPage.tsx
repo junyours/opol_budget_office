@@ -15,6 +15,7 @@ import {
   Settings2, Save, RotateCcw,
 } from 'lucide-react';
 import API from '@/src/services/api';
+import { useAuth } from '@/src/hooks/useAuth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -310,7 +311,8 @@ const AbpPanel: React.FC<{
   departments: Department[];
   filterOptions: FilterOption[];
   loadingInit: boolean;
-}> = ({ budgetPlans, departments, filterOptions, loadingInit }) => {
+  restrictToCalamity?: boolean;
+}> = ({ budgetPlans, departments, filterOptions, loadingInit, restrictToCalamity = false }) => {
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [selectedDept,   setSelectedDept]   = useState<string>('all');
@@ -329,7 +331,10 @@ const AbpPanel: React.FC<{
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
-  const allFormIds  = FORM_DEFS.map(f => f.id) as FormId[];
+  const visibleForms = restrictToCalamity
+    ? FORM_DEFS.filter(f => f.id === 'calamity5')
+    : FORM_DEFS;
+  const allFormIds  = visibleForms.map(f => f.id) as FormId[];
   const allSelected = allFormIds.every(id => selectedForms.has(id));
   const someSelected= allFormIds.some(id  => selectedForms.has(id)) && !allSelected;
 
@@ -496,7 +501,7 @@ const AbpPanel: React.FC<{
               <span className="text-xs font-bold text-zinc-700 group-hover:text-zinc-900">{allSelected ? 'Deselect All' : 'Select All'}</span>
             </label>
             <div className="space-y-2">
-              {FORM_DEFS.map(form => (
+              {visibleForms.map(form => (
                 <label key={form.id} htmlFor={`chk-${form.id}`} className="flex items-start gap-2 cursor-pointer group">
                   <Checkbox id={`chk-${form.id}`} checked={selectedForms.has(form.id)} onCheckedChange={() => toggleForm(form.id)} className="mt-0.5 flex-shrink-0" />
                   <div>
@@ -939,6 +944,8 @@ const LepPanel: React.FC<{
 // ═════════════════════════════════════════════════════════════════════════════
 
 const UnifiedReportsPage: React.FC = () => {
+  const { user } = useAuth();
+  const restrictToCalamity = user?.role === 'admin-ldrrmo';
 
   const [budgetPlans,   setBudgetPlans]   = useState<BudgetPlan[]>([]);
   const [departments,   setDepartments]   = useState<Department[]>([]);
@@ -1026,6 +1033,7 @@ const UnifiedReportsPage: React.FC = () => {
             departments={departments}
             filterOptions={filterOptions}
             loadingInit={loadingInit}
+            restrictToCalamity={restrictToCalamity}
           />
         </TabsContent>
 

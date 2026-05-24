@@ -348,6 +348,7 @@ const LBPForms: React.FC = () => {
     const notifications = useNotificationStore(s => s.notifications);
   const markRead      = useNotificationStore(s => s.markRead);
   const isAdmin = user?.role === 'admin';
+const isViewer = user?.role === 'viewer';
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const activePlanId = activePlan?.budget_plan_id;
@@ -842,32 +843,33 @@ const filteredPlans = useMemo(() => {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {selectedPlan.status === 'submitted' && (
-                  <>
-                    <Button size="sm" variant="outline"
-                      onClick={() => setRejectTarget(selectedPlan)}
-                      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-                      <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
-                      Return to Draft
-                    </Button>
-                    <Button size="sm"
-                      onClick={() => setApproveTarget(selectedPlan)}
-                      className="gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
-                      <CheckCircleIcon className="w-3.5 h-3.5" />
-                      Approve
-                    </Button>
-                  </>
-                )}
-                {selectedPlan.status === 'approved' && (
-                  <Button size="sm" variant="outline"
-                    onClick={() => setRejectTarget(selectedPlan)}
-                    className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600">
-                    <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
-                    Return to Draft
-                  </Button>
-                )}
-              </div>
+              {/* Action buttons */}
+<div className="flex items-center gap-2 flex-shrink-0">
+  {!isViewer && selectedPlan.status === 'submitted' && (
+    <>
+      <Button size="sm" variant="outline"
+        onClick={() => setRejectTarget(selectedPlan)}
+        className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+        <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+        Return to Draft
+      </Button>
+      <Button size="sm"
+        onClick={() => setApproveTarget(selectedPlan)}
+        className="gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+        <CheckCircleIcon className="w-3.5 h-3.5" />
+        Approve
+      </Button>
+    </>
+  )}
+  {!isViewer && selectedPlan.status === 'approved' && (
+    <Button size="sm" variant="outline"
+      onClick={() => setRejectTarget(selectedPlan)}
+      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600">
+      <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+      Return to Draft
+    </Button>
+  )}
+</div>
             </div>
 
             {/* Forms area */}

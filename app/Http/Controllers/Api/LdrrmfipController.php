@@ -144,6 +144,8 @@ class LdrrmfipController extends BaseApiController
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', \App\Models\LdrrmfipItem::class);
+
         $validated = $request->validate([
             'budget_plan_id'        => 'required|integer|exists:budget_plans,budget_plan_id',
             'ldrrmfip_category_id'  => 'required|integer|exists:ldrrmfip_categories,ldrrmfip_category_id',
@@ -200,6 +202,8 @@ $item = LdrrmfipItem::create([
 
     public function update(Request $request, LdrrmfipItem $ldrrmfip): JsonResponse
     {
+        $this->authorize('update', $ldrrmfip);
+
         $validated = $request->validate([
             'ldrrmfip_category_id' => 'sometimes|integer|exists:ldrrmfip_categories,ldrrmfip_category_id',
             'description'          => 'sometimes|string|max:500',
@@ -248,6 +252,8 @@ $ldrrmfip->update([
 
     public function destroy(LdrrmfipItem $ldrrmfip): JsonResponse
     {
+        $this->authorize('delete', $ldrrmfip);
+
         $ldrrmfip->delete();
         return $this->success(['message' => 'Deleted.']);
     }
@@ -411,6 +417,8 @@ $ldrrmfip->update([
      */
     public function upsertYearAmounts(Request $request): JsonResponse
     {
+        $this->authorize('create', \App\Models\LdrrmfipItem::class);
+
         $validated = $request->validate([
             'budget_plan_id'   => 'required|integer|exists:budget_plans,budget_plan_id',
             'source'           => 'required|string|max:50',

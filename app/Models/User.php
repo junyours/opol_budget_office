@@ -19,6 +19,7 @@ class User extends Authenticatable
     protected $fillable = [
         'username',
         'password',
+        'pin',
         'fname',
         'mname',
         'lname',
@@ -29,7 +30,8 @@ class User extends Authenticatable
         'is_active',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'pin', 'remember_token'];
+
     protected $casts = [
         'is_online' => 'boolean',
         'is_active' => 'boolean',

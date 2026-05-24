@@ -30,6 +30,7 @@ import {
 } from './PersonnelServicesSettings';
 import { DeptDots } from '@/src/components/ui/DeptDots';
 import { usePsSettings } from '@/src/hooks/usePsSettings';
+import { useAuth } from '@/src/hooks/useAuth';
 
 
 // ── Animation styles injected once ───────────────────────────────────────────
@@ -404,7 +405,9 @@ function sumAllowances(a: AllowanceResult): number {
 const PersonnelServices: React.FC = () => {
   useAnimationStyles();
 
-  const { activePlan, loading: planLoading }              = useActiveBudgetPlan();
+  const { user } = useAuth();
+const isViewer = user?.role === 'viewer';
+const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const { activeVersion, matrix, loading: matrixLoading, refresh } = useSalaryMatrix();
 
   const [departments,       setDepartments]       = useState<Department[]>([]);
@@ -419,7 +422,7 @@ const PersonnelServices: React.FC = () => {
   const [tabAnimKey, setTabAnimKey] = useState(0);
 
 //   const [settings, setSettings] = useState<PsSettings>(() => mergeWithDefaults(lsGet<Partial<PsSettings>>(LS_SETTINGS_KEY, {})));
-const { settings, setSettings, loading: settingsLoading, save: saveSettings } = usePsSettings();
+    const { settings, setSettings, loading: settingsLoading, save: saveSettings } = usePsSettings();
   const [edits,    setEdits]    = useState<Record<number, RowEdit>>(() => lsGet(LS_EDITS_KEY, {} as Record<number, RowEdit>));
 
   const [searchRaw,    setSearchRaw] = useState<Record<string, string>>({});
@@ -787,20 +790,24 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PersonnelServicesSettings settings={settings} onChange={handleSettingsChange} />
-          <Button
-            onClick={handleSave}
-            size="lg"
-            className="shadow-sm transition-all duration-200 active:scale-95"
-            disabled={saving || isSubmitted}
-            title={isSubmitted ? 'Submitted — read only.' : undefined}
-          >
-            {saving
-              ? <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Saving…</span>
-              : 'Save Edits'
-            }
-          </Button>
-        </div>
+  {!isViewer && (
+    <PersonnelServicesSettings settings={settings} onChange={handleSettingsChange} />
+  )}
+  {!isViewer && (
+    <Button
+      onClick={handleSave}
+      size="lg"
+      className="shadow-sm transition-all duration-200 active:scale-95"
+      disabled={saving || isSubmitted}
+      title={isSubmitted ? 'Submitted — read only.' : undefined}
+    >
+      {saving
+        ? <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Saving…</span>
+        : 'Save Edits'
+      }
+    </Button>
+  )}
+</div>
       </div>
 
       {/* ── Alert banner — fade up with delay ── */}
@@ -1281,10 +1288,11 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                 </SheetHeader>
 
                 {/* Editable fields */}
-                <div
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-3 mb-4 space-y-2 ps-animate-fade-up"
-                  style={{ animationDelay: '120ms' }}
-                >
+{!isViewer && (
+<div
+  className="rounded-lg border border-gray-200 bg-gray-50 p-3 mb-4 space-y-2 ps-animate-fade-up"
+  style={{ animationDelay: '120ms' }}
+>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Editable Fields</p>
                   {[
                     { label: 'Honoraria',     field: 'honoraria'     as keyof RowEdit },
@@ -1309,7 +1317,9 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                       />
                     </div>
                   ))}
+
                 </div>
+)}
 
                 {/* Allowance sections — staggered */}
                 {[

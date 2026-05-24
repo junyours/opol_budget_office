@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { useAuth } from "@/src/hooks/useAuth";
 import { LoadingState } from "@/src/pages/common/LoadingState";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -506,11 +507,12 @@ function TableSkeleton() {
 
 // ─── FocusSection ─────────────────────────────────────────────────────────────
 
-function FocusSection({ focusType, entries, departments, subtotal, onUpdate, onDelete, onAdd }: {
+function FocusSection({ focusType, entries, departments, subtotal, onUpdate, onDelete, onAdd, isViewer = false }: {
   focusType: FocusType; entries: GADEntry[]; departments: Department[]; subtotal: number;
   onUpdate: (id: number, field: keyof GADEntry, value: any) => void;
   onDelete: (entry: GADEntry) => void;
   onAdd: (ft: FocusType) => void;
+  isViewer?: boolean;
 }) {
   const meta = focusType === "client"
     ? { label: "CLIENT-FOCUSED",       subLabel: "Subtotal A", badge: "bg-violet-100 text-violet-700 border border-violet-200" }
@@ -525,9 +527,11 @@ function FocusSection({ focusType, entries, departments, subtotal, onUpdate, onD
           <span className={cn("text-[10px] font-bold uppercase tracking-[0.12em] px-2.5 py-1 rounded-full", meta.badge)}>{meta.label}</span>
           <span className="text-[11px] text-gray-400">Gender Issue</span>
         </div>
-        <Button size="sm" variant="outline" onClick={() => onAdd(focusType)} className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-          <PlusIcon className="w-3.5 h-3.5" />Add Row
-        </Button>
+       {!isViewer && (
+  <Button size="sm" variant="outline" onClick={() => onAdd(focusType)} className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+    <PlusIcon className="w-3.5 h-3.5" />Add Row
+  </Button>
+)}
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -549,30 +553,57 @@ function FocusSection({ focusType, entries, departments, subtotal, onUpdate, onD
               {entries.length === 0 ? (
                 <tr><td colSpan={9} className="py-12 text-center text-gray-400 text-sm">
                   No entries yet.{" "}
-                  <button onClick={() => onAdd(focusType)} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Add the first entry</button>
+{!isViewer && (
+  <button onClick={() => onAdd(focusType)} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">Add the first entry</button>
+)}
                 </td></tr>
               ) : entries.map((entry, idx) => (
                 <tr key={entry.gad_entry_id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="border-r border-gray-100 px-3 py-2 text-gray-400 text-center align-top text-[11px]">{idx + 1}</td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={entry.gender_issue ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gender_issue", v)} multiline /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={entry.gad_objective ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gad_objective", v)} multiline /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={entry.relevant_program ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "relevant_program", v)} multiline /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={entry.gad_activity ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gad_activity", v)} multiline /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><EditableCell value={entry.performance_indicator ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "performance_indicator", v)} multiline /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><MooeCell value={entry.mooe} onSave={v => onUpdate(entry.gad_entry_id, "mooe", v)} /></td>
-                  <td className="border-r border-gray-100 px-2 py-1.5 align-top"><LeadOfficeCell entry={entry} departments={departments} onUpdate={onUpdate} /></td>
-                  <td className="px-1.5 py-1.5 align-top">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreHorizontalIcon className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => onDelete(entry)}>Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+                  <td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer ? <span className="text-[12px] text-gray-600 px-1.5 py-0.5 leading-snug block">{entry.gender_issue || <span className="text-gray-300">—</span>}</span>
+    : <EditableCell value={entry.gender_issue ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gender_issue", v)} multiline />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer ? <span className="text-[12px] text-gray-600 px-1.5 py-0.5 leading-snug block">{entry.gad_objective || <span className="text-gray-300">—</span>}</span>
+    : <EditableCell value={entry.gad_objective ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gad_objective", v)} multiline />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer ? <span className="text-[12px] text-gray-600 px-1.5 py-0.5 leading-snug block">{entry.relevant_program || <span className="text-gray-300">—</span>}</span>
+    : <EditableCell value={entry.relevant_program ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "relevant_program", v)} multiline />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer ? <span className="text-[12px] text-gray-600 px-1.5 py-0.5 leading-snug block">{entry.gad_activity || <span className="text-gray-300">—</span>}</span>
+    : <EditableCell value={entry.gad_activity ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "gad_activity", v)} multiline />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer ? <span className="text-[12px] text-gray-600 px-1.5 py-0.5 leading-snug block">{entry.performance_indicator || <span className="text-gray-300">—</span>}</span>
+    : <EditableCell value={entry.performance_indicator ?? ""} onSave={v => onUpdate(entry.gad_entry_id, "performance_indicator", v)} multiline />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer
+    ? <span className={cn("text-right text-[12px] font-mono tabular-nums px-1.5 py-0.5 block", entry.mooe === 0 ? "text-gray-300" : "text-gray-800")}>{entry.mooe === 0 ? "—" : fmt(entry.mooe)}</span>
+    : <MooeCell value={entry.mooe} onSave={v => onUpdate(entry.gad_entry_id, "mooe", v)} />}
+</td>
+<td className="border-r border-gray-100 px-2 py-1.5 align-top">
+  {isViewer
+    ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200">{entry.lead_office_display || "—"}</span>
+    : <LeadOfficeCell entry={entry} departments={departments} onUpdate={onUpdate} />}
+</td>
+<td className="px-1.5 py-1.5 align-top">
+  {!isViewer && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-7 text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
+          <MoreHorizontalIcon className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-32">
+        <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => onDelete(entry)}>Delete</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )}
+</td>
                 </tr>
               ))}
             </tbody>
@@ -771,6 +802,8 @@ function EntryDialog({ open, onOpenChange, initialForm, departments, onSubmit, s
 
 export default function GadPage() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
+  const { user } = useAuth();
+  const isViewer = user?.role === "viewer";
 
   const [entries,     setEntries]     = useState<GADEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -946,16 +979,18 @@ export default function GadPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">GAD Budget Plan</h1>
         </div>
         <div className="flex items-center gap-2.5">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-          <Button size="sm" variant="outline" onClick={downloadTemplate}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-            <ArrowDownTrayIcon className="w-3.5 h-3.5" /> Download Template
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-            <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Import Excel
-          </Button>
-        </div>
+  <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+  <Button size="sm" variant="outline" onClick={downloadTemplate}
+    className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+    <ArrowDownTrayIcon className="w-3.5 h-3.5" /> Download Template
+  </Button>
+  {!isViewer && (
+    <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}
+      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+      <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Import Excel
+    </Button>
+  )}
+</div>
       </div>
 
       {/* Stat cards */}
@@ -1004,8 +1039,8 @@ export default function GadPage() {
         </>
       ) : (
         <>
-          <FocusSection focusType="client"       entries={clientEntries} departments={departments} subtotal={subtotalA} onUpdate={handleUpdate} onDelete={setDeleteTarget} onAdd={openAdd} />
-          <FocusSection focusType="organization" entries={orgEntries}    departments={departments} subtotal={subtotalB} onUpdate={handleUpdate} onDelete={setDeleteTarget} onAdd={openAdd} />
+          <FocusSection focusType="client"       entries={clientEntries} departments={departments} subtotal={subtotalA} onUpdate={handleUpdate} onDelete={setDeleteTarget} onAdd={openAdd} isViewer={isViewer} />
+<FocusSection focusType="organization" entries={orgEntries}    departments={departments} subtotal={subtotalB} onUpdate={handleUpdate} onDelete={setDeleteTarget} onAdd={openAdd} isViewer={isViewer} />
         </>
       )}
 

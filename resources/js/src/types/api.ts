@@ -1,6 +1,8 @@
 // types/api.ts
 
-export type UserRole = 'admin' | 'super-admin' | 'admin-hrmo' | 'department-head';
+// export type UserRole = 'admin' | 'super-admin' | 'admin-hrmo' | 'department-head';
+// export type UserRole = 'admin' | 'super-admin' | 'admin-hrmo' | 'department-head' | 'viewer';
+export type UserRole = 'admin' | 'super-admin' | 'admin-hrmo' | 'department-head' | 'viewer' | 'admin-ldrrmo';
 
 export interface User {
   user_id: number;
@@ -23,9 +25,27 @@ export interface LoginCredentials {
   password: string;
 }
 
+// export interface LoginResponse {
+//   user: User;
+//   token: string;
+// }
+
 export interface LoginResponse {
   user: User;
   token: string;
+}
+
+// Remembered account stored locally (90-day expiry)
+export interface RememberedAccount {
+  user_id: number;
+  username: string;
+  fname: string;
+  lname: string;
+  avatar: string | null;
+  role: UserRole;
+  dept_id: number | null;
+  department_name: string | null;
+  saved_at: number; // timestamp ms
 }
 
 export interface ApiError {

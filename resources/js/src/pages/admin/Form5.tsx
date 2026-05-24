@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { useAuth } from "@/src/hooks/useAuth";
 import { LoadingState } from "@/src/pages/common/LoadingState";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Button } from "@/src/components/ui/button";
@@ -318,8 +319,10 @@ function TruncatedCell({ text, className }: { text: string; className?: string }
 
 export default function Form5() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
+const { user } = useAuth();
+const isViewer = user?.role === "viewer";
 
-  const [rows, setRows]       = useState<DebtObligation[]>([]);
+  const [rows, setRows] = useState<DebtObligation[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [dirty, setDirty]     = useState(false);
@@ -529,14 +532,18 @@ export default function Form5() {
               Unsaved
             </span>
           )}
-          <Button size="sm" variant="outline" onClick={openAdd}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
-            <PlusIcon className="w-3.5 h-3.5" />Add Creditor
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !dirty}
-            className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white">
-            <CheckIcon className="w-3.5 h-3.5" />Save
-          </Button>
+          {!isViewer && (
+  <Button size="sm" variant="outline" onClick={openAdd}
+    className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+    <PlusIcon className="w-3.5 h-3.5" />Add Creditor
+  </Button>
+)}
+{!isViewer && (
+  <Button size="sm" onClick={handleSave} disabled={saving || !dirty}
+    className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white">
+    <CheckIcon className="w-3.5 h-3.5" />Save
+  </Button>
+)}
         </div>
       </div>
 
@@ -594,9 +601,11 @@ export default function Form5() {
                   <tr>
                     <td colSpan={14} className="text-center py-14 text-gray-400 text-sm">
                       No indebtedness records.{" "}
-                      <button onClick={openAdd} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">
-                        Add the first creditor
-                      </button>
+{!isViewer && (
+  <button onClick={openAdd} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">
+    Add the first creditor
+  </button>
+)}
                     </td>
                   </tr>
                 ) : computedRows.map((ob, idx) => (
@@ -611,19 +620,31 @@ export default function Form5() {
                     <td className={cn("border-r border-l px-3 py-3 text-right font-mono text-gray-600 align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_principal)}</td>
                     <td className={cn("border-r px-3 py-3 text-right font-mono text-gray-600 align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_interest)}</td>
                     <td className={cn("border-r px-3 py-3 text-right font-mono text-gray-700 font-medium align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_total)}</td>
-                    {/* Amount Due — orange, editable */}
-                    <td className={cn("border-r border-l px-2 py-2 align-top", C_DUE_TD)}>
-                      <AmountCell obligationId={ob.obligation_id} field="principal"
-                        value={edits[ob.obligation_id]?.principal ?? ""}
-                        onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], principal: val } })); setDirty(true); }}
-                        onBlurSave={handleBlurSave} />
-                    </td>
-                    <td className={cn("border-r px-2 py-2 align-top", C_DUE_TD)}>
-                      <AmountCell obligationId={ob.obligation_id} field="interest"
-                        value={edits[ob.obligation_id]?.interest ?? ""}
-                        onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], interest: val } })); setDirty(true); }}
-                        onBlurSave={handleBlurSave} />
-                    </td>
+                    {/* Amount Due — orange, editable (read-only for viewer) */}
+<td className={cn("border-r border-l px-2 py-2 align-top", C_DUE_TD)}>
+  {isViewer ? (
+    <span className="block w-full text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">
+      {fmt(ob.current_principal)}
+    </span>
+  ) : (
+    <AmountCell obligationId={ob.obligation_id} field="principal"
+      value={edits[ob.obligation_id]?.principal ?? ""}
+      onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], principal: val } })); setDirty(true); }}
+      onBlurSave={handleBlurSave} />
+  )}
+</td>
+<td className={cn("border-r px-2 py-2 align-top", C_DUE_TD)}>
+  {isViewer ? (
+    <span className="block w-full text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">
+      {fmt(ob.current_interest)}
+    </span>
+  ) : (
+    <AmountCell obligationId={ob.obligation_id} field="interest"
+      value={edits[ob.obligation_id]?.interest ?? ""}
+      onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], interest: val } })); setDirty(true); }}
+      onBlurSave={handleBlurSave} />
+  )}
+</td>
                     <td className={cn("border-r px-3 py-3 text-right font-mono text-gray-700 font-medium align-top tabular-nums", C_DUE_TD)}>{fmt(ob.current_total)}</td>
                     {/* Balance */}
                     <td className="border-r border-l border-gray-100 px-3 py-3 text-right font-mono align-top font-semibold tabular-nums">
@@ -639,9 +660,16 @@ export default function Form5() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-36">
-                          <DropdownMenuItem onClick={() => openEdit(ob)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => setDeleteTarget(ob)}>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
+  {!isViewer && (
+    <DropdownMenuItem onClick={() => openEdit(ob)}>Edit</DropdownMenuItem>
+  )}
+  {!isViewer && (
+    <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => setDeleteTarget(ob)}>Delete</DropdownMenuItem>
+  )}
+  {isViewer && (
+    <DropdownMenuItem disabled className="text-gray-400">View only</DropdownMenuItem>
+  )}
+</DropdownMenuContent>
                       </DropdownMenu>
                     </td>
                   </tr>

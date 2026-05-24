@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { useAuth } from "@/src/hooks/useAuth";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
@@ -475,6 +476,8 @@ function AddItemDialog({
 
 export default function MDFFund() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
+const { user } = useAuth();
+const isViewer = user?.role === "viewer";
 
   const [categories,      setCategories]      = useState<MdfCategory[]>([]);
   const [years,           setYears]           = useState<MdfYears | null>(null);
@@ -919,20 +922,20 @@ export default function MDFFund() {
                               </Badge>
                             )}
                           </div>
-                          {!cat.is_debt_servicing && (
-                            <TooltipProvider delayDuration={300}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="sm" variant="outline"
-                                    className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
-                                    onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
-                                    <PlusIcon className="w-3.5 h-3.5" />Add Item
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="text-xs">Add item in {cat.name}</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
+                          {!cat.is_debt_servicing && !isViewer && (
+  <TooltipProvider delayDuration={300}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="sm" variant="outline"
+          className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
+          onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
+          <PlusIcon className="w-3.5 h-3.5" />Add Item
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="text-xs">Add item in {cat.name}</TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)}
                         </div>
                       </td>
                     </tr>
@@ -941,12 +944,12 @@ export default function MDFFund() {
                       <tr key={`empty-${cat.category_id}`}>
                         <td colSpan={7} className="px-4 py-3 text-[12px] text-gray-400 italic">
                           No expense items.{" "}
-                          {!cat.is_debt_servicing && (
-                            <button className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
-                              onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
-                              Add the first item
-                            </button>
-                          )}
+{!cat.is_debt_servicing && !isViewer && (
+  <button className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
+    onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
+    Add the first item
+  </button>
+)}
                         </td>
                       </tr>
                     ) : cat.items.map(item => {
@@ -980,12 +983,12 @@ export default function MDFFund() {
                                 {item.obligation_id && (
                                   <Badge variant="outline" className="text-[9px] border-blue-200 text-blue-600 bg-blue-50 px-1 py-0">auto</Badge>
                                 )}
-                                {!item.obligation_id && (
-                                  <button className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
-                                    title="Remove item" onClick={() => setDeleteTarget(item)}>
-                                    <TrashIcon className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+                                {!item.obligation_id && !isViewer && (
+  <button className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+    title="Remove item" onClick={() => setDeleteTarget(item)}>
+    <TrashIcon className="w-3.5 h-3.5" />
+  </button>
+)}
                               </div>
                             </div>
                           </td>
@@ -997,14 +1000,14 @@ export default function MDFFund() {
 
                           {/* (3) Past obligation — editable for BOTH regular and debt rows */}
                           <td className={cn("border-r border-l px-2 py-2 align-top", C_PAST_TD)}>
-                            {oblEditable ? (
-                              <AmountInput
-                                value={oblStr}
-                                colorClass="focus:ring-green-300 focus:border-green-300"
-                                onChange={v => setObligationEdits(prev => ({ ...prev, [item.item_id]: v }))}
-                                onBlur={() => handleObligationBlur(item)}
-                              />
-                            ) : (
+                            {oblEditable && !isViewer ? (
+  <AmountInput
+    value={oblStr}
+    colorClass="focus:ring-green-300 focus:border-green-300"
+    onChange={v => setObligationEdits(prev => ({ ...prev, [item.item_id]: v }))}
+    onBlur={() => handleObligationBlur(item)}
+  />
+) : (
                               <span className={cn(
                                 "block w-full text-right text-[12px] font-mono px-2 py-1.5 tabular-nums",
                                 pastPlanMissing ? "text-gray-300 cursor-not-allowed" : "text-gray-500"
@@ -1017,14 +1020,14 @@ export default function MDFFund() {
 
                           {/* (4) Sem1 — editable for BOTH regular and debt rows */}
                           <td className={cn("border-r border-l px-2 py-2 align-top", C_CURR_TD)}>
-                            {sem1Editable ? (
-                              <AmountInput
-                                value={sem1Str}
-                                colorClass="focus:ring-blue-300 focus:border-blue-300"
-                                onChange={v => setSem1Edits(prev => ({ ...prev, [item.item_id]: v }))}
-                                onBlur={() => handleSem1Blur(item)}
-                              />
-                            ) : (
+                            {sem1Editable && !isViewer ? (
+  <AmountInput
+    value={sem1Str}
+    colorClass="focus:ring-blue-300 focus:border-blue-300"
+    onChange={v => setSem1Edits(prev => ({ ...prev, [item.item_id]: v }))}
+    onBlur={() => handleSem1Blur(item)}
+  />
+) : (
                               <span className="block w-full text-right text-[12px] font-mono px-2 py-1.5 text-gray-400">
                                 {sem1Str ? enPH(parseNum(sem1Str)) : "–"}
                               </span>
@@ -1043,18 +1046,18 @@ export default function MDFFund() {
 
                           {/* (7) Proposed — editable for regular, read-only for debt */}
                           <td className={cn("border-r border-l px-2 py-2 align-top", C_BUDG_TD)}>
-                            {isDebt ? (
-                              <span className="block w-full text-right text-[12px] font-mono px-2.5 py-1.5 text-gray-500 tabular-nums">
-                                {fmt(item.proposed)}
-                              </span>
-                            ) : (
-                              <AmountInput
-                                value={propStr}
-                                colorClass="focus:ring-orange-300 focus:border-orange-300"
-                                onChange={v => setProposedEdits(prev => ({ ...prev, [item.item_id]: v }))}
-                                onBlur={() => handleProposedBlur(item.item_id)}
-                              />
-                            )}
+                            {isDebt || isViewer ? (
+  <span className="block w-full text-right text-[12px] font-mono px-2.5 py-1.5 text-gray-500 tabular-nums">
+    {fmt(item.proposed)}
+  </span>
+) : (
+  <AmountInput
+    value={propStr}
+    colorClass="focus:ring-orange-300 focus:border-orange-300"
+    onChange={v => setProposedEdits(prev => ({ ...prev, [item.item_id]: v }))}
+    onBlur={() => handleProposedBlur(item.item_id)}
+  />
+)}
                           </td>
                         </tr>
                       );

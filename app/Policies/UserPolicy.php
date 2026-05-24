@@ -6,9 +6,13 @@ use App\Models\User;
 
 class UserPolicy
 {
+    // public function viewAny(User $user)
+    // {
+    //     return in_array($user->role, ['admin','super-admin']);
+    // }
     public function viewAny(User $user)
     {
-        return in_array($user->role, ['admin','super-admin']);
+        return in_array($user->role, ['admin', 'super-admin', 'viewer']);
     }
 
     public function view(User $user, User $model)

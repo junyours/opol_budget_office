@@ -21,7 +21,7 @@
 //         'plan_id' => $plan->dept_budget_plan_id,
 //         'plan_dept_id' => $plan->dept_id,
 //     ]);
-    
+
 //         if (in_array($user->role,['admin','super-admin'])) return true;
 
 //         if ($user->role === 'department-head') {
@@ -90,9 +90,19 @@ class DepartmentBudgetPlanPolicy
         return true;
     }
 
+    // public function view(User $user, DepartmentBudgetPlan $plan): bool
+    // {
+    //     if (in_array($user->role, ['admin', 'super-admin'])) return true;
+
+    //     if ($user->role === 'department-head') {
+    //         return (int) $user->dept_id === (int) $plan->dept_id;
+    //     }
+
+    //     return false;
+    // }
     public function view(User $user, DepartmentBudgetPlan $plan): bool
     {
-        if (in_array($user->role, ['admin', 'super-admin'])) return true;
+        if (in_array($user->role, ['admin', 'super-admin', 'viewer'])) return true;
 
         if ($user->role === 'department-head') {
             return (int) $user->dept_id === (int) $plan->dept_id;

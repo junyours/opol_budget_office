@@ -2,12 +2,22 @@ import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types/api';
 import API from '../services/api';
 
+// interface AuthContextType {
+//   user: User | null;
+//   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+//   token: string | null;
+//   loading: boolean;
+//   login: (user: User, token: string) => void;
+//   logout: () => Promise<void>;
+// }
+
 interface AuthContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   token: string | null;
   loading: boolean;
   login: (user: User, token: string) => void;
+  updateUser: (user: User) => void;
   logout: () => Promise<void>;
 }
 
@@ -49,12 +59,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
   }, []);
 
+//   const login = (userData: User, authToken: string) => {
+//     setUser(userData);
+//     setToken(authToken);
+
+//     localStorage.setItem('token', authToken);
+//   };
+
   const login = (userData: User, authToken: string) => {
     setUser(userData);
     setToken(authToken);
     // Only the token needs to be persisted — user is always re-fetched from
     // the DB on mount, so we no longer need a localStorage copy of the user.
     localStorage.setItem('token', authToken);
+  };
+
+  const updateUser = (userData: User) => {
+    setUser(userData);
   };
 
   const logout = async () => {
@@ -71,7 +92,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, token, loading, login, logout }}>
+    // <AuthContext.Provider value={{ user, setUser, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, token, loading, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

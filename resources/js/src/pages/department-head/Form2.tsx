@@ -1591,7 +1591,7 @@ const Form2: React.FC<Form2Props> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                {canEdit && isAdmin && (
+                                                {/* {canEdit && isAdmin && (
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <Button
@@ -1622,7 +1622,30 @@ const Form2: React.FC<Form2Props> = ({
                                                             {cls.abbreviation}
                                                         </TooltipContent>
                                                     </Tooltip>
-                                                )}
+                                                )} */}
+                                                {canEdit && (
+    <Tooltip>
+        <TooltipTrigger asChild>
+            <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
+                onClick={() =>
+                    setModalState({
+                        isOpen: true,
+                        classificationId: cls.expense_class_id,
+                        classificationName: cls.expense_class_name,
+                    })
+                }
+            >
+                <PlusIcon className="w-3.5 h-3.5" /> Add Item
+            </Button>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="text-xs">
+            Add item in {cls.abbreviation}
+        </TooltipContent>
+    </Tooltip>
+)}
                                             </div>
                                         </td>
                                     </tr>

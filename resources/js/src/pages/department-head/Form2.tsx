@@ -49,7 +49,7 @@ const TD_M = "px-3 py-2.5 text-[12px] font-mono tabular-nums text-right";
 const TH_APP =
     "border-b border-green-200 bg-green-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-green-700 text-right";
 const TH_PRO =
-    "border-b border-orange-200 bg-orange-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-orange-700 text-right";
+    "border-b border-orange-200 bg-orange-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-orange-700 text-center";
 const TD_APP = `${TD_M} bg-green-50/30`;
 const TD_PRO = `${TD_M} bg-orange-50/30`;
 
@@ -1487,10 +1487,10 @@ const Form2: React.FC<Form2Props> = ({
                                 Proposed ({currYear})
                             </th>
                             <th className={cn(TH, "text-right")} rowSpan={2}>
-                                Inc / Dec
+                                Increase / Decrease
                             </th>
-                            <th className={cn(TH, "text-right")} rowSpan={2}>
-                                %
+                            <th className={cn(TH, "text-left")} rowSpan={2}>
+                                Percentage
                             </th>
                             {isAdmin && (
                                 <th className={TH} rowSpan={2}>

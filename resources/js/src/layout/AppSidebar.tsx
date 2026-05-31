@@ -27,7 +27,7 @@
         BuildingLibraryIcon as HeroPiggyIcon,
         UsersIcon, ClipboardDocumentListIcon, TableCellsIcon, CreditCardIcon, ScaleIcon,
         ShieldCheckIcon, Cog6ToothIcon, CalculatorIcon, DocumentChartBarIcon,
-        ListBulletIcon,
+        ListBulletIcon,MapIcon,
         } from "@heroicons/react/24/outline";
         // ── NEW: hook for submitted plan count ────────────────────────────────────────
         import { useSubmittedPlanCount } from "@/src/hooks/useSubmittedPlanCount";
@@ -95,6 +95,14 @@
             label: "Overview",
             items: [
                { name: "Dashboard", href: "/dashboard", icon: HomeIcon, iconBg: "bg-blue-100", iconColor: "text-blue-600", roles: ["super-admin", "admin", "department-head", "admin-hrmo", "viewer", "admin-ldrrmo"] },
+               {
+  name: "Bag-ong Opol",
+  href: "/bag-ong-opol",
+  icon: MapIcon,           // import MapIcon from heroicons
+  iconBg: "bg-rose-100",
+  iconColor: "text-rose-600",
+  roles: ["super-admin", "admin", "department-head", "admin-hrmo", "viewer", "admin-ldrrmo"],
+},
             ] as NavItem[],
             },
             ...(eligible ? [{

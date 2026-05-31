@@ -294,7 +294,7 @@ const invalidateActivePlanDependents = () => {
             <thead>
               <tr>
                 {/* {["Year", "Status", "Submissions", "Dept. Plans", "Created"].map((h, i) => ( */}
-                {["Year", "Status", ...(!isViewer ? ["Submissions"] : []), "Dept. Plans", "Created"].map((h, i) => (
+                {["Year", "Status", ...(!isViewer ? ["Submissions"] : []), "Department Plans", "Created"].map((h, i) => (
                   <th
                     key={i}
                     className="border-b border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide"

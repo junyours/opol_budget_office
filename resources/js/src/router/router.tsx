@@ -103,7 +103,7 @@ const LdrrmfPlanPage = React.lazy(
 );
 
 const GadPage = React.lazy(
-  () => import("../pages/admin/GadPage")
+  () => import("../pages/admin/plans/GadPage")
 );
 
 const PlansPage = React.lazy(() => import("../pages/admin/PlansPage"));
@@ -137,6 +137,10 @@ const DepartmentSettings = React.lazy(
 const ExpenditurePage = React.lazy(
      () => import("../pages/admin/ExpenditurePage")
    );
+
+   const BagOngOpol = React.lazy(
+   () => import("../pages/common/BagOngOpol")
+ );
 
 
 /* ------------------ Suspense Wrapper ------------------ */
@@ -247,6 +251,8 @@ const router = createBrowserRouter([
             path: "dashboard",
             element: Lazy(Dashboard),
           },
+
+{ path: "bag-ong-opol", element: Lazy(BagOngOpol) },
           {
             path: "profile",
             element: Lazy(ProfilePage),

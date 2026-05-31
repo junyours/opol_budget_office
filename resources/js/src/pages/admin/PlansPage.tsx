@@ -12,16 +12,16 @@ import {
 } from "@heroicons/react/24/outline";
 
 // ── Lazy-load sub-pages ───────────────────────────────────────────────────────
-const GadPage       = React.lazy(() => import("./GadPage"));
-const LcpcPage      = React.lazy(() => import("./LCPCPage"));
-const LydpPage      = React.lazy(() => import("./LYDPPage"));
-const ScPage        = React.lazy(() => import("./SCPage"));
-const MpocPage      = React.lazy(() => import("./MPOCPage"));
-const DrugsPage     = React.lazy(() => import("./PPACombatIllegalDrugsPage"));
-const ArtsPage      = React.lazy(() => import("./CultureAndArtsPage"));
-const AidsPage      = React.lazy(() => import("./PPACombatAidsPage"));
-const ScPpaPage     = React.lazy(() => import("./PPASCPage"));
-const NutritionPage = React.lazy(() => import("./NutritionPage"));
+const GadPage       = React.lazy(() => import("./plans/GadPage"));
+const LcpcPage      = React.lazy(() => import("./plans/LCPCPage"));
+const LydpPage      = React.lazy(() => import("./plans/LYDPPage"));
+const ScPage        = React.lazy(() => import("./plans/SCPage"));
+const MpocPage      = React.lazy(() => import("./plans/MPOCPage"));
+const DrugsPage     = React.lazy(() => import("./plans/PPACombatIllegalDrugsPage"));
+const ArtsPage      = React.lazy(() => import("./plans/CultureAndArtsPage"));
+const AidsPage      = React.lazy(() => import("./plans/PPACombatAidsPage"));
+const ScPpaPage     = React.lazy(() => import("./plans/PPASCPage"));
+const NutritionPage = React.lazy(() => import("./plans/NutritionPage"));
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 

@@ -454,7 +454,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                             <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
                                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                             </p>
-                            <h1 className="text-[22px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
+                            <h1 className="text-[32px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
                                 Overview
                             </h1>
                             {/* <p className="text-[12px] text-zinc-400 mt-0.5">

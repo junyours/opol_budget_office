@@ -142,13 +142,13 @@ function TableSkeleton() {
             {/* Row 3 — column numbers */}
             <tr className="border-b-2 border-gray-200">
               <td className="border-r border-gray-200 bg-white sticky left-0" />
-              <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-[10px] text-green-300">(1)</td>
-              <td className="border-r border-l border-blue-200  bg-blue-50  px-3 py-1 text-center text-[10px] text-blue-300">(2)</td>
-              <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-[10px] text-blue-300">(3)</td>
-              <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-[10px] text-blue-300">(4)</td>
-              <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-[10px] text-orange-300">(5)</td>
-              <td className="border-r border-gray-200 bg-white px-3 py-1 text-center text-[10px] text-gray-200">(6)</td>
-              <td className="border-gray-200 bg-white px-3 py-1 text-center text-[10px] text-gray-200">(7)</td>
+              <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-300">(1)</td>
+                <td className="border-r border-l border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(2)</td>
+                <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(3)</td>
+                <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(4)</td>
+                <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-300">(5)</td>
+                <td className="border-r border-gray-200 bg-white px-3 py-1 text-center text-eyebrow text-gray-200">(6)</td>
+                <td className="border-gray-200 bg-white px-3 py-1 text-center text-eyebrow text-gray-200">(7)</td>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -522,45 +522,45 @@ const savePastObligation = useCallback(
       <table className="w-full min-w-[1200px] text-[12px] border-collapse">
         <thead>
           <tr>
-            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left align-bottom font-semibold text-gray-600 text-[11px] uppercase tracking-wide min-w-[260px]">
+            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left align-bottom text-table-header min-w-[260px]">
               Object of Expenditure
             </th>
-            <th rowSpan={2} className="border-b border-r border-green-200 bg-green-50 px-3 py-2.5 text-center align-bottom font-semibold text-green-700 text-[11px] uppercase tracking-wide w-40">
+            <th rowSpan={2} className="border-b border-r border-green-200 bg-green-50 px-3 py-2.5 text-center align-bottom text-table-header text-green-700 w-40">
               Past Year (Actual)<br />
-              <span className="text-[9.5px] font-normal normal-case text-green-500">{meta?.past_year}</span>
+              <span className="text-meta font-normal normal-case text-green-500">{meta?.past_year}</span>
             </th>
-            <th colSpan={3} className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-widest text-blue-700">
+            <th colSpan={3} className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-2 text-center text-eyebrow text-blue-700">
               Current Year {meta?.current_year} (Estimate)
             </th>
-            <th rowSpan={2} className="border-b border-r border-orange-200 bg-orange-50 px-3 py-2.5 text-center align-bottom font-semibold text-orange-700 text-[11px] uppercase tracking-wide w-52">
+            <th rowSpan={2} className="border-b border-r border-orange-200 bg-orange-50 px-3 py-2.5 text-center align-bottom text-table-header text-orange-700 w-52">
               {meta?.year} Budget Year
             </th>
-            <th rowSpan={2} className="border-b border-r border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-[11px] font-semibold uppercase tracking-wide w-28 text-gray-600">
+            <th rowSpan={2} className="border-b border-r border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-table-header w-28">
               Increase /<br />Decrease
             </th>
-            <th rowSpan={2} className="border-b border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-[11px] font-semibold uppercase tracking-wide w-24 text-gray-600">
+            <th rowSpan={2} className="border-b border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-table-header w-24">
               % Change
             </th>
           </tr>
           <tr>
-            <th className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-[10px] font-medium text-blue-600 uppercase tracking-wide w-32">
+            <th className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
               1st Semester<br />(Actual)
             </th>
-            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-[10px] font-medium text-blue-600 uppercase tracking-wide w-32">
+            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
               2nd Semester<br />(Estimate)
             </th>
-            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-[10px] font-medium text-blue-600 uppercase tracking-wide w-32">
+            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
               Total
             </th>
           </tr>
           <tr className="border-b-2 border-gray-200">
-            <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-[10px] text-green-400">(1)</td>
-            <td className="border-r border-l border-blue-200  bg-blue-50   px-3 py-1 text-center text-[10px] text-blue-400">(2)</td>
-            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-[10px] text-blue-400">(3)</td>
-            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-[10px] text-blue-400">(4)</td>
-            <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-[10px] text-orange-400">(5)</td>
-            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-[10px] text-gray-300">(6)</td>
-            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-[10px] text-gray-300">(7)</td>
+            <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-400">(1)</td>
+            <td className="border-r border-l border-blue-200  bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(2)</td>
+            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(3)</td>
+            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(4)</td>
+            <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-400">(5)</td>
+            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-eyebrow text-gray-300">(6)</td>
+            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-eyebrow text-gray-300">(7)</td>
           </tr>
         </thead>
 
@@ -585,7 +585,7 @@ const savePastObligation = useCallback(
             if (row.isGrandTotal) {
               return (
                 <tr key={row.id} className="bg-gray-900 text-white">
-                  <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 font-semibold text-[11px] uppercase tracking-wide text-gray-300">
+                  <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 text-table-header text-gray-300">
                     {row.name}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_PAST_GRAND)}>{fmtNum(row.past_obligation)}</td>
@@ -602,7 +602,7 @@ const savePastObligation = useCallback(
             if (row.isSubtotal) {
   return (
     <tr key={row.id} className="bg-gray-50">
-      <td className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 font-bold text-gray-800 text-[13px] border-r border-gray-200" style={{ paddingLeft: indent + 16 }}>
+      <td className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 text-table-grand-total text-gray-800 border-r border-gray-200" style={{ paddingLeft: indent + 16 }}>
         {row.name}
       </td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
@@ -642,7 +642,7 @@ const savePastObligation = useCallback(
   <input
     type="text"
     inputMode="decimal"
-    className="w-full text-right text-[12px] font-mono h-7 px-2 rounded border bg-white border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300 tabular-nums placeholder:text-gray-300"
+    className="w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300 tabular-nums placeholder:text-gray-300"
     value={fmtInput(row.past_obligation)}
     onChange={(e) => handlePastObligationChange(row.id, e.target.value)}
     onBlur={(e) => {
@@ -658,7 +658,7 @@ const savePastObligation = useCallback(
                 <td className={cn("border-r border-l px-2 py-2", COL_CURR)}>
                   {editable && !isViewer ? (
   <input type="text" inputMode="decimal"
-    className={cn("w-full text-right text-[12px] font-mono h-7 px-2 rounded border bg-white",
+    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
       "border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300",
       "placeholder:text-gray-300 tabular-nums", isSaving && "opacity-50 pointer-events-none")}
     value={fmtInput(row.sem1)}
@@ -676,7 +676,7 @@ const savePastObligation = useCallback(
                 <td className={cn("border-r border-l px-2 py-1.5", COL_BUDGET)}>
                   {editable && !isViewer ? (
   <input type="text" inputMode="decimal"
-    className={cn("w-full text-right text-[12px] font-mono h-7 px-2 rounded border bg-white",
+    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
       "border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300",
       "tabular-nums placeholder:text-gray-300", isSaving && "opacity-50 pointer-events-none")}
     value={fmtInput(row.proposed)}
@@ -701,7 +701,7 @@ const savePastObligation = useCallback(
   );
 
   const renderLegend = () => (
-    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">
+    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-table-secondary">
       <span className="flex items-center gap-1.5">
         <span className="w-2.5 h-2.5 rounded-sm bg-green-50 border border-green-200 inline-block" />
         <span className="text-green-600 font-semibold">Green</span> = Past Year (Actual)
@@ -737,15 +737,15 @@ const savePastObligation = useCallback(
       <div className="p-6">
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">LBP Form 1 · Receipts Program</span>
+            <span className="text-eyebrow">LBP Form 1 · Receipts Program</span>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Income Fund</h1>
+          <h1 className="text-page-title">Income Fund</h1>
         </div>
         <Tabs value={currentSource} onValueChange={handleSourceChange} className="w-full">
           <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-5">
             {availableSources.map((s) => (
               <TabsTrigger key={s.id} value={s.id}
-                className="text-xs px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+                className="text-subtitle px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
                 {s.name}
               </TabsTrigger>
             ))}
@@ -764,13 +764,13 @@ const savePastObligation = useCallback(
     <div className="p-6">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">Receipts Program</span>
-          <span className="text-gray-300 text-[10px]">·</span>
-          <span className="text-[10px] font-medium text-gray-400">FY {meta?.past_year} – {meta?.year}</span>
-          <span className="text-gray-300 text-[10px]">·</span>
-          <span className="text-[10px] font-medium text-gray-400">{meta?.source ? sourceName(meta.source) : sourceName(currentSource)}</span>
+          <span className="text-eyebrow">Receipts Program</span>
+          <span className="text-eyebrow text-gray-300">·</span>
+          <span className="text-meta">{/* remove font-medium since text-meta has font-weight */}FY {meta?.past_year} – {meta?.year}</span>
+          <span className="text-eyebrow text-gray-300">·</span>
+          <span className="text-meta">{meta?.source ? sourceName(meta.source) : sourceName(currentSource)}</span>
         </div>
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Income Fund</h1>
+        <h1 className="text-page-title">Income Fund</h1>
       </div>
       {renderContent()}
     </div>

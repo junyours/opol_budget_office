@@ -278,12 +278,17 @@ const router = createBrowserRouter([
                 element: Lazy(LdrrmfipPage),
               },
               {
-                path: "admin/ldrrmf-plan",
-                element: Lazy(LdrrmfPlanPage),
-              },
-              {
                 path: "admin/ldrrmf-reports",
                 element: Lazy(UnifiedReportsPage),
+              },
+            ],
+          },
+          {
+            element: <RoleRoute roles={["admin", "super-admin", "viewer"]} />,
+            children: [
+              {
+                path: "admin/ldrrmf-plan",
+                element: Lazy(LdrrmfPlanPage),
               },
             ],
           },

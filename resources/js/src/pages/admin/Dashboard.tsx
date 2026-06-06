@@ -95,8 +95,8 @@ const BarTip = ({ active, payload, label }: any) => {
 
 function Shimmer({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <div style={style} className={cn("relative overflow-hidden rounded-2xl bg-zinc-100 animate-in fade-in duration-700 fill-mode-both", className)}>
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+    <div style={style} className={cn("relative overflow-hidden rounded-2xl bg-muted animate-in fade-in duration-700 fill-mode-both", className)}>
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-background/70 to-transparent" />
     </div>
   );
 }
@@ -127,9 +127,9 @@ function Card({ children, className, style, onClick }: {
       onClick={onClick}
       style={style}
       className={cn(
-        "bg-white rounded-2xl border border-zinc-100 shadow-sm",
+        "bg-card rounded-2xl border border-border shadow-sm",
         "animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both",
-        onClick && "cursor-pointer hover:border-zinc-200 hover:shadow-md transition-all",
+        onClick && "cursor-pointer hover:border-border/80 hover:shadow-md transition-all",
         className
       )}
     >
@@ -253,7 +253,7 @@ const ApprovalProgressCard: React.FC<{
         <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
           <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
         </div>
-        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">Approval Progress</p>
+        <p className="text-eyebrow">Approval Progress</p>
       </div>
 
       <div className="flex items-center gap-5 flex-1">
@@ -534,10 +534,10 @@ const AdminDashboard: React.FC = () => {
               <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mt-0.5 leading-none">
                 Dashboard
               </h1> */}
-              <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+              <p className="text-eyebrow">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </p>
-              <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
+              <h1 className="text-page-title">
                 Overview
               </h1>
             </div>
@@ -567,21 +567,21 @@ const AdminDashboard: React.FC = () => {
                   <DocumentTextIcon className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Budget Plan Year</p>
+                  <p className="text-eyebrow leading-none">Budget Plan Year</p>
                   {/* {activePlan && (
                     // <p className="text-[11px] text-zinc-400 mt-0.5">Fiscal Year {activePlan.year}</p>
                   )} */}
                 </div>
               </div>
               <div className="flex-1">
-                <p className="text-[13px] font-medium text-zinc-500 leading-snug">Proposed Annual Budget</p>
-                <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none mt-1">
+                <p className="text-subtitle leading-snug">Proposed Annual Budget</p>
+                <p className="text-metric leading-none mt-1">
                   {activePlan ? activePlan.year : "—"}
                 </p>
               </div>
-              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
-                <span className="text-[10px] text-zinc-400">Budget Plans</span>
-                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+              <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-eyebrow">Budget Plans</span>
+                <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
               </div>
             </Card>
 
@@ -592,17 +592,17 @@ const AdminDashboard: React.FC = () => {
                 <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
                   <BuildingOffice2Icon className="w-4 h-4 text-violet-500" />
                 </div>
-                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Departments</p>
+                <p className="text-eyebrow leading-none">Departments</p>
               </div>
               <div className="flex-1">
-                <p className="text-3xl font-semibold text-zinc-900 tracking-tight leading-none">
+                <p className="text-metric leading-none">
                   {departments.length}
                 </p>
-                <p className="text-[12px] text-zinc-400 mt-1">Registered Offices</p>
+                <p className="text-metric-support mt-1">Registered Offices</p>
               </div>
-              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
-                <span className="text-[10px] text-zinc-400">View all</span>
-                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+              <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-eyebrow">View all</span>
+                <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
               </div>
             </Card>
 
@@ -613,19 +613,19 @@ const AdminDashboard: React.FC = () => {
                 <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
                   <BriefcaseIcon className="w-4 h-4 text-orange-500" />
                 </div>
-                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-zinc-400 leading-none">Salary Tranche</p>
+                <p className="text-eyebrow leading-none">Salary Tranche</p>
               </div>
               <div className="flex-1">
-                <p className="text-lg font-semibold text-zinc-900 leading-tight truncate">
+                <p className="text-section-title leading-tight truncate">
                   {activeVersion?.lbc_reference ?? "—"}
                 </p>
-                <p className="text-[11px] text-zinc-400 mt-1 truncate">
+                <p className="text-metric-support mt-1 truncate">
                   {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
                 </p>
               </div>
-              <div className="border-t border-zinc-100 pt-2.5 flex items-center justify-between mt-4">
-                <span className="text-[10px] text-zinc-400">Salary Standards</span>
-                <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+              <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+                <span className="text-eyebrow">Salary Standards</span>
+                <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
               </div>
             </Card>
 
@@ -655,8 +655,8 @@ const AdminDashboard: React.FC = () => {
                       <ArrowTrendingUpIcon className="w-5 h-5 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Estimated Revenue</p>
-                      <p className="text-sm font-semibold text-zinc-900 mt-0.5">General Fund</p>
+                      <p className="text-eyebrow">Estimated Revenue</p>
+                      <p className="text-section-title mt-0.5">General Fund</p>
                     </div>
                   </div>
                   <button onClick={() => navigate("/admin/income-general-fund")}
@@ -901,12 +901,12 @@ const AdminDashboard: React.FC = () => {
               <Card style={st(6)} className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                       <ChartBarIcon className="w-4 h-4 text-indigo-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Department Expenditures</p>
-                      <p className="text-sm font-semibold text-zinc-900 mt-0.5">General Fund</p>
+                      <p className="text-eyebrow">Department Expenditures</p>
+                      <p className="text-section-title mt-0.5">General Fund</p>
                     </div>
                   </div>
                   {!deptExpLoading && deptExp.length > 0 && (
@@ -966,8 +966,8 @@ const AdminDashboard: React.FC = () => {
                       <BuildingStorefrontIcon className="w-5 h-5 text-violet-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">Estimated Revenue</p>
-                      <p className="text-sm font-semibold text-zinc-900 mt-0.5">Special Accounts</p>
+                      <p className="text-eyebrow">Estimated Revenue</p>
+                      <p className="text-section-title mt-0.5">Special Accounts</p>
                     </div>
                   </div>
                   <button onClick={() => navigate("/admin/consolidated-special-income")}
@@ -1111,7 +1111,7 @@ const AdminDashboard: React.FC = () => {
 
               {/* Quick Links */}
               <Card style={st(8)} className="p-5">
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400 mb-4">Quick Links</p>
+                <p className="text-eyebrow mb-4">Quick Links</p>
                 <div className="grid grid-cols-4 gap-2">
                   {quickLinks.map(link => (
                     <button key={link.href} onClick={() => navigate(link.href)}
@@ -1134,15 +1134,15 @@ const AdminDashboard: React.FC = () => {
 
           {/* Missing depts warning */}
           {activePlan && missingDepts.length > 0 && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-zinc-200 bg-zinc-50 p-4 flex items-start gap-3" style={st(9)}>
-              <div className="w-7 h-7 rounded-xl bg-white border border-zinc-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border bg-muted p-4 flex items-start gap-3" style={st(9)}>
+              <div className="w-7 h-7 rounded-xl bg-background border border-border flex items-center justify-center flex-shrink-0 mt-0.5">
                 <ExclamationTriangleIcon className="w-4 h-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-800">
+                <p className="text-section-title">
                   {missingDepts.length} department{missingDepts.length !== 1 ? "s" : ""} without a budget plan
                 </p>
-                <p className="text-sm text-zinc-500 mt-0.5">
+                <p className="text-subtitle mt-0.5">
                   {missingDepts.map(d => d.dept_abbreviation ?? d.dept_name).join(" · ")}
                 </p>
               </div>

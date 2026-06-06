@@ -92,7 +92,7 @@ async function fetchBreakdown(planId: number): Promise<Breakdown> {
 
 function Shimmer({ className }: { className?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-xl bg-zinc-100 animate-pulse", className)} />
+    <div className={cn("relative overflow-hidden rounded-xl bg-muted animate-pulse", className)} />
   );
 }
 
@@ -171,21 +171,21 @@ export const BreakdownCard: React.FC<BreakdownCardProps> = ({
     <div
       style={style}
       className={cn(
-        "bg-white rounded-2xl border border-zinc-100 shadow-sm p-5",
+        "bg-card rounded-2xl border border-border shadow-sm p-5",
         "animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both",
         className
       )}
     >
       {/* Header */}
       <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
           <BanknotesIcon className="w-4 h-4 text-emerald-600" />
         </div>
         <div>
-          <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+          <p className="text-eyebrow">
             General Fund · FY {activePlan?.year ?? "—"}
           </p>
-          <p className="text-sm font-semibold text-zinc-900 mt-0.5">Expenditure Breakdown</p>
+          <p className="text-section-title mt-0.5">Expenditure Breakdown</p>
         </div>
       </div>
 
@@ -195,10 +195,10 @@ export const BreakdownCard: React.FC<BreakdownCardProps> = ({
           <Shimmer className="h-7 w-36 mb-1" />
         ) : (
           <>
-            <p className="text-2xl font-semibold text-zinc-900 tabular-nums tracking-tight leading-none">
+            <p className="text-metric leading-none">
               {pesoC(bd.total)}
             </p>
-            <p className="text-[10px] font-mono text-zinc-400 mt-1">{peso(bd.total)}</p>
+            <p className="text-meta mt-1">{peso(bd.total)}</p>
           </>
         )}
       </div>
@@ -217,15 +217,15 @@ export const BreakdownCard: React.FC<BreakdownCardProps> = ({
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.color }} />
-                <span className="text-[11px] font-semibold text-zinc-600">{row.abbr}</span>
-                <span className="text-[10px] text-zinc-400 truncate hidden sm:block">{row.label}</span>
+                <span className="text-[11px] font-semibold text-foreground">{row.abbr}</span>
+                <span className="text-meta truncate hidden sm:block">{row.label}</span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {isLoading ? (
                   <Shimmer className="h-3.5 w-20" />
                 ) : (
                   <>
-                    <span className="text-[11px] font-mono font-semibold text-zinc-700">
+                    <span className="text-[11px] font-mono font-semibold text-foreground">
                       {pesoC(row.value)}
                     </span>
                     <span
@@ -241,7 +241,7 @@ export const BreakdownCard: React.FC<BreakdownCardProps> = ({
               </div>
             </div>
             {!isLoading && (
-              <div className="h-1 rounded-full bg-zinc-100 overflow-hidden">
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{ width: `${row.pct}%`, background: row.color }}

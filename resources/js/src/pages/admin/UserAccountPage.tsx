@@ -587,7 +587,6 @@ const UserAccountPage: React.FC = () => {
               <SelectItem key={r.value} value={r.value} className="text-xs">{r.label}</SelectItem>
             ))}
             <SelectItem value="super-admin" className="text-xs">Super Admin</SelectItem>
-<SelectItem value="viewer"      className="text-xs">Viewer</SelectItem>
           </SelectContent>
         </Select>
 

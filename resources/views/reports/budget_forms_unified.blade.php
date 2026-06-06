@@ -3048,7 +3048,7 @@ $summary    = $cal5['summary'];
       <td style="width:6%;padding:0;border:none;"></td>
     </tr>
     <tr>
-      <th rowspan="2">Functional Classification</th>
+      <th rowspan="2">Thematic Area</th>
       <th rowspan="2">Program/Project/Activity Code and Description</th>
       <th rowspan="2">Implementing Office</th>
       <th colspan="2">Schedule of Implementation</th>
@@ -3105,7 +3105,7 @@ $summary    = $cal5['summary'];
         <td style="width:6%;padding:0;border:none;"></td>
       </tr>
       <tr>
-        <th rowspan="2">Functional Classification</th>
+        <th rowspan="2">Thematic Area</th>
         <th rowspan="2">Program/Project/Activity Code and Description</th>
         <th rowspan="2">Implementing Office</th>
         <th colspan="2">Schedule of Implementation</th>

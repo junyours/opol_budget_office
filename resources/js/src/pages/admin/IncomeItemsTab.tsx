@@ -514,9 +514,7 @@ const IncomeItemsTab: React.FC = () => {
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
-            Expenditure
-          </span>
+          <span className="text-eyebrow">Expenditure</span>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
             Income Items
           </h1>

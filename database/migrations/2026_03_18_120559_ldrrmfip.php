@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // ── Categories (Functional Classification) ────────────────────────
+        // ── Categories (Thematic Area) ────────────────────────
         Schema::create('ldrrmfip_categories', function (Blueprint $table) {
             $table->id('ldrrmfip_category_id');
             $table->string('name');

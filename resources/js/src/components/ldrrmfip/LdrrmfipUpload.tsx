@@ -175,7 +175,7 @@ function downloadTemplate(sourceId: string, sourceLabel: string) {
   const data = [
     [`Source: ${sourceLabel}`, "", "", "", "", "", "", "", "", ""],
     [
-      "Functional Classification",
+      "Thematic Area",
       "Program/Project/Activity Code and Description",
       "Implementing Office",
       "Schedule of Implementation", "",

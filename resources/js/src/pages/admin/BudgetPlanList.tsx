@@ -246,13 +246,13 @@ const invalidateActivePlanDependents = () => {
       {/* ── Page Header ── */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
+          <span className="text-eyebrow">
             Budget Administration
           </span>
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
+          <h1 className="text-page-title">
             Budget Plans
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-subtitle mt-1">
             Manage annual budget plans and department submission windows.
           </p>
         </div>
@@ -297,7 +297,7 @@ const invalidateActivePlanDependents = () => {
                 {["Year", "Status", ...(!isViewer ? ["Submissions"] : []), "Department Plans", "Created"].map((h, i) => (
                   <th
                     key={i}
-                    className="border-b border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide"
+                    className="border-b border-gray-200 bg-white px-4 py-2.5 text-left text-table-header"
                   >
                     {h}
                   </th>
@@ -328,9 +328,9 @@ const invalidateActivePlanDependents = () => {
                     {/* Year */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900 tabular-nums text-sm">{plan.year}</span>
+                        <span className="text-table-primary tabular-nums">{plan.year}</span>
                         {plan.is_active && (
-                          <span className="text-[9px] font-semibold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                          <span className="text-badge bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
                             Active
                           </span>
                         )}
@@ -340,12 +340,12 @@ const invalidateActivePlanDependents = () => {
                     {/* Active status */}
                     <td className="px-4 py-3">
                       {plan.is_active ? (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                        <span className="inline-flex items-center gap-1.5 text-table-header text-emerald-700">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                        <span className="inline-flex items-center gap-1.5 text-table-secondary">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
                           Inactive
                         </span>
@@ -381,24 +381,21 @@ const invalidateActivePlanDependents = () => {
         disabled={!plan.is_active}
         className="data-[state=checked]:bg-blue-600"
       />
-      <span className={cn(
-        "text-[11px] font-medium",
-        plan.is_open ? "text-blue-600" : "text-gray-400"
-      )}>
+      <span className={cn("text-table-secondary font-medium", plan.is_open ? "text-blue-600" : "")}>
         {plan.is_open ? "Open" : "Closed"}
       </span>
     </div>
     {!plan.is_active && (
-      <span className="text-[10px] text-gray-300 mt-0.5 block">Active plan only</span>
+      <span className="text-meta mt-0.5 block">Active plan only</span>
     )}
   </td>
 )}
 
                     {/* Dept count */}
-                    <td className="px-4 py-3 text-gray-500 tabular-nums">{deptCount}</td>
+                    <td className="px-4 py-3 text-table-number">{deptCount}</td>
 
                     {/* Created */}
-                    <td className="px-4 py-3 text-gray-400 text-[11px]">
+                    <td className="px-4 py-3 text-table-secondary">
                       {new Date(plan.created_at).toLocaleDateString("en-PH", {
                         year: "numeric", month: "short", day: "numeric",
                       })}
@@ -411,7 +408,7 @@ const invalidateActivePlanDependents = () => {
           <div className="px-4 py-2.5 border-t border-gray-100">
             {/* <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p> */}
             {!isViewer && (
-  <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p>
+  <p className="text-meta italic">Click a row to edit the plan status</p>
 )}
           </div>
           </>
@@ -419,7 +416,7 @@ const invalidateActivePlanDependents = () => {
       </div>
 
       {/* ── Legend ── */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-table-secondary">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
           Only one plan can be active at a time
@@ -434,14 +431,14 @@ const invalidateActivePlanDependents = () => {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
-            <DialogTitle className="text-[15px] font-semibold text-gray-900">New Budget Plan</DialogTitle>
-            <DialogDescription className="text-xs text-gray-400 mt-0.5">
+            <DialogTitle className="text-section-title">New Budget Plan</DialogTitle>
+            <DialogDescription className="text-subtitle mt-0.5">
               Department plans for all departments will be auto-initialized.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-600">
+              <Label className="text-field-label">
                 Fiscal Year <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -453,14 +450,14 @@ const invalidateActivePlanDependents = () => {
             </div>
             <div className="flex items-center justify-between py-1">
               <div>
-                <p className="text-xs font-semibold text-gray-600">Set as Active</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Will deactivate the current active plan</p>
+                <p className="text-field-label">Set as Active</p>
+<p className="text-meta mt-0.5">Will deactivate the current active plan</p>
               </div>
               <Switch checked={newActive} onCheckedChange={setNewActive} />
             </div>
             {newActive && plans.some(p => p.is_active) && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
-                <p className="text-[11px] text-amber-700 font-medium">
+                <p className="text-table-secondary text-amber-700 font-medium">
                   Budget Plan Year {plans.find(p => p.is_active)?.year} will be deactivated.
                 </p>
               </div>
@@ -494,16 +491,16 @@ const invalidateActivePlanDependents = () => {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
-            <DialogTitle className="text-[15px] font-semibold text-gray-900">Edit Budget Plan</DialogTitle>
-            <DialogDescription className="text-xs text-gray-400 mt-0.5">
+            <DialogTitle className="text-section-title">Edit Budget Plan</DialogTitle>
+            <DialogDescription className="text-subtitle mt-0.5">
               Budget Plan Year {editPlan?.year}
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-gray-600">Active</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-field-label">Active</p>
+                <p className="text-meta mt-0.5">
                   {editActive ? "This plan is active" : "This plan is inactive"}
                 </p>
               </div>
@@ -538,7 +535,7 @@ const invalidateActivePlanDependents = () => {
       <AlertDialog open={!!activateTarget} onOpenChange={o => { if (!o) setActivateTarget(null); }}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[15px] font-semibold">
+            <AlertDialogTitle className="text-section-title">
               Activate Budget Plan Year {activateTarget?.year}?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-500">
@@ -567,7 +564,7 @@ const invalidateActivePlanDependents = () => {
       <AlertDialog open={!!closeTarget} onOpenChange={o => { if (!o) { setCloseTarget(null); setDraftDepts([]); } }}>
         <AlertDialogContent className="rounded-2xl max-w-md border-gray-200 max-h-[90vh] flex flex-col overflow-hidden">
           <AlertDialogHeader className="flex-shrink-0">
-            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+            <AlertDialogTitle className="text-section-title">
               Close submissions for FY {closeTarget?.year}?
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -584,16 +581,16 @@ const invalidateActivePlanDependents = () => {
                 ) : draftDepts.length > 0 ? (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
                     <div className="px-3 pt-2.5 pb-2 border-b border-amber-200 flex items-center justify-between">
-                      <p className="text-[11px] font-semibold text-amber-800 uppercase tracking-wide">
+                      <p className="text-table-header text-amber-800">
                         {draftDepts.length} dept{draftDepts.length > 1 ? "s" : ""} still in draft — will be auto-submitted
                       </p>
-                      <span className="text-[10px] text-amber-500 font-medium tabular-nums">
+                      <span className="text-meta text-amber-500 tabular-nums">
                         {draftDepts.length} total
                       </span>
                     </div>
                     <ul className="overflow-y-auto max-h-[200px] divide-y divide-amber-100">
                       {draftDepts.map(d => (
-                        <li key={d.dept_budget_plan_id} className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-amber-700">
+                        <li key={d.dept_budget_plan_id} className="flex items-center gap-2 px-3 py-1.5 text-table-secondary text-amber-700">
                           <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0" />
                           <span className="font-semibold flex-shrink-0 w-10 truncate">{d.dept_abbreviation}</span>
                           <span className="text-amber-600 truncate">{d.dept_name}</span>
@@ -602,7 +599,7 @@ const invalidateActivePlanDependents = () => {
                     </ul>
                   </div>
                 ) : (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-[12px] text-emerald-700 font-medium">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-subtitle text-emerald-700 font-medium">
                     ✓ All departments have already submitted their plans.
                   </div>
                 )}

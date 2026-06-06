@@ -103,82 +103,169 @@
   #dept-tabs-scroll::-webkit-scrollbar {
     display: none;
   }
+
+  /* ── Base body text ── */
+ body {
+  font-family: theme('fontFamily.sans');
+  font-size: 14px;
+    font-weight: 400;
+    color: hsl(var(--foreground));
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Headings ── */
+  /* Page Title  — e.g. "Local Disaster Risk Reduction…" */
+  .text-page-title {
+    font-size: 1.25rem;      /* 20px */
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+  }
+
+  /* Section Title — e.g. card/panel heading inside a page */
+  .text-section-title {
+    font-size: 0.9375rem;    /* 15px */
+    font-weight: 600;
+    line-height: 1.4;
+    color: hsl(var(--foreground));
+  }
+
+  /* Sub-title / description — e.g. "Municipality of Opol…" */
+  .text-subtitle {
+    font-size: 0.75rem;      /* 12px */
+    font-weight: 400;
+    line-height: 1.5;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Eyebrow label — e.g. "LDRRMF INVESTMENT PLAN" above the title */
+  .text-eyebrow {
+    font-size: 0.625rem;     /* 10px */
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ── Table ── */
+
+  /* Table column header */
+  .text-table-header {
+    font-size: 0.6875rem;    /* 11px */
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Table body cell — primary content (description, name) */
+  .text-table-primary {
+    font-size: 0.8125rem;    /* 13px */
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    line-height: 1.4;
+  }
+
+  /* Table body cell — secondary content (codes, dates, office) */
+  .text-table-secondary {
+    font-size: 0.6875rem;    /* 11px */
+    font-weight: 400;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Table numeric/amount cell */
+  .text-table-number {
+    font-size: 0.6875rem;    /* 11px */
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--foreground) / 0.75);
+  }
+
+  /* Table total / subtotal row — bold number */
+  .text-table-total {
+    font-size: 0.75rem;      /* 12px */
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--foreground));
+  }
+
+  /* Grand total — largest number in a table */
+  .text-table-grand-total {
+    font-size: 0.8125rem;    /* 13px */
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--foreground));
+  }
+
+  /* ── Labels & Badges ── */
+
+  /* Form field label */
+  .text-field-label {
+    font-size: 0.6875rem;    /* 11px */
+    font-weight: 600;
+    color: hsl(var(--foreground) / 0.7);
+  }
+
+  /* Badge / status pill text */
+  .text-badge {
+    font-size: 0.625rem;     /* 10px */
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* Metadata / helper text — e.g. "derived · 5% of General Fund" */
+  .text-meta {
+    font-size: 0.625rem;     /* 10px */
+    font-weight: 500;
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  /* ── Navigation ── */
+
+  /* Sidebar nav item */
+  .text-nav-item {
+    font-size: 0.8125rem;    /* 13px */
+    font-weight: 500;
+  }
+
+  /* Sidebar section label */
+  .text-nav-section {
+    font-size: 0.625rem;     /* 10.5px */
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ── Dashboard cards ── */
+
+  /* Card metric — large number on dashboard */
+  .text-metric {
+    font-size: 1.5rem;       /* 24px */
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  /* Card metric label */
+  .text-metric-label {
+    font-size: 0.625rem;     /* 10px */
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Card supporting text */
+  .text-metric-support {
+    font-size: 0.6875rem;    /* 11px */
+    font-weight: 400;
+    color: hsl(var(--muted-foreground));
+  }
+
 }
-
-/* @tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem
-  ;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%}
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
-  ;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%}
-
-
-} */

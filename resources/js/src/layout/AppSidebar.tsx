@@ -157,7 +157,6 @@
     label: "Calamity Fund",
     items: [
         { name: "5% CF GF & SA", href: "/admin/ldrrmfip",     icon: ShieldCheckIcon,     iconBg: "bg-red-100",    iconColor: "text-red-600",    roles: ["admin-ldrrmo"] },
-        { name: "5% SA Consolidated",   href: "/admin/ldrrmf-plan",  icon: DocumentChartBarIcon,iconBg: "bg-orange-100", iconColor: "text-orange-600", roles: ["admin-ldrrmo"] },
         ] as NavItem[],
 },
 {

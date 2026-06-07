@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
@@ -101,6 +101,7 @@ function Shimmer({ className, style }: { className?: string; style?: React.CSSPr
   );
 }
 
+
 const DeptAvatars = React.memo(function DeptAvatars({ depts, max = 8 }: { depts: Department[]; max?: number }) {
   const visible = depts.slice(0, max), rest = depts.length - max;
   return (
@@ -114,7 +115,7 @@ const DeptAvatars = React.memo(function DeptAvatars({ depts, max = 8 }: { depts:
       {rest > 0 && (
         <div className="h-6 w-6 rounded-full border-2 border-white bg-zinc-400 flex items-center justify-center text-[9px] font-bold text-white">+{rest}</div>
       )}
-     </div>
+    </div>
   );
 });
 
@@ -320,41 +321,45 @@ const ApprovalProgressCard: React.FC<{
             ))}
           </div>
 
-          {/* Fixed-height container — prevents layout shift on switch */}
+          {/* Fixed-height container — all panels prerendered, toggled via opacity to keep imgs mounted */}
           <div className="relative min-w-0" style={{ height: 100 }}>
-            <div
-              style={{
-                transition: "opacity 400ms ease, transform 400ms ease",
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateY(0)" : "translateY(6px)",
-                position: "absolute",
-                inset: 0,
-              }}
-              className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  {s.icon}
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{s.label}</span>
+            {statuses.map((st, i) => (
+              <div
+                key={st.label}
+                style={{
+                  transition: "opacity 400ms ease, transform 400ms ease",
+                  opacity: i === activeIdx ? (visible ? 1 : 0) : 0,
+                  transform: i === activeIdx ? (visible ? "translateY(0)" : "translateY(6px)") : "translateY(6px)",
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: i === activeIdx ? "auto" : "none",
+                }}
+                className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {st.icon}
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{st.label}</span>
+                  </div>
+                  <span className="text-2xl font-bold text-zinc-900">{st.depts.length}</span>
                 </div>
-                <span className="text-2xl font-bold text-zinc-900">{s.depts.length}</span>
-              </div>
 
-              <div className="h-1 rounded-full bg-zinc-200 overflow-hidden mb-2.5">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: totalWithPlan > 0 ? `${(s.depts.length / totalWithPlan) * 100}%` : "0%",
-                    background: s.color,
-                  }}
-                />
-              </div>
+                <div className="h-1 rounded-full bg-zinc-200 overflow-hidden mb-2.5">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: totalWithPlan > 0 ? `${(st.depts.length / totalWithPlan) * 100}%` : "0%",
+                      background: st.color,
+                    }}
+                  />
+                </div>
 
-              {s.depts.length > 0
-                ? <DeptAvatars depts={s.depts} max={10} />
-                : <p className="text-[10px] text-zinc-300">None yet</p>
-              }
-            </div>
+                {st.depts.length > 0
+                  ? <DeptAvatars depts={st.depts} max={10} />
+                  : <p className="text-[10px] text-zinc-300">None yet</p>
+                }
+              </div>
+            ))}
           </div>
 
         </div>
@@ -375,7 +380,7 @@ const AdminDashboard: React.FC = () => {
   const { data: departments = [], isLoading: deptsLoading } = useDepartments();
   const { data: plans = [],       isLoading: plansLoading } = useBudgetPlans();
 
-  const activePlan = plans.find(p => p.is_active) ?? null;
+  const activePlan = useMemo(() => plans.find(p => p.is_active) ?? null, [plans]);
   const planId     = activePlan?.budget_plan_id;
 
   const { data: deptBudgetPlans = [] } = useDepartmentBudgetPlans(planId);
@@ -411,9 +416,9 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
     }
   };
 
-  const draftDepts     = deptBudgetPlans.filter(p => p.status === 'draft').map(p => p.department).filter(Boolean) as Department[];
-  const submittedDepts = deptBudgetPlans.filter(p => p.status === 'submitted').map(p => p.department).filter(Boolean) as Department[];
-  const approvedDepts  = deptBudgetPlans.filter(p => p.status === 'approved').map(p => p.department).filter(Boolean) as Department[];
+  const draftDepts     = useMemo(() => deptBudgetPlans.filter(p => p.status === 'draft').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const submittedDepts = useMemo(() => deptBudgetPlans.filter(p => p.status === 'submitted').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const approvedDepts  = useMemo(() => deptBudgetPlans.filter(p => p.status === 'approved').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
   const withPlanIds    = new Set(deptBudgetPlans.map(p => p.dept_id));
   const missingDepts   = departments.filter(d => !withPlanIds.has(d.dept_id));
   const totalWithPlan  = draftDepts.length + submittedDepts.length + approvedDepts.length;

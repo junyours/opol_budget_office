@@ -101,7 +101,7 @@ function Shimmer({ className, style }: { className?: string; style?: React.CSSPr
   );
 }
 
-function DeptAvatars({ depts, max = 8 }: { depts: Department[]; max?: number }) {
+const DeptAvatars = React.memo(function DeptAvatars({ depts, max = 8 }: { depts: Department[]; max?: number }) {
   const visible = depts.slice(0, max), rest = depts.length - max;
   return (
     <div className="flex -space-x-1.5 flex-wrap">
@@ -114,9 +114,9 @@ function DeptAvatars({ depts, max = 8 }: { depts: Department[]; max?: number }) 
       {rest > 0 && (
         <div className="h-6 w-6 rounded-full border-2 border-white bg-zinc-400 flex items-center justify-center text-[9px] font-bold text-white">+{rest}</div>
       )}
-    </div>
+     </div>
   );
-}
+});
 
 function Card({ children, className, style, onClick }: {
   children: React.ReactNode; className?: string;
@@ -392,9 +392,9 @@ const AdminDashboard: React.FC = () => {
   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
-  const shExpTotal  = exp.shExpenditure;
-  const occExpTotal = exp.occExpenditure;
-  const pmExpTotal  = exp.pmExpenditure;
+  const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
+const occExpTotal = exp.occExpenditure + exp.occCalamity;
+const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
 
   const createPlan = useCreateBudgetPlan();
 

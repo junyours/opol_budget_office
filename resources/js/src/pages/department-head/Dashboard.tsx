@@ -31,6 +31,9 @@ import {
     ClipboardDocumentListIcon,
     InformationCircleIcon,
     BuildingOfficeIcon,
+    ExclamationTriangleIcon,
+    BuildingStorefrontIcon,
+    ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,10 +47,9 @@ const fmt = (n: number) =>
 
 const pct = (a: number, b: number) => (b === 0 ? 0 : Math.round((a / b) * 100));
 
-// Classification name constants
-const CLASS_PS = "Personal Services";
+const CLASS_PS   = "Personal Services";
 const CLASS_MOOE = "Maintenance and Other Operating Expenses";
-const CLASS_CO = "Capital Outlay";
+const CLASS_CO   = "Capital Outlay";
 
 // ─── Skeleton pieces ─────────────────────────────────────────────────────────
 
@@ -64,13 +66,7 @@ const CardSkeleton = () => (
     </div>
 );
 
-const ChartSkeleton = ({
-    title,
-    h = "h-52",
-}: {
-    title?: string;
-    h?: string;
-}) => (
+const ChartSkeleton = ({ h = "h-52" }: { title?: string; h?: string }) => (
     <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
         <div className="space-y-1 mb-4">
             <Shimmer className="h-2.5 w-24" />
@@ -111,12 +107,12 @@ interface StatCardProps {
 }
 
 const accentMap = {
-    blue: { tile: "bg-blue-50", icon: "text-blue-600" },
-    violet: { tile: "bg-violet-50", icon: "text-violet-600" },
-    cyan: { tile: "bg-cyan-50", icon: "text-cyan-600" },
+    blue:    { tile: "bg-blue-50",    icon: "text-blue-600"    },
+    violet:  { tile: "bg-violet-50",  icon: "text-violet-600"  },
+    cyan:    { tile: "bg-cyan-50",    icon: "text-cyan-600"    },
     emerald: { tile: "bg-emerald-50", icon: "text-emerald-600" },
-    amber: { tile: "bg-amber-50", icon: "text-amber-600" },
-    rose: { tile: "bg-rose-50", icon: "text-rose-600" },
+    amber:   { tile: "bg-amber-50",   icon: "text-amber-600"   },
+    rose:    { tile: "bg-rose-50",    icon: "text-rose-600"    },
 };
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -131,12 +127,7 @@ const StatCard: React.FC<StatCardProps> = ({
     return (
         <Reveal delay={delay}>
             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full">
-                <div
-                    className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center mb-3 flex-shrink-0",
-                        a.tile,
-                    )}
-                >
+                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3 flex-shrink-0", a.tile)}>
                     <Icon className={cn("w-[18px] h-[18px]", a.icon)} />
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
@@ -146,9 +137,7 @@ const StatCard: React.FC<StatCardProps> = ({
                     {value}
                 </p>
                 {sub && (
-                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
-                        {sub}
-                    </p>
+                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">{sub}</p>
                 )}
             </div>
         </Reveal>
@@ -162,30 +151,19 @@ const ChartTip = ({ active, payload, label }: any) => {
     const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
     return (
         <div className="bg-white border border-zinc-200 rounded-xl shadow-lg p-3 text-xs max-w-[220px]">
-            {label && (
-                <p className="font-semibold text-zinc-700 mb-2 truncate">
-                    {label}
-                </p>
-            )}
+            {label && <p className="font-semibold text-zinc-700 mb-2 truncate">{label}</p>}
             {payload.map((p: any) => (
                 <div key={p.dataKey} className="flex items-center gap-2 mt-1">
-                    <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: p.color }}
-                    />
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                     <span className="text-zinc-500">{p.name}:</span>
-                    <span className="font-semibold text-zinc-800 tabular-nums">
-                        {fmt(p.value)}
-                    </span>
+                    <span className="font-semibold text-zinc-800 tabular-nums">{fmt(p.value)}</span>
                 </div>
             ))}
             {payload.length > 1 && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-zinc-100">
                     <span className="w-2 h-2 rounded-full flex-shrink-0 bg-zinc-400" />
                     <span className="text-zinc-500">Total:</span>
-                    <span className="font-bold text-zinc-900 tabular-nums">
-                        {fmt(total)}
-                    </span>
+                    <span className="font-bold text-zinc-900 tabular-nums">{fmt(total)}</span>
                 </div>
             )}
         </div>
@@ -208,21 +186,14 @@ const SectionHead = ({
     iconColor: string;
 }) => (
     <div className="flex items-center gap-2.5 mb-4">
-        <div
-            className={cn(
-                "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0",
-                iconBg,
-            )}
-        >
+        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0", iconBg)}>
             <Icon className={cn("w-4 h-4", iconColor)} />
         </div>
         <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
                 {eyebrow}
             </p>
-            <p className="text-[13px] font-bold text-zinc-800 leading-none">
-                {title}
-            </p>
+            <p className="text-[13px] font-bold text-zinc-800 leading-none">{title}</p>
         </div>
     </div>
 );
@@ -234,34 +205,22 @@ const DepartmentHeadDashboard: React.FC = () => {
     const deptId = user?.dept_id;
 
     const { activePlan, loading: planLoading } = useActiveBudgetPlan();
-    const { programs, loading: aipLoading } = useAipProgramData(
-        activePlan?.budget_plan_id,
-    );
-    const {
-        items,
-        amountMap,
-        loading: expLoading,
-    } = useExpenseData(activePlan?.budget_plan_id);
+    const { programs, loading: aipLoading } = useAipProgramData(activePlan?.budget_plan_id);
+    const { items, amountMap, loading: expLoading } = useExpenseData(activePlan?.budget_plan_id);
 
-    // Draft notification state
     const [showDraftAlert, setShowDraftAlert] = useState(false);
 
-    // This dept's budget plan record
     const { data: deptPlan, isLoading: deptPlanLoading } = useQuery({
         queryKey: ["my-dept-plan", activePlan?.budget_plan_id, deptId],
         queryFn: () =>
             API.get("/department-budget-plans", {
                 params: { budget_plan_id: activePlan?.budget_plan_id },
             }).then(
-                (r) =>
-                    (r.data?.data ?? []).find(
-                        (p: any) => p.dept_id === deptId,
-                    ) ?? null,
+                (r) => (r.data?.data ?? []).find((p: any) => p.dept_id === deptId) ?? null,
             ),
         enabled: !!activePlan && !!deptId,
     });
 
-    // Plantilla positions for this dept
     const { data: plantilla = [], isLoading: plantillaLoading } = useQuery({
         queryKey: ["plantilla-my-dept", deptId],
         queryFn: () =>
@@ -273,17 +232,84 @@ const DepartmentHeadDashboard: React.FC = () => {
         enabled: !!deptId,
     });
 
-    const isLoading =
-        planLoading || aipLoading || expLoading || deptPlanLoading;
+    const isSpecialAccountDept = useMemo(() => {
+        if (!user || (user as any).role !== "department-head") return false;
+        const d = (user as any)?.department;
+        if (!d) return false;
+        const n = d.dept_name?.toLowerCase() ?? "";
+        const c = d.dept_abbreviation?.toLowerCase() ?? "";
+        return (
+            n.includes("opol community college") ||
+            n.includes("slaughterhouse") ||
+            n.includes("public market") ||
+            c === "occ" || c === "pm" || c === "sh"
+        );
+    }, [user]);
 
-    // Show draft alert when data is ready
+const deptSource = useMemo(() => {
+    const abbr = ((user as any)?.department?.dept_abbreviation ?? "").toLowerCase();
+    return abbr; // "occ", "sh", or "pm"
+}, [user]);
+
+const { data: specialFund, isLoading: specialFundLoading } = useQuery({
+    queryKey: ["special-fund-my-dept", deptSource, activePlan?.budget_plan_id],
+    queryFn: () =>
+        API.get("/income-fund", {
+            params: { source: deptSource },
+        }).then((r) => r.data?.data ?? r.data ?? []),
+    enabled: !!deptSource && !!activePlan && isSpecialAccountDept,
+});
+
+const { data: ldrrmfSummary } = useQuery({
+    queryKey: ["ldrrmf-summary-dept", deptSource, activePlan?.budget_plan_id],
+    queryFn: () =>
+        API.get("/ldrrmfip/summary", {
+            params: {
+                budget_plan_id: activePlan?.budget_plan_id,
+                source: deptSource,
+            },
+        }).then((r) => {
+            const d = r.data?.data ?? r.data ?? {};
+            return { allocated70: Number(d.total_70pct ?? 0) };
+        }).catch(() => ({ allocated70: 0 })),
+    enabled: !!deptSource && !!activePlan && isSpecialAccountDept,
+});
+
+const sfAllocated70 = ldrrmfSummary?.allocated70 ?? 0;
+
+    const { total: sfTotal, nonTaxRevenue: sfNonTax } = useMemo(() => {
+        const allItems: any[] = Array.isArray(specialFund) ? specialFund : [];
+        if (!allItems.length) return { total: 0, nonTaxRevenue: 0 };
+
+        const parentIds = new Set(allItems.map((i: any) => i.parent_id).filter(Boolean));
+        const leaves = allItems.filter((i: any) => !parentIds.has(i.id) && i.proposed != null);
+        const total = leaves.reduce((s: number, i: any) => s + parseFloat(i.proposed ?? 0), 0);
+
+        // REPLACE WITH
+const nonTaxNode = allItems.find(
+    (i: any) => i.name?.toLowerCase().includes("non-tax") && parentIds.has(i.id),
+);
+        const desc = new Set<number>();
+        if (nonTaxNode) {
+            const queue = [nonTaxNode.id];
+            while (queue.length) {
+                const pid = queue.shift()!;
+                allItems.forEach((i: any) => {
+                    if (i.parent_id === pid) { desc.add(i.id); queue.push(i.id); }
+                });
+            }
+        }
+        const nonTaxRevenue = leaves
+            .filter((i: any) => desc.has(i.id))
+            .reduce((s: number, i: any) => s + parseFloat(i.proposed ?? 0), 0);
+
+        return { total, nonTaxRevenue };
+    }, [specialFund]);
+
+    const isLoading = planLoading || aipLoading || expLoading || deptPlanLoading;
+
     useEffect(() => {
-        if (
-            !isLoading &&
-            deptPlan &&
-            deptPlan.status === "draft" &&
-            activePlan
-        ) {
+        if (!isLoading && deptPlan && deptPlan.status === "draft" && activePlan) {
             setShowDraftAlert(true);
         }
     }, [isLoading, deptPlan, activePlan]);
@@ -295,62 +321,25 @@ const DepartmentHeadDashboard: React.FC = () => {
         [programs, deptId],
     );
 
-    // ── Expense-item based totals (scoped to this dept) ───────────────────────
-
-    // Build a map: expense_item_id → classificationName for this dept's items
-    const expenseItemClassMap = useMemo(() => {
-        const m = new Map<number, string>();
+    const { totalExpensePS, totalExpenseMOOE, totalExpenseCO, totalExpense } = useMemo(() => {
+        let ps = 0, mooe = 0, co = 0;
         items.forEach((item) => {
-            m.set(item.expense_class_item_id, item.classificationName);
+            const amt = amountMap.get(`${deptId}-${item.expense_class_item_id}`) ?? 0;
+            const cls = item.classificationName;
+            if (cls === CLASS_PS) ps += amt;
+            else if (cls === CLASS_MOOE) mooe += amt;
+            else if (cls === CLASS_CO) co += amt;
         });
-        return m;
-    }, [items]);
+        return { totalExpensePS: ps, totalExpenseMOOE: mooe, totalExpenseCO: co, totalExpense: ps + mooe + co };
+    }, [items, amountMap, deptId]);
 
-    // Sum amounts for this dept's expense items by classification
-    const { totalExpensePS, totalExpenseMOOE, totalExpenseCO, totalExpense } =
-        useMemo(() => {
-            let ps = 0,
-                mooe = 0,
-                co = 0;
-            items.forEach((item) => {
-                const amt =
-                    amountMap.get(`${deptId}-${item.expense_class_item_id}`) ??
-                    0;
-                const cls = item.classificationName;
-                if (cls === CLASS_PS) ps += amt;
-                else if (cls === CLASS_MOOE) mooe += amt;
-                else if (cls === CLASS_CO) co += amt;
-            });
-            return {
-                totalExpensePS: ps,
-                totalExpenseMOOE: mooe,
-                totalExpenseCO: co,
-                totalExpense: ps + mooe + co,
-            };
-        }, [items, amountMap, deptId]);
+    const aipTotalPS   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_ps, 0), [myPrograms]);
+    const aipTotalMOOE = useMemo(() => myPrograms.reduce((s, p) => s + p.total_mooe, 0), [myPrograms]);
+    const aipTotalCO   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_co, 0), [myPrograms]);
+    const aipTotal     = useMemo(() => myPrograms.reduce((s, p) => s + p.total_amount, 0), [myPrograms]);
 
-    // AIP program totals (for radial chart)
-    const aipTotalPS = useMemo(
-        () => myPrograms.reduce((s, p) => s + p.total_ps, 0),
-        [myPrograms],
-    );
-    const aipTotalMOOE = useMemo(
-        () => myPrograms.reduce((s, p) => s + p.total_mooe, 0),
-        [myPrograms],
-    );
-    const aipTotalCO = useMemo(
-        () => myPrograms.reduce((s, p) => s + p.total_co, 0),
-        [myPrograms],
-    );
-    const aipTotal = useMemo(
-        () => myPrograms.reduce((s, p) => s + p.total_amount, 0),
-        [myPrograms],
-    );
-
-    // Total proposed expenditure = expense items total + AIP total
     const totalProposedExpenditure = totalExpense + aipTotal;
 
-    // Bar chart — top 6 AIP programs
     const barData = useMemo(
         () =>
             [...myPrograms]
@@ -368,57 +357,54 @@ const DepartmentHeadDashboard: React.FC = () => {
         [myPrograms],
     );
 
-    // Pie — PS / MOOE / CO from expense items
-    const pieData = useMemo(() => {
-        const data = [
-            {
-                name: "Personal Services",
-                value: totalExpensePS,
-                color: "#6366f1",
-            },
-            { name: "MOOE", value: totalExpenseMOOE, color: "#22d3ee" },
-            { name: "Capital Outlay", value: totalExpenseCO, color: "#f59e0b" },
-        ].filter((d) => d.value > 0);
-        return data;
-    }, [totalExpensePS, totalExpenseMOOE, totalExpenseCO]);
+    const pieData = useMemo(
+        () =>
+            [
+                { name: "Personal Services", value: totalExpensePS,   color: "#6366f1" },
+                { name: "MOOE",              value: totalExpenseMOOE, color: "#22d3ee" },
+                { name: "Capital Outlay",    value: totalExpenseCO,   color: "#f59e0b" },
+            ].filter((d) => d.value > 0),
+        [totalExpensePS, totalExpenseMOOE, totalExpenseCO],
+    );
 
-    // Radial — AIP allocation %
     const radialData = useMemo(() => {
         if (!aipTotal) return [];
         return [
-            { name: "PS", value: pct(aipTotalPS, aipTotal), fill: "#6366f1" },
-            {
-                name: "MOOE",
-                value: pct(aipTotalMOOE, aipTotal),
-                fill: "#22d3ee",
-            },
-            { name: "CO", value: pct(aipTotalCO, aipTotal), fill: "#f59e0b" },
+            { name: "PS",   value: pct(aipTotalPS,   aipTotal), fill: "#6366f1" },
+            { name: "MOOE", value: pct(aipTotalMOOE, aipTotal), fill: "#22d3ee" },
+            { name: "CO",   value: pct(aipTotalCO,   aipTotal), fill: "#f59e0b" },
         ];
     }, [aipTotal, aipTotalPS, aipTotalMOOE, aipTotalCO]);
 
-    // Plantilla
-    const filled = (plantilla as any[]).filter(
-        (p) => p.assignments?.[0]?.personnel_id != null,
-    ).length;
+    const filled   = (plantilla as any[]).filter((p) => p.assignments?.[0]?.personnel_id != null).length;
     const fillRate = pct(filled, plantilla.length);
 
-    const dept = (user as any)?.department;
+    const dept     = (user as any)?.department;
     const deptName = dept?.dept_name ?? "Your Department";
     const deptAbbr = dept?.dept_abbreviation ?? "";
 
+    // REPLACE WITH
+const isSpecialAccount = isSpecialAccountDept;
+const sfCal    = sfNonTax * 0.05;          // mandatory appropriation
+const sfQrf    = sfCal * 0.30;
+const sfPredis = sfCal * 0.70;
+const sfExp    = totalExpense + sfCal;     // expense items + calamity fund
+const sfUnap   = sfTotal - sfExp;          // simplified: total - (items + cal)
+    const sfUPos   = sfUnap >= 0;
+    // REPLACE WITH — Expenditures slice = items only, Calamity is separate slice
+const sfPieData =
+    sfTotal > 0
+        ? [
+              { name: "Expenditures",           value: totalExpense,        color: "#a1a1aa" },
+              { name: "5% Calamity",            value: sfCal,               color: "#f43f5e" },
+              { name: "Unappropriated Balance", value: Math.max(0, sfUnap), color: "#10b981" },
+          ].filter((d) => d.value > 0)
+        : [];
+
     const statusCfg: Record<string, { label: string; cls: string }> = {
-        draft: {
-            label: "Draft",
-            cls: "text-amber-700 bg-amber-50 border-amber-200",
-        },
-        submitted: {
-            label: "Submitted",
-            cls: "text-blue-700 bg-blue-50 border-blue-200",
-        },
-        approved: {
-            label: "Approved",
-            cls: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        },
+        draft:     { label: "Draft",     cls: "text-amber-700 bg-amber-50 border-amber-200"       },
+        submitted: { label: "Submitted", cls: "text-blue-700 bg-blue-50 border-blue-200"          },
+        approved:  { label: "Approved",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
     };
     const planStatus = deptPlan?.status ?? "draft";
     const sCfg = statusCfg[planStatus] ?? statusCfg.draft;
@@ -443,26 +429,24 @@ const DepartmentHeadDashboard: React.FC = () => {
       `}</style>
 
             <div className="min-h-screen bg-zinc-50/50 p-6 pb-20">
+
                 {/* ── Page header ───────────────────────────────────────────── */}
                 <Reveal delay={0}>
                     <div className="flex items-start justify-between mb-7">
                         <div>
-                            {/* <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-zinc-400">
-                                {deptAbbr ? `${deptAbbr} · ` : ""}Department
-                                Dashboard
-                            </span> */}
                             <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
-                                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                                {new Date().toLocaleDateString("en-US", {
+                                    weekday: "long",
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                })}
                             </p>
                             <h1 className="text-[32px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
                                 Overview
                             </h1>
-                            {/* <p className="text-[12px] text-zinc-400 mt-0.5">
-                                Budget Overview
-                            </p> */}
                         </div>
-
-                        <div className="flex items-center gap-2 flex-shrink-0"></div>
+                        <div className="flex items-center gap-2 flex-shrink-0" />
                     </div>
                 </Reveal>
 
@@ -472,28 +456,24 @@ const DepartmentHeadDashboard: React.FC = () => {
                         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 mb-6">
                             <InformationCircleIcon className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-medium text-zinc-900">
-                                    No active budget plan
-                                </p>
+                                <p className="text-sm font-medium text-zinc-900">No active budget plan</p>
                                 <p className="text-[11px] text-zinc-500 mt-0.5">
-                                    The admin hasn't activated a budget plan
-                                    yet.
+                                    The admin hasn't activated a budget plan yet.
                                 </p>
                             </div>
                         </div>
                     </Reveal>
                 )}
 
-                {/* ── Stat cards ────────────────────────────────────────────── */}
+                {/* ── Row 1: Stat cards ─────────────────────────────────────── */}
                 {isLoading ? (
                     <div className="flex gap-4 mb-6">
-                        {[...Array(5)].map((_, i) => (
-                            <CardSkeleton key={i} />
-                        ))}
+                        {[...Array(5)].map((_, i) => <CardSkeleton key={i} />)}
                     </div>
                 ) : (
                     <div className="flex gap-4 mb-6 items-stretch">
-                        {/* Active Plan */}
+
+                        {/* Budget plan year */}
                         <Reveal delay={40} className="flex-shrink-0 w-[190px]">
                             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full relative overflow-hidden">
                                 <span className="absolute top-4 right-4 flex h-2 w-2">
@@ -510,17 +490,14 @@ const DepartmentHeadDashboard: React.FC = () => {
                                     {activePlan ? `${activePlan.year}` : "—"}
                                 </p>
                                 <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
-                                    {activePlan
-                                        ? "Currently active"
-                                        : "No active plan"}
+                                    {activePlan ? "Currently active" : "No active plan"}
                                 </p>
                             </div>
                         </Reveal>
 
-                        {/* Vertical divider */}
                         <div className="w-px bg-zinc-200 my-2 flex-shrink-0" />
 
-                        {/* Total Proposed Expenditure — clickable card with status */}
+                        {/* Total proposed expenditure */}
                         <Reveal delay={60} className="flex-1">
                             {deptPlan ? (
                                 <Link
@@ -531,12 +508,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                         <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-100 transition-colors flex items-center justify-center flex-shrink-0">
                                             <CurrencyDollarIcon className="w-[18px] h-[18px] text-blue-600" />
                                         </div>
-                                        <span
-                                            className={cn(
-                                                "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
-                                                sCfg.cls,
-                                            )}
-                                        >
+                                        <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", sCfg.cls)}>
                                             {sCfg.label}
                                         </span>
                                     </div>
@@ -595,8 +567,9 @@ const DepartmentHeadDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* ── Row 2: Radial + Grouped Bar ───────────────────────────── */}
+                {/* ── Row 2: AIP Radial + Bar ────────────────────────────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
                     {/* Radial: AIP PS/MOOE/CO split */}
                     {isLoading ? (
                         <ChartSkeleton h="h-56" />
@@ -616,10 +589,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height={180}
-                                        >
+                                        <ResponsiveContainer width="100%" height={180}>
                                             <RadialBarChart
                                                 cx="50%"
                                                 cy="50%"
@@ -632,9 +602,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                                 <RadialBar
                                                     dataKey="value"
                                                     cornerRadius={5}
-                                                    background={{
-                                                        fill: "#f4f4f5",
-                                                    }}
+                                                    background={{ fill: "#f4f4f5" }}
                                                     label={{
                                                         position: "insideStart",
                                                         fill: "#fff",
@@ -646,15 +614,11 @@ const DepartmentHeadDashboard: React.FC = () => {
                                                     iconType="circle"
                                                     iconSize={7}
                                                     formatter={(v) => (
-                                                        <span className="text-[11px] text-zinc-500">
-                                                            {v}
-                                                        </span>
+                                                        <span className="text-[11px] text-zinc-500">{v}</span>
                                                     )}
                                                 />
                                                 <Tooltip
-                                                    formatter={(v: number) => [
-                                                        `${v}%`,
-                                                    ]}
+                                                    formatter={(v: number) => [`${v}%`]}
                                                     contentStyle={{
                                                         borderRadius: 12,
                                                         border: "1px solid #e4e4e7",
@@ -665,43 +629,15 @@ const DepartmentHeadDashboard: React.FC = () => {
                                         </ResponsiveContainer>
                                         <div className="grid grid-cols-3 gap-1.5 mt-1">
                                             {[
-                                                {
-                                                    label: "PS",
-                                                    val: fmt(aipTotalPS),
-                                                    color: "text-indigo-600",
-                                                    bg: "bg-indigo-50",
-                                                },
-                                                {
-                                                    label: "MOOE",
-                                                    val: fmt(aipTotalMOOE),
-                                                    color: "text-cyan-600",
-                                                    bg: "bg-cyan-50",
-                                                },
-                                                {
-                                                    label: "CO",
-                                                    val: fmt(aipTotalCO),
-                                                    color: "text-amber-600",
-                                                    bg: "bg-amber-50",
-                                                },
+                                                { label: "PS",   val: fmt(aipTotalPS),   color: "text-indigo-600", bg: "bg-indigo-50" },
+                                                { label: "MOOE", val: fmt(aipTotalMOOE), color: "text-cyan-600",   bg: "bg-cyan-50"   },
+                                                { label: "CO",   val: fmt(aipTotalCO),   color: "text-amber-600", bg: "bg-amber-50"  },
                                             ].map((d) => (
-                                                <div
-                                                    key={d.label}
-                                                    className={cn(
-                                                        "rounded-xl py-2 text-center",
-                                                        d.bg,
-                                                    )}
-                                                >
-                                                    <p
-                                                        className={cn(
-                                                            "text-[13px] font-bold tabular-nums",
-                                                            d.color,
-                                                        )}
-                                                    >
+                                                <div key={d.label} className={cn("rounded-xl py-2 text-center", d.bg)}>
+                                                    <p className={cn("text-[13px] font-bold tabular-nums", d.color)}>
                                                         {d.val}
                                                     </p>
-                                                    <p className="text-[10px] text-zinc-400 font-semibold">
-                                                        {d.label}
-                                                    </p>
+                                                    <p className="text-[10px] text-zinc-400 font-semibold">{d.label}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -741,8 +677,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                             {fmt(aipTotal)}
                                         </p>
                                         <p className="text-[10px] text-zinc-400 mt-0.5">
-                                            {myPrograms.length} program
-                                            {myPrograms.length !== 1 ? "s" : ""}
+                                            {myPrograms.length} program{myPrograms.length !== 1 ? "s" : ""}
                                         </p>
                                     </div>
                                 </div>
@@ -751,18 +686,10 @@ const DepartmentHeadDashboard: React.FC = () => {
                                         No AIP programs for this department
                                     </div>
                                 ) : (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height={230}
-                                    >
+                                    <ResponsiveContainer width="100%" height={230}>
                                         <BarChart
                                             data={barData}
-                                            margin={{
-                                                top: 0,
-                                                right: 8,
-                                                left: 0,
-                                                bottom: 36,
-                                            }}
+                                            margin={{ top: 0, right: 8, left: 0, bottom: 36 }}
                                             barSize={9}
                                             barGap={2}
                                         >
@@ -773,10 +700,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                             />
                                             <XAxis
                                                 dataKey="name"
-                                                tick={{
-                                                    fontSize: 9,
-                                                    fill: "#a1a1aa",
-                                                }}
+                                                tick={{ fontSize: 9, fill: "#a1a1aa" }}
                                                 angle={-30}
                                                 textAnchor="end"
                                                 interval={0}
@@ -784,34 +708,16 @@ const DepartmentHeadDashboard: React.FC = () => {
                                                 axisLine={false}
                                             />
                                             <YAxis
-                                                tick={{
-                                                    fontSize: 9,
-                                                    fill: "#a1a1aa",
-                                                }}
+                                                tick={{ fontSize: 9, fill: "#a1a1aa" }}
                                                 tickFormatter={fmt}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 width={54}
                                             />
                                             <Tooltip content={<ChartTip />} />
-                                            <Bar
-                                                dataKey="PS"
-                                                name="PS"
-                                                fill="#6366f1"
-                                                radius={[3, 3, 0, 0]}
-                                            />
-                                            <Bar
-                                                dataKey="MOOE"
-                                                name="MOOE"
-                                                fill="#22d3ee"
-                                                radius={[3, 3, 0, 0]}
-                                            />
-                                            <Bar
-                                                dataKey="CO"
-                                                name="CO"
-                                                fill="#f59e0b"
-                                                radius={[3, 3, 0, 0]}
-                                            />
+                                            <Bar dataKey="PS"   name="PS"   fill="#6366f1" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="MOOE" name="MOOE" fill="#22d3ee" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="CO"   name="CO"   fill="#f59e0b" radius={[3, 3, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 )}
@@ -820,8 +726,284 @@ const DepartmentHeadDashboard: React.FC = () => {
                     )}
                 </div>
 
-                {/* ── Row 3: Expense Classification Breakdown + Plantilla ────── */}
+                {/* ── Row 4: Special Account Fund (conditional) ─────────────── */}
+                {isSpecialAccount && (
+                    <Reveal delay={460}>
+                        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm overflow-hidden mb-4">
+
+                            <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                                        <BuildingStorefrontIcon className="w-5 h-5 text-violet-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
+                                            Estimated Revenue
+                                        </p>
+                                        <p className="text-[13px] font-bold text-zinc-800 leading-none">
+                                            Special Account · {deptAbbr || deptName}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 space-y-4">
+                                <div className="grid grid-cols-12 gap-3">
+
+                                    {/* Estimated Revenue */}
+                                    <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">
+                                            Estimated Revenue
+                                        </p>
+                                        {specialFundLoading ? (
+                                            <div className="h-7 w-24 rounded-lg bg-zinc-200 animate-pulse" />
+                                        ) : (
+                                            <>
+                                                <p className="text-2xl font-semibold text-zinc-900 tabular-nums leading-none">
+                                                    {fmt(sfTotal)}
+                                                </p>
+                                                <p className="text-[10px] font-mono text-zinc-400 mt-1.5">
+                                                    ₱{Math.round(sfTotal).toLocaleString("en-PH")}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Expenditures */}
+                                    <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                                        <p className="text-[10px] font-medium uppercase tracking-widests text-zinc-500 mb-2 flex items-center gap-1">
+                                            <ArrowTrendingDownIcon className="w-3 h-3 text-zinc-400" />
+                                            Expenditures
+                                        </p>
+                                        {expLoading ? (
+                                            <div className="h-7 w-24 rounded-lg bg-zinc-200 animate-pulse" />
+                                        ) : (
+                                            <>
+                                                <p className="text-2xl font-semibold text-zinc-900 tabular-nums leading-none">
+                                                    {fmt(sfExp)}
+                                                </p>
+                                                <p className="text-[10px] font-mono text-zinc-400 mt-1.5">
+                                                    ₱{Math.round(sfExp).toLocaleString("en-PH")}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Pie + legend */}
+                                    <div className="col-span-6 flex items-center gap-3">
+                                        {specialFundLoading || expLoading ? (
+                                            <div className="flex-1 flex items-center justify-center">
+                                                <div className="w-24 h-24 rounded-full bg-zinc-100 animate-pulse" />
+                                            </div>
+                                        ) : sfPieData.length > 0 ? (
+                                            <>
+                                                <div className="w-[96px] flex-shrink-0">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 text-center mb-1">
+                                                        Allocation
+                                                    </p>
+                                                    <ResponsiveContainer width="100%" height={88}>
+                                                        <PieChart>
+                                                            <Pie
+                                                                data={sfPieData}
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                innerRadius={24}
+                                                                outerRadius={42}
+                                                                paddingAngle={2}
+                                                                dataKey="value"
+                                                                strokeWidth={0}
+                                                            >
+                                                                {sfPieData.map((e, i) => (
+                                                                    <Cell key={i} fill={e.color} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip
+                                                                formatter={(v: number) => [
+                                                                    `₱${Math.round(v).toLocaleString("en-PH")}`,
+                                                                ]}
+                                                                contentStyle={{
+                                                                    borderRadius: 12,
+                                                                    border: "1px solid #e4e4e7",
+                                                                    fontSize: 11,
+                                                                }}
+                                                            />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+
+                                                <div className="flex-1 space-y-1.5 min-w-0">
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#a1a1aa" }} />
+                                                            <span className="text-xs text-zinc-500 font-medium truncate">Expenditures</span>
+                                                        </div>
+                                                        <span className="text-xs text-zinc-700 font-semibold font-mono flex-shrink-0">
+                                                            {fmt(sfExp)}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-2 py-1.5 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
+                                                                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                                                                    5% Calamity
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-[10px] font-semibold font-mono text-zinc-500">
+                                                                {fmt(sfCal)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between pl-3">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
+                                                                <span className="text-[10px] text-zinc-400">30% QRF</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-zinc-500">{fmt(sfQrf)}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between pl-3">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
+                                                                <span className="text-[10px] text-zinc-400">70% Pre-Disaster</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-zinc-500">{fmt(sfPredis)}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div
+                                                        className={`rounded-lg border px-2 py-1.5 ${
+                                                            sfUPos
+                                                                ? "bg-emerald-50 border-emerald-200"
+                                                                : "bg-red-50 border-red-200"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-1 mb-0.5">
+                                                            <span
+                                                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                                                style={{ background: sfUPos ? "#10b981" : "#ef4444" }}
+                                                            />
+                                                            <p
+                                                                className={`text-[10px] font-semibold uppercase tracking-widest ${
+                                                                    sfUPos ? "text-emerald-700" : "text-red-600"
+                                                                }`}
+                                                            >
+                                                                Unappropriated Balance
+                                                            </p>
+                                                        </div>
+                                                        <p
+                                                            className={`text-sm font-semibold font-mono ${
+                                                                sfUPos ? "text-emerald-700" : "text-red-600"
+                                                            }`}
+                                                        >
+                                                            {sfUPos ? "+" : ""}₱{Math.round(sfUnap).toLocaleString("en-PH")}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex-1 flex items-center justify-center opacity-20">
+                                                <BuildingStorefrontIcon className="w-10 h-10 text-zinc-400" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 5% Calamity Fund detail panel */}
+                                {sfNonTax > 0 && (
+                                    <div className="rounded-2xl border border-zinc-100 overflow-hidden">
+                                        <div className="bg-zinc-50 px-4 py-3 flex items-center justify-between border-b border-zinc-100">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                                                    <ExclamationTriangleIcon className="w-3.5 h-3.5 text-rose-500" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600">
+                                                        5% Calamity Fund
+                                                    </p>
+                                                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                                                        of Non-Tax Revenue · R.A. 10121
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-base font-semibold text-zinc-900">
+                                                    ₱{Math.round(sfCal).toLocaleString("en-PH")}
+                                                </p>
+                                                <p className="text-[10px] text-zinc-400 font-mono">budgeted</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 bg-white">
+                                            <div className="px-4 py-3 border-r border-zinc-100 space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                                        30% QRF
+                                                    </p>
+                                                    <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">
+                                                        reserved
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-baseline gap-1">
+                                                    <p className="text-sm font-semibold text-rose-700">
+                                                        ₱{Math.round(sfQrf).toLocaleString("en-PH")}
+                                                    </p>
+                                                    <p className="text-[10px] text-zinc-400">
+                                                        / ₱{Math.round(sfQrf).toLocaleString("en-PH")}
+                                                    </p>
+                                                </div>
+                                                <p className="text-[10px] text-zinc-400">reserved · not yet disbursed</p>
+                                                <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-rose-400 rounded-full" style={{ width: "100%" }} />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-zinc-400">Available</span>
+                                                    <span className="text-[10px] font-semibold font-mono text-rose-500">
+                                                        ₱{Math.round(sfQrf).toLocaleString("en-PH")}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="px-4 py-3 space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                                        70% Pre-Disaster
+                                                    </p>
+                                                    <span className="text-[9px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">
+                                                        {sfPredis > 0 ? `${Math.round((sfAllocated70 / sfPredis) * 100)}%` : "0%"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-baseline gap-1">
+                                                    <p className="text-sm font-semibold text-orange-700">
+                                                        ₱{Math.round(sfAllocated70).toLocaleString("en-PH")}
+                                                    </p>
+                                                    <p className="text-[10px] text-zinc-400">
+                                                        / ₱{Math.round(sfPredis).toLocaleString("en-PH")}
+                                                    </p>
+                                                </div>
+                                                <p className="text-[10px] text-zinc-400">allocated</p>
+                                                <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-orange-400 rounded-full transition-all duration-700"
+                                                        style={{ width: sfPredis > 0 ? `${Math.min(100, (sfAllocated70 / sfPredis) * 100)}%` : "0%" }} />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-zinc-400">Remaining</span>
+                                                    <span className="text-[10px] font-semibold font-mono text-orange-500">
+                                                        ₱{Math.round(Math.max(0, sfPredis - sfAllocated70)).toLocaleString("en-PH")}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-zinc-300">JMC 2013-1 · R.A. 10121</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Reveal>
+                )}
+
+                {/* ── Row 3: Expense Classification + Plantilla ─────────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
                     {/* Pie: PS / MOOE / CO from expense items */}
                     {isLoading ? (
                         <ChartSkeleton h="h-44" />
@@ -841,10 +1023,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-4">
-                                        <ResponsiveContainer
-                                            width={160}
-                                            height={160}
-                                        >
+                                        <ResponsiveContainer width={160} height={160}>
                                             <PieChart>
                                                 <Pie
                                                     data={pieData}
@@ -857,16 +1036,11 @@ const DepartmentHeadDashboard: React.FC = () => {
                                                     paddingAngle={2}
                                                 >
                                                     {pieData.map((d, i) => (
-                                                        <Cell
-                                                            key={i}
-                                                            fill={d.color}
-                                                        />
+                                                        <Cell key={i} fill={d.color} />
                                                     ))}
                                                 </Pie>
                                                 <Tooltip
-                                                    formatter={(v: number) => [
-                                                        fmt(v),
-                                                    ]}
+                                                    formatter={(v: number) => [fmt(v)]}
                                                     contentStyle={{
                                                         borderRadius: 12,
                                                         border: "1px solid #e4e4e7",
@@ -877,17 +1051,11 @@ const DepartmentHeadDashboard: React.FC = () => {
                                         </ResponsiveContainer>
                                         <div className="flex-1 space-y-3 min-w-0">
                                             {pieData.map((d) => (
-                                                <div
-                                                    key={d.name}
-                                                    className="space-y-1"
-                                                >
+                                                <div key={d.name} className="space-y-1">
                                                     <div className="flex items-center gap-2">
                                                         <span
                                                             className="w-2 h-2 rounded-full flex-shrink-0"
-                                                            style={{
-                                                                background:
-                                                                    d.color,
-                                                            }}
+                                                            style={{ background: d.color }}
                                                         />
                                                         <span className="text-[11px] text-zinc-500 truncate flex-1">
                                                             {d.name}
@@ -901,17 +1069,12 @@ const DepartmentHeadDashboard: React.FC = () => {
                                                             className="h-full rounded-full transition-[width] duration-700"
                                                             style={{
                                                                 width: `${pct(d.value, totalExpense)}%`,
-                                                                background:
-                                                                    d.color,
+                                                                background: d.color,
                                                             }}
                                                         />
                                                     </div>
                                                     <p className="ml-4 text-[10px] text-zinc-400">
-                                                        {pct(
-                                                            d.value,
-                                                            totalExpense,
-                                                        )}
-                                                        % of total
+                                                        {pct(d.value, totalExpense)}% of total
                                                     </p>
                                                 </div>
                                             ))}
@@ -926,7 +1089,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                     {plantillaLoading ? (
                         <ChartSkeleton h="h-44" />
                     ) : (
-                        <Reveal delay={400}>
+                        <Reveal delay={410}>
                             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
                                 <SectionHead
                                     eyebrow="Plantilla"
@@ -935,7 +1098,6 @@ const DepartmentHeadDashboard: React.FC = () => {
                                     iconBg="bg-emerald-50"
                                     iconColor="text-emerald-600"
                                 />
-                                {/* Fill bar */}
                                 <div className="mb-3">
                                     <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                                         <div
@@ -944,55 +1106,39 @@ const DepartmentHeadDashboard: React.FC = () => {
                                         />
                                     </div>
                                     <div className="flex justify-between text-[10px] mt-1.5">
+                                        <span className="text-zinc-400">{filled} filled</span>
+                                        <span className="font-bold text-emerald-600">{fillRate}%</span>
                                         <span className="text-zinc-400">
-                                            {filled} filled
-                                        </span>
-                                        <span className="font-bold text-emerald-600">
-                                            {fillRate}%
-                                        </span>
-                                        <span className="text-zinc-400">
-                                            {(plantilla as any[]).length -
-                                                filled}{" "}
-                                            vacant
+                                            {(plantilla as any[]).length - filled} vacant
                                         </span>
                                     </div>
                                 </div>
-                                {/* Position rows */}
                                 <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                                    {(plantilla as any[])
-                                        .slice(0, 8)
-                                        .map((pos) => {
-                                            const assigned =
-                                                pos.assignments?.[0]
-                                                    ?.personnel_id != null;
-                                            return (
-                                                <div
-                                                    key={
-                                                        pos.plantilla_position_id
-                                                    }
-                                                    className="flex items-center gap-2 py-1"
-                                                >
-                                                    <span
-                                                        className={cn(
-                                                            "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                                                            assigned
-                                                                ? "bg-emerald-400"
-                                                                : "bg-zinc-200",
-                                                        )}
-                                                    />
-                                                    <span className="text-[11px] text-zinc-600 truncate flex-1">
-                                                        {pos.position_title}
-                                                    </span>
-                                                    <span className="text-[10px] text-zinc-400 tabular-nums font-mono">
-                                                        SG {pos.salary_grade}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
+                                    {(plantilla as any[]).slice(0, 8).map((pos) => {
+                                        const assigned = pos.assignments?.[0]?.personnel_id != null;
+                                        return (
+                                            <div
+                                                key={pos.plantilla_position_id}
+                                                className="flex items-center gap-2 py-1"
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                                                        assigned ? "bg-emerald-400" : "bg-zinc-200",
+                                                    )}
+                                                />
+                                                <span className="text-[11px] text-zinc-600 truncate flex-1">
+                                                    {pos.position_title}
+                                                </span>
+                                                <span className="text-[10px] text-zinc-400 tabular-nums font-mono">
+                                                    SG {pos.salary_grade}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
                                     {(plantilla as any[]).length > 8 && (
                                         <p className="text-center text-[10px] text-zinc-400 pt-1">
-                                            +{(plantilla as any[]).length - 8}{" "}
-                                            more positions
+                                            +{(plantilla as any[]).length - 8} more positions
                                         </p>
                                     )}
                                     {(plantilla as any[]).length === 0 && (
@@ -1005,6 +1151,9 @@ const DepartmentHeadDashboard: React.FC = () => {
                         </Reveal>
                     )}
                 </div>
+
+
+
             </div>
 
             {/* ── Draft Proposal Notification ────────────────────────────────── */}
@@ -1027,10 +1176,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                                 </p>
                                 <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
                                     You have an unsubmitted proposal for{" "}
-                                    <span className="font-medium text-zinc-700">
-                                        FY {activePlan?.year}
-                                    </span>
-                                    .
+                                    <span className="font-medium text-zinc-700">FY {activePlan?.year}</span>.
                                 </p>
                                 <Link
                                     to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}

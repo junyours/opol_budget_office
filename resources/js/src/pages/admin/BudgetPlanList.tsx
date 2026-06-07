@@ -26,10 +26,12 @@ import {
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
 import { PlusIcon } from "@heroicons/react/24/outline";
-import { useQueryClient } from '@tanstack/react-query';
+// import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { useAuth } from "../../hooks/useAuth";
+
 
 // ─── Extended type ────────────────────────────────────────────────────────────
 
@@ -46,8 +48,14 @@ interface DraftDept {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const BudgetPlanList: React.FC = () => {
-  const [plans, setPlans]     = useState<BudgetPlanWithOpen[]>([]);
-  const [loading, setLoading] = useState(true);
+//   const [plans, setPlans]     = useState<BudgetPlanWithOpen[]>([]);
+//   const [loading, setLoading] = useState(true);
+const { data: plans = [], isLoading: loading, refetch: refetchPlans } = useQuery<BudgetPlanWithOpen[]>({
+    queryKey: ['budget-plans'],
+    queryFn:  () => API.get('/budget-plans').then(r =>
+      (r.data.data as BudgetPlanWithOpen[]).sort((a, b) => b.year - a.year)
+    ),
+  });
 
   // ── Create dialog ──────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen]   = useState(false);
@@ -98,20 +106,7 @@ const invalidateActivePlanDependents = () => {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchPlans(); }, []);
-
-  const fetchPlans = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get("/budget-plans");
-      const sorted = (res.data.data as BudgetPlanWithOpen[]).sort((a, b) => b.year - a.year);
-      setPlans(sorted);
-    } catch {
-      toast.error("Failed to load budget plans.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchPlans = () => refetchPlans();
 
   // ── Create ─────────────────────────────────────────────────────────────────
 
@@ -122,10 +117,16 @@ const invalidateActivePlanDependents = () => {
       const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive });
       const created = res.data.data;
       const deptCount = created.department_plans?.length ?? 0;
-      toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);
+    //   toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);
+    //   setCreateOpen(false);
+    //   setNewYear(new Date().getFullYear() + 1);
+    //   setNewActive(false);
+    //   fetchPlans();
+    toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);
       setCreateOpen(false);
       setNewYear(new Date().getFullYear() + 1);
       setNewActive(false);
+      invalidateActivePlanDependents();
       fetchPlans();
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Failed to create budget plan.");

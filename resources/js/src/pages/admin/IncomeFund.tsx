@@ -1,4 +1,7 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+// import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+// import API from "@/src/services/api";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import { Skeleton } from "@/src/components/ui/skeleton";
@@ -225,18 +228,30 @@ function TableSkeleton() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// export default function IncomeFundPage() {
+//   const { user } = useAuth();
+//   const [rows, setRows]             = useState<IncomeFundRow[]>([]);
+//   const [meta, setMeta]             = useState<Omit<IncomeFundResponse, "data"> | null>(null);
+//   const [loading, setLoading]       = useState(true);
+//   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
+//   const [currentSource, setCurrentSource] = useState<string>("general-fund");
+
+//   const savedValues = useRef<
+//     Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>
+//   >(new Map());
+//   const initialSaveDone = useRef(false);
+
 export default function IncomeFundPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [rows, setRows]             = useState<IncomeFundRow[]>([]);
-  const [meta, setMeta]             = useState<Omit<IncomeFundResponse, "data"> | null>(null);
-  const [loading, setLoading]       = useState(true);
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
   const [currentSource, setCurrentSource] = useState<string>("general-fund");
 
-  const savedValues = useRef<
-    Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>
-  >(new Map());
-  const initialSaveDone = useRef(false);
+
+const savedValues = useRef<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>;
+  const seededSources = useRef<Set<string>>(new Set()) as React.MutableRefObject<Set<string>>;
+
 
   const availableSources = useMemo<SourceConfig[]>(() => {
     const src: SourceConfig[] = [];
@@ -256,7 +271,78 @@ export default function IncomeFundPage() {
     return src;
   }, [user]);
 
-  useEffect(() => {
+//   useEffect(() => {
+//     const path = window.location.pathname;
+//     if      (path.includes("sh-fund"))  setCurrentSource("sh");
+//     else if (path.includes("occ-fund")) setCurrentSource("occ");
+//     else if (path.includes("pm-fund"))  setCurrentSource("pm");
+//     else                                setCurrentSource("general-fund");
+//   }, []);
+
+//   const sourceName = (id: string) =>
+//     ({ "general-fund": "General Fund", sh: "Slaughterhouse", occ: "Opol Community College", pm: "Public Market" }[id] ?? id);
+
+//   useEffect(() => {
+//     if (currentSource) load(currentSource);
+//   }, [currentSource]);
+
+//   const load = async (source: string) => {
+//     setLoading(true);
+//     try {
+//       const res = await API.get<IncomeFundResponse>(`/income-fund?source=${source}`);
+//       const data = res.data.data.map((row) => ({
+//         ...row,
+//         past:            row.past             !== null ? Number(row.past)             : null,
+//         past_obligation: row.past_obligation  !== null ? Number(row.past_obligation)  : null,
+//         current_sem1:    row.current_sem1     !== null ? Number(row.current_sem1)     : null,
+//         current_sem2:    row.current_sem2     !== null ? Number(row.current_sem2)     : null,
+//         current_total:   row.current_total    !== null ? Number(row.current_total)    : null,
+//         sem1:            row.sem1             !== null ? Number(row.sem1)             : null,
+//         sem2:            row.sem2             !== null ? Number(row.sem2)             : null,
+//         proposed:        row.proposed         !== null ? Number(row.proposed)         : null,
+//       }));
+//       setRows(data);
+//       setMeta({
+//   year: res.data.year, past_year: res.data.past_year,
+//   current_year: res.data.current_year, source: res.data.source,
+//   records_exist: res.data.records_exist,
+// });
+
+// if (res.data.past_plan_missing) {
+//   toast.warning(
+//     `Budget plan for ${res.data.past_year} does not exist. Create it first to enable past year obligation amount entries.`,
+//     { duration: 8000 }
+//   );
+// }
+//       data.forEach((r) =>
+//         savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+//         );
+//       if (!res.data.records_exist && !initialSaveDone.current) {
+//         initialSaveDone.current = true;
+//         try {
+//           await API.post("/income-fund/save", { rows: data, source });
+//           data.forEach((r) =>
+//             savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+//             );
+//           toast.success(`Initial data saved for ${sourceName(source)}`);
+//         } catch {
+//           toast.error(`Failed to save initial data for ${sourceName(source)}`);
+//         }
+//       }
+//     } catch {
+//       toast.error("Failed to load data");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleSourceChange = (id: string) => {
+//     setCurrentSource(id);
+//     initialSaveDone.current = false;
+//     savedValues.current.clear();
+//   };
+
+useEffect(() => {
     const path = window.location.pathname;
     if      (path.includes("sh-fund"))  setCurrentSource("sh");
     else if (path.includes("occ-fund")) setCurrentSource("occ");
@@ -267,63 +353,85 @@ export default function IncomeFundPage() {
   const sourceName = (id: string) =>
     ({ "general-fund": "General Fund", sh: "Slaughterhouse", occ: "Opol Community College", pm: "Public Market" }[id] ?? id);
 
+  // ── TanStack fetch ─────────────────────────────────────────────────────────
+  const { data: queryData, isLoading: loading } = useQuery<IncomeFundResponse>({
+    queryKey: ['income-fund', currentSource],
+    queryFn:  () => API.get<IncomeFundResponse>(`/income-fund?source=${currentSource}`)
+      .then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Sync query data → local rows state ────────────────────────────────────
+  const meta = queryData ? {
+    year: queryData.year, past_year: queryData.past_year,
+    current_year: queryData.current_year, source: queryData.source,
+    records_exist: queryData.records_exist,
+  } : null;
+
   useEffect(() => {
-    if (currentSource) load(currentSource);
-  }, [currentSource]);
+    if (!queryData) return;
 
-  const load = async (source: string) => {
-    setLoading(true);
-    try {
-      const res = await API.get<IncomeFundResponse>(`/income-fund?source=${source}`);
-      const data = res.data.data.map((row) => ({
-        ...row,
-        past:            row.past             !== null ? Number(row.past)             : null,
-        past_obligation: row.past_obligation  !== null ? Number(row.past_obligation)  : null,
-        current_sem1:    row.current_sem1     !== null ? Number(row.current_sem1)     : null,
-        current_sem2:    row.current_sem2     !== null ? Number(row.current_sem2)     : null,
-        current_total:   row.current_total    !== null ? Number(row.current_total)    : null,
-        sem1:            row.sem1             !== null ? Number(row.sem1)             : null,
-        sem2:            row.sem2             !== null ? Number(row.sem2)             : null,
-        proposed:        row.proposed         !== null ? Number(row.proposed)         : null,
-      }));
-      setRows(data);
-      setMeta({
-  year: res.data.year, past_year: res.data.past_year,
-  current_year: res.data.current_year, source: res.data.source,
-  records_exist: res.data.records_exist,
-});
-
-if (res.data.past_plan_missing) {
-  toast.warning(
-    `Budget plan for ${res.data.past_year} does not exist. Create it first to enable past year obligation amount entries.`,
-    { duration: 8000 }
-  );
-}
-      data.forEach((r) =>
-        savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-        );
-      if (!res.data.records_exist && !initialSaveDone.current) {
-        initialSaveDone.current = true;
-        try {
-          await API.post("/income-fund/save", { rows: data, source });
-          data.forEach((r) =>
-            savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-            );
-          toast.success(`Initial data saved for ${sourceName(source)}`);
-        } catch {
-          toast.error(`Failed to save initial data for ${sourceName(source)}`);
-        }
-      }
-    } catch {
-      toast.error("Failed to load data");
-    } finally {
-      setLoading(false);
+    if (queryData.past_plan_missing) {
+      toast.warning(
+        `Budget plan for ${queryData.past_year} does not exist. Create it first to enable past year obligation amount entries.`,
+        { duration: 8000 }
+      );
     }
-  };
+
+    const data = queryData.data.map((row) => ({
+      ...row,
+      past:            row.past            != null ? Number(row.past)            : null,
+      past_obligation: row.past_obligation != null ? Number(row.past_obligation) : null,
+      current_sem1:    row.current_sem1    != null ? Number(row.current_sem1)    : null,
+      current_sem2:    row.current_sem2    != null ? Number(row.current_sem2)    : null,
+      current_total:   row.current_total   != null ? Number(row.current_total)   : null,
+      sem1:            row.sem1            != null ? Number(row.sem1)            : null,
+      sem2:            row.sem2            != null ? Number(row.sem2)            : null,
+      proposed:        row.proposed        != null ? Number(row.proposed)        : null,
+    }));
+
+    setRows(data);
+    savedValues.current.clear();
+    data.forEach((r) =>
+      savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+    );
+  }, [queryData]);
+
+  // ── Seed effect — runs once per source if records don't exist yet ──────────
+  useEffect(() => {
+    if (!queryData || queryData.records_exist) return;
+    if (seededSources.current.has(currentSource)) return;
+    if (rows.length === 0) return;
+
+    seededSources.current.add(currentSource);
+    API.post('/income-fund/save', { rows, source: currentSource })
+      .then(() => {
+        rows.forEach((r) =>
+          savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+        );
+        // Mark as seeded in cache so revisiting doesn't re-seed
+        queryClient.setQueryData(['income-fund', currentSource], (old: IncomeFundResponse | undefined) =>
+          old ? { ...old, records_exist: true } : old
+        );
+        toast.success(`Initial data saved for ${sourceName(currentSource)}`);
+      })
+      .catch(() => toast.error(`Failed to save initial data for ${sourceName(currentSource)}`));
+  }, [queryData, rows, currentSource]);
+
+  // ── Save mutation ──────────────────────────────────────────────────────────
+  const saveMutation = useMutation({
+    mutationFn: (payload: { rows: IncomeFundRow[]; source: string }) =>
+      API.post('/income-fund/save', payload),
+    onSuccess: (_, variables) => {
+      // Update cache with current rows so revisiting shows latest values
+      queryClient.setQueryData(['income-fund', variables.source], (old: IncomeFundResponse | undefined) =>
+        old ? { ...old, data: variables.rows } : old
+      );
+    },
+  });
 
   const handleSourceChange = (id: string) => {
     setCurrentSource(id);
-    initialSaveDone.current = false;
     savedValues.current.clear();
   };
 
@@ -352,8 +460,21 @@ if (res.data.past_plan_missing) {
         last.proposed === row.proposed &&
         last.past_obligation === row.past_obligation   // ← add this
         ) return;
-      setSavingRows((prev) => new Set(prev).add(rowId));
-      const promise = API.post("/income-fund/save", { rows, source: currentSource }).then(() =>
+    //   setSavingRows((prev) => new Set(prev).add(rowId));
+    //   const promise = API.post("/income-fund/save", { rows, source: currentSource }).then(() =>
+    //     savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
+    //   );
+    //   toast.promise(promise, {
+    //     loading: "Saving…",
+    //     success: "Saved successfully",
+    //     error: (err: any) => `Save failed: ${err?.response?.data?.message ?? err?.message}`,
+    //   });
+    //   try { await promise; } finally {
+    //     setSavingRows((prev) => { const n = new Set(prev); n.delete(rowId); return n; });
+    //   }
+
+    setSavingRows((prev) => new Set(prev).add(rowId));
+      const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
         savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
       );
       toast.promise(promise, {
@@ -404,7 +525,11 @@ const savePastObligation = useCallback(
       r.id === rowId ? { ...r, past_obligation: value } : r
     );
 
-    const promise = API.post("/income-fund/save", {
+    // const promise = API.post("/income-fund/save", {
+    //   rows: updatedRows,
+    //   source: currentSource,
+    // }).then(() => {
+    const promise = saveMutation.mutateAsync({
       rows: updatedRows,
       source: currentSource,
     }).then(() => {
@@ -513,7 +638,10 @@ const savePastObligation = useCallback(
   const isPastEditable = (row: DisplayRow) =>
     !row.isSubtotal && !row.isGrandTotal;
 
-  const isViewer = user?.role === "viewer";
+  const isViewer   = user?.role === "viewer";
+  const isAdmin    = user?.role === "admin" || user?.role === "super-admin";
+  const canEditPastAndSem1   = isAdmin;
+  const canEditBudgetYear    = isAdmin || user?.role === "department-head";
 
   // ── Table renderer ─────────────────────────────────────────────────────────
 
@@ -638,7 +766,7 @@ const savePastObligation = useCallback(
                   ) : (
                     <div className="text-right font-mono text-gray-700 tabular-nums px-2">{fmtNum(row.past_obligation)}</div>
                   )} */}
-                  {isPastEditable(row) && !isViewer ? (
+                  {isPastEditable(row) && canEditPastAndSem1 ? (
   <input
     type="text"
     inputMode="decimal"
@@ -656,7 +784,7 @@ const savePastObligation = useCallback(
 )}
                 </td>
                 <td className={cn("border-r border-l px-2 py-2", COL_CURR)}>
-                  {editable && !isViewer ? (
+                  {editable && canEditPastAndSem1 ? (
   <input type="text" inputMode="decimal"
     className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
       "border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300",
@@ -674,7 +802,7 @@ const savePastObligation = useCallback(
                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.sem2)}</td>
                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-600 tabular-nums", COL_CURR)}>{fmtNum(row.current_total)}</td>
                 <td className={cn("border-r border-l px-2 py-1.5", COL_BUDGET)}>
-                  {editable && !isViewer ? (
+                  {editable && canEditBudgetYear ? (
   <input type="text" inputMode="decimal"
     className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
       "border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300",

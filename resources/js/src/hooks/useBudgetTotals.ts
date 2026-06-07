@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import API from '../services/api';
 import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 import { AipProgramEntry } from './useAipProgramData';
+import { useAllFunds } from './useDashboardQueries';
 
 const SPECIAL_ACCOUNTS_CATEGORY_ID = 4;
 
@@ -10,6 +11,9 @@ export interface BudgetTotals {
   shExpenditure:  number;
   occExpenditure: number;
   pmExpenditure:  number;
+  shCalamity:     number;  // 5% of SH non-tax revenue
+  occCalamity:    number;  // 5% of OCC non-tax revenue
+  pmCalamity:     number;  // 5% of PM non-tax revenue
 }
 
 export interface UseBudgetTotalsResult {
@@ -20,16 +24,20 @@ export interface UseBudgetTotalsResult {
 const EMPTY: BudgetTotals = {
   gfExpenditure: 0, shExpenditure: 0,
   occExpenditure: 0, pmExpenditure: 0,
+  shCalamity: 0, occCalamity: 0, pmCalamity: 0,
 };
 
+// REPLACE computeTotals signature + body
 function computeTotals(
   plans:       DepartmentBudgetPlan[],
   depts:       Department[],
   aipPrograms: AipProgramEntry[],
+  shNonTax:    number,
+  occNonTax:   number,
+  pmNonTax:    number,
 ): BudgetTotals {
   const deptMap = new Map<number, Department>(depts.map(d => [d.dept_id, d]));
 
-  // Sum AIP total_amount per dept
   const aipByDept = new Map<number, number>();
   aipPrograms.forEach(p => {
     aipByDept.set(p.dept_id, (aipByDept.get(p.dept_id) ?? 0) + (p.total_amount ?? 0));
@@ -37,18 +45,19 @@ function computeTotals(
 
   const result = { ...EMPTY };
 
+  // Calamity fund is a mandatory appropriation — treat it as an expenditure
+  result.shCalamity  = shNonTax  * 0.05;
+  result.occCalamity = occNonTax * 0.05;
+  result.pmCalamity  = pmNonTax  * 0.05;
+
   plans.forEach(plan => {
     const dept = deptMap.get(plan.dept_id);
     if (!dept) return;
 
-    // form2 items (PS + MOOE + CO)
     const form2Total = (plan.items ?? []).reduce(
       (sum, item) => sum + (parseFloat(String(item.total_amount)) || 0), 0
     );
-
-    // AIP programs for this department
     const aipTotal = aipByDept.get(plan.dept_id) ?? 0;
-
     const deptTotal = form2Total + aipTotal;
     if (deptTotal === 0) return;
 
@@ -66,6 +75,7 @@ function computeTotals(
   return result;
 }
 
+// REPLACE useBudgetTotals — add useAllFunds and pass nonTaxRevenue values
 export function useBudgetTotals(activePlan: BudgetPlan | null): UseBudgetTotalsResult {
   const planId = activePlan?.budget_plan_id;
 
@@ -90,10 +100,18 @@ export function useBudgetTotals(activePlan: BudgetPlan | null): UseBudgetTotalsR
     enabled: !!planId,
   });
 
-  const loading = plansLoading || deptsLoading || aipLoading;
+  // Need non-tax revenue for each special account to compute 5% calamity fund
+  const { data: funds, isLoading: fundsLoading } = useAllFunds();
+
+  const loading = plansLoading || deptsLoading || aipLoading || fundsLoading;
 
   return {
-    totals:  loading ? EMPTY : computeTotals(plans, depts, aipPrograms),
+    totals: loading ? EMPTY : computeTotals(
+      plans, depts, aipPrograms,
+      funds?.sh.nonTaxRevenue  ?? 0,
+      funds?.occ.nonTaxRevenue ?? 0,
+      funds?.pm.nonTaxRevenue  ?? 0,
+    ),
     loading,
   };
 }

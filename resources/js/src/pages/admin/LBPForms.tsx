@@ -5,7 +5,7 @@ import { DepartmentBudgetPlan, ExpenseClassification, ExpenseItem } from '../../
 import Form2 from '@/src/pages/department-head/Form2';
 import Form3 from '@/src/pages/department-head/Form3';
 import Form4 from '@/src/pages/department-head/Form4';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import {
   AlertDialog,

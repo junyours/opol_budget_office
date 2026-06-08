@@ -198,6 +198,37 @@ if (!$pastPlan) {
                 $currentTotal = $currentRecord?->proposed_amount;
             }
 
+            // $rows[] = [
+            //     'id'              => $obj->id,
+            //     'parent_id'       => $obj->parent_id,
+            //     'code'            => $obj->code,
+            //     'name'            => $obj->name,
+            //     'level'           => $obj->level,
+            //     'past'            => $pastAmount,
+            //     'past_obligation' => $pastObligation,   // ← new
+            //     'current_sem1'    => $currentSem1,      // ← renamed (was sem1 from active plan)
+            //     'current_sem2'    => $currentSem2,      // ← renamed
+            //     'current_total'   => $currentTotal,
+            //     'sem1'            => $current?->sem1_actual,
+            //     'sem2'            => $current?->sem2_actual,
+            //     'proposed'        => $current?->proposed_amount,
+            // ];
+            // $rows[] = [
+            //     'id'              => $obj->id,
+            //     'parent_id'       => $obj->parent_id,
+            //     'code'            => $obj->code,
+            //     'name'            => $obj->name,
+            //     'level'           => $obj->level,
+            //     'past'            => $pastAmount,
+            //     'past_obligation' => $pastObligation,
+            //     'current_sem1'    => $currentSem1,
+            //     'current_sem2'    => $currentSem2,
+            //     'current_total'   => $currentTotal,
+            //     'sem1'            => $currentRecord?->sem1_actual,
+            //     'sem2'            => $currentRecord?->sem2_actual,
+            //     'proposed'        => $current?->proposed_amount,
+            // ];
+
             $rows[] = [
                 'id'              => $obj->id,
                 'parent_id'       => $obj->parent_id,
@@ -205,12 +236,10 @@ if (!$pastPlan) {
                 'name'            => $obj->name,
                 'level'           => $obj->level,
                 'past'            => $pastAmount,
-                'past_obligation' => $pastObligation,   // ← new
-                'current_sem1'    => $currentSem1,      // ← renamed (was sem1 from active plan)
-                'current_sem2'    => $currentSem2,      // ← renamed
+                'past_obligation' => $pastObligation,
+                'current_sem1'    => $currentSem1,
+                'current_sem2'    => $currentSem2,
                 'current_total'   => $currentTotal,
-                'sem1'            => $current?->sem1_actual,
-                'sem2'            => $current?->sem2_actual,
                 'proposed'        => $current?->proposed_amount,
             ];
         }
@@ -266,6 +295,8 @@ $pastPlan = BudgetPlan::where('year', $plan->year - 2)->first();
         try {
             foreach ($request->rows as $row) {
     // Save proposed_amount to the ACTIVE plan (budget year e.g. 2027)
+    // Also save proposed as sem2_actual so when this year becomes "current year"
+    // next cycle, sem2 is already populated (sem1 will be filled during that year).
     IncomeFundAmount::updateOrCreate(
         [
             'budget_plan_id'        => $plan->budget_plan_id,
@@ -274,9 +305,24 @@ $pastPlan = BudgetPlan::where('year', $plan->year - 2)->first();
         ],
         [
             'proposed_amount' => $row['proposed'] ?? null,
+            'sem2_actual'     => $row['proposed'] ?? null,
         ]
     );
 
+    // Save sem1/sem2 actual values to the CURRENT YEAR plan (e.g. 2026)
+    // if ($currentPlan) {
+    //     IncomeFundAmount::updateOrCreate(
+    //         [
+    //             'budget_plan_id'        => $currentPlan->budget_plan_id,
+    //             'income_fund_object_id' => $row['id'],
+    //             'source'                => $source,
+    //         ],
+    //         [
+    //             'sem1_actual' => $row['sem1'] ?? null,
+    //             'sem2_actual' => $row['sem2'] ?? null,
+    //         ]
+    //     );
+    // }
     // Save sem1/sem2 actual values to the CURRENT YEAR plan (e.g. 2026)
     if ($currentPlan) {
         IncomeFundAmount::updateOrCreate(
@@ -286,8 +332,8 @@ $pastPlan = BudgetPlan::where('year', $plan->year - 2)->first();
                 'source'                => $source,
             ],
             [
-                'sem1_actual' => $row['sem1'] ?? null,
-                'sem2_actual' => $row['sem2'] ?? null,
+                'sem1_actual' => $row['current_sem1'] ?? null,
+                'sem2_actual' => $row['current_sem2'] ?? null,
             ]
         );
     }

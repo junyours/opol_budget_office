@@ -368,18 +368,7 @@ $maybeBreak = function(
 ) use (
     &$pageRowCount, $PAGE_ROWS, $rptHead
 ): string {
-    $out = '';
-    if ($pageRowCount + $cost > $PAGE_ROWS && $pageRowCount > 0) {
-        $out .= '</tbody></table></div>';
-        $out .= '<div class="page">';
-        $out .= '<table class="data-table"><thead>' . $rptHead() . '</thead><tbody>';
-        $pageRowCount = 3; // thead = 3 rows
-        if ($continueLabel !== null) {
-            $out .= '<tr class="sec-hdr"><td colspan="7">' . $continueLabel . '</td></tr>';
-            $pageRowCount += 1;
-        }
-    }
-    return $out;
+    return '';
 };
 @endphp
 
@@ -444,6 +433,65 @@ $maybeBreak = function(
     <td class="r">{!! $pesoA($grandIncome['current_total']) !!}</td>
     <td class="r">{!! $pesoA($grandIncome['proposed']) !!}</td>
 </tr>
+
+{{-- Page break + signatories after Total Available Resources --}}
+</tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;">
+  <tr>
+    <td style="border:1px solid #000;border-bottom:none;text-align:left;padding:6px 6px 18px;">
+      We hereby certify that the information presented above are true and correct.
+      We further certify that the foregoing estimated receipts are reasonably projected as collectible for the budget year.
+    </td>
+  </tr>
+  <tr>
+    <td style="border-left:1px solid #000;border-right:1px solid #000;padding:0;">
+      <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+        <tr>
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
+            <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
+            <span class="sig-name">{{ $signatories['administrator']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['administrator']['title'] }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
+            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
+            <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
+      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
+      <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+      <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
+    </td>
+  </tr>
+</table>
+
+</div>{{-- end income page --}}
+<div class="page">
+
+<div class="form-no">LBP Form No. 1 (Continuation)</div>
+<div class="doc-title">BUDGET OF EXPENDITURES AND SOURCES OF FINANCING, (B.E.S.F.)</div>
+<div class="doc-title">LGU : {{ $lgu }}</div>
+<div class="fund-label">{{ $label }}, CY {{ $propYear }} — Expenditures</div>
+
+<table class="data-table">
+<thead>
+{!! $rptHead() !!}
+</thead>
+<tbody>
+@php $pageRowCount = 3; @endphp
 
 {{-- EXPENDITURE CLASSIFICATION GROUPS — global row counter across all sections --}}
 @foreach($clsGroups as $cls)

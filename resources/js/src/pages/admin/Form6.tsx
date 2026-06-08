@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import API from '../../services/api';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
 import { useGetIncomeFundTotals } from '../../hooks/useGetTotalAmount';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { Button } from '@/src/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/tabs';
 import { toast } from 'sonner';

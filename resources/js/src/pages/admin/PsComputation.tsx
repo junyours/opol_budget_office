@@ -4,7 +4,7 @@ import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
-import { LoadingState } from "@/src/pages/common/LoadingState";
+import { LoadingState } from "@/src/components/states/LoadingState";
 import { Skeleton }     from "@/src/components/ui/skeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

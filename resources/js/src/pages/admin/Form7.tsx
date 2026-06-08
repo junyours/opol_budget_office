@@ -1,6 +1,6 @@
 import React from 'react';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { cn } from '@/src/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/tabs';
 import {

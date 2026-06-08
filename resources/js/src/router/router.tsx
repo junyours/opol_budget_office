@@ -10,13 +10,15 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { UserRole } from "../types/api";
 import MainLayout from "../layout/MainLayout";
-import { LoadingState } from "../pages/common/LoadingState";
+import { LoadingState } from "../components/states/LoadingState";
+import ErrorBoundary from "../components/states/ErrorBoundary";
+import Unauthorized from "../components/states/Unauthorized";
 
 /* ------------------ Lazy Pages ------------------ */
 
 const Login = React.lazy(() => import("../pages/common/Login"));
 const Dashboard = React.lazy(() => import("../pages/common/Dashboard"));
-const Unauthorized = React.lazy(() => import("../pages/common/Unauthorized"));
+// const Unauthorized = React.lazy(() => import("../components/states/Unauthorized"));
 
 const BudgetPlanDetail = React.lazy(
   () => import("../pages/department-head/BudgetPlanDetail")
@@ -210,8 +212,11 @@ const ProtectedRoute = () => {
 const RoleRoute: React.FC<{ roles: UserRole[] }> = ({ roles }) => {
   const { user } = useAuth();
 
-  if (!user || !roles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+//   if (!user || !roles.includes(user.role)) {
+//     return <Navigate to="/unauthorized" replace />;
+//   }
+if (!user || !roles.includes(user.role)) {
+    return <Unauthorized />;
   }
 
   return <Outlet />;
@@ -222,6 +227,7 @@ const RoleRoute: React.FC<{ roles: UserRole[] }> = ({ roles }) => {
 const router = createBrowserRouter([
   {
     element: <GuestRoute />,
+    errorElement: <ErrorBoundary />,
     children: [
       {
         path: "/login",
@@ -230,13 +236,15 @@ const router = createBrowserRouter([
     ],
   },
 
-  {
-    path: "/unauthorized",
-    element: Lazy(Unauthorized),
-  },
+//   {
+//     path: "/unauthorized",
+//     element: Lazy(Unauthorized),
+//     errorElement: <ErrorBoundary />,
+//   },
 
   {
     element: <ProtectedRoute />,
+    errorElement: <ErrorBoundary />,
     children: [
 
       {

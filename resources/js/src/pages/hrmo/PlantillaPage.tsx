@@ -21,7 +21,7 @@ import {
 // import { MoreHorizontalIcon } from "lucide-react";
 import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { ExcelUploadModal } from './ExcelUploadModal';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
 import API from '../../services/api';
 import { Department } from '../../types/api';

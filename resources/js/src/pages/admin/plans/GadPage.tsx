@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { useAuth } from "@/src/hooks/useAuth";
-import { LoadingState } from "@/src/pages/common/LoadingState";
+import { LoadingState } from "@/src/components/states/LoadingState";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";

@@ -1,7 +1,7 @@
 // components/admin/LdrrmfPlanPage.tsx
 import React, { useEffect, useState } from "react";
 import API from "@/src/services/api";
-import { LoadingState } from "@/src/pages/common/LoadingState";
+import { LoadingState } from "@/src/components/states/LoadingState";
 import {
   Tooltip,
   TooltipContent,

@@ -613,7 +613,7 @@ import { toast } from "sonner";
 import API from "../../services/api";
 import { Department, DepartmentCategory } from "../../types/api";
 import { useDebounce } from "../../hooks/useDebounce";
-import { LoadingState } from "../common/LoadingState";
+import { LoadingState } from "../../components/states/LoadingState";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";

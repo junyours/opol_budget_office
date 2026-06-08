@@ -17,7 +17,7 @@ import {
 import { Calendar } from "@/src/components/ui/calendar"
 import { cn } from "@/src/lib/utils"
 import { DeptDots } from '@/src/components/ui/DeptDots';
-import { LoadingState } from '../common/LoadingState'
+import { LoadingState } from '../../components/states/LoadingState'
 import API from '../../services/api'
 import { Department, PlantillaPosition, Personnel } from '../../types/api'
 
@@ -445,7 +445,7 @@ const PlantillaOfPersonnelPage: React.FC = () => {
           </button>
         </div>
         {/* <TabScrollIndicator scrollId="pop-tabs-scroll" /> */}
-        <div className="mt-2 flex justify-center">  
+        <div className="mt-2 flex justify-center">
             <DeptDots
               departments={departments}
               activeId={activeTab}

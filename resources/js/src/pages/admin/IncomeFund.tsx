@@ -249,7 +249,8 @@ export default function IncomeFundPage() {
   const [currentSource, setCurrentSource] = useState<string>("general-fund");
 
 
-const savedValues = useRef<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>;
+// const savedValues = useRef<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>;
+const savedValues = useRef<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>;
   const seededSources = useRef<Set<string>>(new Set()) as React.MutableRefObject<Set<string>>;
 
 
@@ -378,6 +379,17 @@ useEffect(() => {
       );
     }
 
+    // const data = queryData.data.map((row) => ({
+    //   ...row,
+    //   past:            row.past            != null ? Number(row.past)            : null,
+    //   past_obligation: row.past_obligation != null ? Number(row.past_obligation) : null,
+    //   current_sem1:    row.current_sem1    != null ? Number(row.current_sem1)    : null,
+    //   current_sem2:    row.current_sem2    != null ? Number(row.current_sem2)    : null,
+    //   current_total:   row.current_total   != null ? Number(row.current_total)   : null,
+    //   sem1:            row.sem1            != null ? Number(row.sem1)            : null,
+    //   sem2:            row.sem2            != null ? Number(row.sem2)            : null,
+    //   proposed:        row.proposed        != null ? Number(row.proposed)        : null,
+    // }));
     const data = queryData.data.map((row) => ({
       ...row,
       past:            row.past            != null ? Number(row.past)            : null,
@@ -385,15 +397,18 @@ useEffect(() => {
       current_sem1:    row.current_sem1    != null ? Number(row.current_sem1)    : null,
       current_sem2:    row.current_sem2    != null ? Number(row.current_sem2)    : null,
       current_total:   row.current_total   != null ? Number(row.current_total)   : null,
-      sem1:            row.sem1            != null ? Number(row.sem1)            : null,
-      sem2:            row.sem2            != null ? Number(row.sem2)            : null,
       proposed:        row.proposed        != null ? Number(row.proposed)        : null,
     }));
 
+    // setRows(data);
+    // savedValues.current.clear();
+    // data.forEach((r) =>
+    //   savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+    // );
     setRows(data);
     savedValues.current.clear();
     data.forEach((r) =>
-      savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+      savedValues.current.set(r.id, { current_sem1: r.current_sem1, proposed: r.proposed, past_obligation: r.past_obligation })
     );
   }, [queryData]);
 
@@ -404,10 +419,16 @@ useEffect(() => {
     if (rows.length === 0) return;
 
     seededSources.current.add(currentSource);
+    // API.post('/income-fund/save', { rows, source: currentSource })
+    //   .then(() => {
+    //     rows.forEach((r) =>
+    //       savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+    //     );
+
     API.post('/income-fund/save', { rows, source: currentSource })
       .then(() => {
         rows.forEach((r) =>
-          savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
+          savedValues.current.set(r.id, { current_sem1: r.current_sem1, proposed: r.proposed, past_obligation: r.past_obligation })
         );
         // Mark as seeded in cache so revisiting doesn't re-seed
         queryClient.setQueryData(['income-fund', currentSource], (old: IncomeFundResponse | undefined) =>
@@ -435,13 +456,25 @@ useEffect(() => {
     savedValues.current.clear();
   };
 
-  const update = (rowId: number, field: "sem1" | "proposed", value: number | null) => {
+//   const update = (rowId: number, field: "sem1" | "proposed", value: number | null) => {
+//     setRows((prev) => {
+//       const copy = [...prev];
+//       const i = copy.findIndex((r) => r.id === rowId);
+//       if (i === -1) return prev;
+//       const row = { ...copy[i], [field]: value };
+//       if (field === "sem1") row.sem2 = value !== null ? (row.current_total ?? 0) - value : null;
+//       copy[i] = row;
+//       return copy;
+//     });
+//   };
+
+const update = (rowId: number, field: "current_sem1" | "proposed", value: number | null) => {
     setRows((prev) => {
       const copy = [...prev];
       const i = copy.findIndex((r) => r.id === rowId);
       if (i === -1) return prev;
       const row = { ...copy[i], [field]: value };
-      if (field === "sem1") row.sem2 = value !== null ? (row.current_total ?? 0) - value : null;
+      if (field === "current_sem1") row.current_sem2 = value !== null ? (row.current_total ?? 0) - value : null;
       copy[i] = row;
       return copy;
     });
@@ -452,14 +485,21 @@ useEffect(() => {
       if (savingRows.has(rowId)) return;
       const row = rows.find((r) => r.id === rowId);
       if (!row) return;
-      const last = savedValues.current.get(rowId);
+    //   const last = savedValues.current.get(rowId);
+    //   if (
+    //     last &&
+    //     last.sem1 === row.sem1 &&
+    //     last.sem2 === row.sem2 &&
+    //     last.proposed === row.proposed &&
+    //     last.past_obligation === row.past_obligation   // ← add this
+    //     ) return;
+    const last = savedValues.current.get(rowId);
       if (
         last &&
-        last.sem1 === row.sem1 &&
-        last.sem2 === row.sem2 &&
+        last.current_sem1 === row.current_sem1 &&
         last.proposed === row.proposed &&
-        last.past_obligation === row.past_obligation   // ← add this
-        ) return;
+        last.past_obligation === row.past_obligation
+      ) return;
     //   setSavingRows((prev) => new Set(prev).add(rowId));
     //   const promise = API.post("/income-fund/save", { rows, source: currentSource }).then(() =>
     //     savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
@@ -474,8 +514,11 @@ useEffect(() => {
     //   }
 
     setSavingRows((prev) => new Set(prev).add(rowId));
-      const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
-        savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
+    //   const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
+    //     savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
+    //   );
+    const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
+        savedValues.current.set(rowId, { current_sem1: row.current_sem1, proposed: row.proposed, past_obligation: row.past_obligation })
       );
       toast.promise(promise, {
         loading: "Saving…",
@@ -489,9 +532,13 @@ useEffect(() => {
     [rows, savingRows, currentSource]
   );
 
-  const handleSem1Change = (rowId: number, raw: string) => {
+//   const handleSem1Change = (rowId: number, raw: string) => {
+//     const n = raw.replace(/,/g, "");
+//     update(rowId, "sem1", n === "" ? null : Number(n));
+//   };
+const handleSem1Change = (rowId: number, raw: string) => {
     const n = raw.replace(/,/g, "");
-    update(rowId, "sem1", n === "" ? null : Number(n));
+    update(rowId, "current_sem1", n === "" ? null : Number(n));
   };
 
   const handleAmountChange = (rowId: number, raw: string) => {
@@ -534,7 +581,8 @@ const savePastObligation = useCallback(
       source: currentSource,
     }).then(() => {
       savedValues.current.set(rowId, {
-        ...(savedValues.current.get(rowId) ?? { sem1: null, sem2: null, proposed: null, past_obligation: null }),
+        // ...(savedValues.current.get(rowId) ?? { sem1: null, sem2: null, proposed: null, past_obligation: null }),
+        ...(savedValues.current.get(rowId) ?? { current_sem1: null, proposed: null, past_obligation: null }),
         past_obligation: value,
       });
     });
@@ -562,9 +610,13 @@ const savePastObligation = useCallback(
       }
     });
     const nameToId = new Map(rows.map((r) => [r.name, r.id]));
+    // const sumDesc = (
+    //   pid: number,
+    //   field: keyof Pick<IncomeFundRow, "past" | "current_total" | "sem1" | "sem2" | "proposed" | "past_obligation" | "current_sem1" | "current_sem2">
+    // ) => {
     const sumDesc = (
       pid: number,
-      field: keyof Pick<IncomeFundRow, "past" | "current_total" | "sem1" | "sem2" | "proposed" | "past_obligation" | "current_sem1" | "current_sem2">
+      field: keyof Pick<IncomeFundRow, "past" | "current_total" | "proposed" | "past_obligation" | "current_sem1" | "current_sem2">
     ) => {
       let total = 0;
       const stack = [pid];
@@ -585,7 +637,24 @@ const savePastObligation = useCallback(
       if (cfg) {
         const pid = cfg.parentId ?? (cfg.parentName ? nameToId.get(cfg.parentName) : undefined);
         if (pid) {
-          const sub: DisplayRow = {
+        //   const sub: DisplayRow = {
+        //     id: -Date.now() - Math.random(),
+        //     parent_id: null,
+        //     code: "",
+        //     name: cfg.name,
+        //     level: cfg.level,
+        //     past: sumDesc(pid, "past"),
+        //     past_obligation: sumDesc(pid, "past_obligation"),
+        //     current_total: sumDesc(pid, "current_total"),
+        //     current_sem1: sumDesc(pid, "current_sem1"),
+        //     current_sem2: sumDesc(pid, "current_sem2"),
+        //     sem1: sumDesc(pid, "sem1"),
+        //     sem2: sumDesc(pid, "sem2"),
+        //     proposed: sumDesc(pid, "proposed"),
+        //     isSubtotal: true,
+        //     isGrandTotal: false,
+        //   };
+        const sub: DisplayRow = {
             id: -Date.now() - Math.random(),
             parent_id: null,
             code: "",
@@ -596,8 +665,6 @@ const savePastObligation = useCallback(
             current_total: sumDesc(pid, "current_total"),
             current_sem1: sumDesc(pid, "current_sem1"),
             current_sem2: sumDesc(pid, "current_sem2"),
-            sem1: sumDesc(pid, "sem1"),
-            sem2: sumDesc(pid, "sem2"),
             proposed: sumDesc(pid, "proposed"),
             isSubtotal: true,
             isGrandTotal: false,
@@ -609,9 +676,27 @@ const savePastObligation = useCallback(
     }
     const beginningCash = rows.find((r) => r.name === "Beginning Cash Balance");
     const filteredSubs  = subtotals.filter((r) => r.name !== "Total Non-Income Receipts");
-    const grand = (f: keyof Pick<IncomeFundRow, "past" | "past_obligation" | "current_total" | "sem1" | "sem2" | "proposed" | "current_sem1" | "current_sem2">) =>
+    // const grand = (f: keyof Pick<IncomeFundRow, "past" | "past_obligation" | "current_total" | "sem1" | "sem2" | "proposed" | "current_sem1" | "current_sem2">) =>
+    const grand = (f: keyof Pick<IncomeFundRow, "past" | "past_obligation" | "current_total" | "proposed" | "current_sem1" | "current_sem2">) =>
       (beginningCash?.[f] ?? 0) + filteredSubs.reduce((a, r) => a + (r[f] ?? 0), 0);
 
+    // result.push({
+    //   id: -999,
+    //   parent_id: null,
+    //   code: "",
+    //   name: "Total Available Resources for Appropriations",
+    //   level: 0,
+    //   past: grand("past"),
+    //   past_obligation: grand("past_obligation"),
+    //   current_total: grand("current_total"),
+    //   current_sem1: grand("current_sem1"),
+    //   current_sem2: grand("current_sem2"),
+    //   sem1: grand("sem1"),
+    //   sem2: grand("sem2"),
+    //   proposed: grand("proposed"),
+    //   isSubtotal: false,
+    //   isGrandTotal: true,
+    // });
     result.push({
       id: -999,
       parent_id: null,
@@ -623,8 +708,6 @@ const savePastObligation = useCallback(
       current_total: grand("current_total"),
       current_sem1: grand("current_sem1"),
       current_sem2: grand("current_sem2"),
-      sem1: grand("sem1"),
-      sem2: grand("sem2"),
       proposed: grand("proposed"),
       isSubtotal: false,
       isGrandTotal: true,
@@ -717,8 +800,10 @@ const savePastObligation = useCallback(
                     {row.name}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_PAST_GRAND)}>{fmtNum(row.past_obligation)}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem1)}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem2)}</td>
+                  {/* <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem1)}</td>
+                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem2)}</td> */}
+                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_sem1)}</td>
+                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_sem2)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_total)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono font-semibold tabular-nums border-l", COL_BUDGET_GRAND)}>{fmtNum(row.proposed)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l border-gray-700", incColor)}>{fmtNum(increase)}</td>
@@ -734,8 +819,10 @@ const savePastObligation = useCallback(
         {row.name}
       </td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem1)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem2)}</td>
+                  {/* <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem1)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem2)}</td> */}
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem1)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem2)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_total)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_BUDGET_SUB)}>{fmtNum(row.proposed)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-gray-200", incColor)}>{fmtNum(increase)}</td>
@@ -789,17 +876,23 @@ const savePastObligation = useCallback(
     className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
       "border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300",
       "placeholder:text-gray-300 tabular-nums", isSaving && "opacity-50 pointer-events-none")}
-    value={fmtInput(row.sem1)}
+    // value={fmtInput(row.sem1)}
+    value={fmtInput(row.current_sem1)}
     onChange={(e) => handleSem1Change(row.id, e.target.value)}
     onBlur={() => saveRow(row.id)}
     disabled={isSaving}
     placeholder="0"
   />
+// ) : (
+//   <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.sem1)}</div>
+// )}
+//                 </td>
+//                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.sem2)}</td>
 ) : (
-  <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.sem1)}</div>
+  <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.current_sem1)}</div>
 )}
                 </td>
-                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.sem2)}</td>
+                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.current_sem2)}</td>
                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-600 tabular-nums", COL_CURR)}>{fmtNum(row.current_total)}</td>
                 <td className={cn("border-r border-l px-2 py-1.5", COL_BUDGET)}>
                   {editable && canEditBudgetYear ? (

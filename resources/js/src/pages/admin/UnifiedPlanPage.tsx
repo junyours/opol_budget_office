@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { LoadingState } from "@/src/pages/common/LoadingState";
+import { LoadingState } from "@/src/components/states/LoadingState";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { useAuth } from "@/src/hooks/useAuth";

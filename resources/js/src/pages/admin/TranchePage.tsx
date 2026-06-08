@@ -367,7 +367,7 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useSalaryMatrix } from "../../hooks/useSalaryMatrix";
 import { ExcelUploadModal } from "../hrmo/ExcelUploadModal";
-import { LoadingState } from "../common/LoadingState";
+import { LoadingState } from "../../components/states/LoadingState";
 import API from "../../services/api";
 import { SalaryStandardVersion, SalaryGradeStep } from "../../types/api";
 import { ArrowUpTrayIcon, CheckBadgeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";

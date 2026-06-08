@@ -9,7 +9,7 @@ import {
   TableHead, TableHeader, TableRow,
 } from '@/src/components/ui/table';
 import { Input } from '@/src/components/ui/input';
-import { LoadingState } from '@/src/pages/common/LoadingState';
+import { LoadingState } from '@/src/components/states/LoadingState';
 import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
 import { toast } from 'sonner';

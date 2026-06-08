@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import API from '../../services/api';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan, DepartmentBudgetPlanForm4Item } from '../../types/api';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/src/components/ui/button';

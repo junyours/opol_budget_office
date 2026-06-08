@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import API from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { Department } from "../../types/api";
-import { LoadingState } from "../common/LoadingState";
+import { LoadingState } from "../../components/states/LoadingState";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";

@@ -308,7 +308,7 @@ import {
 import Form2 from './Form2';
 import Form3 from './Form3';
 import Form4 from './Form4';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Button } from '@/src/components/ui/button';
 import {

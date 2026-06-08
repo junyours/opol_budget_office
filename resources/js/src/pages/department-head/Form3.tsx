@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import API from '../../services/api';
-import { LoadingState } from '../common/LoadingState';
+import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan } from '../../types/api';
 import { cn } from '@/src/lib/utils';
 import { TrashIcon } from '@heroicons/react/24/outline';

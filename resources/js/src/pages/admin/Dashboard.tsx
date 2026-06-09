@@ -423,7 +423,7 @@ const RecentActivityCard: React.FC<{
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-2 py-10 text-zinc-300">
+      <div className="flex flex-col items-center justify-center gap-2 min-h-[465px] text-zinc-300">
         <BellIcon className="w-8 h-8" />
         <p className="text-xs">No recent activity</p>
       </div>
@@ -1088,16 +1088,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
-                    <p className="text-eyebrow text-zinc-500 mb-2">GF Local Source</p>
-                    <Money v={!fundsReady ? null : gfLocalSource} loading={!fundsReady} size="md" />
-                    <p className="text-[9px] text-zinc-400 mt-1">Tax + Non-Tax only</p>
-                  </div>
-                  <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
-                    <p className="text-eyebrow text-zinc-500 mb-2">Special Accounts</p>
-                    <Money v={!fundsReady ? null : specialTotal} loading={!fundsReady} size="md" />
-                    <p className="text-[9px] text-zinc-400 mt-1">SH + OCC + PM</p>
-                  </div>
+
+
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">

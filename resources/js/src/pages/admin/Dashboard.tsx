@@ -16,7 +16,7 @@ import {
 } from "../../components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
   RadialBarChart, RadialBar,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   PolarGrid, PolarRadiusAxis,
@@ -33,13 +33,25 @@ import {
   ClipboardDocumentListIcon, ArrowTrendingUpIcon,
   ArrowTrendingDownIcon, CheckCircleIcon, ClockIcon,
   ExclamationTriangleIcon, BuildingStorefrontIcon,
-
+InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import {
+Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { Department } from "../../types/api";
 import {
-  useDepartments, useBudgetPlans, useDepartmentBudgetPlans,
+//   useDepartments, useBudgetPlans, useDepartmentBudgetPlans,
+//   useAllFunds,
+//   useMdfFund, useLdrrmfSummary, useDeptExpenditures,
+//   useCreateBudgetPlan,
+// } from "../../hooks/useDashboardQueries";
+useDepartments, useBudgetPlans, useDepartmentBudgetPlans,
   useAllFunds,
   useMdfFund, useLdrrmfSummary, useDeptExpenditures,
+  useSpecialDeptExpenditures,
   useCreateBudgetPlan,
 } from "../../hooks/useDashboardQueries";
 
@@ -444,7 +456,9 @@ const AdminDashboard: React.FC = () => {
 
   const { data: mdfAllocated = 0, isLoading: mdfLoading } = useMdfFund(planId);
   const { data: ldrrmfData,       isLoading: ldrLoading  } = useLdrrmfSummary(planId);
-  const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
+//   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
+const { data: deptExp = [],        isLoading: deptExpLoading }        = useDeptExpenditures(planId, departments);
+const { data: specialDeptExp = [], isLoading: specialDeptExpLoading } = useSpecialDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
   const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
@@ -744,16 +758,19 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                     </div> */}
                     <div className="col-span-6 bg-blue-50 rounded-2xl border border-blue-100 p-3.5 flex items-stretch gap-3">
                       <div className="flex-1">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500 mb-2">Estimated Revenue</p>
-                        <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
-                        <p className="text-[9px] text-blue-400 mt-1">Total External Source + Tax + Non-Tax Revenue</p>
-                      </div>
-                      <div className="border-l border-blue-200 pl-3 flex-1">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400 mb-2">Total Local Source</p>
                         <Money v={!fundsReady ? null : gfLocalSource} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
                         <p className="text-[9px] text-blue-400 mt-1">Tax + Non-Tax Revenue</p>
+
+                      </div>
+                      <div className="border-l border-blue-200 pl-3 flex-1">
+<p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500 mb-2">Estimated Revenue</p>
+                        <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
+                        <p className="text-[9px] text-blue-400 mt-1">Total External Source + Tax + Non-Tax Revenue</p>
                       </div>
                     </div>
+
+
 
                     {/* <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
                       <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1">
@@ -803,34 +820,59 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                           </div>
                         );
                       })()}
+{/* Per Capita */}
+<div className="col-span-3 rounded-2xl border border-violet-100 bg-violet-50 p-3.5 flex flex-col justify-between">
+  <div>
+    <div className="flex items-center gap-1.5 mb-2">
+      <p className="text-eyebrow text-violet-500">Per Capita</p>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button className="text-violet-300 hover:text-violet-500 transition-colors">
+              <InformationCircleIcon className="w-3.5 h-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            className="max-w-[200px] text-center text-xs leading-snug"
+          >
+            Rounded to the nearest centavo. Multiplying back by population
+            may not exactly equal the total due to rounding.
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+
+    {!fundsReady ? (
+      <Shimmer className="h-7 w-28 rounded-lg" />
+    ) : perCapita !== null ? (
+      <>
+        <p className="text-metric text-violet-700 tracking-tight leading-none">
+          {peso(perCapita)}
+        </p>
+        <p className="text-meta font-mono text-violet-400 mt-1">
+          approx. · per person
+        </p>
+      </>
+    ) : (
+      <p className="text-violet-300 font-bold text-lg">—</p>
+    )}
+  </div>
+
+  <div className="mt-3 pt-2.5 border-t border-violet-200 space-y-0.5">
+    <p className="text-meta text-violet-400">
+      Population:{" "}
+      <span className="font-semibold text-violet-600">
+        {POPULATION.count.toLocaleString("en-PH")}
+      </span>
+    </p>
+    <p className="text-meta text-violet-400">
+      {POPULATION.year} {POPULATION.surveyor}
+    </p>
+  </div>
+</div>
 
 
-                      {/* Per Capita */}
-                <div className="col-span-3 rounded-2xl border border-violet-100 bg-violet-50 p-3.5 flex flex-col justify-between">
-                  <div>
-                    <p className="text-eyebrow text-violet-500 mb-2">Per Capita</p>
-                    {!fundsReady ? (
-                      <Shimmer className="h-7 w-28 rounded-lg" />
-                    ) : perCapita !== null ? (
-                      <>
-                        <p className="text-metric text-violet-700 tracking-tight leading-none">
-                          {peso(perCapita)}
-                        </p>
-                        <p className="text-meta font-mono text-violet-400 mt-1">per person</p>
-                      </>
-                    ) : (
-                      <p className="text-violet-300 font-bold text-lg">—</p>
-                    )}
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-violet-200 space-y-0.5">
-                    <p className="text-meta text-violet-400">
-                      Population: <span className="font-semibold text-violet-600">{POPULATION.count.toLocaleString("en-PH")}</span>
-                    </p>
-                    <p className="text-meta text-violet-400">
-                      {POPULATION.year} {POPULATION.surveyor}
-                    </p>
-                  </div>
-                </div>
 
 
                   </div>
@@ -846,7 +888,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                         </div>
                         <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5 space-y-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">20% MDF</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">20% MDF · From NTA</p>
                           <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                             {mdf > 0 ? `${Math.round((mdfActual / mdf) * 100)}%` : "0%"} allocated
                           </span>
@@ -882,7 +924,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                                   <Pie data={gfPie} cx="50%" cy="50%" innerRadius={24} outerRadius={42} paddingAngle={2} dataKey="value" strokeWidth={0}>
                                     {gfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                                   </Pie>
-                                  <Tooltip content={<PieTip />} />
+                                  <RechartsTooltip content={<PieTip />} />
                                 </PieChart>
                               </ResponsiveContainer>
                             </div>
@@ -1129,7 +1171,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                         height={40}
                       />
                       <YAxis tickFormatter={v => pesoC(v)} tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 600 }} tickLine={false} axisLine={false} width={56} />
-                      <Tooltip content={<BarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
+                      <RechartsTooltip content={<BarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
                       <Bar dataKey="total" name="Expenditure" radius={[4, 4, 0, 0]}>
                         {deptExp.map((_, i) => <Cell key={i} fill={`hsl(${220 + i * 18}, 70%, ${62 - i * 2}%)`} />)}
                       </Bar>
@@ -1172,7 +1214,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                             <Pie data={specialPie} cx="50%" cy="50%" innerRadius={36} outerRadius={62} paddingAngle={3} dataKey="value" strokeWidth={0}>
                               {specialPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                             </Pie>
-                            <Tooltip content={<PieTip />} />
+                            <RechartsTooltip content={<PieTip />} />
                           </PieChart>
                         </ResponsiveContainer>
                       ) : (
@@ -1296,8 +1338,10 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                 </div>
               </Card>
 
-              {/* Recent Activity */}
-              <RecentActivityCard style={st(8)} activePlanYear={activePlan?.year ?? null} />
+
+
+{/* Recent Activity */}
+<RecentActivityCard style={st(9)} activePlanYear={activePlan?.year ?? null} />
               {/* Quick Links */}
               {/* <Card style={st(8)} className="p-5">
                 <p className="text-eyebrow mb-4">Quick Links</p>

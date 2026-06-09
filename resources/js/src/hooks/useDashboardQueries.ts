@@ -293,7 +293,48 @@ export function useDeptExpenditures(
 
   return { data, isLoading };
 }
+export function useSpecialDeptExpenditures(
+  budgetPlanId: number | undefined,
+  departments: Department[],
+): { data: DeptExpenditure[]; isLoading: boolean } {
+  const { data: deptPlans = [],   isLoading: plansLoading } = useDepartmentBudgetPlans(budgetPlanId);
+  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId);
 
+  const isLoading = !budgetPlanId || plansLoading || aipLoading || departments.length === 0;
+
+  const data = useMemo<DeptExpenditure[]>(() => {
+    if (!budgetPlanId || departments.length === 0 || deptPlans.length === 0) return [];
+
+    const deptMap = new Map<number, Department>(departments.map(d => [d.dept_id, d]));
+
+    const aipByDept = new Map<number, number>();
+    aipPrograms.forEach((p: any) => {
+      aipByDept.set(p.dept_id, (aipByDept.get(p.dept_id) ?? 0) + (p.total_amount ?? 0));
+    });
+
+    return deptPlans
+      .filter((dp: DepartmentBudgetPlan) => {
+        const d = deptMap.get(dp.dept_id);
+        return d && d.dept_category_id === SPECIAL_CAT_ID; // ← only special accounts
+      })
+      .map((dp: DepartmentBudgetPlan) => {
+        const d     = deptMap.get(dp.dept_id)!;
+        const form2 = (dp.items ?? []).reduce(
+          (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
+        );
+        const aip = aipByDept.get(dp.dept_id) ?? 0;
+        return {
+          dept_id: dp.dept_id,
+          abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
+          total:   form2 + aip,
+        };
+      })
+      .filter((r: DeptExpenditure) => r.total > 0)
+      .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
+  }, [deptPlans, aipPrograms, departments, budgetPlanId]);
+
+  return { data, isLoading };
+}
 export function useSpecialAccountExpenditures(
   budgetPlanId: number | undefined,
   departments: Department[],

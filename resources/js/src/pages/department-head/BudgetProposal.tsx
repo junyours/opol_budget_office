@@ -92,30 +92,30 @@ const BudgetProposal: React.FC = () => {
     }
   };
 
-//   const handleCreatePlan = () => {
-//     if (!activePlan) {
-//       toast.error("No active budget plan. Please contact admin.");
-//       return;
-//     }
-//     if (plans.some(p => p.budget_plan_id === activePlan.budget_plan_id)) {
-//       toast.error("You already have a budget plan for the active year.");
-//       return;
-//     }
-//     setShowCreateConfirm(true);
-//   };
+  const handleCreatePlan = () => {
+    if (!activePlan) {
+      toast.error("No active budget plan. Please contact admin.");
+      return;
+    }
+    if (plans.some(p => p.budget_plan_id === activePlan.budget_plan_id)) {
+      toast.error("You already have a budget plan for the active year.");
+      return;
+    }
+    setShowCreateConfirm(true);
+  };
 
-//   const createPlan = async () => {
-//     setShowCreateConfirm(false);
-//     const promise = API.post("/department-budget-plans", {
-//       budget_plan_id: activePlan!.budget_plan_id,
-//       dept_id:        user?.dept_id,
-//     }).then(() => { fetchData(); });
-//     toast.promise(promise, {
-//       loading: "Creating budget plan…",
-//       success: "Budget plan created.",
-//       error:   "Failed to create budget plan.",
-//     });
-//   };
+  const createPlan = async () => {
+    setShowCreateConfirm(false);
+    const promise = API.post("/department-budget-plans", {
+      budget_plan_id: activePlan!.budget_plan_id,
+      dept_id:        user?.dept_id,
+    }).then(() => { fetchData(); });
+    toast.promise(promise, {
+      loading: "Creating budget plan…",
+      success: "Budget plan created.",
+      error:   "Failed to create budget plan.",
+    });
+  };
 
   const handleRowClick = (plan: DepartmentBudgetPlan) => {
     navigate(`/department-budget-plans/${plan.dept_budget_plan_id}`);
@@ -217,7 +217,7 @@ const BudgetProposal: React.FC = () => {
               <p className="text-gray-400 text-[12px] mb-4">
                 Create your first budget proposal for FY {activePlan?.year}.
               </p>
-              {/* {activePlan && (
+              {activePlan && (
                 <Button
                   size="sm"
                   onClick={handleCreatePlan}
@@ -226,7 +226,7 @@ const BudgetProposal: React.FC = () => {
                   <PlusIcon className="w-3.5 h-3.5 mr-1.5" />
                   Create Proposal
                 </Button>
-              )} */}
+              )}
             </div>
           ) : (
             <>
@@ -334,7 +334,7 @@ const BudgetProposal: React.FC = () => {
             <AlertDialogCancel asChild>
               <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
             </AlertDialogCancel>
-            {/* <AlertDialogAction asChild>
+            <AlertDialogAction asChild>
               <Button
                 size="sm"
                 className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
@@ -342,7 +342,7 @@ const BudgetProposal: React.FC = () => {
               >
                 Create
               </Button>
-            </AlertDialogAction> */}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

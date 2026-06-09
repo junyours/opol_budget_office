@@ -33,6 +33,7 @@ import {
   ClipboardDocumentListIcon, ArrowTrendingUpIcon,
   ArrowTrendingDownIcon, CheckCircleIcon, ClockIcon,
   ExclamationTriangleIcon, BuildingStorefrontIcon,
+
 } from "@heroicons/react/24/outline";
 import { Department } from "../../types/api";
 import {
@@ -45,10 +46,16 @@ import {
 import { BudgetAreaChart } from "@/src/components/charts/BudgetAreaChart";
 import { BreakdownCard } from "@/src/components/cards/BreakdownCard";
 
+import { useNotificationStore } from "@/src/store/useNotificationStore";
+import { BellIcon } from "@heroicons/react/24/outline";
+import { formatDistanceToNow } from "date-fns"; // optional — or use a simple formatter below
+
 const getInitials = (d: Department) =>
   (d.dept_abbreviation ?? d.dept_name).slice(0, 2).toUpperCase();
 
-const peso = (v: number) => `₱${Math.round(v).toLocaleString("en-PH")}`;
+// const peso = (v: number) => `₱${Math.round(v).toLocaleString("en-PH")}`;
+
+const peso = (v: number) => `₱${v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const pesoC = (v: number): string => {
   if (v >= 1_000_000_000) {
@@ -368,6 +375,49 @@ const ApprovalProgressCard: React.FC<{
   );
 };
 
+const typeConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  budget_submitted: { label: "Submitted",  color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200"   },
+  budget_approved:  { label: "Approved",   color: "text-emerald-600",bg: "bg-emerald-50", border: "border-emerald-200" },
+  budget_returned:  { label: "Returned",   color: "text-amber-600",  bg: "bg-amber-50",   border: "border-amber-200"  },
+};
+
+const timeAgo = (date: string | Date) => {
+  const diff = Date.now() - new Date(date).getTime();
+  const m = Math.floor(diff / 60_000);
+  if (m < 1)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+
+const RecentActivityCard: React.FC<{
+  style: React.CSSProperties;
+  activePlanYear: number | null;
+}> = ({ style, activePlanYear }) => {
+  return (
+    <Card style={style} className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b border-zinc-100">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+            <BellIcon className="w-4 h-4 text-zinc-500" />
+          </div>
+          <div>
+            <p className="text-eyebrow leading-none">Recent Activity</p>
+            {activePlanYear && (
+              <p className="text-[10px] text-zinc-400 mt-0.5">FY {activePlanYear}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center justify-center gap-2 py-10 text-zinc-300">
+        <BellIcon className="w-8 h-8" />
+        <p className="text-xs">No recent activity</p>
+      </div>
+    </Card>
+  );
+};
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -400,6 +450,9 @@ const AdminDashboard: React.FC = () => {
   const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
 const occExpTotal = exp.occExpenditure + exp.occCalamity;
 const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
+
+  const gfLocalSource = gf?.localSource ?? 0;
+  const overallTotal  = gfLocalSource + (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
 
   const createPlan = useCreateBudgetPlan();
 
@@ -463,7 +516,13 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
   const shCal        = (sh?.nonTaxRevenue  ?? 0) * 0.05;
   const occCal       = (occ?.nonTaxRevenue ?? 0) * 0.05;
   const pmCal        = (pm?.nonTaxRevenue  ?? 0) * 0.05;
-  const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
+//   const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
+const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
+  const overallEstimatedIncome = (gf?.total ?? 0) + specialTotal;
+
+  // TODO: replace with DB fetch when population table is ready
+  const POPULATION = { count: 66_836, year: 2024, surveyor: "POPCEN" } as const;
+  const perCapita  = overallEstimatedIncome > 0 ? overallEstimatedIncome / POPULATION.count : null;
   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
   const specialCal   = shCal + occCal + pmCal;
   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
@@ -672,126 +731,120 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                 <div className="p-5 space-y-3">
                   <div className="grid grid-cols-12 gap-3">
 
-                    <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                    {/* <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Estimated Revenue</p>
                       <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" />
                     </div>
 
                     <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
-                      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1">
-                        <ArrowTrendingDownIcon className="w-3 h-3 text-zinc-400" />Expenditures
-                      </p>
-                      <Money
-                        v={expLoading || allocLoading ? null : exp.gfExpenditure + mdfActual + ldrrmfPieTotal}
-                        loading={expLoading || allocLoading}
-                        size="lg"
-                      />
-                      {!expLoading && !allocLoading && (
-                        <div className="mt-2 space-y-0.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] text-zinc-400">Dept. expenses</span>
-                            <span className="text-[9px] font-mono text-zinc-500">{pesoC(exp.gfExpenditure)}</span>
-                          </div>
-                          {mdfActual > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] text-zinc-400">20% MDF</span>
-                              <span className="text-[9px] font-mono text-zinc-500">{pesoC(mdfActual)}</span>
-                            </div>
-                          )}
-                          {ldrrmfPieTotal > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] text-zinc-400">5% LDRRMF</span>
-                              <span className="text-[9px] font-mono text-zinc-500">{pesoC(ldrrmfPieTotal)}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1"> */}
+                      {/* <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Estimated Revenue</p>
+                      <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" />
+                    </div> */}
+                    <div className="col-span-6 bg-blue-50 rounded-2xl border border-blue-100 p-3.5 flex items-stretch gap-3">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500 mb-2">Estimated Revenue</p>
+                        <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
+                        <p className="text-[9px] text-blue-400 mt-1">Total External Source + Tax + Non-Tax Revenue</p>
+                      </div>
+                      <div className="border-l border-blue-200 pl-3 flex-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400 mb-2">Total Local Source</p>
+                        <Money v={!fundsReady ? null : gfLocalSource} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
+                        <p className="text-[9px] text-blue-400 mt-1">Tax + Non-Tax Revenue</p>
+                      </div>
                     </div>
 
-                    <div className="col-span-6 flex items-center gap-2">
-                      {!fundsReady || expLoading ? (
-                        <div className="flex-1 flex items-center justify-center">
-                          <Shimmer className="w-24 h-24 rounded-full" />
-                        </div>
-                      ) : gfPie.length > 0 ? (
-                        <>
-                          <div className="w-[96px] flex-shrink-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 text-center mb-1">Allocation</p>
-                            <ResponsiveContainer width="100%" height={88}>
-                              <PieChart>
-                                <Pie data={gfPie} cx="50%" cy="50%" innerRadius={24} outerRadius={42} paddingAngle={2} dataKey="value" strokeWidth={0}>
-                                  {gfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                                </Pie>
-                                <Tooltip content={<PieTip />} />
-                              </PieChart>
-                            </ResponsiveContainer>
+                    {/* <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1">
+                        <ArrowTrendingDownIcon className="w-3 h-3 text-zinc-400" />Expenditures
+                      </p> */}
+                      {(() => {
+                        const totalGfExp = exp.gfExpenditure + mdfActual + ldrrmfPieTotal;
+                        const gfTotal = gf?.total ?? 0;
+                        const isLoaded = fundsReady && !expLoading && !allocLoading;
+                        const isOver = isLoaded && totalGfExp > gfTotal;
+                        const isUnder = isLoaded && totalGfExp <= gfTotal;
+                        const bg    = !isLoaded ? "bg-blue-50   border-blue-100"   : isOver ? "bg-rose-50  border-rose-100"   : "bg-emerald-50  border-emerald-100";
+                        const label = !isLoaded ? "text-blue-500"                  : isOver ? "text-rose-500"                 : "text-emerald-600";
+                        const icon  = !isLoaded ? "text-blue-400"                  : isOver ? "text-rose-400"                 : "text-emerald-400";
+                        const sub   = !isLoaded ? "text-blue-400"                  : isOver ? "text-rose-400"                 : "text-emerald-500";
+                        const subMono = !isLoaded ? "text-blue-500"                : isOver ? "text-rose-500"                 : "text-emerald-600";
+                        return (
+                          <div className={cn("col-span-3 rounded-2xl border p-3.5", bg)}>
+                            <p className={cn("text-[10px] font-medium uppercase tracking-widest mb-2 flex items-center gap-1", label)}>
+                              <ArrowTrendingDownIcon className={cn("w-3 h-3", icon)} />Expenditures
+                            </p>
+                            <Money
+                              v={expLoading || allocLoading ? null : totalGfExp}
+                              loading={expLoading || allocLoading}
+                              size="lg"
+                            />
+                            {!expLoading && !allocLoading && (
+                              <div className="mt-2 space-y-0.5">
+                                <div className="flex items-center justify-between">
+                                  <span className={cn("text-[9px]", sub)}>Dept. expenses</span>
+                                  <span className={cn("text-[9px] font-mono", subMono)}>{pesoC(exp.gfExpenditure)}</span>
+                                </div>
+                                {mdfActual > 0 && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-zinc-400">20% MDF</span>
+                                    <span className="text-[9px] font-mono text-zinc-500">{pesoC(mdfActual)}</span>
+                                  </div>
+                                )}
+                                {ldrrmfPieTotal > 0 && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-zinc-400">5% LDRRMF</span>
+                                    <span className="text-[9px] font-mono text-zinc-500">{pesoC(ldrrmfPieTotal)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex-1 space-y-1.5 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#a1a1aa" }} />
-                                <span className="text-xs text-zinc-500 font-medium truncate">Expenditures</span>
-                              </div>
-                              <span className="text-xs text-zinc-700 font-semibold font-mono flex-shrink-0">{pesoC(exp.gfExpenditure)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f59e0b" }} />
-                                <span className="text-xs text-zinc-500 font-medium truncate">20% MDF</span>
-                              </div>
-                              <span className="text-xs text-zinc-700 font-semibold font-mono flex-shrink-0">{pesoC(mdfPieValue)}</span>
-                            </div>
-                            <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-2 py-1.5 space-y-1">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
-                                  <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">5% LDRRMF</span>
-                                </div>
-                                <span className="text-[10px] font-semibold font-mono text-zinc-500">{pesoC(ldrrmfPieTotal)}</span>
-                              </div>
-                              <div className="flex items-center justify-between pl-3">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
-                                  <span className="text-[10px] text-zinc-400">30% QRF</span>
-                                </div>
-                                <span className="text-[10px] font-mono text-zinc-500">{pesoC(qrf)}</span>
-                              </div>
-                              <div className="flex items-center justify-between pl-3">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
-                                  <span className="text-[10px] text-zinc-400">70% Pre-Disaster</span>
-                                </div>
-                                <span className="text-[10px] font-mono text-zinc-500">{pesoC(ldrrmf70Actual)}</span>
-                              </div>
-                            </div>
-                            <div className={cn("rounded-lg border px-2 py-1.5", gfUnap >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
-                              <div className="flex items-center gap-1 mb-0.5">
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981" }} />
-                                <p className={cn("text-[10px] font-semibold uppercase tracking-widest", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
-                                  Unappropriated Balance
-                                </p>
-                              </div>
-                              <p className={cn("text-sm font-semibold font-mono", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
-                                {gfUnap >= 0 ? "+" : ""}{peso(gfUnap)}
-                              </p>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex-1 flex items-center justify-center opacity-20">
-                          <ChartBarIcon className="w-10 h-10 text-zinc-400" />
-                        </div>
-                      )}
-                    </div>
+                        );
+                      })()}
+
+
+                      {/* Per Capita */}
+                <div className="col-span-3 rounded-2xl border border-violet-100 bg-violet-50 p-3.5 flex flex-col justify-between">
+                  <div>
+                    <p className="text-eyebrow text-violet-500 mb-2">Per Capita</p>
+                    {!fundsReady ? (
+                      <Shimmer className="h-7 w-28 rounded-lg" />
+                    ) : perCapita !== null ? (
+                      <>
+                        <p className="text-metric text-violet-700 tracking-tight leading-none">
+                          {peso(perCapita)}
+                        </p>
+                        <p className="text-meta font-mono text-violet-400 mt-1">per person</p>
+                      </>
+                    ) : (
+                      <p className="text-violet-300 font-bold text-lg">—</p>
+                    )}
                   </div>
+                  <div className="mt-3 pt-2.5 border-t border-violet-200 space-y-0.5">
+                    <p className="text-meta text-violet-400">
+                      Population: <span className="font-semibold text-violet-600">{POPULATION.count.toLocaleString("en-PH")}</span>
+                    </p>
+                    <p className="text-meta text-violet-400">
+                      {POPULATION.year} {POPULATION.surveyor}
+                    </p>
+                  </div>
+                </div>
+
+
+                  </div>
+
+
 
                   {(gf?.nta ?? 0) > 0 && (
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">NTA · National Tax Allotment</p>
-                        <Money v={!fundsReady ? null : (gf?.nta ?? 0)} loading={!fundsReady} size="md" />
-                      </div>
-                      <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5 space-y-2">
+                      <div className="space-y-3">
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">NTA · National Tax Allotment</p>
+                          <Money v={!fundsReady ? null : (gf?.nta ?? 0)} loading={!fundsReady} size="md" />
+                        </div>
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5 space-y-2">
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">20% MDF</p>
                           <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
@@ -801,8 +854,8 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                         <div className="flex items-baseline gap-1">
                           {allocLoading
                             ? <Shimmer className="h-5 w-24 rounded" />
-                            : <><p className="text-base font-semibold text-amber-700">{pesoC(mdfActual)}</p>
-                                <p className="text-[10px] text-zinc-400">/ {pesoC(mdf)}</p></>}
+                            : <><p className="text-section-title text-amber-700">{peso(mdfActual)}</p>
+                                <p className="text-subtitle text-zinc-400">/ {peso(mdf)}</p></>}
                         </div>
                         <div className="h-1 bg-amber-100 rounded-full overflow-hidden">
                           <div className="h-full bg-amber-400 rounded-full transition-all duration-700"
@@ -810,8 +863,85 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-zinc-400">Unallocated</span>
-                          <span className="text-[10px] font-semibold font-mono text-amber-600">{pesoC(mdfRemaining)}</span>
+                          <span className="text-subtitle font-bold font-mono text-amber-600">{peso(mdfRemaining)}</span>
                         </div>
+                      </div>
+                      </div>
+                      {/* Pie chart right column */}
+                      <div className="flex items-center gap-2">
+                        {!fundsReady || expLoading ? (
+                          <div className="flex-1 flex items-center justify-center">
+                            <Shimmer className="w-24 h-24 rounded-full" />
+                          </div>
+                        ) : gfPie.length > 0 ? (
+                          <>
+                            <div className="w-[96px] flex-shrink-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 text-center mb-1">Allocation</p>
+                              <ResponsiveContainer width="100%" height={88}>
+                                <PieChart>
+                                  <Pie data={gfPie} cx="50%" cy="50%" innerRadius={24} outerRadius={42} paddingAngle={2} dataKey="value" strokeWidth={0}>
+                                    {gfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                                  </Pie>
+                                  <Tooltip content={<PieTip />} />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                            <div className="flex-1 space-y-1.5 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#a1a1aa" }} />
+                                  <span className="text-xs text-zinc-500 font-medium truncate">Expenditures</span>
+                                </div>
+                               <span className="text-metric-support font-semibold font-mono flex-shrink-0 text-zinc-700">{peso(exp.gfExpenditure)}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f59e0b" }} />
+                                  <span className="text-xs text-zinc-500 font-medium truncate">20% MDF</span>
+                                </div>
+                                <span className="text-metric-support font-semibold font-mono flex-shrink-0 text-zinc-700">{peso(mdfPieValue)}</span>
+                              </div>
+                              <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-2 py-1.5 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">5% LDRRMF</span>
+                                  </div>
+                                  <span className="text-[10px] font-semibold font-mono text-zinc-500">{peso(ldrrmfPieTotal)}</span>
+                                </div>
+                                <div className="flex items-center justify-between pl-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
+                                    <span className="text-[10px] text-zinc-400">30% QRF</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono text-zinc-500">{peso(qrf)}</span>
+                                </div>
+                                <div className="flex items-center justify-between pl-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
+                                    <span className="text-[10px] text-zinc-400">70% Pre-Disaster</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono text-zinc-500">{peso(ldrrmf70Actual)}</span>
+                                </div>
+                              </div>
+                              <div className={cn("rounded-lg border px-2 py-1.5", gfUnap >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981" }} />
+                                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
+                                    Unappropriated Balance
+                                  </p>
+                                </div>
+                                <p className={cn("text-sm font-semibold font-mono", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
+                                  {gfUnap >= 0 ? "+" : ""}{peso(gfUnap)}
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex-1 flex items-center justify-center opacity-20">
+                            <ChartBarIcon className="w-10 h-10 text-zinc-400" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -860,8 +990,8 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                           </div> */}
                           <div className="flex items-baseline gap-1">
                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-                              : <><p className="text-sm font-semibold text-rose-700">{peso(qrf)}</p>
-                                  <p className="text-[10px] text-zinc-400">/ {peso(qrf)}</p></>}
+                              : <><p className="text-section-title text-rose-700">{peso(qrf)}</p>
+                                  <p className="text-subtitle text-zinc-400">/ {peso(qrf)}</p></>}
                           </div>
                           <p className="text-[10px] text-zinc-400">reserved · not yet disbursed</p>
                           <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
@@ -870,7 +1000,7 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-zinc-400">Available</span>
-                            <span className="text-[10px] font-semibold font-mono text-rose-500">{peso(qrf)}</span>
+                            <span className="text-subtitle font-bold font-mono text-rose-500">{peso(qrf)}</span>
                           </div>
                         </div>
                         <div className="px-4 py-3 space-y-1.5">
@@ -882,8 +1012,8 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                           </div>
                           <div className="flex items-baseline gap-1">
                             {allocLoading ? <Shimmer className="h-4 w-16 rounded" />
-                              : <><p className="text-sm font-semibold text-orange-700">{peso(ldrrmf70Actual)}</p>
-                                  <p className="text-[10px] text-zinc-400">/ {peso(predis)}</p></>}
+                              : <><p className="text-section-title text-orange-700">{peso(ldrrmf70Actual)}</p>
+                                  <p className="text-subtitle text-zinc-400">/ {peso(predis)}</p></>}
                           </div>
                           <p className="text-[10px] text-zinc-400">allocated</p>
                           <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
@@ -892,13 +1022,64 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-zinc-400">Remaining</span>
-                            <span className="text-[10px] font-semibold font-mono text-orange-500">{peso(ldrrmf70Remaining)}</span>
+                            <span className="text-subtitle font-bold font-mono text-orange-500">{peso(ldrrmf70Remaining)}</span>
                           </div>
                           <p className="text-[10px] text-zinc-300">JMC 2013-1 · R.A. 10121</p>
                         </div>
                       </div>
                     </div>
                   )}
+                </div>
+              </Card>
+
+              {/* Dept Expenditure Chart */}
+              {/* <Card style={st(6)} className="p-5"> */}
+              {/* Overall Income Fund */}
+              <Card style={st(6)} className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                    <BanknotesIcon className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className="text-eyebrow">Combined Revenue</p>
+                    <p className="text-section-title mt-0.5">Overall Income Fund</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                    <p className="text-eyebrow text-zinc-500 mb-2">GF Local Source</p>
+                    <Money v={!fundsReady ? null : gfLocalSource} loading={!fundsReady} size="md" />
+                    <p className="text-[9px] text-zinc-400 mt-1">Tax + Non-Tax only</p>
+                  </div>
+                  <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                    <p className="text-eyebrow text-zinc-500 mb-2">Special Accounts</p>
+                    <Money v={!fundsReady ? null : specialTotal} loading={!fundsReady} size="md" />
+                    <p className="text-[9px] text-zinc-400 mt-1">SH + OCC + PM</p>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
+                    <p className="text-eyebrow text-zinc-500 mb-2">Overall Local Source</p>
+                    <Money
+                      v={!fundsReady ? null : overallTotal}
+                      loading={!fundsReady}
+                      size="md"
+                      cls="text-zinc-700"
+                      sub="text-zinc-400"
+                    />
+                    <p className="text-[9px] text-zinc-400 mt-1">GF Local Source + Special Accounts</p>
+                  </div>
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-3.5">
+                    <p className="text-eyebrow text-indigo-600 mb-2">Overall Estimated Income</p>
+                    <Money
+                      v={!fundsReady ? null : overallEstimatedIncome}
+                      loading={!fundsReady}
+                      size="lg"
+                      cls="text-indigo-700"
+                      sub="text-indigo-400"
+                    />
+                    <p className="text-[9px] text-indigo-400 mt-1">GF Total (incl. NTA) + Special Accounts</p>
+                  </div>
                 </div>
               </Card>
 
@@ -957,7 +1138,7 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                 )}
               </Card>
 
-              <BreakdownCard activePlan={activePlan} style={st(7)} />
+              {/* <BreakdownCard activePlan={activePlan} style={st(7)} /> */}
             </div>
 
             {/* RIGHT */}
@@ -1040,7 +1221,8 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                         { label: "Public Market",  abbr: "PM",  data: pm,  expV: pmExpTotal,  cal: pmCal,  accentColor: "#f59e0b" },
                       ].map(({ label, abbr, data, expV, cal, accentColor }) => {
                         const rev  = data?.total ?? 0;
-                        const unap = Math.max(0, rev - expV - cal);
+                        // const unap = Math.max(0, rev - expV - cal);
+                        const unap = rev - expV - cal;
                         const uPos = unap >= 0;
                         const qrfV = cal * 0.30;
                         const preV = cal * 0.70;
@@ -1114,8 +1296,10 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                 </div>
               </Card>
 
+              {/* Recent Activity */}
+              <RecentActivityCard style={st(8)} activePlanYear={activePlan?.year ?? null} />
               {/* Quick Links */}
-              <Card style={st(8)} className="p-5">
+              {/* <Card style={st(8)} className="p-5">
                 <p className="text-eyebrow mb-4">Quick Links</p>
                 <div className="grid grid-cols-4 gap-2">
                   {quickLinks.map(link => (
@@ -1128,7 +1312,7 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
                     </button>
                   ))}
                 </div>
-              </Card>
+              </Card> */}
 
             </div>
           </div>

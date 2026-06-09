@@ -6,7 +6,8 @@ import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface FundData { total: number; nta: number; nonTaxRevenue: number }
+// export interface FundData { total: number; nta: number; nonTaxRevenue: number }
+export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number }
 export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
 
 export interface SpecialAccountExpenditures {
@@ -17,24 +18,58 @@ export interface SpecialAccountExpenditures {
 }
 
 const SPECIAL_CAT_ID = 4;
-const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0 };
+// const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0 };
+const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0 }
 const EMPTY_SPECIAL_EXP: SpecialAccountExpenditures = { sh: 0, occ: 0, pm: 0, combined: 0 };
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
+
+// export async function fetchFund(source: string): Promise<FundData> {
+//   try {
+//     const res = await API.get('/income-fund', { params: { source } });
+//     const rows: any[] = res.data?.data ?? [];
+
+//     if (rows.length === 0) return EMPTY_FUND;
+
+//     const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
+//     const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
+//     const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
+//     const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
+//     const ntrParent = rows.find((r: any) => /non[\s-]*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
+
+//     let nonTaxRevenue = 0;
+//     if (ntrParent) {
+//       const stack = [ntrParent.id];
+//       while (stack.length) {
+//         const pid = stack.pop()!;
+//         rows.forEach((r: any) => {
+//           if (r.parent_id === pid) {
+//             if (!parentIds.has(r.id)) nonTaxRevenue += parseFloat(r.proposed) || 0;
+//             else stack.push(r.id);
+//           }
+//         });
+//       }
+//     }
+
+//     return { total, nta: parseFloat(ntaRow?.proposed) || 0, nonTaxRevenue };
+//   } catch {
+//     return EMPTY_FUND;
+//   }
+// }
 
 export async function fetchFund(source: string): Promise<FundData> {
   try {
     const res = await API.get('/income-fund', { params: { source } });
     const rows: any[] = res.data?.data ?? [];
-
     if (rows.length === 0) return EMPTY_FUND;
 
     const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
     const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
     const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
     const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
-    const ntrParent = rows.find((r: any) => /non[\s-]*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
 
+    // Non-Tax Revenue subtree
+    const ntrParent = rows.find((r: any) => /non[\s-]*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
     let nonTaxRevenue = 0;
     if (ntrParent) {
       const stack = [ntrParent.id];
@@ -49,7 +84,28 @@ export async function fetchFund(source: string): Promise<FundData> {
       }
     }
 
-    return { total, nta: parseFloat(ntaRow?.proposed) || 0, nonTaxRevenue };
+    // Tax Revenue subtree
+    const taxParent = rows.find((r: any) => /^(?!.*non).*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
+    let taxRevenue = 0;
+    if (taxParent) {
+      const stack = [taxParent.id];
+      while (stack.length) {
+        const pid = stack.pop()!;
+        rows.forEach((r: any) => {
+          if (r.parent_id === pid) {
+            if (!parentIds.has(r.id)) taxRevenue += parseFloat(r.proposed) || 0;
+            else stack.push(r.id);
+          }
+        });
+      }
+    }
+
+    return {
+      total,
+      nta: parseFloat(ntaRow?.proposed) || 0,
+      nonTaxRevenue,
+      localSource: taxRevenue + nonTaxRevenue,
+    };
   } catch {
     return EMPTY_FUND;
   }

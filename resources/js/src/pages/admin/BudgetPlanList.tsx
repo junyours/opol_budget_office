@@ -51,11 +51,10 @@ const BudgetPlanList: React.FC = () => {
 //   const [plans, setPlans]     = useState<BudgetPlanWithOpen[]>([]);
 //   const [loading, setLoading] = useState(true);
 const { data: plans = [], isLoading: loading, refetch: refetchPlans } = useQuery<BudgetPlanWithOpen[]>({
-    queryKey: ['budget-plans'],
-    queryFn:  () => API.get('/budget-plans').then(r =>
-      (r.data.data as BudgetPlanWithOpen[]).sort((a, b) => b.year - a.year)
-    ),
-  });
+  queryKey: ['budget-plans'],
+  queryFn: () => API.get('/budget-plans').then(r => r.data.data as BudgetPlanWithOpen[]),
+  select: (data) => [...data].sort((a, b) => b.year - a.year),
+});
 
   // ── Create dialog ──────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen]   = useState(false);

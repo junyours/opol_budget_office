@@ -728,7 +728,7 @@ const BudgetPlanDetail: React.FC = () => {
     Form 3 — Personnel
   </TabsTrigger>
   <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-    Form 4 — AIP Programs
+    Form 4 — Special Programs
   </TabsTrigger>
 </TabsList>
 

@@ -357,9 +357,8 @@ useEffect(() => {
   // ── TanStack fetch ─────────────────────────────────────────────────────────
   const { data: queryData, isLoading: loading } = useQuery<IncomeFundResponse>({
     queryKey: ['income-fund', currentSource],
-    queryFn:  () => API.get<IncomeFundResponse>(`/income-fund?source=${currentSource}`)
+    queryFn: () => API.get<IncomeFundResponse>(`/income-fund?source=${currentSource}`)
       .then(r => r.data),
-    staleTime: 5 * 60 * 1000,
   });
 
   // ── Sync query data → local rows state ────────────────────────────────────

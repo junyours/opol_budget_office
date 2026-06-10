@@ -106,10 +106,10 @@ const BagOngOpol: React.FC = () => {
             <HoverImg src="/images/2.png" alt="Smart Services" eager />
           </div>
 
-          {/* Row 3 — pillars, slide in from left | eager: above the fold */}
-          <div className="flex gap-1" style={anim("left", 750)}>
+          {/* Row 3 — pillars, each slides in from left with staggered delay */}
+          <div className="flex gap-1">
             {[3, 4, 5, 6, 7].map((n, i) => (
-              <div key={i} className="flex-1 min-w-0">
+              <div key={i} className="flex-1 min-w-0" style={anim("left", 750 + i * 120)}>
                 <HoverImg src={`/images/${n}.png`} alt={`Pillar ${i + 1}`} eager />
               </div>
             ))}

@@ -118,12 +118,18 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
   const diff         = currentTotal - pastTotal;
   const diffPct      = pctOf(pastTotal, diff);
   const threshold    = pastTotal * 1.1;
-  const isOver       = currentTotal > threshold;
+  const isOver       = pastTotal > 0 && currentTotal > threshold;
+  const excess       = isOver ? currentTotal - threshold : 0;
   const prevYear     = Number(plan.budget_plan?.year) - 1;
   const currYear     = plan.budget_plan?.year;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+    <div className={cn(
+      'rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-center gap-3',
+      isOver
+        ? 'bg-red-50 border-red-300'
+        : 'bg-white border-gray-200',
+    )}>
 
       {/* ── Appropriation card (blue) ── */}
       <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
@@ -145,35 +151,19 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
       {/* Arrow */}
       <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
 
-      {/* ── Proposed card (orange or red if over) ── */}
-      <div className={cn(
-        'flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border',
-        isOver
-          ? 'bg-red-50 border-red-200'
-          : 'bg-orange-50 border-orange-200',
-      )}>
-        <span className={cn(
-          'text-[10px] font-semibold uppercase tracking-widest',
-          isOver ? 'text-red-400' : 'text-orange-400',
-        )}>
+     {/* ── Proposed card (always orange) ── */}
+      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border bg-orange-50 border-orange-200">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
           Proposed {currYear}
         </span>
         {aipLoading ? (
           <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
         ) : (
-          <span className={cn(
-            'text-[18px] font-bold font-mono tabular-nums leading-tight',
-            isOver ? 'text-red-700' : 'text-orange-700',
-          )}>
+          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-orange-700">
             {fmtP(currentTotal)}
           </span>
         )}
-        <span className={cn(
-          'text-[11px]',
-          isOver ? 'text-red-300' : 'text-orange-300',
-        )}>
-          Current proposal
-        </span>
+        <span className="text-[11px] text-orange-300">Current proposal</span>
       </div>
 
       {/* ── Inc / Dec chip ── */}
@@ -185,16 +175,27 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
           : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
           :               'bg-gray-100 border-gray-200 text-gray-500',
         )}>
-          {diff > 0
-            ? <ArrowTrendingUpIcon   className="w-3.5 h-3.5" />
+          {isOver
+            ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+            : diff > 0
+            ? <ArrowTrendingUpIcon     className="w-3.5 h-3.5" />
             : diff < 0
-            ? <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
-            : <MinusIcon            className="w-3.5 h-3.5" />
+            ? <ArrowTrendingDownIcon   className="w-3.5 h-3.5" />
+            : <MinusIcon               className="w-3.5 h-3.5" />
           }
-          <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
-          <span className="opacity-60">
-            ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
-          </span>
+          {isOver ? (
+            <>
+              <span>+{fmtP(excess)} over ceiling</span>
+              <span className="opacity-60">({((excess / threshold) * 100).toFixed(2)}% excess)</span>
+            </>
+          ) : (
+            <>
+              <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
+              <span className="opacity-60">
+                ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+              </span>
+            </>
+          )}
         </div>
       )}
 
@@ -204,18 +205,21 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
       {!aipLoading && (
         <div className="flex items-start gap-2 flex-shrink-0">
           {isOver ? (
-            <>
-              <ExclamationTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2">
+              <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-medium text-red-600">
-                  Exceeds 10% ceiling
+                <span className="text-[12px] font-semibold text-red-700">
+                  Above 10% Appropriation Ceiling
                 </span>
-                <span className="text-[11px] text-gray-400">
-                  Max allowed:{' '}
-                  <span className="font-mono font-medium text-red-500">{fmtP(threshold)}</span>
+                <span className="text-[11px] text-red-500">
+                  Ceiling:{' '}
+                  <span className="font-mono font-medium">{fmtP(threshold)}</span>
+                </span>
+                <span className="text-[10px] text-red-400 italic">
+                  Proposed amount exceeds the 10% growth ceiling.
                 </span>
               </div>
-            </>
+            </div>
           ) : pastTotal === 0 ? (
             <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
           ) : (
@@ -223,11 +227,14 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
               <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
               <div className="flex flex-col gap-0.5">
                 <span className="text-[12px] font-medium text-emerald-600">
-                  Within 10% ceiling
+                  Within 10% Appropriation Ceiling
                 </span>
                 <span className="text-[11px] text-gray-400">
-                  Max allowed:{' '}
+                  Suggested limit:{' '}
                   <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
+                </span>
+                <span className="text-[10px] text-gray-400 italic">
+                  For reference only — final budget is at the department head's discretion.
                 </span>
               </div>
             </>
@@ -883,10 +890,16 @@ const filteredPlans = useMemo(() => {
             //     <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
             ) : (
                 <>
-                  <BudgetComparisonBanner
+                  {/* <BudgetComparisonBanner
                     plan={selectedPlan}
                     pastYearPlan={pastYearPlan}
-                  />
+                  /> */}
+                  {!loadingPast && (
+                    <BudgetComparisonBanner
+                      plan={selectedPlan}
+                      pastYearPlan={pastYearPlan}
+                    />
+                  )}
 
                   <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
                   <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 mb-4">

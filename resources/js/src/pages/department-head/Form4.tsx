@@ -19,6 +19,16 @@ import { Badge } from '@/src/components/ui/badge';
 import { MagnifyingGlassIcon, PlusCircleIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/src/lib/utils';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/src/components/ui/alert-dialog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,8 +82,10 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [items, setItems]                       = useState<DepartmentBudgetPlanForm4Item[]>([]);
   const [existingPrograms, setExistingPrograms] = useState<AIPProgram[]>([]);
   const [loading, setLoading]                   = useState(true);
-  const [seeding, setSeeding]                   = useState(false);
+//   const [seeding, setSeeding]                   = useState(false);
 
+const [seeding, setSeeding]                   = useState(false);
+  const seededPlanId = useRef<number | null>(null);
 //    const [validProgramIds, setValidProgramIds] = useState<Set<number>>(new Set());
 
   const [modalOpen, setModalOpen]             = useState(false);
@@ -85,8 +97,12 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [saving, setSaving]                   = useState(false);
 
   // ── Context menu ────────────────────────────────────────────────────────────
-  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
+//   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
+//   const ctxRef = useRef<HTMLDivElement>(null);
+const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DepartmentBudgetPlanForm4Item | null>(null);
+  const [deleteChecking, setDeleteChecking] = useState(false);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -303,8 +319,15 @@ const seedPastPrograms = async (
 //     seedPastPrograms(items, existingPrograms);
 //     // eslint-disable-next-line react-hooks/exhaustive-deps
 //   }, [loading]);
+// useEffect(() => {
+//     if (loading) return;
+//     seedPastPrograms(items, existingPrograms);
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [loading]);
 useEffect(() => {
     if (loading) return;
+    if (seededPlanId.current === plan.dept_budget_plan_id) return;
+    seededPlanId.current = plan.dept_budget_plan_id;
     seedPastPrograms(items, existingPrograms);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -416,14 +439,138 @@ useEffect(() => {
     }
   };
 
-  const handleDelete = async (itemId: number) => {
+//   const handleDelete = async (itemId: number) => {
+//     setCtxMenu(null);
+//     if (!confirm('Delete this item?')) return;
+//     try {
+//       await API.delete(`/form4-items/${itemId}`);
+//       await fetchItems();
+//       toast.success('Item deleted.');
+//     } catch (err) {
+//       toast.error('Failed to delete item.');
+//     }
+//   };
+// const handleDelete = async (itemId: number) => {
+//     setCtxMenu(null);
+//     const item = items.find(i => i.dept_bp_form4_item_id === itemId);
+//     if (!item) return;
+
+//     // Block if current year has amounts
+//     if (item.total_amount > 0) {
+//       toast.warning('Cannot delete — this program has a proposed amount. Set all amounts to 0 first.');
+//       return;
+//     }
+
+//     // Block if past years have amounts (check via API)
+//     const year   = Number(plan.budget_plan?.year);
+//     const deptId = plan.dept_id;
+//     if (year && deptId) {
+//       try {
+//         const [appPlanRes, oblPlanRes] = await Promise.allSettled([
+//           API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 1}`),
+//           API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 2}`),
+//         ]);
+
+//         if (appPlanRes.status === 'fulfilled') {
+//           const appPlanId = appPlanRes.value.data.data?.dept_budget_plan_id;
+//           if (appPlanId) {
+//             const res = await API.get('/form4-items', { params: { budget_plan_id: appPlanId } });
+//             const match = (res.data.data ?? []).find((pi: any) => Number(pi.aip_program_id) === Number(item.aip_program_id));
+//             if (match && (parseFloat(match.total_amount) || 0) > 0) {
+//               toast.warning('Cannot delete — this program has appropriation data in the prior year.');
+//               return;
+//             }
+//           }
+//         }
+
+//         if (oblPlanRes.status === 'fulfilled') {
+//           const oblPlanId = oblPlanRes.value.data.data?.dept_budget_plan_id;
+//           if (oblPlanId) {
+//             const res = await API.get('/form4-items', { params: { budget_plan_id: oblPlanId } });
+//             const match = (res.data.data ?? []).find((pi: any) => Number(pi.aip_program_id) === Number(item.aip_program_id));
+//             if (match && ((parseFloat(match.total_amount) || 0) > 0 || (parseFloat(match.obligation_amount) || 0) > 0)) {
+//               toast.warning('Cannot delete — this program has obligation data in the obligation year.');
+//               return;
+//             }
+//           }
+//         }
+//       } catch {
+//         // If we can't verify past years, allow delete to proceed
+//       }
+//     }
+
+//     if (!confirm('Delete this item?')) return;
+//     try {
+//       await API.delete(`/form4-items/${itemId}`);
+//       await fetchItems();
+//       toast.success('Item deleted.');
+//     } catch (err) {
+//       toast.error('Failed to delete item.');
+//     }
+//   };
+
+const handleDeleteRequest = async (itemId: number) => {
     setCtxMenu(null);
-    if (!confirm('Delete this item?')) return;
+    const item = items.find(i => i.dept_bp_form4_item_id === itemId);
+    if (!item) return;
+
+    if (item.total_amount > 0) {
+      toast.warning('Cannot delete — this program has a proposed amount. Set all amounts to 0 first.');
+      return;
+    }
+
+    const year   = Number(plan.budget_plan?.year);
+    const deptId = plan.dept_id;
+    if (year && deptId) {
+      setDeleteChecking(true);
+      try {
+        const [appPlanRes, oblPlanRes] = await Promise.allSettled([
+          API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 1}`),
+          API.get(`/department-budget-plans/by-dept-year/${deptId}/${year - 2}`),
+        ]);
+
+        if (appPlanRes.status === 'fulfilled') {
+          const appPlanId = appPlanRes.value.data.data?.dept_budget_plan_id;
+          if (appPlanId) {
+            const res = await API.get('/form4-items', { params: { budget_plan_id: appPlanId } });
+            const match = (res.data.data ?? []).find((pi: any) => Number(pi.aip_program_id) === Number(item.aip_program_id));
+            if (match && (parseFloat(match.total_amount) || 0) > 0) {
+              toast.warning('Cannot delete — this program has appropriation data in the prior year.');
+              return;
+            }
+          }
+        }
+
+        if (oblPlanRes.status === 'fulfilled') {
+          const oblPlanId = oblPlanRes.value.data.data?.dept_budget_plan_id;
+          if (oblPlanId) {
+            const res = await API.get('/form4-items', { params: { budget_plan_id: oblPlanId } });
+            const match = (res.data.data ?? []).find((pi: any) => Number(pi.aip_program_id) === Number(item.aip_program_id));
+            if (match && ((parseFloat(match.total_amount) || 0) > 0 || (parseFloat(match.obligation_amount) || 0) > 0)) {
+              toast.warning('Cannot delete — this program has obligation data in the obligation year.');
+              return;
+            }
+          }
+        }
+      } catch {
+        // If we can't verify past years, allow delete to proceed
+      } finally {
+        setDeleteChecking(false);
+      }
+    }
+
+    setDeleteTarget(item);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteTarget) return;
+    const itemId = deleteTarget.dept_bp_form4_item_id;
+    setDeleteTarget(null);
     try {
       await API.delete(`/form4-items/${itemId}`);
       await fetchItems();
       toast.success('Item deleted.');
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete item.');
     }
   };
@@ -587,12 +734,12 @@ useEffect(() => {
             <PencilSquareIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
             Edit Item
           </button>
-          <button
-            onClick={() => handleDelete(ctxMenu.item.dept_bp_form4_item_id)}
+         <button
+            onClick={() => handleDeleteRequest(ctxMenu.item.dept_bp_form4_item_id)}
             className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
           >
             <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
-            Delete
+            {deleteChecking ? 'Checking…' : 'Delete'}
           </button>
         </div>
       )}
@@ -789,6 +936,41 @@ useEffect(() => {
           )}
         </DialogContent>
       </Dialog>
+    {/* ── Delete Confirm Dialog ── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+              Delete this program?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              <span className="font-medium text-gray-700">
+                {deleteTarget?.aip_reference_code
+                  ? `[${deleteTarget.aip_reference_code}] `
+                  : ''}
+                {deleteTarget?.program_description}
+              </span>{' '}
+              will be permanently removed from this budget plan. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">
+                Cancel
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleDeleteConfirmed}
+              >
+                Delete
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -21,9 +21,22 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+// import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+// import { cn } from "@/src/lib/utils";
+// import { useCalamityFund } from "../../hooks/useCalamityFund";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/src/lib/utils";
 import { useCalamityFund } from "../../hooks/useCalamityFund";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -270,6 +283,16 @@ const Form2: React.FC<Form2Props> = ({
         new Map(),
     );
 
+    // const [modalState, setModalState] = useState<{
+    //     isOpen: boolean;
+    //     classificationId: number;
+    //     classificationName: string;
+    // } | null>(null);
+    // const [pastModalState, setPastModalState] = useState<{
+    //     isOpen: boolean;
+    //     classificationId: number;
+    //     classificationName: string;
+    // } | null>(null);
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
         classificationId: number;
@@ -280,6 +303,7 @@ const Form2: React.FC<Form2Props> = ({
         classificationId: number;
         classificationName: string;
     } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<ItemWithMeta | null>(null);
 
     // ── Refs (never cause re-renders — used in async handlers) ────────────────
 
@@ -312,13 +336,21 @@ const Form2: React.FC<Form2Props> = ({
     const currYear = plan.budget_plan?.year;
 
 
+    // const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
+
     const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
+    const aipFetchKey = useRef<string>('');
 
     // ── Effect: Load AIP items + obligation-year obligations ──────────────────
 
     useEffect(() => {
+    // const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
+    // const appPlanId = pastYearPlan?.dept_budget_plan_id; // ← ADD
     const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
-    const appPlanId = pastYearPlan?.dept_budget_plan_id; // ← ADD
+    const appPlanId = pastYearPlan?.dept_budget_plan_id;
+    const fetchKey = `${plan.dept_budget_plan_id}-${oblPlanId ?? 0}-${appPlanId ?? 0}`;
+    if (aipFetchKey.current === fetchKey) return;
+    aipFetchKey.current = fetchKey;
 
     const currentReq = API.get("/form4-items", {
         params: { budget_plan_id: plan.dept_budget_plan_id },
@@ -881,26 +913,40 @@ const Form2: React.FC<Form2Props> = ({
     // ── Handlers: delete item ─────────────────────────────────────────────────
 
     const handleDeleteItem = useCallback(
-        async (itemId: number, expenseItemId: number) => {
+        (itemId: number, expenseItemId: number) => {
             const item = items.find((i) => i.dept_bp_form2_item_id === itemId);
             if (!item) return;
-            if (item.pastTotal > 0) {
-                toast.warning("Has past year data. Set proposed to 0 instead.");
+            if (Number(item.total_amount) > 0) {
+                toast.warning("Cannot delete — this item has a proposed amount. Set it to 0 first.");
                 return;
             }
-            if (!confirm("Remove this item?")) return;
-            try {
-                await API.delete(
-                    `/department-budget-plans/${plan.dept_budget_plan_id}/items/${itemId}`,
-                );
-                toast.success("Item deleted");
-                onItemUpdate();
-            } catch {
-                toast.error("Failed to delete item.");
+            if (item.pastTotal > 0) {
+                toast.warning("Cannot delete — this item has appropriation data in the prior year.");
+                return;
             }
+            if (item.pastObligation > 0) {
+                toast.warning("Cannot delete — this item has obligation data in the obligation year.");
+                return;
+            }
+            setDeleteTarget(item);
         },
-        [items, plan.dept_budget_plan_id, onItemUpdate],
+        [items],
     );
+
+    const handleDeleteConfirmed = useCallback(async () => {
+        if (!deleteTarget) return;
+        const itemId = deleteTarget.dept_bp_form2_item_id;
+        setDeleteTarget(null);
+        try {
+            await API.delete(
+                `/department-budget-plans/${plan.dept_budget_plan_id}/items/${itemId}`,
+            );
+            toast.success("Item deleted");
+            onItemUpdate();
+        } catch {
+            toast.error("Failed to delete item.");
+        }
+    }, [deleteTarget, plan.dept_budget_plan_id, onItemUpdate]);
 
     // ── Handlers: recommendation (regular items) ──────────────────────────────
 
@@ -2753,6 +2799,38 @@ const Form2: React.FC<Form2Props> = ({
                     }}
                 />
             )}
+
+            <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
+                <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+                            Remove this item?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm text-gray-500">
+                            <span className="font-medium text-gray-700">
+                                {deleteTarget?.expense_item?.expense_class_item_name ?? "This item"}
+                            </span>{' '}
+                            will be permanently removed from this budget plan. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel asChild>
+                            <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">
+                                Cancel
+                            </Button>
+                        </AlertDialogCancel>
+                        <AlertDialogAction asChild>
+                            <Button
+                                size="sm"
+                                className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                                onClick={handleDeleteConfirmed}
+                            >
+                                Remove
+                            </Button>
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {pastModalState && pastYearPlan && (
                 <AddItemModal

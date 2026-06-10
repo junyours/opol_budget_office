@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
+// import { useActiveBudgetPlan } from '@/src/hooks/useActiveBudgetPlan';
+import { useQuery } from '@tanstack/react-query';
 import { useActiveBudgetPlan } from '@/src/hooks/useActiveBudgetPlan';
 import { useSalaryMatrix } from '@/src/hooks/useSalaryMatrix';
 import API from '@/src/services/api';
@@ -410,13 +412,16 @@ const isViewer = user?.role === 'viewer';
 const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const { activeVersion, matrix, loading: matrixLoading, refresh } = useSalaryMatrix();
 
-  const [departments,       setDepartments]       = useState<Department[]>([]);
-  const [assignments,       setAssignments]       = useState<ApiAssignment[]>([]);
-  const [expenseClassItems, setExpenseClassItems] = useState<ExpenseClassItem[]>([]);
-  const [deptBudgetPlans,   setDeptBudgetPlans]   = useState<DeptBudgetPlan[]>([]);
-  const [loading,           setLoading]           = useState(true);
-  const [saving,            setSaving]            = useState(false);
-  const [activeTab,         setActiveTab]         = useState<string>('');
+//   const [departments,       setDepartments]       = useState<Department[]>([]);
+//   const [assignments,       setAssignments]       = useState<ApiAssignment[]>([]);
+//   const [expenseClassItems, setExpenseClassItems] = useState<ExpenseClassItem[]>([]);
+//   const [deptBudgetPlans,   setDeptBudgetPlans]   = useState<DeptBudgetPlan[]>([]);
+//   const [loading,           setLoading]           = useState(true);
+//   const [saving,            setSaving]            = useState(false);
+//   const [activeTab,         setActiveTab]         = useState<string>('');
+const [loading,   setLoading]   = useState(false); // kept for compat, no longer used for fetching
+  const [saving,    setSaving]    = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('');
 
   // Track tab changes for re-triggering row animations
   const [tabAnimKey, setTabAnimKey] = useState(0);
@@ -429,7 +434,16 @@ const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const debouncedSearchMap           = useDebounce(searchRaw, 250);
   const [pageMap, setPageMap]        = useState<Record<string, number>>({});
 
-  const prevVersionId = useRef<number | null>(null);
+//   const prevVersionId = useRef<number | null>(null);
+// useEffect(() => {
+//     if (departments.length > 0 && !activeTab) {
+//       setActiveTab(departments[0].dept_id.toString());
+//     }
+//   }, [departments]);
+
+//   const prevVersionId = useRef<number | null>(null);
+const prevVersionId = useRef<number | null>(null);
+
   const [detailRow, setDetailRow] = useState<PersonnelServiceRow | null>(null);
   const [deptDetailDept, setDeptDetailDept] = useState<number | null>(null);
 
@@ -455,25 +469,61 @@ const handleSettingsChange = async (s: PsSettings) => {
     setTabAnimKey(k => k + 1);
   };
 
+//   useEffect(() => {
+//     refresh();
+//     (async () => {
+//       setLoading(true);
+//       try {
+//         const [dR, aR, eR] = await Promise.all([
+//           API.get('/departments'),
+//           API.get('/plantilla-assignments'),
+//           API.get('/expense-class-items'),
+//         ]);
+//         const depts: Department[] = dR.data.data || [];
+//         setDepartments(depts);
+//         setAssignments(aR.data.data || []);
+//         setExpenseClassItems(eR.data.data || []);
+//         if (depts.length > 0) setActiveTab(depts[0].dept_id.toString());
+//       } catch { toast.error('Failed to load personnel data'); }
+//       finally { setLoading(false); }
+//     })();
+//   }, []);
+
+useEffect(() => { refresh(); }, []);
+
+  const { data: departments = [],      isLoading: deptsLoading    } = useQuery<Department[]>({
+    queryKey: ['departments'],
+    queryFn:  () => API.get('/departments').then(r => r.data?.data ?? []),
+  });
+
+  const { data: assignments = [],      isLoading: assignLoading   } = useQuery<ApiAssignment[]>({
+    queryKey: ['plantilla-assignments'],
+    queryFn:  () => API.get('/plantilla-assignments').then(r => r.data?.data ?? []),
+  });
+
+  const { data: deptBudgetPlans = [],  isLoading: deptPlansLoading } = useQuery<DeptBudgetPlan[]>({
+    queryKey: ['dept-budget-plans', activePlan?.budget_plan_id],
+    queryFn:  () => API.get('/department-budget-plans', {
+      params: { 'filter[budget_plan_id]': activePlan!.budget_plan_id },
+    }).then(r => r.data?.data ?? []),
+    enabled: !!activePlan?.budget_plan_id,
+  });
+
+  // Fetched lazily — only needed when Save is clicked
+//   const fetchExpenseClassItems = async (): Promise<ExpenseClassItem[]> => {
+//     const r = await API.get('/expense-class-items');
+//     return r.data?.data ?? [];
+//   };
+const fetchExpenseClassItems = async (): Promise<ExpenseClassItem[]> => {
+    const r = await API.get('/expense-class-items');
+    return r.data?.data ?? [];
+  };
+
   useEffect(() => {
-    refresh();
-    (async () => {
-      setLoading(true);
-      try {
-        const [dR, aR, eR] = await Promise.all([
-          API.get('/departments'),
-          API.get('/plantilla-assignments'),
-          API.get('/expense-class-items'),
-        ]);
-        const depts: Department[] = dR.data.data || [];
-        setDepartments(depts);
-        setAssignments(aR.data.data || []);
-        setExpenseClassItems(eR.data.data || []);
-        if (depts.length > 0) setActiveTab(depts[0].dept_id.toString());
-      } catch { toast.error('Failed to load personnel data'); }
-      finally { setLoading(false); }
-    })();
-  }, []);
+    if (departments.length > 0 && !activeTab) {
+      setActiveTab(departments[0].dept_id.toString());
+    }
+  }, [departments]);
 
   useEffect(() => {
     if (!activeVersion) return;
@@ -484,12 +534,12 @@ const handleSettingsChange = async (s: PsSettings) => {
     prevVersionId.current = newId;
   }, [activeVersion]);
 
-  useEffect(() => {
-    if (!activePlan) return;
-    API.get('/department-budget-plans', { params: { 'filter[budget_plan_id]': activePlan.budget_plan_id } })
-      .then(r => setDeptBudgetPlans(r.data?.data || []))
-      .catch(console.error);
-  }, [activePlan]);
+//   useEffect(() => {
+//     if (!activePlan) return;
+//     API.get('/department-budget-plans', { params: { 'filter[budget_plan_id]': activePlan.budget_plan_id } })
+//       .then(r => setDeptBudgetPlans(r.data?.data || []))
+//       .catch(console.error);
+//   }, [activePlan]);
 
   const salaryLookup = useMemo(() => {
     const map = new Map<string, number>();
@@ -499,10 +549,15 @@ const handleSettingsChange = async (s: PsSettings) => {
 
   const getSalary = (grade: number, step: number) => salaryLookup.get(`${grade}-${step}`) ?? 0;
 
-  const findExpenseItemId = (key: string): number | null => {
+//   const findExpenseItemId = (key: string): number | null => {
+//     const patterns = ALLOWANCE_TO_EXPENSE_ITEM[key];
+//     if (!patterns) return null;
+//     return expenseClassItems.find(i => patterns.some(p => i.expense_class_item_name.toLowerCase().includes(p.toLowerCase())))?.expense_class_item_id ?? null;
+//   };
+const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | null => {
     const patterns = ALLOWANCE_TO_EXPENSE_ITEM[key];
     if (!patterns) return null;
-    return expenseClassItems.find(i => patterns.some(p => i.expense_class_item_name.toLowerCase().includes(p.toLowerCase())))?.expense_class_item_id ?? null;
+    return items.find(i => patterns.some(p => i.expense_class_item_name.toLowerCase().includes(p.toLowerCase())))?.expense_class_item_id ?? null;
   };
 
   const departmentRows = useMemo(() => {
@@ -660,12 +715,19 @@ const handleSettingsChange = async (s: PsSettings) => {
     return out;
   }, [departmentRows, debouncedSearchMap]);
 
-  const handleSave = async () => {
+//   const handleSave = async () => {
+//     if (!activePlan) { toast.error('No active budget plan found.'); return; }
+//     const cDeptId = parseInt(activeTab);
+//     if (!cDeptId) { toast.error('No department selected.'); return; }
+//     const dbp = deptBudgetPlans.find(p => p.dept_id === cDeptId && p.budget_plan_id === activePlan.budget_plan_id);
+//     if (!dbp) { toast.error('No department budget plan found.'); return; }
+const handleSave = async () => {
     if (!activePlan) { toast.error('No active budget plan found.'); return; }
     const cDeptId = parseInt(activeTab);
     if (!cDeptId) { toast.error('No department selected.'); return; }
     const dbp = deptBudgetPlans.find(p => p.dept_id === cDeptId && p.budget_plan_id === activePlan.budget_plan_id);
     if (!dbp) { toast.error('No department budget plan found.'); return; }
+    const expenseClassItems = await fetchExpenseClassItems();
     const rows = departmentRows[cDeptId] || [];
     // const rows = departmentRows[cDeptId] || [];
     //if (rows.length === 0) { toast.warning('No personnel data to save.'); return; }
@@ -739,8 +801,10 @@ const handleSettingsChange = async (s: PsSettings) => {
       const exRes = await API.get(`/department-budget-plans/${dbp.dept_budget_plan_id}/items`);
       const exMap = new Map((exRes.data?.data || []).map((i: any) => [i.expense_item_id, i]));
 
-      await Promise.all(Object.entries(sums).map(async ([key, amount]) => {
-        const id = findExpenseItemId(key);
+    //   await Promise.all(Object.entries(sums).map(async ([key, amount]) => {
+    //     const id = findExpenseItemId(key);
+    await Promise.all(Object.entries(sums).map(async ([key, amount]) => {
+        const id = findExpenseItemId(expenseClassItems, key);
         if (!id) return;
         const ex = exMap.get(id) as any;
         if (ex) {
@@ -762,7 +826,8 @@ const handleSettingsChange = async (s: PsSettings) => {
   };
 
 //   if (planLoading || matrixLoading || loading) return <LoadingState />;
-if (planLoading || matrixLoading || loading || settingsLoading) return <LoadingState />;
+// if (planLoading || matrixLoading || loading || settingsLoading) return <LoadingState />;
+if (planLoading || matrixLoading || deptsLoading || assignLoading || deptPlansLoading || settingsLoading) return <LoadingState />;
 if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
   if (!activeVersion) return <div className="p-8 text-center text-yellow-600">No active salary version found.</div>;
 

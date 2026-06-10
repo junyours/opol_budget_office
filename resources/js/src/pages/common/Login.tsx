@@ -327,10 +327,9 @@ export default function Login() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
         .login-wrap * { box-sizing: border-box; }
-        .login-wrap { font-family: 'Geist', sans-serif; }
-        .login-mono  { font-family: 'Geist Mono', monospace; }
+.login-wrap { font-family: inherit; }
+.login-mono  { font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Menlo, monospace; }
         .login-anim { transition: opacity 0.48s cubic-bezier(.25,.8,.25,1), transform 0.48s cubic-bezier(.25,.8,.25,1); }
         .login-slide-left  { opacity: 0; transform: translateX(-22px); }
         .login-slide-right { opacity: 0; transform: translateX(22px);  }

@@ -350,9 +350,8 @@
         return (
             <>
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
-                [data-sidebar="sidebar"] { font-family: 'Geist', sans-serif; }
-                .sb-mono { font-family: 'Geist Mono', monospace; }
+                [data-sidebar="sidebar"] { font-family: inherit; }
+.sb-mono { font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Menlo, monospace; }
 
                 @keyframes sbIn {
                 from { opacity: 0; transform: translateX(-8px); }

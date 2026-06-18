@@ -37,6 +37,13 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* ── Department category colors ── */
+    --cat-1: 217 91% 60%;   /* blue   */
+    --cat-2: 330 81% 60%;   /* pink   */
+    --cat-3: 142 71% 45%;   /* green  */
+    --cat-4: 38  92% 50%;   /* amber  */
+    --cat-none: 220 9% 70%; /* gray fallback */
   }
 
   .dark {
@@ -269,3 +276,30 @@
   }
 
 }
+
+/* ── Department category border utilities ── */
+.border-cat-1 { border-color: hsl(var(--cat-1)); }
+.border-cat-2 { border-color: hsl(var(--cat-2)); }
+.border-cat-3 { border-color: hsl(var(--cat-3)); }
+.border-cat-4 { border-color: hsl(var(--cat-4)); }
+.border-cat-none { border-color: hsl(var(--cat-none)); }
+
+.bg-cat-1 { background-color: hsl(var(--cat-1)); }
+.bg-cat-2 { background-color: hsl(var(--cat-2)); }
+.bg-cat-3 { background-color: hsl(var(--cat-3)); }
+.bg-cat-4 { background-color: hsl(var(--cat-4)); }
+
+.text-cat-1 { color: hsl(var(--cat-1)); }
+.text-cat-2 { color: hsl(var(--cat-2)); }
+.text-cat-3 { color: hsl(var(--cat-3)); }
+.text-cat-4 { color: hsl(var(--cat-4)); }
+
+.bg-cat-1\/10 { background-color: hsl(var(--cat-1) / 0.10); }
+.bg-cat-2\/10 { background-color: hsl(var(--cat-2) / 0.10); }
+.bg-cat-3\/10 { background-color: hsl(var(--cat-3) / 0.10); }
+.bg-cat-4\/10 { background-color: hsl(var(--cat-4) / 0.10); }
+
+.bg-cat-1\/20 { background-color: hsl(var(--cat-1) / 0.20); }
+.bg-cat-2\/20 { background-color: hsl(var(--cat-2) / 0.20); }
+.bg-cat-3\/20 { background-color: hsl(var(--cat-3) / 0.20); }
+.bg-cat-4\/20 { background-color: hsl(var(--cat-4) / 0.20); }

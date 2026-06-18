@@ -63,7 +63,7 @@ const DepartmentSettings: React.FC = () => {
       setDept(found);
       setMandate(found?.mandate ?? "");
       setSpecialProvisions(found?.special_provisions ?? "");
-    //   setLogoPreview(found?.logo ? `/storage/${found.logo}` : null);
+    //  setLogoPreview(found?.logo ? `/storage/${found.logo}` : null);
         setLogoPreview(found?.logo ? `/storage/${found.logo}?t=${logoVersion}` : null);
 } catch {
       toast.error("Failed to load department details.");

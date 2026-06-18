@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import API from '../../services/api';
 import { ExpenseItem } from '../../types/api';
 import { Search, X } from 'lucide-react';
-// import { toast } from 'sonner'; // ✅ import toast
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -46,7 +45,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const handleAdd = async () => {
     if (!selectedItem || adding) return;
     setAdding(true);
-    try { 
+    try {
       await API.post(`/department-budget-plans/${planId}/items`, {
         expense_item_id: selectedItem.expense_class_item_id,
         sem1_amount: 0,

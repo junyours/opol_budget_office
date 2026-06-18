@@ -21,9 +21,6 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-// import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
-// import { cn } from "@/src/lib/utils";
-// import { useCalamityFund } from "../../hooks/useCalamityFund";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/src/lib/utils";
 import { useCalamityFund } from "../../hooks/useCalamityFund";
@@ -39,22 +36,16 @@ import {
 } from "@/src/components/ui/alert-dialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
 const PS_CLASS_ID = 1;
-
 const COL_WIDTHS = [110, 220, 100, 95, 95, 100, 100, 95, 75, 170];
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
-
-// const C_APP_SUB = "bg-blue-50 border-blue-200";
-// const C_APP_GT = "bg-blue-950/20 border-blue-900/40 text-blue-300";
 const C_APP_SUB = "bg-green-50 border-green-200";
 const C_APP_GT = "bg-green-950/20 border-green-900/40 text-green-300";
 const C_PRO_SUB = "bg-orange-50 border-orange-200";
 const C_PRO_GT = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 
 // ─── Table class tokens ───────────────────────────────────────────────────────
-
 const TH =
     "border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left";
 const TD = "px-3 py-2.5 text-[12px]";
@@ -139,6 +130,7 @@ interface Form2Props {
     isEditable: boolean;
     isAdmin?: boolean;
     onItemUpdate: () => void;
+    cardView?: boolean;
 }
 
 interface ItemWithMeta extends DepartmentBudgetPlanItem {
@@ -208,7 +200,7 @@ const SubHeader: React.FC<SubHeaderProps> = ({
                 className={cn(TH, "text-right border-t-2 border-gray-300")}
                 rowSpan={2}
             >
-                %
+                Percentage
             </th>
             {isAdmin && (
                 <th
@@ -238,6 +230,7 @@ const Form2: React.FC<Form2Props> = ({
     isEditable,
     isAdmin = false,
     onItemUpdate,
+    cardView = false,
 }) => {
     useEffect(() => {
         ensureAnim();
@@ -283,16 +276,6 @@ const Form2: React.FC<Form2Props> = ({
         new Map(),
     );
 
-    // const [modalState, setModalState] = useState<{
-    //     isOpen: boolean;
-    //     classificationId: number;
-    //     classificationName: string;
-    // } | null>(null);
-    // const [pastModalState, setPastModalState] = useState<{
-    //     isOpen: boolean;
-    //     classificationId: number;
-    //     classificationName: string;
-    // } | null>(null);
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
         classificationId: number;
@@ -335,17 +318,12 @@ const Form2: React.FC<Form2Props> = ({
     const prevYear = Number(plan.budget_plan?.year) - 1;
     const currYear = plan.budget_plan?.year;
 
-
-    // const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
-
     const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
     const aipFetchKey = useRef<string>('');
 
     // ── Effect: Load AIP items + obligation-year obligations ──────────────────
 
     useEffect(() => {
-    // const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
-    // const appPlanId = pastYearPlan?.dept_budget_plan_id; // ← ADD
     const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
     const appPlanId = pastYearPlan?.dept_budget_plan_id;
     const fetchKey = `${plan.dept_budget_plan_id}-${oblPlanId ?? 0}-${appPlanId ?? 0}`;
@@ -362,11 +340,11 @@ const Form2: React.FC<Form2Props> = ({
         ? API.get("/form4-items", { params: { budget_plan_id: appPlanId } })
         : Promise.resolve({ data: { data: [] as any[] } });
 
-    Promise.all([currentReq, obligationReq, appropriationReq]) // ← ADD
-        .then(([currentRes, oblRes, appRes]) => {               // ← ADD
+    Promise.all([currentReq, obligationReq, appropriationReq])
+        .then(([currentRes, oblRes, appRes]) => {
             const currentItems: any[] = currentRes.data.data ?? [];
             const obligationItems: any[] = oblRes.data.data ?? [];
-            const appropriationItems: any[] = appRes.data.data ?? []; // ← ADD
+            const appropriationItems: any[] = appRes.data.data ?? [];
 
             // existing oblByProgram map...
             const oblByProgram = new Map<number, { itemId: number; obligation: number }>();
@@ -377,7 +355,7 @@ const Form2: React.FC<Form2Props> = ({
                 });
             }
 
-            // ← ADD: appropriation map by aip_program_id
+            //  appropriation map by aip_program_id
             const appByProgram = new Map<number, { sem1: number; sem2: number; total: number }>();
             for (const pi of appropriationItems) {
                 appByProgram.set(pi.aip_program_id, {
@@ -389,7 +367,7 @@ const Form2: React.FC<Form2Props> = ({
 
             const merged = currentItems.map((item: any) => {
                 const obl = oblByProgram.get(item.aip_program_id);
-                const app = appByProgram.get(item.aip_program_id); // ← ADD
+                const app = appByProgram.get(item.aip_program_id);
                 return {
                     ...item,
                     ps_amount:          parseFloat(item.ps_amount)    || 0,
@@ -401,7 +379,7 @@ const Form2: React.FC<Form2Props> = ({
                     obligation_amount:  obl?.obligation ?? 0,
                     oblAipItemId:       obl?.itemId,
                     recommendation:     item.recommendation ?? null,
-                    // ← ADD appropriation year data
+                    // appropriation year data
                     app_sem1:  app?.sem1  ?? 0,
                     app_sem2:  app?.sem2  ?? 0,
                     app_total: app?.total ?? 0,
@@ -587,11 +565,6 @@ const Form2: React.FC<Form2Props> = ({
             return n;
         });
     }, []);
-
-    // const parseDigits = (rawValue: string): number => {
-    //     const digits = rawValue.replace(/[^0-9]/g, "");
-    //     return digits === "" ? 0 : parseInt(digits, 10);
-    // };
 
     const parseDigits = (rawValue: string): number => {
     const digits = rawValue.replace(/[^0-9.]/g, "");
@@ -1296,16 +1269,6 @@ const Form2: React.FC<Form2Props> = ({
         ],
     );
 
-    // const handleAipCommaInput = useCallback(
-    //     (id: number, rawValue: string) => {
-    //         const digits = rawValue.replace(/[^0-9]/g, "");
-    //         setDraft(`aip_${id}_obligation`, digits);
-    //         const num = digits === "" ? 0 : parseInt(digits, 10);
-    //         aipOblEditsRef.current.set(id, num);
-    //         setAipOblEdits((prev) => new Map(prev).set(id, num));
-    //     },
-    //     [setDraft],
-    // );
     const handleAipCommaInput = useCallback(
         (id: number, field: "obligation" | "sem1", rawValue: string) => {
             const digits = rawValue.replace(/[^0-9]/g, "");
@@ -1490,6 +1453,503 @@ const Form2: React.FC<Form2Props> = ({
                 </div>
             </div>
 
+            {/* {cardView ? (
+              <div className="p-4 flex flex-col gap-3">
+                {itemsByClassification.map((cls) => {
+                  if (cls.items.length === 0) return null;
+                  const label = cls.expense_class_name === 'Prop/Plant/Eqpt'
+                    ? 'Capital Outlay (CO)'
+                    : cls.expense_class_name;
+                  const clsPast = cls.items.reduce((s, i) => s + i.pastTotal, 0);
+                  const clsProp = cls.items.reduce((s, i) => s + Number(i.total_amount), 0);
+                  const clsDiff = clsProp - clsPast;
+                  const clsPct = pctOf(clsPast, clsDiff);
+                  return (
+                    <div key={cls.expense_class_id}>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">{label}</p>
+                      <div className="flex flex-col gap-2">
+                        {cls.items.map((item, idx) => {
+                          const past = item.pastTotal;
+                          const proposed = Number(item.total_amount);
+                          const d = proposed - past;
+                          const p = pctOf(past, d);
+                          return (
+                            <div
+                              key={item.expense_item_id}
+                              className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                              style={{
+                                opacity: 0,
+                                animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
+                              }}
+                            >
+                              <div className="flex-1 min-w-[180px]">
+                                <p className="text-[12px] font-medium text-gray-800 leading-tight">
+                                  {item.expense_item?.expense_class_item_name ?? '—'}
+                                </p>
+                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                  {item.expense_item?.expense_class_item_acc_code ?? '—'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-5 flex-wrap">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
+                                  <span className="text-[13px] font-mono font-semibold text-blue-700">
+                                    {past === 0 ? '–' : fmtP(past)}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
+                                  <span className="text-[13px] font-mono font-semibold text-orange-700">
+                                    {proposed === 0 ? '–' : fmtP(proposed)}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col items-end min-w-[80px]">
+                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                                  <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                                    {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col items-end min-w-[60px]">
+                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
+                                  <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                                    {past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
+                                  </span>
+                                </div>
+                                {isAdmin && (
+                                  <div className="flex flex-col items-end min-w-[140px]">
+                                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                                    {isEditable ? (
+                                      <input
+                                        type="text"
+                                        value={item.recommendation ?? ''}
+                                        onChange={(e) => handleRecommendationChange(item.expense_item_id, e.target.value)}
+                                        onBlur={() => handleRecommendationBlur(item.expense_item_id)}
+                                        placeholder="Add note…"
+                                        maxLength={255}
+                                        className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                                      />
+                                    ) : (
+                                      <span className="text-[12px] text-gray-600">{item.recommendation || '–'}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+                        <div className="flex-1 min-w-[180px]">
+                          <p className="text-[11px] font-semibold text-gray-600">Total {label}</p>
+                        </div>
+                        <div className="flex items-center gap-5 flex-wrap">
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
+                            <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP(clsPast)}</span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
+                            <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP(clsProp)}</span>
+                          </div>
+                          <div className="flex flex-col items-end min-w-[80px]">
+                            <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                            <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                              {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP(clsDiff)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end min-w-[60px]">
+                            <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
+                            <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                              {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {aipItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">Special Programs (AIP)</p>
+                    <div className="flex flex-col gap-2">
+                      {aipItems.map((item, idx) => {
+                        const appTotal = (item as any).app_total ?? 0;
+                        const proposed = item.total_amount;
+                        const d = proposed - appTotal;
+                        const p = pctOf(appTotal, d);
+                        return (
+                          <div
+                            key={item.dept_bp_form4_item_id}
+                            className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                            style={{
+                              opacity: 0,
+                              animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
+                            }}
+                          >
+                            <div className="flex-1 min-w-[180px]">
+                              <p className="text-[12px] font-medium text-gray-800 leading-tight">{item.program_description || '—'}</p>
+                              <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.aip_reference_code || '—'}</p>
+                            </div>
+                            <div className="flex items-center gap-5 flex-wrap">
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
+                                <span className="text-[13px] font-mono font-semibold text-blue-700">{appTotal === 0 ? '–' : fmtP(appTotal)}</span>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
+                                <span className="text-[13px] font-mono font-semibold text-orange-700">{proposed === 0 ? '–' : fmtP(proposed)}</span>
+                              </div>
+                              <div className="flex flex-col items-end min-w-[80px]">
+                                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                                <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                                  {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-end min-w-[60px]">
+                                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
+                                <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                                  {appTotal === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
+                                </span>
+                              </div>
+                              {isAdmin && (
+                                <div className="flex flex-col items-end min-w-[140px]">
+                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                                  {isEditable ? (
+                                    <input
+                                      type="text"
+                                      value={(item as any).recommendation ?? ''}
+                                      onChange={(e) => handleAipRecChange(item.dept_bp_form4_item_id, e.target.value)}
+                                      onBlur={() => handleAipRecBlur(item.dept_bp_form4_item_id)}
+                                      placeholder="Add note…"
+                                      maxLength={255}
+                                      className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                                    />
+                                  ) : (
+                                    <span className="text-[12px] text-gray-600">{(item as any).recommendation || '–'}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                         </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-gray-900 text-white rounded-xl px-4 py-3 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <div className="flex-1 min-w-[180px]">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                      Grand Total
+                      {isSpecialAccount && calamityTotal > 0 && (
+                        <span className="ml-2 text-[9px] font-normal text-gray-500 normal-case tracking-normal">
+                          incl. 5% Calamity Fund
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-5 flex-wrap">
+                    {isAdmin && (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-semibold uppercase tracking-widest text-green-400">Obligation</span>
+                        <span className="text-[13px] font-mono font-bold text-green-300">
+                          {grandFinal.obligation === 0 ? '–' : fmtP(grandFinal.obligation)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
+                      <span className="text-[13px] font-mono font-bold text-blue-300">
+                        {fmtP(grandFinal.pastTotal)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
+                      <span className="text-[13px] font-mono font-bold text-orange-300">
+                        {fmtP(grandFinal.proposed)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[80px]">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                      <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+                        {gtDiff === 0 ? '-' : fmtP(gtDiff)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[60px]">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
+                      <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+                        {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : ( */}
+
+
+            {cardView ? (
+  <div className="p-4 flex flex-col gap-3">
+    {itemsByClassification.map((cls) => {
+      if (cls.items.length === 0) return null;
+      const label = cls.expense_class_name === 'Prop/Plant/Eqpt'
+        ? 'Capital Outlay (CO)'
+        : cls.expense_class_name;
+      const clsPast = cls.items.reduce((s, i) => s + i.pastTotal, 0);
+      const clsProp = cls.items.reduce((s, i) => s + Number(i.total_amount), 0);
+      const clsDiff = clsProp - clsPast;
+      const clsPct = pctOf(clsPast, clsDiff);
+      return (
+        <div key={cls.expense_class_id}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">{label}</p>
+          <div className="flex flex-col gap-2">
+            {cls.items.map((item, idx) => {
+              const past = item.pastTotal;
+              const proposed = Number(item.total_amount);
+              const d = proposed - past;
+              const p = pctOf(past, d);
+              const isSaving = savingItems.has(item.expense_item_id);
+              return (
+                <div
+                  key={item.expense_item_id}
+                  className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                  style={{
+                    opacity: 0,
+                    animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
+                  }}
+                >
+                  <div className="flex-1 min-w-[180px]">
+                    <p className="text-[12px] font-medium text-gray-800 leading-tight">
+                      {item.expense_item?.expense_class_item_name ?? '—'}
+                    </p>
+                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                      {item.expense_item?.expense_class_item_acc_code ?? '—'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-5 flex-wrap">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                        Appropriation ({prevYear})
+                      </span>
+                      <span className="text-[13px] font-mono font-semibold text-blue-700">
+                        {past === 0 ? '–' : fmtP(past)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                        Proposed ({currYear})
+                      </span>
+                      {isEditable ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={getDraftValue(item.expense_item_id, "proposed", proposed)}
+                          onChange={(e) => handleCommaInput(item.expense_item_id, "proposed", e.target.value)}
+                          onBlur={() => handleCommaBlur(item.expense_item_id, "proposed")}
+                          disabled={isSaving}
+                          className="text-[13px] font-mono font-semibold text-orange-700 w-28 h-8 px-2 rounded border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 text-right"
+                        />
+                      ) : (
+                        <span className="text-[13px] font-mono font-semibold text-orange-700">
+                          {proposed === 0 ? '–' : fmtP(proposed)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end min-w-[80px]">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                      <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                        {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[60px]">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+                      <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                        {past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex flex-col items-end min-w-[140px]">
+                        <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                        {isEditable ? (
+                          <input
+                            type="text"
+                            value={item.recommendation ?? ''}
+                            onChange={(e) => handleRecommendationChange(item.expense_item_id, e.target.value)}
+                            onBlur={() => handleRecommendationBlur(item.expense_item_id)}
+                            placeholder="Add note…"
+                            maxLength={255}
+                            className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                          />
+                        ) : (
+                          <span className="text-[12px] text-gray-600">{item.recommendation || '–'}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex-1 min-w-[180px]">
+              <p className="text-[11px] font-semibold text-gray-600">Total {label}</p>
+            </div>
+            <div className="flex items-center gap-5 flex-wrap">
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                  Appropriation ({prevYear})
+                </span>
+                <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP(clsPast)}</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                  Proposed ({currYear})
+                </span>
+                <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP(clsProp)}</span>
+              </div>
+              <div className="flex flex-col items-end min-w-[80px]">
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                  {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP(clsDiff)}
+                </span>
+              </div>
+              <div className="flex flex-col items-end min-w-[60px]">
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+                <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                  {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+
+    {aipItems.length > 0 && (
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">Special Programs (AIP)</p>
+        <div className="flex flex-col gap-2">
+          {aipItems.map((item, idx) => {
+            const appTotal = (item as any).app_total ?? 0;
+            const proposed = item.total_amount;
+            const d = proposed - appTotal;
+            const p = pctOf(appTotal, d);
+            return (
+              <div
+                key={item.dept_bp_form4_item_id}
+                className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                style={{
+                  opacity: 0,
+                  animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
+                }}
+              >
+                <div className="flex-1 min-w-[180px]">
+                  <p className="text-[12px] font-medium text-gray-800 leading-tight">{item.program_description || '—'}</p>
+                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.aip_reference_code || '—'}</p>
+                </div>
+                <div className="flex items-center gap-5 flex-wrap">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                      Appropriation ({prevYear})
+                    </span>
+                    <span className="text-[13px] font-mono font-semibold text-blue-700">{appTotal === 0 ? '–' : fmtP(appTotal)}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                      Proposed ({currYear})
+                    </span>
+                    <span className="text-[13px] font-mono font-semibold text-orange-700">{proposed === 0 ? '–' : fmtP(proposed)}</span>
+                  </div>
+                  <div className="flex flex-col items-end min-w-[80px]">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                    <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                      {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end min-w-[60px]">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+                    <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                      {appTotal === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex flex-col items-end min-w-[140px]">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                      {isEditable ? (
+                        <input
+                          type="text"
+                          value={(item as any).recommendation ?? ''}
+                          onChange={(e) => handleAipRecChange(item.dept_bp_form4_item_id, e.target.value)}
+                          onBlur={() => handleAipRecBlur(item.dept_bp_form4_item_id)}
+                          placeholder="Add note…"
+                          maxLength={255}
+                          className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                        />
+                      ) : (
+                        <span className="text-[12px] text-gray-600">{(item as any).recommendation || '–'}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+             </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    <div className="bg-gray-900 text-white rounded-xl px-4 py-3 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div className="flex-1 min-w-[180px]">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          Grand Total
+          {isSpecialAccount && calamityTotal > 0 && (
+            <span className="ml-2 text-[9px] font-normal text-gray-500 normal-case tracking-normal">
+              incl. 5% Calamity Fund
+            </span>
+          )}
+        </p>
+      </div>
+      <div className="flex items-center gap-5 flex-wrap">
+        {isAdmin && (
+          <div className="flex flex-col items-end">
+            {/* <span className="text-[9px] font-semibold uppercase tracking-widest text-green-400">Obligation</span> */}
+            {/* <span className="text-[13px] font-mono font-bold text-green-300"> */}
+              {/* {grandFinal.obligation === 0 ? '–' : fmtP(grandFinal.obligation)} */}
+            {/* </span> */}
+          </div>
+        )}
+        <div className="flex flex-col items-end">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+            Appropriation ({prevYear})
+          </span>
+          <span className="text-[13px] font-mono font-bold text-blue-300">
+            {fmtP(grandFinal.pastTotal)}
+          </span>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+            Proposed ({currYear})
+          </span>
+          <span className="text-[13px] font-mono font-bold text-orange-300">
+            {fmtP(grandFinal.proposed)}
+          </span>
+        </div>
+        <div className="flex flex-col items-end min-w-[80px]">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+          <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+            {gtDiff === 0 ? '-' : fmtP(gtDiff)}
+          </span>
+        </div>
+        <div className="flex flex-col items-end min-w-[60px]">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+          <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+            {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+) : (
             <div className="overflow-x-auto">
                 <table
                     className="w-full text-[12px] border-collapse"
@@ -2782,6 +3242,8 @@ const Form2: React.FC<Form2Props> = ({
                     </tfoot>
                 </table>
             </div>
+
+            )}
 
             {/* ── Modals ── */}
             {modalState && (

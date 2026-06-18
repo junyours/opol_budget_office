@@ -423,8 +423,13 @@ const PlantillaOfPersonnelPage: React.FC = () => {
                   className={cn(
                     'flex-shrink-0 h-8 px-3.5 text-xs font-medium rounded-lg border transition-all duration-200 whitespace-nowrap',
                     activeTab === dept.dept_id
-                      ? 'bg-gray-900 text-white border-gray-900 shadow-md scale-[1.03]'
-                      : 'text-gray-500 border-transparent bg-gray-100 hover:bg-gray-200 hover:text-gray-800 hover:scale-[1.02]'
+                      ? 'bg-gray-900 text-white shadow-md'
+                      : '',
+                    dept.dept_category_id === 1 && (activeTab === dept.dept_id ? 'border-cat-1' : ' border-cat-1 text-cat-1 hover:bg-cat-1/20'),
+                    dept.dept_category_id === 2 && (activeTab === dept.dept_id ? 'border-cat-2' : ' border-cat-2 text-cat-2 hover:bg-cat-2/20'),
+                    dept.dept_category_id === 3 && (activeTab === dept.dept_id ? 'border-cat-3' : ' border-cat-3 text-cat-3 hover:bg-cat-3/20'),
+                    dept.dept_category_id === 4 && (activeTab === dept.dept_id ? 'border-cat-4' : ' border-cat-4 text-cat-4 hover:bg-cat-4/20'),
+                    !dept.dept_category_id && (activeTab === dept.dept_id ? 'border-gray-900' : ' border-transparent text-gray-500 '),
                   )}
                 >
                   {dept.dept_abbreviation || dept.dept_name}

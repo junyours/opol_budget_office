@@ -79,8 +79,425 @@ interface BudgetComparisonBannerProps {
   pastYearPlan: DepartmentBudgetPlan | null;
 }
 
+// const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+//   const [pastAipTotal,    setPastAipTotal]    = useState(0);
+//   const [currentAipTotal, setCurrentAipTotal] = useState(0);
+//   const [aipLoading,      setAipLoading]      = useState(true);
+
+//   useEffect(() => {
+//     setAipLoading(true);
+//     const currentReq = API.get('/form4-items', {
+//       params: { budget_plan_id: plan.dept_budget_plan_id },
+//     });
+//     const pastReq = pastYearPlan
+//       ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
+//       : Promise.resolve({ data: { data: [] as any[] } });
+
+//     Promise.all([currentReq, pastReq])
+//       .then(([curRes, pastRes]) => {
+//         const curItems:  any[] = curRes.data.data  ?? [];
+//         const pastItems: any[] = pastRes.data.data ?? [];
+//         setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
+//         setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
+//       })
+//       .catch(console.error)
+//       .finally(() => setAipLoading(false));
+//   }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
+
+//   const pastForm2Total = useMemo(
+//     () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [pastYearPlan],
+//   );
+//   const currentForm2Total = useMemo(
+//     () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [plan.items],
+//   );
+
+// //   const pastTotal    = pastForm2Total    + pastAipTotal;
+// //   const currentTotal = currentForm2Total + currentAipTotal;
+
+// const incomeSource = (() => {
+//     const abbr = plan.department?.dept_abbreviation?.toLowerCase() ?? '';
+//     const name = plan.department?.dept_name?.toLowerCase() ?? '';
+//     if (abbr === 'sh'  || name.includes('slaughter'))       return 'sh';
+//     if (abbr === 'occ' || name.includes('opol community'))  return 'occ';
+//     if (abbr === 'pm'  || name.includes('public market'))   return 'pm';
+//     return undefined;
+//   })();
+//   const isSpecialAccount = !!incomeSource;
+
+//   const [calamityTotal, setCalamityTotal] = useState(0);
+//   useEffect(() => {
+//     if (!isSpecialAccount || !plan.budget_plan?.budget_plan_id) return;
+//     API.get('/calamity-fund', {
+//       params: { budget_plan_id: plan.budget_plan.budget_plan_id, source: incomeSource },
+//     })
+//       .then(r => setCalamityTotal(parseFloat(r.data?.data?.calamity_fund) || 0))
+//       .catch(() => setCalamityTotal(0));
+//   }, [plan.budget_plan?.budget_plan_id, incomeSource]);
+
+//   const pastTotal    = pastForm2Total    + pastAipTotal;
+//   const currentTotal = currentForm2Total + currentAipTotal + (isSpecialAccount ? calamityTotal : 0);
+
+
+//   const diff         = currentTotal - pastTotal;
+//   const diffPct      = pctOf(pastTotal, diff);
+//   const threshold    = pastTotal * 1.1;
+//   const isOver       = pastTotal > 0 && currentTotal > threshold;
+//   const excess       = isOver ? currentTotal - threshold : 0;
+//   const prevYear     = Number(plan.budget_plan?.year) - 1;
+//   const currYear     = plan.budget_plan?.year;
+
+//   return (
+//     <div className={cn(
+//       'rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-center gap-3',
+//       isOver
+//         ? 'bg-red-50 border-red-300'
+//         : 'bg-white border-gray-200',
+//     )}>
+
+//       {/* ── Appropriation card (blue) ── */}
+//       <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
+//         <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400">
+//           Appropriation {prevYear}
+//         </span>
+//         {aipLoading ? (
+//           <span className="h-5 w-28 rounded bg-blue-100 animate-pulse" />
+//         ) : pastTotal === 0 ? (
+//           <span className="text-[14px] font-semibold text-blue-400">No data</span>
+//         ) : (
+//           <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-blue-700">
+//             {fmtP(pastTotal)}
+//           </span>
+//         )}
+//         <span className="text-[11px] text-blue-300">Prior year</span>
+//       </div>
+
+//       {/* Arrow */}
+//       <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
+
+//      {/* ── Proposed card (always orange) ── */}
+//       <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border bg-orange-50 border-orange-200">
+//         <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
+//           Proposed {currYear}
+//         </span>
+//         {aipLoading ? (
+//           <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
+//         ) : (
+//           <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-orange-700">
+//             {fmtP(currentTotal)}
+//           </span>
+//         )}
+//         <span className="text-[11px] text-orange-300">Current proposal</span>
+//       </div>
+
+//       {/* ── Inc / Dec chip ── */}
+//       {!aipLoading && pastTotal > 0 && (
+//         <div className={cn(
+//           'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium flex-shrink-0 border',
+//           isOver        ? 'bg-red-50 border-red-200 text-red-600'
+//           : diff > 0    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+//           : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
+//           :               'bg-gray-100 border-gray-200 text-gray-500',
+//         )}>
+//           {isOver
+//             ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+//             : diff > 0
+//             ? <ArrowTrendingUpIcon     className="w-3.5 h-3.5" />
+//             : diff < 0
+//             ? <ArrowTrendingDownIcon   className="w-3.5 h-3.5" />
+//             : <MinusIcon               className="w-3.5 h-3.5" />
+//           }
+//           {isOver ? (
+//             <>
+//               <span>+{fmtP(excess)} over ceiling</span>
+//               <span className="opacity-60">({((excess / threshold) * 100).toFixed(2)}% excess)</span>
+//             </>
+//           ) : (
+//             <>
+//               <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
+//               <span className="opacity-60">
+//                 ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+//               </span>
+//             </>
+//           )}
+//         </div>
+//       )}
+
+//       <div className="flex-1" />
+
+//       {/* ── Status message ── */}
+//       {!aipLoading && (
+//         <div className="flex items-start gap-2 flex-shrink-0">
+//           {isOver ? (
+//             <div className="flex items-start gap-2">
+//               <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+//               <div className="flex flex-col gap-0.5">
+//                 <span className="text-[12px] font-semibold text-red-700">
+//                   Above 10% Appropriation Ceiling
+//                 </span>
+//                 <span className="text-[11px] text-red-500">
+//                   Ceiling:{' '}
+//                   <span className="font-mono font-medium">{fmtP(threshold)}</span>
+//                 </span>
+//                 <span className="text-[10px] text-red-400 italic">
+//                   Proposed amount exceeds the 10% growth ceiling.
+//                 </span>
+//               </div>
+//             </div>
+//           ) : pastTotal === 0 ? (
+//             <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
+//           ) : (
+//             <>
+//               <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+//               <div className="flex flex-col gap-0.5">
+//                 <span className="text-[12px] font-medium text-emerald-600">
+//                   Within 10% Appropriation Ceiling
+//                 </span>
+//                 <span className="text-[11px] text-gray-400">
+//                   Suggested limit:{' '}
+//                   <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
+//                 </span>
+//                 <span className="text-[10px] text-gray-400 italic">
+//                   For reference only — final budget is at the department head's discretion.
+//                 </span>
+//               </div>
+//             </>
+//           )}
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+
+// ─── Status config ────────────────────────────────────────────────────────────
+
+// const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+//   const [pastAipTotal,    setPastAipTotal]    = useState(0);
+//   const [currentAipTotal, setCurrentAipTotal] = useState(0);
+//   const [aipLoading,      setAipLoading]      = useState(true);
+
+//   useEffect(() => {
+//     setAipLoading(true);
+//     const currentReq = API.get('/form4-items', {
+//       params: { budget_plan_id: plan.dept_budget_plan_id },
+//     });
+//     const pastReq = pastYearPlan
+//       ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
+//       : Promise.resolve({ data: { data: [] as any[] } });
+
+//     Promise.all([currentReq, pastReq])
+//       .then(([curRes, pastRes]) => {
+//         const curItems:  any[] = curRes.data.data  ?? [];
+//         const pastItems: any[] = pastRes.data.data ?? [];
+//         setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
+//         setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
+//       })
+//       .catch(console.error)
+//       .finally(() => setAipLoading(false));
+//   }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
+
+//   const pastForm2Total = useMemo(
+//     () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [pastYearPlan],
+//   );
+//   const currentForm2Total = useMemo(
+//     () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [plan.items],
+//   );
+
+//   const incomeSource = (() => {
+//     const abbr = plan.department?.dept_abbreviation?.toLowerCase() ?? '';
+//     const name = plan.department?.dept_name?.toLowerCase() ?? '';
+//     if (abbr === 'sh'  || name.includes('slaughter'))       return 'sh';
+//     if (abbr === 'occ' || name.includes('opol community'))  return 'occ';
+//     if (abbr === 'pm'  || name.includes('public market'))   return 'pm';
+//     return undefined;
+//   })();
+//   const isSpecialAccount = !!incomeSource;
+
+//   const [calamityTotal, setCalamityTotal] = useState(0);
+//   useEffect(() => {
+//     if (!isSpecialAccount || !plan.budget_plan?.budget_plan_id) return;
+//     API.get('/calamity-fund', {
+//       params: { budget_plan_id: plan.budget_plan.budget_plan_id, source: incomeSource },
+//     })
+//       .then(r => setCalamityTotal(parseFloat(r.data?.data?.calamity_fund) || 0))
+//       .catch(() => setCalamityTotal(0));
+//   }, [plan.budget_plan?.budget_plan_id, incomeSource]);
+
+//   // Ceiling comparison excludes calamity fund
+//   const pastTotal        = pastForm2Total + pastAipTotal;
+//   const currentExclCal   = currentForm2Total + currentAipTotal;   // used for ceiling check
+//   const currentInclCal   = currentExclCal + (isSpecialAccount ? calamityTotal : 0); // grand total
+
+//   const diff      = currentExclCal - pastTotal;
+//   const diffPct   = pctOf(pastTotal, diff);
+//   const threshold = pastTotal * 1.1;
+//   const isOver    = pastTotal > 0 && currentExclCal > threshold;
+//   const excess    = isOver ? currentExclCal - threshold : 0;
+//   const prevYear  = Number(plan.budget_plan?.year) - 1;
+//   const currYear  = plan.budget_plan?.year;
+
+//   return (
+//     <div className={cn(
+//       'rounded-xl border px-4 py-3 mb-4',
+//       isOver ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
+//     )}>
+
+//       {/* ── Row 1: cards + chip + status ── */}
+//       <div className="flex flex-wrap items-center gap-3">
+
+//         {/* Appropriation card */}
+//         <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
+//           <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400">
+//             Appropriation {prevYear}
+//           </span>
+//           {aipLoading ? (
+//             <span className="h-5 w-28 rounded bg-blue-100 animate-pulse" />
+//           ) : pastTotal === 0 ? (
+//             <span className="text-[14px] font-semibold text-blue-400">No data</span>
+//           ) : (
+//             <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-blue-700">
+//               {fmtP(pastTotal)}
+//             </span>
+//           )}
+//           <span className="text-[11px] text-blue-300">Prior year</span>
+//         </div>
+
+//         {/* Arrow */}
+//         <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
+
+//         {/* Proposed card — shows excl. calamity for ceiling context */}
+//         <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border bg-orange-50 border-orange-200">
+//           <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
+//             Proposed {currYear}
+//           </span>
+//           {aipLoading ? (
+//             <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
+//           ) : (
+//             <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-orange-700">
+//               {fmtP(currentExclCal)}
+//             </span>
+//           )}
+//           <span className="text-[11px] text-orange-300">Excl. calamity fund</span>
+//         </div>
+
+//         {/* Inc / Dec chip — based on ceiling comparison (excl. calamity) */}
+//         {!aipLoading && pastTotal > 0 && (
+//           <div className={cn(
+//             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium flex-shrink-0 border',
+//             isOver        ? 'bg-red-50 border-red-200 text-red-600'
+//             : diff > 0    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+//             : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
+//             :               'bg-gray-100 border-gray-200 text-gray-500',
+//           )}>
+//             {isOver
+//               ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+//               : diff > 0
+//               ? <ArrowTrendingUpIcon     className="w-3.5 h-3.5" />
+//               : diff < 0
+//               ? <ArrowTrendingDownIcon   className="w-3.5 h-3.5" />
+//               : <MinusIcon               className="w-3.5 h-3.5" />
+//             }
+//             {isOver ? (
+//               <>
+//                 <span>+{fmtP(excess)} over ceiling</span>
+//                 <span className="opacity-60">({((excess / threshold) * 100).toFixed(2)}% excess)</span>
+//               </>
+//             ) : (
+//               <>
+//                 <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
+//                 <span className="opacity-60">
+//                   ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+//                 </span>
+//               </>
+//             )}
+//           </div>
+//         )}
+
+//         <div className="flex-1" />
+
+//         {/* Status message */}
+//         {!aipLoading && (
+//           <div className="flex items-start gap-2 flex-shrink-0">
+//             {isOver ? (
+//               <div className="flex items-start gap-2">
+//                 <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+//                 <div className="flex flex-col gap-0.5">
+//                   <span className="text-[12px] font-semibold text-red-700">
+//                     Above 10% Appropriation Ceiling
+//                   </span>
+//                   <span className="text-[11px] text-red-500">
+//                     Ceiling:{' '}
+//                     <span className="font-mono font-medium">{fmtP(threshold)}</span>
+//                   </span>
+//                   <span className="text-[10px] text-red-400 italic">
+//                     Calamity fund not included in ceiling comparison.
+//                   </span>
+//                 </div>
+//               </div>
+//             ) : pastTotal === 0 ? (
+//               <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
+//             ) : (
+//               <>
+//                 <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+//                 <div className="flex flex-col gap-0.5">
+//                   <span className="text-[12px] font-medium text-emerald-600">
+//                     Within 10% Appropriation Ceiling
+//                   </span>
+//                   <span className="text-[11px] text-gray-400">
+//                     Suggested limit:{' '}
+//                     <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
+//                   </span>
+//                   <span className="text-[10px] text-gray-400 italic">
+//                     Calamity fund not included in ceiling comparison.
+//                   </span>
+//                 </div>
+//               </>
+//             )}
+//           </div>
+//         )}
+//       </div>
+
+//       {/* ── Row 2: Calamity fund + Grand total (special accounts only) ── */}
+//       {isSpecialAccount && !aipLoading && (
+//         <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-3">
+
+//           {/* Calamity fund chip */}
+//           <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-rose-50 border border-rose-200">
+//             <div className="flex flex-col gap-0">
+//               <span className="text-[10px] font-semibold uppercase tracking-widest text-rose-400">
+//                 5% Calamity Fund
+//               </span>
+//               <span className="text-[15px] font-bold font-mono tabular-nums text-rose-700">
+//                 {calamityTotal > 0 ? fmtP(calamityTotal) : '—'}
+//               </span>
+//               <span className="text-[10px] text-rose-300">Not counted in ceiling</span>
+//             </div>
+//           </div>
+
+//           <span className="text-gray-300 text-[14px] font-mono hidden sm:block">=</span>
+
+//           {/* Grand total incl. calamity */}
+//           <div className="flex flex-col gap-0 rounded-lg px-3.5 py-2.5 bg-gray-900 border border-gray-800 min-w-[160px]">
+//             <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+//               Total Proposed {currYear}
+//             </span>
+//             <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-white">
+//               {fmtP(currentInclCal)}
+//             </span>
+//             <span className="text-[10px] text-gray-500">Incl. calamity fund</span>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
 const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
-  const [pastAipTotal,    setPastAipTotal]    = useState(0);
+    const [pastAipTotal,    setPastAipTotal]    = useState(0);
   const [currentAipTotal, setCurrentAipTotal] = useState(0);
   const [aipLoading,      setAipLoading]      = useState(true);
 
@@ -113,140 +530,211 @@ const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, p
     [plan.items],
   );
 
-  const pastTotal    = pastForm2Total    + pastAipTotal;
-  const currentTotal = currentForm2Total + currentAipTotal;
-  const diff         = currentTotal - pastTotal;
-  const diffPct      = pctOf(pastTotal, diff);
-  const threshold    = pastTotal * 1.1;
-  const isOver       = pastTotal > 0 && currentTotal > threshold;
-  const excess       = isOver ? currentTotal - threshold : 0;
-  const prevYear     = Number(plan.budget_plan?.year) - 1;
-  const currYear     = plan.budget_plan?.year;
+  const incomeSource = (() => {
+    const abbr = plan.department?.dept_abbreviation?.toLowerCase() ?? '';
+    const name = plan.department?.dept_name?.toLowerCase() ?? '';
+    if (abbr === 'sh'  || name.includes('slaughter'))       return 'sh';
+    if (abbr === 'occ' || name.includes('opol community'))  return 'occ';
+    if (abbr === 'pm'  || name.includes('public market'))   return 'pm';
+    return undefined;
+  })();
+  const isSpecialAccount = !!incomeSource;
+
+  const [calamityTotal, setCalamityTotal] = useState(0);
+  useEffect(() => {
+    if (!isSpecialAccount || !plan.budget_plan?.budget_plan_id) return;
+    API.get('/calamity-fund', {
+      params: { budget_plan_id: plan.budget_plan.budget_plan_id, source: incomeSource },
+    })
+      .then(r => setCalamityTotal(parseFloat(r.data?.data?.calamity_fund) || 0))
+      .catch(() => setCalamityTotal(0));
+  }, [plan.budget_plan?.budget_plan_id, incomeSource]);
+
+
+
+  const pastTotal      = pastForm2Total + pastAipTotal;
+  const currentExclCal = currentForm2Total + currentAipTotal;
+  const currentInclCal = currentExclCal + (isSpecialAccount ? calamityTotal : 0);
+
+  const diff      = currentExclCal - pastTotal;
+  const diffPct   = pctOf(pastTotal, diff);
+  const threshold = pastTotal * 1.1;
+  const isOver    = pastTotal > 0 && currentExclCal > threshold;
+  const excess    = isOver ? currentExclCal - threshold : 0;
+  const prevYear  = Number(plan.budget_plan?.year) - 1;
+  const currYear  = plan.budget_plan?.year;
 
   return (
     <div className={cn(
-      'rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-center gap-3',
-      isOver
-        ? 'bg-red-50 border-red-300'
-        : 'bg-white border-gray-200',
+      'rounded-xl border mb-4 px-5 py-4',
+      isOver ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200',
     )}>
 
-      {/* ── Appropriation card (blue) ── */}
-      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400">
-          Appropriation {prevYear}
-        </span>
-        {aipLoading ? (
-          <span className="h-5 w-28 rounded bg-blue-100 animate-pulse" />
-        ) : pastTotal === 0 ? (
-          <span className="text-[14px] font-semibold text-blue-400">No data</span>
-        ) : (
-          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-blue-700">
-            {fmtP(pastTotal)}
+      {/* ── Top row ── */}
+      <div className="flex items-center gap-0 flex-wrap">
+
+        {/* Appropriation */}
+        <div className="flex flex-col gap-0.5 pr-5">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            Appropriation {prevYear}
           </span>
-        )}
-        <span className="text-[11px] text-blue-300">Prior year</span>
-      </div>
-
-      {/* Arrow */}
-      <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
-
-     {/* ── Proposed card (always orange) ── */}
-      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border bg-orange-50 border-orange-200">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
-          Proposed {currYear}
-        </span>
-        {aipLoading ? (
-          <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
-        ) : (
-          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-orange-700">
-            {fmtP(currentTotal)}
-          </span>
-        )}
-        <span className="text-[11px] text-orange-300">Current proposal</span>
-      </div>
-
-      {/* ── Inc / Dec chip ── */}
-      {!aipLoading && pastTotal > 0 && (
-        <div className={cn(
-          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium flex-shrink-0 border',
-          isOver        ? 'bg-red-50 border-red-200 text-red-600'
-          : diff > 0    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-          : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
-          :               'bg-gray-100 border-gray-200 text-gray-500',
-        )}>
-          {isOver
-            ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-            : diff > 0
-            ? <ArrowTrendingUpIcon     className="w-3.5 h-3.5" />
-            : diff < 0
-            ? <ArrowTrendingDownIcon   className="w-3.5 h-3.5" />
-            : <MinusIcon               className="w-3.5 h-3.5" />
-          }
-          {isOver ? (
-            <>
-              <span>+{fmtP(excess)} over ceiling</span>
-              <span className="opacity-60">({((excess / threshold) * 100).toFixed(2)}% excess)</span>
-            </>
-          ) : (
-            <>
-              <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
-              <span className="opacity-60">
-                ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+          {aipLoading
+            ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
+            : pastTotal === 0
+            ? <span className="text-[20px] font-bold text-gray-300 tracking-tight font-mono">No data</span>
+            : <span className="text-[22px] font-bold text-blue-700 tracking-tight font-mono tabular-nums leading-tight">
+                {fmtP(pastTotal)}
               </span>
-            </>
-          )}
+          }
+          <span className="text-[11px] text-gray-300">Prior year</span>
         </div>
-      )}
 
-      <div className="flex-1" />
+        {/* Divider */}
+        <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
 
-      {/* ── Status message ── */}
-      {!aipLoading && (
-        <div className="flex items-start gap-2 flex-shrink-0">
-          {isOver ? (
-            <div className="flex items-start gap-2">
-              <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-semibold text-red-700">
-                  Above 10% Appropriation Ceiling
+        {/* Proposed */}
+        <div className="flex flex-col gap-0.5 px-5">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            Proposed {currYear}
+          </span>
+          {aipLoading
+            ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
+            : <span className="text-[22px] font-bold text-gray-800 tracking-tight font-mono tabular-nums leading-tight">
+                {fmtP(currentExclCal)}
+              </span>
+          }
+          <span className="text-[11px] text-gray-300">
+            {isSpecialAccount ? 'Excl. calamity fund' : 'Current proposal'}
+          </span>
+        </div>
+
+        {/* Inc/Dec badge */}
+        {!aipLoading && pastTotal > 0 && (
+          <div className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium border flex-shrink-0 mx-3',
+            isOver     ? 'bg-red-50 border-red-200 text-red-700'
+            : diff > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : diff < 0 ? 'bg-sky-50 border-sky-200 text-sky-700'
+            :            'bg-gray-50 border-gray-200 text-gray-500',
+          )}>
+            {isOver
+              ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+              : diff > 0
+              ? <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
+              : diff < 0
+              ? <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
+              : <MinusIcon className="w-3.5 h-3.5" />
+            }
+            {isOver
+              ? <span>+{fmtP(excess)} over ceiling</span>
+              : <span>
+                  {diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}
+                  <span className="opacity-60 ml-1">
+                    ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+                  </span>
                 </span>
-                <span className="text-[11px] text-red-500">
-                  Ceiling:{' '}
-                  <span className="font-mono font-medium">{fmtP(threshold)}</span>
-                </span>
-                <span className="text-[10px] text-red-400 italic">
-                  Proposed amount exceeds the 10% growth ceiling.
-                </span>
-              </div>
+            }
+          </div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Status — right side, separated by a vertical rule */}
+        {!aipLoading && (
+          <div className={cn(
+            'flex items-start gap-2.5 pl-5 flex-shrink-0',
+            pastTotal > 0 && 'border-l border-gray-200',
+          )}>
+            {isOver ? (
+              <>
+                <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <ExclamationTriangleIcon className="w-3 h-3 text-red-600" />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[13px] font-semibold text-red-700">
+                    Above 10% appropriation ceiling
+                  </span>
+                  <span className="text-[11px] text-gray-500">
+                    Ceiling:{' '}
+                    <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+                    {' '}·{' '}
+                    Excess:{' '}
+                    <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span>
+                  </span>
+                  {isSpecialAccount && (
+                    <span className="text-[10px] text-gray-400 italic">
+                      Calamity fund not included in ceiling comparison.
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : pastTotal === 0 ? (
+              <span className="text-[12px] text-gray-400 italic">No prior-year data for comparison.</span>
+            ) : (
+              <>
+                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <CheckCircleIcon className="w-3 h-3 text-emerald-600" />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[13px] font-semibold text-emerald-700">
+                    Within 10% appropriation ceiling
+                  </span>
+                  <span className="text-[11px] text-gray-500">
+                    Ceiling:{' '}
+                    <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+                  </span>
+                  {isSpecialAccount && (
+                    <span className="text-[10px] text-gray-400 italic">
+                      Calamity fund not included in ceiling comparison.
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Calamity row (special accounts only) ── */}
+      {isSpecialAccount && !aipLoading && (
+        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100 flex-wrap">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+            5% Calamity Fund
+          </span>
+          <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
+            {calamityTotal > 0 ? fmtP(calamityTotal) : '—'}
+          </span>
+          <span className="text-[11px] text-gray-400">not counted in ceiling</span>
+
+          <span className="text-gray-300 text-[13px] font-mono mx-1">+</span>
+
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+            Dept. Expenditure
+          </span>
+          <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
+            {fmtP(currentExclCal)}
+          </span>
+
+          <span className="text-gray-300 text-[13px] font-mono mx-1">=</span>
+
+          {/* Grand total chip */}
+          <div className="flex items-center gap-3 bg-gray-900 rounded-lg px-4 py-2">
+            <div className="flex flex-col gap-0">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                Total proposed {currYear}
+              </span>
+              <span className="text-[16px] font-bold font-mono tabular-nums text-white leading-tight">
+                {fmtP(currentInclCal)}
+              </span>
+              <span className="text-[10px] text-gray-600">Incl. calamity fund</span>
             </div>
-          ) : pastTotal === 0 ? (
-            <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
-          ) : (
-            <>
-              <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-medium text-emerald-600">
-                  Within 10% Appropriation Ceiling
-                </span>
-                <span className="text-[11px] text-gray-400">
-                  Suggested limit:{' '}
-                  <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
-                </span>
-                <span className="text-[10px] text-gray-400 italic">
-                  For reference only — final budget is at the department head's discretion.
-                </span>
-              </div>
-            </>
-          )}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-
-// ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; badge: string; dot: string; activeBadge: string }> = {
   draft: {
     label:       'Draft',
@@ -275,6 +763,25 @@ interface DeptPlanWithName extends DepartmentBudgetPlan {
   dept_abbreviation: string;
   dept_logo:         string | null;
 }
+
+// const CATEGORY_COLORS: Record<number, { card: string; activeBorder: string; dot: string }> = {
+//   1: { card: 'bg-white border-blue-400',   activeBorder: 'border-blue-400',   dot: 'bg-blue-400'  },
+//   2: { card: 'bg-white border-pink-400',   activeBorder: 'border-pink-400',   dot: 'bg-pink-400'  },
+//   3: { card: 'bg-white border-green-400',  activeBorder: 'border-green-400',  dot: 'bg-green-400' },
+//   4: { card: 'bg-white border-amber-400',  activeBorder: 'border-amber-400',  dot: 'bg-amber-400' },
+// };
+
+// const getCatColors = (id: number | undefined) =>
+//   CATEGORY_COLORS[id ?? 0] ?? { card: 'bg-white border-gray-300', activeBorder: 'border-gray-500', dot: 'bg-gray-400' };
+const CATEGORY_COLORS: Record<number, { card: string; activeBorder: string; dot: string }> = {
+  1: { card: 'bg-white border-cat-1', activeBorder: 'border-cat-1', dot: 'bg-cat-1' },
+  2: { card: 'bg-white border-cat-2', activeBorder: 'border-cat-2', dot: 'bg-cat-2' },
+  3: { card: 'bg-white border-cat-3', activeBorder: 'border-cat-3', dot: 'bg-cat-3' },
+  4: { card: 'bg-white border-cat-4', activeBorder: 'border-cat-4', dot: 'bg-cat-4' },
+};
+
+const getCatColors = (id: number | undefined) =>
+  CATEGORY_COLORS[id ?? 0] ?? { card: 'bg-white border-cat-none', activeBorder: 'border-cat-none', dot: 'bg-cat-none' };
 
 // ─── Dept Avatar ──────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -376,25 +883,31 @@ const isViewer = user?.role === 'viewer';
   const [acting,          setActing]         = useState(false);
   const [statusFilter,   setStatusFilter]   = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [cardView,       setCardView]       = useState<boolean>(false);
 
   // ── Fetch all dept plans (sidebar list + classifications) ──────────────────
   const fetchAll = useCallback(async () => {
     if (!activePlanId) return;
     try {
       const [plansRes, classRes, itemsRes] = await Promise.all([
-        API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId } }),
+        // API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId } }),
+        API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId, include: 'category' } }),
         API.get('/expense-classifications'),
         API.get('/expense-class-items'),
       ]);
 
       const raw: DepartmentBudgetPlan[] = plansRes.data.data ?? [];
+      console.log('RAW dept[0]:', JSON.stringify(raw[0], null, 2));
       const enriched: DeptPlanWithName[] = raw
-        .map(p => ({
-          ...p,
-          dept_name:         p.department?.dept_name         ?? 'Unknown',
-          dept_abbreviation: p.department?.dept_abbreviation ?? '',
-          dept_logo:         p.department?.logo              ?? null,
-        }))
+  .map(p => ({
+    ...p,
+    dept_name:         p.department?.dept_name         ?? 'Unknown',
+    dept_abbreviation: p.department?.dept_abbreviation ?? '',
+    dept_logo:         p.department?.logo              ?? null,
+    department: p.department
+      ? { ...p.department, category: p.department.category ?? null }
+      : undefined,
+  }))
         // .sort((a, b) => a.dept_name.localeCompare(b.dept_name));
         .sort((a, b) => a.dept_id - b.dept_id);
 
@@ -637,28 +1150,8 @@ const filteredPlans = useMemo(() => {
           <p className="text-[13px] font-semibold text-gray-800">Budget Year {activePlan.year}</p>
         </div>
 
-        {/* Summary pills */}
-        {/* <div className="px-2.5 mb-3 flex flex-wrap gap-1.5">
-          {counts.submitted > 0 && (
-            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-              {counts.submitted} to review
-            </span>
-          )}
-          {counts.approved > 0 && (
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-              {counts.approved} approved
-            </span>
-          )}
-          {counts.draft > 0 && (
-            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-              {counts.draft} draft
-            </span>
-          )}
-        </div> */}
-
         {/* Search */}
-        {/* Search */}
-<div className="px-1 mb-2">
+ <div className="px-1 mb-2">
   <div className="relative">
     <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
     <Input
@@ -750,18 +1243,29 @@ const filteredPlans = useMemo(() => {
           <p className="px-2.5 py-6 text-xs text-gray-400 text-center">No departments found.</p>
         ) : (
           filteredPlans.map(plan => {
+            //  console.log(plan.dept_abbreviation, '→', plan.department?.category?.dept_category_name);
             const cfg    = getStatusCfg(plan.status);
             const active = plan.dept_budget_plan_id === selectedPlanId;
 
             return (
-              <button
+            //   <button
+            //     key={plan.dept_budget_plan_id}
+            //     onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
+            //     className={cn(
+            //       'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all',
+            //       active
+            //         ? 'bg-gray-900 shadow-sm border border-gray-800 text-white'
+            //         : 'text-gray-600 hover:bg-white/70 hover:text-gray-800 border border-transparent',
+            //     )}
+            //   >
+            <button
                 key={plan.dept_budget_plan_id}
                 onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
                 className={cn(
-                  'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all',
+                  'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all border',
                   active
-                    ? 'bg-gray-900 shadow-sm border border-gray-800 text-white'
-                    : 'text-gray-600 hover:bg-white/70 hover:text-gray-800 border border-transparent',
+                    ? cn('bg-gray-900 text-white shadow-md', getCatColors(plan.department?.dept_category_id).activeBorder)
+                    : cn(getCatColors(plan.department?.dept_category_id).card, 'text-gray-700'),
                 )}
               >
                 <DeptAvatar
@@ -792,9 +1296,9 @@ const filteredPlans = useMemo(() => {
                   )}
                 </div>
 
-                <span className={cn(
+               <span className={cn(
                   'text-[9px] font-semibold px-1.5 py-0.5 rounded-full border flex-shrink-0',
-                  active ? cfg.activeBadge : cfg.badge,
+                  active ? 'bg-white/20 text-white border-white/30' : cfg.badge,
                 )}>
                   {cfg.label}
                 </span>
@@ -850,8 +1354,24 @@ const filteredPlans = useMemo(() => {
               </div>
 
               {/* Action buttons */}
-              {/* Action buttons */}
 <div className="flex items-center gap-2 flex-shrink-0">
+  <div className="flex items-center gap-1.5 mr-1">
+    <span className="text-[10px] text-gray-400 font-medium">REVIEW</span>
+    <button
+      onClick={() => setCardView(v => !v)}
+      className={cn(
+        'relative inline-flex h-5 w-9 items-center rounded-full border transition-colors focus:outline-none',
+        cardView ? 'bg-gray-900 border-gray-900' : 'bg-gray-200 border-gray-300',
+      )}
+      role="switch"
+      aria-checked={cardView}
+    >
+      <span className={cn(
+        'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
+        cardView ? 'translate-x-[18px]' : 'translate-x-[2px]',
+      )} />
+    </button>
+  </div>
   {!isViewer && selectedPlan.status === 'submitted' && (
     <>
       <Button size="sm" variant="outline"
@@ -924,6 +1444,7 @@ const filteredPlans = useMemo(() => {
                       isEditable={isAdmin}
                       isAdmin={isAdmin}
                       onItemUpdate={handleItemUpdate}
+                      cardView={cardView}
                     />
                   </TabsContent>
                   <TabsContent value="3">

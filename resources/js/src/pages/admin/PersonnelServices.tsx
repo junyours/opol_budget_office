@@ -918,12 +918,13 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                   value={d.dept_id.toString()}
                   style={{ animationDelay: `${idx * 30}ms` }}
                   className={cn(
-                    'flex-shrink-0 h-8 px-3.5 text-xs font-medium rounded-lg border transition-all duration-200',
-                    'text-gray-500 border-transparent bg-gray-100 hover:bg-gray-200 hover:text-gray-800 hover:scale-[1.02]',
-                    'data-[state=active]:bg-gray-900 data-[state=active]:text-white data-[state=active]:border-gray-900 data-[state=active]:shadow-md',
-                    'data-[state=active]:scale-[1.03]',
-                    'ps-animate-scale-in',
-                  )}
+                    'flex-shrink-0 h-8 px-3.5 text-xs font-medium rounded-lg border transition-all duration-200 ps-animate-scale-in hover:scale-[1.02] data-[state=active]:scale-[1.03] data-[state=active]:shadow-md data-[state=active]:bg-gray-900 data-[state=active]:text-white',
+                    d.dept_category_id === 1 && ' border-cat-1 text-cat-1 hover:bg-cat-1/20 data-[state=active]:border-cat-1',
+                    d.dept_category_id === 2 && ' border-cat-2 text-cat-2 hover:bg-cat-2/20 data-[state=active]:border-cat-2',
+                    d.dept_category_id === 3 && ' border-cat-3 text-cat-3 hover:bg-cat-3/20 data-[state=active]:border-cat-3',
+                    d.dept_category_id === 4 && ' border-cat-4 text-cat-4 hover:bg-cat-4/20 data-[state=active]:border-cat-4',
+                    !d.dept_category_id      && ' border-gray-300 text-gray-500 hover:bg-gray-200 data-[state=active]:border-gray-900',
+                                    )}
                   onClick={() => {
                     setTimeout(() => {
                       const strip = document.getElementById('dept-tabs-scroll');

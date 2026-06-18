@@ -101,6 +101,17 @@ export interface DepartmentCategory {
   dept_category_name: string;
 }
 
+// export interface Department {
+//   dept_id: number;
+//   dept_name: string;
+//   dept_abbreviation: string;
+//   dept_category_id: number;
+//   mandate: string | null;
+//   special_provisions: string | null;
+//   logo: string | null;
+//   category?: DepartmentCategory;
+// }
+
 export interface Department {
   dept_id: number;
   dept_name: string;
@@ -109,7 +120,7 @@ export interface Department {
   mandate: string | null;
   special_provisions: string | null;
   logo: string | null;
-  category?: DepartmentCategory;
+  category?: DepartmentCategory | null;
 }
 
 ///////////////////////////////////////////////

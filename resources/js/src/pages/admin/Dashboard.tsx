@@ -1083,7 +1083,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                     <BanknotesIcon className="w-5 h-5 text-indigo-500" />
                   </div>
                   <div>
-                    <p className="text-eyebrow">Combined Revenue</p>
+                    <p className="text-eyebrow">Combined Estimted Revenue</p>
                     <p className="text-section-title mt-0.5">Overall Income Fund</p>
                   </div>
                 </div>
@@ -1104,7 +1104,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                     <p className="text-[9px] text-zinc-400 mt-1">GF Local Source + Special Accounts</p>
                   </div>
                   <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-3.5">
-                    <p className="text-eyebrow text-indigo-600 mb-2">Overall Estimated Income</p>
+                    <p className="text-eyebrow text-indigo-600 mb-2">Overall Income</p>
                     <Money
                       v={!fundsReady ? null : overallEstimatedIncome}
                       loading={!fundsReady}

@@ -98,31 +98,31 @@ const BagOngOpol: React.FC = () => {
 
           {/* Row 1 — roof, falls from top | eager: above the fold */}
           <div style={anim("top", 150)}>
-            <HoverImg src="/images/1.png" alt="Bag-ong Opol" eager />
+            <HoverImg src="/images/1m.png" alt="Bag-ong Opol" eager />
           </div>
 
           {/* Row 2 — smart services banner, falls from top | eager: above the fold */}
           <div style={anim("top", 400)}>
-            <HoverImg src="/images/2.png" alt="Smart Services" eager />
+            <HoverImg src="/images/2m.png" alt="Smart Services" eager />
           </div>
 
           {/* Row 3 — pillars, each slides in from left with staggered delay */}
           <div className="flex gap-1">
             {[3, 4, 5, 6, 7].map((n, i) => (
               <div key={i} className="flex-1 min-w-0" style={anim("left", 750 + i * 120)}>
-                <HoverImg src={`/images/${n}.png`} alt={`Pillar ${i + 1}`} eager />
+                <HoverImg src={`/images/${n}m.png`} alt={`Pillar ${i + 1}`} eager />
               </div>
             ))}
           </div>
 
           {/* Row 4 — core values, rises from bottom | lazy: below fold */}
           <div style={anim("bottom", 1100)}>
-            <HoverImg src="/images/8.png" alt="Core Values" />
+            <HoverImg src="/images/8m.png" alt="Core Values" />
           </div>
 
           {/* Row 5 — financial sustainability, rises from bottom | lazy: below fold */}
           <div style={anim("bottom", 1350)}>
-            <HoverImg src="/images/9.png" alt="Financial Sustainability" />
+            <HoverImg src="/images/9m.png" alt="Financial Sustainability" />
           </div>
 
         </div>

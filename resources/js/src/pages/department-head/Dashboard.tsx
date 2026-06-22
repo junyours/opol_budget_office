@@ -401,11 +401,19 @@ const sfPieData =
           ].filter((d) => d.value > 0)
         : [];
 
+    // const statusCfg: Record<string, { label: string; cls: string }> = {
+    //     draft:     { label: "Draft",     cls: "text-amber-700 bg-amber-50 border-amber-200"       },
+    //     submitted: { label: "Submitted", cls: "text-blue-700 bg-blue-50 border-blue-200"          },
+    //     approved:  { label: "Approved",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    // };
+
     const statusCfg: Record<string, { label: string; cls: string }> = {
-        draft:     { label: "Draft",     cls: "text-amber-700 bg-amber-50 border-amber-200"       },
-        submitted: { label: "Submitted", cls: "text-blue-700 bg-blue-50 border-blue-200"          },
-        approved:  { label: "Approved",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+        draft:         { label: "Draft",         cls: "text-amber-700 bg-amber-50 border-amber-200"       },
+        submitted:     { label: "Submitted",     cls: "text-blue-700 bg-blue-50 border-blue-200"          },
+        under_review:  { label: "Under Review",  cls: "text-violet-700 bg-violet-50 border-violet-200"    },
+        approved:      { label: "Approved",      cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
     };
+
     const planStatus = deptPlan?.status ?? "draft";
     const sCfg = statusCfg[planStatus] ?? statusCfg.draft;
 

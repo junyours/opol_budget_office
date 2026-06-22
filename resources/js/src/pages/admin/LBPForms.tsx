@@ -971,8 +971,11 @@ const LBPForms: React.FC = () => {
   const [activeFormTab,   setActiveFormTab]   = useState('2');
   const [search,          setSearch]         = useState('');
   const [panelKey,        setPanelKey]       = useState(0);
-  const [approveTarget,   setApproveTarget]  = useState<DeptPlanWithName | null>(null);
-  const [rejectTarget,    setRejectTarget]   = useState<DeptPlanWithName | null>(null);
+//   const [approveTarget,   setApproveTarget]  = useState<DeptPlanWithName | null>(null);
+//   const [rejectTarget,    setRejectTarget]   = useState<DeptPlanWithName | null>(null);
+    const [approveTarget,    setApproveTarget]    = useState<DeptPlanWithName | null>(null);
+  const [rejectTarget,     setRejectTarget]     = useState<DeptPlanWithName | null>(null);
+  const [acknowledgeTarget, setAcknowledgeTarget] = useState<DeptPlanWithName | null>(null);
   const [acting,          setActing]         = useState(false);
   const [acknowledging,   setAcknowledging]  = useState(false);
   const [statusFilter,   setStatusFilter]   = useState<string>('all');
@@ -1074,11 +1077,25 @@ const LBPForms: React.FC = () => {
   }, [refreshDeptPlans]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const handleAcknowledge = async (plan: DeptPlanWithName) => {
+//   const handleAcknowledge = async (plan: DeptPlanWithName) => {
+//     setAcknowledging(true);
+//     try {
+//       await API.post(`/department-budget-plans/${plan.dept_budget_plan_id}/acknowledge`);
+//       toast.success(`${plan.dept_abbreviation} proposal moved to review.`);
+//       refreshDeptPlans();
+//     } catch (err: any) {
+//       toast.error(err?.response?.data?.message ?? 'Failed to acknowledge.');
+//     } finally {
+//       setAcknowledging(false);
+//     }
+//   };
+const handleAcknowledge = async () => {
+    if (!acknowledgeTarget) return;
     setAcknowledging(true);
     try {
-      await API.post(`/department-budget-plans/${plan.dept_budget_plan_id}/acknowledge`);
-      toast.success(`${plan.dept_abbreviation} proposal moved to review.`);
+      await API.post(`/department-budget-plans/${acknowledgeTarget.dept_budget_plan_id}/acknowledge`);
+      toast.success(`${acknowledgeTarget.dept_abbreviation} proposal moved to review.`);
+      setAcknowledgeTarget(null);
       refreshDeptPlans();
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'Failed to acknowledge.');
@@ -1418,11 +1435,11 @@ const LBPForms: React.FC = () => {
         Return to Draft
       </Button>
       <Button size="sm"
-        onClick={() => handleAcknowledge(selectedPlan)}
+        onClick={() => setAcknowledgeTarget(selectedPlan)}
         disabled={acknowledging}
         className="gap-1.5 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white">
         <EyeIcon className="w-3.5 h-3.5" />
-        {acknowledging ? 'Starting…' : 'Acknowledge'}
+        Acknowledge
       </Button>
     </>
   )}
@@ -1555,6 +1572,33 @@ const LBPForms: React.FC = () => {
             <AlertDialogAction asChild>
               <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={handleApprove} disabled={acting}>
                 {acting ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Approving…</> : 'Approve'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ════ ACKNOWLEDGE CONFIRM ════ */}
+      <AlertDialog open={!!acknowledgeTarget} onOpenChange={o => { if (!o) setAcknowledgeTarget(null); }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+              Acknowledge {acknowledgeTarget?.dept_abbreviation}'s proposal?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              Acknowledging confirms that the budget officer has received{' '}
+              <span className="font-medium text-gray-700">{acknowledgeTarget?.dept_name}</span>'s
+              budget proposal. It will move to <span className="font-medium text-gray-700">Under Review</span> while
+              the budget office evaluates it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleAcknowledge} disabled={acknowledging}>
+                {acknowledging ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Acknowledging…</> : 'Acknowledge'}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

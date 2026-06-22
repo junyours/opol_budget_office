@@ -18,6 +18,17 @@ class DepartmentBudgetPlan extends Model
         'status',
         'created_by',
         'updated_by',
+        'submitted_at',
+        'acknowledged_at',
+        'approved_at',
+        'returned_at',
+    ];
+
+    protected $casts = [
+        'submitted_at'    => 'datetime',
+        'acknowledged_at' => 'datetime',
+        'approved_at'     => 'datetime',
+        'returned_at'     => 'datetime',
     ];
 
     public function department()

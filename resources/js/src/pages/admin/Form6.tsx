@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import API from '../../services/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
 import { useGetIncomeFundTotals } from '../../hooks/useGetTotalAmount';
 import { LoadingState } from '../../components/states/LoadingState';
@@ -56,29 +57,28 @@ const FORCE_PESO_SIGN = new Set(['2.1']);
 const isExternallyDerived = (code: string) =>
   PS_DERIVED_CODES.has(code) || INCOME_DERIVED_CODES.has(code);
 
-// ─── Per-source state slice ───────────────────────────────────────────────────
-
-interface SourceState {
-  rows:     Form6Row[];
-  loading:  boolean;
-  syncing:  boolean;
-  initDone: boolean;
-}
-
-const emptySource = (): SourceState => ({
-  rows: [], loading: true, syncing: false, initDone: false,
-});
-
 // ─── Root component ───────────────────────────────────────────────────────────
 
 const Form6: React.FC = () => {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
-  const [tabs,        setTabs]        = useState<TabSource[]>([]);
-  const [tabsLoading, setTabsLoading] = useState(true);
-  const [activeSource,setActiveSource]= useState<string>('general-fund');
+  const [activeSource, setActiveSource] = useState<string>('general-fund');
+  const queryClient = useQueryClient();
 
-  const [stateMap, setStateMap] = useState<Record<string, SourceState>>({});
+  const { data: tabs = [{ id: 'general-fund', label: 'General Fund', type: 'general' as const }], isLoading: tabsLoading } = useQuery<TabSource[]>({
+    queryKey: ['form6-special-sources'],
+    queryFn: async () => {
+      try {
+        const res = await API.get('/form6-special/sources');
+        const specials: TabSource[] = (res.data?.data ?? []).map((s: { id: string; label: string }) => ({
+          id: s.id, label: s.label, type: 'special' as const,
+        }));
+        return [{ id: 'general-fund', label: 'General Fund', type: 'general' as const }, ...specials];
+      } catch {
+        return [{ id: 'general-fund', label: 'General Fund', type: 'general' as const }];
+      }
+    },
+  });
 
   // Income-fund derived — only used for general-fund
   const {
@@ -90,85 +90,48 @@ const Form6: React.FC = () => {
     enabled:      !!activePlan,
   });
 
-  // ── Build tab list ─────────────────────────────────────────────────────────
+// ── Fetch rows for one source ──────────────────────────────────────────────
 
-  useEffect(() => {
-    API.get('/form6-special/sources')
-      .then(res => {
-        const specials: TabSource[] = (res.data?.data ?? []).map((s: { id: string; label: string }) => ({
-          id: s.id, label: s.label, type: 'special' as const,
-        }));
-        setTabs([{ id: 'general-fund', label: 'General Fund', type: 'general' }, ...specials]);
-      })
-      .catch(() => {
-        setTabs([{ id: 'general-fund', label: 'General Fund', type: 'general' }]);
-      })
-      .finally(() => setTabsLoading(false));
-  }, []);
-
-  // ── Fetch rows for one source ──────────────────────────────────────────────
-
-  const initDoneRef = useRef<Record<string, boolean>>({});
-
-  const fetchRows = useCallback(async (source: string, planId: number) => {
-    setStateMap(prev => ({ ...prev, [source]: { ...(prev[source] ?? emptySource()), loading: true } }));
-
+  const fetchForm6Rows = useCallback(async (source: string, planId: number): Promise<Form6Row[]> => {
     const endpoint = source === 'general-fund' ? '/form6' : '/form6-special';
+    const res          = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
+    const data         = toRows(res.data?.data);
+    const recordsExist = res.data?.records_exist ?? data.length > 0;
 
-    try {
-      const res          = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
-      const data         = toRows(res.data?.data);
-      const recordsExist = res.data?.records_exist ?? data.length > 0;
-
-      if (!recordsExist && !initDoneRef.current[source]) {
-        initDoneRef.current[source] = true;
-        await API.post(`${endpoint}/init`, { budget_plan_id: planId, source });
-        const res2 = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
-        setStateMap(prev => ({
-          ...prev,
-          [source]: { rows: toRows(res2.data?.data), loading: false, syncing: false, initDone: true },
-        }));
-        return;
-      }
-
-      setStateMap(prev => ({
-        ...prev,
-        [source]: { rows: data, loading: false, syncing: false, initDone: prev[source]?.initDone ?? false },
-      }));
-    } catch {
-      toast.error(`Failed to load Form 6 data${source !== 'general-fund' ? ` for ${source}` : ''}.`);
-      setStateMap(prev => ({ ...prev, [source]: { ...(prev[source] ?? emptySource()), loading: false } }));
+    if (!recordsExist) {
+      await API.post(`${endpoint}/init`, { budget_plan_id: planId, source });
+      const res2 = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
+      return toRows(res2.data?.data);
     }
+    return data;
   }, []);
 
-  useEffect(() => {
-    if (activePlan && activeSource) {
-      fetchRows(activeSource, activePlan.budget_plan_id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePlan, activeSource]);
+  const {
+    data: activeRows = [],
+    isLoading: activeRowsLoading,
+  } = useQuery<Form6Row[]>({
+    queryKey: ['form6-rows', activeSource, activePlan?.budget_plan_id],
+    queryFn:  () => fetchForm6Rows(activeSource, activePlan!.budget_plan_id),
+    enabled:  !!activePlan && !!activeSource,
+  });
 
   // ── Sync All ───────────────────────────────────────────────────────────────
+
+  const [syncing, setSyncing] = useState(false);
 
   const handleSync = useCallback(async (source: string) => {
     if (!activePlan) return;
 
     const endpoint = source === 'general-fund' ? '/form6' : '/form6-special';
 
-    setStateMap(prev => ({ ...prev, [source]: { ...(prev[source] ?? emptySource()), syncing: true } }));
-
+    setSyncing(true);
     try {
       await API.post(`${endpoint}/sync-from-ps`,    { budget_plan_id: activePlan.budget_plan_id, source });
       const otherRes = await API.post(`${endpoint}/sync-from-other`, { budget_plan_id: activePlan.budget_plan_id, source });
 
       (otherRes.data?.warnings ?? []).forEach((w: string) => toast.warning(w));
 
-      const refreshed = await API.get(endpoint, { params: { budget_plan_id: activePlan.budget_plan_id, source } });
-
-      setStateMap(prev => ({
-        ...prev,
-        [source]: { ...(prev[source] ?? emptySource()), rows: toRows(refreshed.data?.data), syncing: false },
-      }));
+      await queryClient.invalidateQueries({ queryKey: ['form6-rows', source, activePlan.budget_plan_id] });
 
       if (source === 'general-fund') refetchDerived();
 
@@ -176,11 +139,12 @@ const Form6: React.FC = () => {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       toast.error(`Sync failed: ${e?.response?.data?.message ?? e?.message}`);
-      setStateMap(prev => ({ ...prev, [source]: { ...(prev[source] ?? emptySource()), syncing: false } }));
+    } finally {
+      setSyncing(false);
     }
-  }, [activePlan, refetchDerived]);
+  }, [activePlan, refetchDerived, queryClient]);
 
-  // ── Guards ─────────────────────────────────────────────────────────────────
+ // ── Guards ─────────────────────────────────────────────────────────────────
 
   if (planLoading || tabsLoading) return <LoadingState />;
 
@@ -222,7 +186,7 @@ const Form6: React.FC = () => {
         {/* Sync button in header only when there's a single tab (no tab bar) */}
         {!isMultiTab && (
           <SyncButton
-            syncing={stateMap['general-fund']?.syncing ?? false}
+            syncing={syncing}
             onSync={() => handleSync('general-fund')}
           />
         )}
@@ -232,8 +196,8 @@ const Form6: React.FC = () => {
       {!isMultiTab ? (
         <Form6Panel
           source="general-fund"
-          rows={stateMap['general-fund']?.rows ?? []}
-          loading={stateMap['general-fund']?.loading ?? true}
+          rows={activeRows}
+          loading={activeRowsLoading}
           syncing={false}               // button already in header
           budgetYear={budgetYear}
           derivedData={derivedData}
@@ -261,9 +225,9 @@ const Form6: React.FC = () => {
               <Form6Panel
                 source={tab.id}
                 sourceLabel={tab.type === 'special' ? tab.label : undefined}
-                rows={stateMap[tab.id]?.rows ?? []}
-                loading={stateMap[tab.id]?.loading ?? true}
-                syncing={stateMap[tab.id]?.syncing ?? false}
+                rows={tab.id === activeSource ? activeRows : []}
+                loading={tab.id === activeSource ? activeRowsLoading : true}
+                syncing={tab.id === activeSource ? syncing : false}
                 budgetYear={budgetYear}
                 derivedData={tab.id === 'general-fund' ? derivedData : null}
                 derivedLoading={tab.id === 'general-fund' ? derivedLoading : false}

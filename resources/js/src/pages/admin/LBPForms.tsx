@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+// import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import API from '../../services/api';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
 import { DepartmentBudgetPlan, ExpenseClassification, ExpenseItem } from '../../types/api';
@@ -35,6 +37,7 @@ import {
   ArrowTrendingDownIcon,
   ExclamationTriangleIcon,
   MinusIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
@@ -43,6 +46,11 @@ import { useLocation } from 'react-router-dom';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
 
 import { refreshSubmittedCount } from "@/src/hooks/useSubmittedPlanCount";
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
+import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
+
 
 // ─── Panel entrance animation ─────────────────────────────────────────────────
 const PANEL_CSS = `
@@ -74,10 +82,10 @@ const pctOf = (base: number, diff: number) =>
 
 // ─── Budget Comparison Banner ─────────────────────────────────────────────────
 
-interface BudgetComparisonBannerProps {
-  plan:         DepartmentBudgetPlan;
-  pastYearPlan: DepartmentBudgetPlan | null;
-}
+// interface BudgetComparisonBannerProps {
+//   plan:         DepartmentBudgetPlan;
+//   pastYearPlan: DepartmentBudgetPlan | null;
+// }
 
 // const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
 //   const [pastAipTotal,    setPastAipTotal]    = useState(0);
@@ -496,244 +504,273 @@ interface BudgetComparisonBannerProps {
 //   );
 // };
 
-const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
-    const [pastAipTotal,    setPastAipTotal]    = useState(0);
-  const [currentAipTotal, setCurrentAipTotal] = useState(0);
-  const [aipLoading,      setAipLoading]      = useState(true);
+// const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+//     const [pastAipTotal,    setPastAipTotal]    = useState(0);
+//   const [currentAipTotal, setCurrentAipTotal] = useState(0);
+//   const [aipLoading,      setAipLoading]      = useState(true);
 
-  useEffect(() => {
-    setAipLoading(true);
-    const currentReq = API.get('/form4-items', {
-      params: { budget_plan_id: plan.dept_budget_plan_id },
-    });
-    const pastReq = pastYearPlan
-      ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
-      : Promise.resolve({ data: { data: [] as any[] } });
+//   useEffect(() => {
+//     setAipLoading(true);
+//     const currentReq = API.get('/form4-items', {
+//       params: { budget_plan_id: plan.dept_budget_plan_id },
+//     });
+//     const pastReq = pastYearPlan
+//       ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
+//       : Promise.resolve({ data: { data: [] as any[] } });
 
-    Promise.all([currentReq, pastReq])
-      .then(([curRes, pastRes]) => {
-        const curItems:  any[] = curRes.data.data  ?? [];
-        const pastItems: any[] = pastRes.data.data ?? [];
-        setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
-        setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
-      })
-      .catch(console.error)
-      .finally(() => setAipLoading(false));
-  }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
+//     Promise.all([currentReq, pastReq])
+//       .then(([curRes, pastRes]) => {
+//         const curItems:  any[] = curRes.data.data  ?? [];
+//         const pastItems: any[] = pastRes.data.data ?? [];
+//         setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
+//         setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
+//       })
+//       .catch(console.error)
+//       .finally(() => setAipLoading(false));
+//   }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
 
-  const pastForm2Total = useMemo(
-    () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
-    [pastYearPlan],
-  );
-  const currentForm2Total = useMemo(
-    () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
-    [plan.items],
-  );
+//   const pastForm2Total = useMemo(
+//     () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [pastYearPlan],
+//   );
+//   const currentForm2Total = useMemo(
+//     () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
+//     [plan.items],
+//   );
 
-  const incomeSource = (() => {
-    const abbr = plan.department?.dept_abbreviation?.toLowerCase() ?? '';
-    const name = plan.department?.dept_name?.toLowerCase() ?? '';
-    if (abbr === 'sh'  || name.includes('slaughter'))       return 'sh';
-    if (abbr === 'occ' || name.includes('opol community'))  return 'occ';
-    if (abbr === 'pm'  || name.includes('public market'))   return 'pm';
-    return undefined;
-  })();
-  const isSpecialAccount = !!incomeSource;
+//   const incomeSource = (() => {
+//     const abbr = plan.department?.dept_abbreviation?.toLowerCase() ?? '';
+//     const name = plan.department?.dept_name?.toLowerCase() ?? '';
+//     if (abbr === 'sh'  || name.includes('slaughter'))       return 'sh';
+//     if (abbr === 'occ' || name.includes('opol community'))  return 'occ';
+//     if (abbr === 'pm'  || name.includes('public market'))   return 'pm';
+//     return undefined;
+//   })();
+//   const isSpecialAccount = !!incomeSource;
 
-  const [calamityTotal, setCalamityTotal] = useState(0);
-  useEffect(() => {
-    if (!isSpecialAccount || !plan.budget_plan?.budget_plan_id) return;
-    API.get('/calamity-fund', {
-      params: { budget_plan_id: plan.budget_plan.budget_plan_id, source: incomeSource },
-    })
-      .then(r => setCalamityTotal(parseFloat(r.data?.data?.calamity_fund) || 0))
-      .catch(() => setCalamityTotal(0));
-  }, [plan.budget_plan?.budget_plan_id, incomeSource]);
+//   const [calamityTotal, setCalamityTotal] = useState(0);
+//   useEffect(() => {
+//     if (!isSpecialAccount || !plan.budget_plan?.budget_plan_id) return;
+//     API.get('/calamity-fund', {
+//       params: { budget_plan_id: plan.budget_plan.budget_plan_id, source: incomeSource },
+//     })
+//       .then(r => setCalamityTotal(parseFloat(r.data?.data?.calamity_fund) || 0))
+//       .catch(() => setCalamityTotal(0));
+//   }, [plan.budget_plan?.budget_plan_id, incomeSource]);
 
 
 
-  const pastTotal      = pastForm2Total + pastAipTotal;
-  const currentExclCal = currentForm2Total + currentAipTotal;
-  const currentInclCal = currentExclCal + (isSpecialAccount ? calamityTotal : 0);
+//   // Special accounts (SH / OCC / PM) are self-funded: their ceiling is their own
+//   // Income Fund grand total, not the 10% prior-year growth rule.
+//   const { grandTotal: incomeGrandTotal, loading: incomeGrandLoading } =
+//     useIncomeFundGrandTotal(incomeSource ?? 'general-fund');
 
-  const diff      = currentExclCal - pastTotal;
-  const diffPct   = pctOf(pastTotal, diff);
-  const threshold = pastTotal * 1.1;
-  const isOver    = pastTotal > 0 && currentExclCal > threshold;
-  const excess    = isOver ? currentExclCal - threshold : 0;
-  const prevYear  = Number(plan.budget_plan?.year) - 1;
-  const currYear  = plan.budget_plan?.year;
+//   const pastTotal      = pastForm2Total + pastAipTotal;
+//   const currentExclCal = currentForm2Total + currentAipTotal;
+//   const currentInclCal = currentExclCal + (isSpecialAccount ? calamityTotal : 0);
 
-  return (
-    <div className={cn(
-      'rounded-xl border mb-4 px-5 py-4',
-      isOver ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200',
-    )}>
+//   const diff      = currentExclCal - pastTotal;
+//   const diffPct   = pctOf(pastTotal, diff);
 
-      {/* ── Top row ── */}
-      <div className="flex items-center gap-0 flex-wrap">
+//   const ceilingLoading = isSpecialAccount ? incomeGrandLoading : false;
+//   const threshold       = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * 1.1;
+//   const ceilingBasis     = isSpecialAccount ? currentInclCal : currentExclCal;   // special accts compare incl. calamity
+//   const isOver = isSpecialAccount
+//     ? (!ceilingLoading && threshold > 0 && ceilingBasis > threshold)
+//     : (pastTotal > 0 && ceilingBasis > threshold);
+//   const excess    = isOver ? ceilingBasis - threshold : 0;
+//   const prevYear  = Number(plan.budget_plan?.year) - 1;
+//   const currYear  = plan.budget_plan?.year;
 
-        {/* Appropriation */}
-        <div className="flex flex-col gap-0.5 pr-5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            Appropriation {prevYear}
-          </span>
-          {aipLoading
-            ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
-            : pastTotal === 0
-            ? <span className="text-[20px] font-bold text-gray-300 tracking-tight font-mono">No data</span>
-            : <span className="text-[22px] font-bold text-blue-700 tracking-tight font-mono tabular-nums leading-tight">
-                {fmtP(pastTotal)}
-              </span>
-          }
-          <span className="text-[11px] text-gray-300">Prior year</span>
-        </div>
+//   return (
+//     <div className={cn(
+//       'rounded-xl border mb-4 px-5 py-4',
+//       isOver ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200',
+//     )}>
 
-        {/* Divider */}
-        <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
+//       {/* ── Top row ── */}
+//       <div className="flex items-center gap-0 flex-wrap">
 
-        {/* Proposed */}
-        <div className="flex flex-col gap-0.5 px-5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            Proposed {currYear}
-          </span>
-          {aipLoading
-            ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
-            : <span className="text-[22px] font-bold text-gray-800 tracking-tight font-mono tabular-nums leading-tight">
-                {fmtP(currentExclCal)}
-              </span>
-          }
-          <span className="text-[11px] text-gray-300">
-            {isSpecialAccount ? 'Excl. calamity fund' : 'Current proposal'}
-          </span>
-        </div>
+//         {/* Appropriation */}
+//         <div className="flex flex-col gap-0.5 pr-5">
+//           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+//             Appropriation {prevYear}
+//           </span>
+//           {aipLoading
+//             ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
+//             : pastTotal === 0
+//             ? <span className="text-[20px] font-bold text-gray-300 tracking-tight font-mono">No data</span>
+//             : <span className="text-[22px] font-bold text-blue-700 tracking-tight font-mono tabular-nums leading-tight">
+//                 {fmtP(pastTotal)}
+//               </span>
+//           }
+//           <span className="text-[11px] text-gray-300">Prior year</span>
+//         </div>
 
-        {/* Inc/Dec badge */}
-        {!aipLoading && pastTotal > 0 && (
-          <div className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium border flex-shrink-0 mx-3',
-            isOver     ? 'bg-red-50 border-red-200 text-red-700'
-            : diff > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-            : diff < 0 ? 'bg-sky-50 border-sky-200 text-sky-700'
-            :            'bg-gray-50 border-gray-200 text-gray-500',
-          )}>
-            {isOver
-              ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-              : diff > 0
-              ? <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
-              : diff < 0
-              ? <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
-              : <MinusIcon className="w-3.5 h-3.5" />
-            }
-            {isOver
-              ? <span>+{fmtP(excess)} over ceiling</span>
-              : <span>
-                  {diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}
-                  <span className="opacity-60 ml-1">
-                    ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
-                  </span>
-                </span>
-            }
-          </div>
-        )}
+//         {/* Divider */}
+//         <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
 
-        <div className="flex-1" />
+//         {/* Proposed */}
+//         <div className="flex flex-col gap-0.5 px-5">
+//           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+//             Proposed {currYear}
+//           </span>
+//           {aipLoading
+//             ? <span className="h-7 w-32 rounded bg-gray-100 animate-pulse mt-0.5" />
+//             : <span className="text-[22px] font-bold text-gray-800 tracking-tight font-mono tabular-nums leading-tight">
+//                 {fmtP(currentExclCal)}
+//               </span>
+//           }
+//           <span className="text-[11px] text-gray-300">
+//             {isSpecialAccount ? 'Excl. calamity fund' : 'Current proposal'}
+//           </span>
+//         </div>
 
-        {/* Status — right side, separated by a vertical rule */}
-        {!aipLoading && (
-          <div className={cn(
-            'flex items-start gap-2.5 pl-5 flex-shrink-0',
-            pastTotal > 0 && 'border-l border-gray-200',
-          )}>
-            {isOver ? (
-              <>
-                <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ExclamationTriangleIcon className="w-3 h-3 text-red-600" />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[13px] font-semibold text-red-700">
-                    Above 10% appropriation ceiling
-                  </span>
-                  <span className="text-[11px] text-gray-500">
-                    Ceiling:{' '}
-                    <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
-                    {' '}·{' '}
-                    Excess:{' '}
-                    <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span>
-                  </span>
-                  {isSpecialAccount && (
-                    <span className="text-[10px] text-gray-400 italic">
-                      Calamity fund not included in ceiling comparison.
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : pastTotal === 0 ? (
-              <span className="text-[12px] text-gray-400 italic">No prior-year data for comparison.</span>
-            ) : (
-              <>
-                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <CheckCircleIcon className="w-3 h-3 text-emerald-600" />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[13px] font-semibold text-emerald-700">
-                    Within 10% appropriation ceiling
-                  </span>
-                  <span className="text-[11px] text-gray-500">
-                    Ceiling:{' '}
-                    <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
-                  </span>
-                  {isSpecialAccount && (
-                    <span className="text-[10px] text-gray-400 italic">
-                      Calamity fund not included in ceiling comparison.
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+//         {/* Inc/Dec badge */}
+//         {!aipLoading && (pastTotal > 0 || isOver) && (
+//           <div className={cn(
+//             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium border flex-shrink-0 mx-3',
+//             isOver     ? 'bg-red-50 border-red-200 text-red-700'
+//             : diff > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+//             : diff < 0 ? 'bg-sky-50 border-sky-200 text-sky-700'
+//             :            'bg-gray-50 border-gray-200 text-gray-500',
+//           )}>
+//             {isOver
+//               ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+//               : diff > 0
+//               ? <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
+//               : diff < 0
+//               ? <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
+//               : <MinusIcon className="w-3.5 h-3.5" />
+//             }
+//             {isOver
+//               ? <span>+{fmtP(excess)} over ceiling</span>
+//               : <span>
+//                   {diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}
+//                   <span className="opacity-60 ml-1">
+//                     ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+//                   </span>
+//                 </span>
+//             }
+//           </div>
+//         )}
 
-      {/* ── Calamity row (special accounts only) ── */}
-      {isSpecialAccount && !aipLoading && (
-        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100 flex-wrap">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-            5% Calamity Fund
-          </span>
-          <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
-            {calamityTotal > 0 ? fmtP(calamityTotal) : '—'}
-          </span>
-          <span className="text-[11px] text-gray-400">not counted in ceiling</span>
+//         <div className="flex-1" />
 
-          <span className="text-gray-300 text-[13px] font-mono mx-1">+</span>
+//         {/* Status — right side, separated by a vertical rule */}
+//         {!aipLoading && (
+//           <div className={cn(
+//             'flex items-start gap-2.5 pl-5 flex-shrink-0',
+//             (pastTotal > 0 || (isSpecialAccount && threshold > 0)) && 'border-l border-gray-200',
+//           )}>
+//             {ceilingLoading ? (
+//               <span className="text-[12px] text-gray-400 italic">Loading Income Fund ceiling…</span>
+//             ) : isOver ? (
+//               <>
+//                 <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+//                   <ExclamationTriangleIcon className="w-3 h-3 text-red-600" />
+//                 </div>
+//                 <div className="flex flex-col gap-0.5">
+//                   <span className="text-[13px] font-semibold text-red-700">
+//                     {isSpecialAccount ? 'Above Income Fund ceiling' : 'Above 10% appropriation ceiling'}
+//                   </span>
+//                   <span className="text-[11px] text-gray-500">
+//                     {isSpecialAccount ? 'Income Fund total' : 'Ceiling'}:{' '}
+//                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+//                     {' '}·{' '}
+//                     Excess:{' '}
+//                     <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span>
+//                   </span>
+//                   {isSpecialAccount && (
+//                     <span className="text-[10px] text-gray-400 italic">
+//                       Total proposed expenditure (incl. calamity fund) exceeds this department's Income Fund grand total.
+//                     </span>
+//                   )}
+//                 </div>
+//               </>
+//             ) : isSpecialAccount ? (
+//               threshold === 0 ? (
+//                 <span className="text-[12px] text-gray-400 italic">No Income Fund data available for comparison.</span>
+//               ) : (
+//                 <>
+//                   <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+//                     <CheckCircleIcon className="w-3 h-3 text-emerald-600" />
+//                   </div>
+//                   <div className="flex flex-col gap-0.5">
+//                     <span className="text-[13px] font-semibold text-emerald-700">
+//                       Within Income Fund ceiling
+//                     </span>
+//                     <span className="text-[11px] text-gray-500">
+//                       Income Fund total:{' '}
+//                       <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+//                     </span>
+//                     <span className="text-[10px] text-gray-400 italic">
+//                       Total proposed expenditure (incl. calamity fund) is matched against this department's Income Fund grand total.
+//                     </span>
+//                   </div>
+//                 </>
+//               )
+//             ) : pastTotal === 0 ? (
+//               <span className="text-[12px] text-gray-400 italic">No prior-year data for comparison.</span>
+//             ) : (
+//               <>
+//                 <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+//                   <CheckCircleIcon className="w-3 h-3 text-emerald-600" />
+//                 </div>
+//                 <div className="flex flex-col gap-0.5">
+//                   <span className="text-[13px] font-semibold text-emerald-700">
+//                     Within 10% appropriation ceiling
+//                   </span>
+//                   <span className="text-[11px] text-gray-500">
+//                     Ceiling:{' '}
+//                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+//                   </span>
+//                 </div>
+//               </>
+//             )}
+//           </div>
+//         )}
+//       </div>
 
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-            Dept. Expenditure
-          </span>
-          <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
-            {fmtP(currentExclCal)}
-          </span>
+//       {/* ── Calamity row (special accounts only) ── */}
+//       {isSpecialAccount && !aipLoading && (
+//         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100 flex-wrap">
+//           <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+//             5% Calamity Fund
+//           </span>
+//           <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
+//             {calamityTotal > 0 ? fmtP(calamityTotal) : '—'}
+//           </span>
+//           <span className="text-[11px] text-gray-400">not counted in ceiling</span>
 
-          <span className="text-gray-300 text-[13px] font-mono mx-1">=</span>
+//           <span className="text-gray-300 text-[13px] font-mono mx-1">+</span>
 
-          {/* Grand total chip */}
-          <div className="flex items-center gap-3 bg-gray-900 rounded-lg px-4 py-2">
-            <div className="flex flex-col gap-0">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                Total proposed {currYear}
-              </span>
-              <span className="text-[16px] font-bold font-mono tabular-nums text-white leading-tight">
-                {fmtP(currentInclCal)}
-              </span>
-              <span className="text-[10px] text-gray-600">Incl. calamity fund</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+//           <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+//             Dept. Expenditure
+//           </span>
+//           <span className="text-[14px] font-bold font-mono tabular-nums text-gray-700">
+//             {fmtP(currentExclCal)}
+//           </span>
+
+//           <span className="text-gray-300 text-[13px] font-mono mx-1">=</span>
+
+//           {/* Grand total chip */}
+//           <div className="flex items-center gap-3 bg-gray-900 rounded-lg px-4 py-2">
+//             <div className="flex flex-col gap-0">
+//               <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+//                 Total proposed {currYear}
+//               </span>
+//               <span className="text-[16px] font-bold font-mono tabular-nums text-white leading-tight">
+//                 {fmtP(currentInclCal)}
+//               </span>
+//               <span className="text-[10px] text-gray-600">Incl. calamity fund</span>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
 
 const STATUS_CFG: Record<string, { label: string; badge: string; dot: string; activeBadge: string }> = {
   draft: {
@@ -747,6 +784,12 @@ const STATUS_CFG: Record<string, { label: string; badge: string; dot: string; ac
     badge:       'text-blue-700 bg-blue-50 border-blue-200',
     activeBadge: 'text-blue-200 bg-white/10 border-white/20',
     dot:         'bg-blue-400',
+  },
+  under_review: {
+    label:       'Under Review',
+    badge:       'text-indigo-700 bg-indigo-50 border-indigo-200',
+    activeBadge: 'text-indigo-200 bg-white/10 border-white/20',
+    dot:         'bg-indigo-400',
   },
   approved: {
     label:       'Approved',
@@ -857,268 +900,268 @@ function DeptAvatar({
 const LBPForms: React.FC = () => {
   useEffect(() => { ensurePanelAnim(); }, []);
   const { user } = useAuth();
-    const location = useLocation();
-    // const { notifications, markRead } = useNotifications();
-    const notifications = useNotificationStore(s => s.notifications);
+  const location = useLocation();
+  const notifications = useNotificationStore(s => s.notifications);
   const markRead      = useNotificationStore(s => s.markRead);
   const isAdmin = user?.role === 'admin';
-const isViewer = user?.role === 'viewer';
+  const isViewer = user?.role === 'viewer';
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const activePlanId = activePlan?.budget_plan_id;
 
-  const [deptPlans,       setDeptPlans]       = useState<DeptPlanWithName[]>([]);
-  const [classifications, setClassifications] = useState<ExpenseClassification[]>([]);
-  const [expenseItems,    setExpenseItems]     = useState<ExpenseItem[]>([]);
-  const [loading,         setLoading]         = useState(true);
+  const queryClient = useQueryClient();
+
+  // ── Static reference data — cached once, shared across every click ────────
+  const { data: classifications = [] } = useQuery<ExpenseClassification[]>({
+    queryKey: ['expense-classifications'],
+    queryFn: () => API.get('/expense-classifications').then(r => r.data.data ?? []),
+  });
+
+  const { data: expenseItems = [] } = useQuery<ExpenseItem[]>({
+    queryKey: ['expense-class-items'],
+    queryFn: () => API.get('/expense-class-items').then(r => r.data.data ?? []),
+  });
+
+  const { data: categoryList = [] } = useQuery<{ dept_category_id: number; dept_category_name: string }[]>({
+    queryKey: ['department-categories'],
+    queryFn: () => API.get('/department-categories').then(r => r.data.data ?? []),
+  });
+
+  const categoryMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    categoryList.forEach(c => { map[c.dept_category_id] = c.dept_category_name; });
+    return map;
+  }, [categoryList]);
+
+  // ── Department budget plans — keyed on the active budget year only ────────
+  // Clicking a department does NOT change activePlanId, so this stays cached.
+  const {
+    data: rawDeptPlans = [],
+    isLoading: deptPlansLoading,
+  } = useQuery<DepartmentBudgetPlan[]>({
+    queryKey: ['department-budget-plans', activePlanId],
+    queryFn: () =>
+      API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId, include: 'category' } })
+        .then(r => r.data.data ?? []),
+    enabled: !!activePlanId,
+  });
+
+  const deptPlans: DeptPlanWithName[] = useMemo(() => {
+    return rawDeptPlans
+      .map(p => ({
+        ...p,
+        dept_name:         p.department?.dept_name         ?? 'Unknown',
+        dept_abbreviation: p.department?.dept_abbreviation ?? '',
+        dept_logo:         p.department?.logo              ?? null,
+        department: p.department
+          ? { ...p.department, category: p.department.category ?? null }
+          : undefined,
+      }))
+      .sort((a, b) => {
+        const catA = a.department?.dept_category_id ?? 999;
+        const catB = b.department?.dept_category_id ?? 999;
+        if (catA !== catB) return catA - catB;
+        return (a.department?.sort_order ?? 0) - (b.department?.sort_order ?? 0);
+      });
+  }, [rawDeptPlans]);
+
+  const loading = deptPlansLoading;
+
   const [selectedPlanId,  setSelectedPlanId]  = useState<number | null>(null);
-  const [pastYearPlan,       setPastYearPlan]       = useState<DepartmentBudgetPlan | null>(null);
-  const [obligationYearPlan, setObligationYearPlan] = useState<DepartmentBudgetPlan | null>(null);
-  const [loadingPast,        setLoadingPast]        = useState(false);
   const [activeFormTab,   setActiveFormTab]   = useState('2');
   const [search,          setSearch]         = useState('');
   const [panelKey,        setPanelKey]       = useState(0);
   const [approveTarget,   setApproveTarget]  = useState<DeptPlanWithName | null>(null);
   const [rejectTarget,    setRejectTarget]   = useState<DeptPlanWithName | null>(null);
   const [acting,          setActing]         = useState(false);
+  const [acknowledging,   setAcknowledging]  = useState(false);
   const [statusFilter,   setStatusFilter]   = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [cardView,       setCardView]       = useState<boolean>(false);
 
-  // ── Fetch all dept plans (sidebar list + classifications) ──────────────────
-  const fetchAll = useCallback(async () => {
-    if (!activePlanId) return;
-    try {
-      const [plansRes, classRes, itemsRes] = await Promise.all([
-        // API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId } }),
-        API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId, include: 'category' } }),
-        API.get('/expense-classifications'),
-        API.get('/expense-class-items'),
-      ]);
-
-      const raw: DepartmentBudgetPlan[] = plansRes.data.data ?? [];
-      console.log('RAW dept[0]:', JSON.stringify(raw[0], null, 2));
-      const enriched: DeptPlanWithName[] = raw
-  .map(p => ({
-    ...p,
-    dept_name:         p.department?.dept_name         ?? 'Unknown',
-    dept_abbreviation: p.department?.dept_abbreviation ?? '',
-    dept_logo:         p.department?.logo              ?? null,
-    department: p.department
-      ? { ...p.department, category: p.department.category ?? null }
-      : undefined,
-  }))
-        // .sort((a, b) => a.dept_name.localeCompare(b.dept_name));
-        .sort((a, b) => a.dept_id - b.dept_id);
-
-      setDeptPlans(enriched);
-      setClassifications(classRes.data.data ?? []);
-      setExpenseItems(itemsRes.data.data ?? []);
-
-      if (!selectedPlanId && enriched.length > 0) {
-        const firstSubmitted = enriched.find(p => p.status === 'submitted');
-        setSelectedPlanId((firstSubmitted ?? enriched[0]).dept_budget_plan_id);
-      }
-    } catch {
-      toast.error('Failed to load department plans.');
-    } finally {
-      setLoading(false);
+  // ── Default selection once plans are loaded ────────────────────────────────
+  useEffect(() => {
+    if (!selectedPlanId && deptPlans.length > 0) {
+      const firstSubmitted = deptPlans.find(p => p.status === 'submitted');
+      setSelectedPlanId((firstSubmitted ?? deptPlans[0]).dept_budget_plan_id);
     }
-  }, [activePlanId, selectedPlanId]);
+  }, [deptPlans, selectedPlanId]);
 
-  useEffect(() => { if (activePlanId) fetchAll(); }, [activePlanId]);
+  // ── Refresh the dept plans list (status badges, totals) after an action ───
+  const refreshDeptPlans = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['department-budget-plans', activePlanId] });
+  }, [queryClient, activePlanId]);
 
   const locationState = location.state as { deptId?: number } | null;
 
-    // useEffect(() => {
-    // const incoming = locationState?.deptId;
-    // if (!incoming || !deptPlans.length) return;
-    // const match = deptPlans.find(p => p.dept_id === incoming);
-    // if (match) {
-    //     setSelectedPlanId(match.dept_budget_plan_id);
-    //     setPanelKey(k => k + 1);
-    //     window.history.replaceState({}, '');
-    // }
-    // }, [deptPlans, locationState?.deptId]);
-
-    useEffect(() => {
+  useEffect(() => {
     const incoming = locationState?.deptId;
     if (!incoming || !deptPlans.length) return;
     const match = deptPlans.find(p => p.dept_id === incoming);
     if (match) {
         setSelectedPlanId(match.dept_budget_plan_id);
         setPanelKey(k => k + 1);
-        markDeptNotificationsRead(incoming); // ← only this line added
+        markDeptNotificationsRead(incoming);
         window.history.replaceState({}, '');
     }
-    }, [deptPlans, locationState?.deptId]);
-
-  // ── Fetch past year plans for the selected department ─────────────────────
-  // Extracted so it can be called independently (e.g. after an item update)
-  // without triggering a full sidebar reload.
-  const fetchPastPlans = useCallback(async (deptId: number) => {
-    if (!activePlan) return;
-    setLoadingPast(true);
-    setPastYearPlan(null);
-    setObligationYearPlan(null);
-    try {
-      const [pastResult, oblResult] = await Promise.allSettled([
-        API.get(`/department-budget-plans/by-dept-year/${deptId}/${activePlan.year - 1}`),
-        API.get(`/department-budget-plans/by-dept-year/${deptId}/${activePlan.year - 2}`),
-      ]);
-      setPastYearPlan(pastResult.status === 'fulfilled' ? pastResult.value.data.data : null);
-      setObligationYearPlan(oblResult.status === 'fulfilled' ? oblResult.value.data.data : null);
-    } finally {
-      setLoadingPast(false);
-    }
-  }, [activePlan]);
+  }, [deptPlans, locationState?.deptId]);
 
   const selectedPlan = useMemo(
     () => deptPlans.find(p => p.dept_budget_plan_id === selectedPlanId) ?? null,
     [deptPlans, selectedPlanId]
   );
 
-  // Re-fetch past plans whenever the selected department changes
-  useEffect(() => {
-    if (!selectedPlan || !activePlan) return;
-    fetchPastPlans(selectedPlan.dept_id);
-  }, [selectedPlanId]); // intentionally only on selectedPlanId to avoid loop
+  // ── Past-year / obligation-year plans for the selected department ─────────
+  // Cached per [deptId, year] — switching back and forth between departments
+  // (or remounting Form2) reuses the cache instead of refetching.
+  const deptId = selectedPlan?.dept_id;
+  const pastYear = activePlan ? activePlan.year - 1 : undefined;
+  const oblYear  = activePlan ? activePlan.year - 2 : undefined;
 
-//   const handleSelectPlan = (id: number) => {
-//     if (id === selectedPlanId) return;
-//     setSelectedPlanId(id);
-//     setPanelKey(k => k + 1);
-//   };
+ const [pastYearQ, oblYearQ] = useQueries({
+    queries: [
+      {
+        queryKey: ['dept-budget-plan-by-year', deptId ?? 'none', pastYear ?? 'none', 'past'],
+        queryFn: () =>
+          API.get(`/department-budget-plans/by-dept-year/${deptId}/${pastYear}`)
+            .then(r => r.data.data)
+            .catch(() => null),
+        enabled: !!deptId && !!pastYear,
+      },
+      {
+        queryKey: ['dept-budget-plan-by-year', deptId ?? 'none', oblYear ?? 'none', 'obl'],
+        queryFn: () =>
+          API.get(`/department-budget-plans/by-dept-year/${deptId}/${oblYear}`)
+            .then(r => r.data.data)
+            .catch(() => null),
+        enabled: !!deptId && !!oblYear,
+      },
+    ],
+  });
 
-const markDeptNotificationsRead = useCallback((deptId: number) => {
+  const pastYearPlan: DepartmentBudgetPlan | null = pastYearQ.data ?? null;
+  const obligationYearPlan: DepartmentBudgetPlan | null = oblYearQ.data ?? null;
+  const loadingPast = (pastYearQ.isLoading && !!deptId) || (oblYearQ.isLoading && !!deptId);
+
+  const markDeptNotificationsRead = useCallback((deptId: number) => {
     notifications
-        .filter(n => n.dept_id === deptId)
+        .filter(n => n.dept_id === deptId && !n.read_at)
         .forEach(n => markRead(n.id));
 }, [notifications, markRead]);
 
-const handleSelectPlan = (id: number) => {
-    if (id === selectedPlanId) return;
-    setSelectedPlanId(id);
-    setPanelKey(k => k + 1);
-    const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
-    if (plan) markDeptNotificationsRead(plan.dept_id);
-};
+  const handleSelectPlan = (id: number) => {
+      if (id === selectedPlanId) return;
+      setSelectedPlanId(id);
+      setPanelKey(k => k + 1);
+      const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
+      if (plan) markDeptNotificationsRead(plan.dept_id);
+  };
 
-  // ── Called by Form2 when an item is saved ─────────────────────────────────
-  // Refreshes BOTH the past year plans (so obligation amounts reappear)
-  // AND the dept plans list (so status badges stay current).
-  // Does NOT reset loadingPast so the form doesn't flash a skeleton.
-  const handleItemUpdate = useCallback(async () => {
-    if (!selectedPlan || !activePlan) return;
+//   // ── Called by Form2 when an item is saved ─────────────────────────────────
+//   const handleItemUpdate = useCallback(() => {
+//     if (!selectedPlan || !activePlan) return;
+//     queryClient.invalidateQueries({
+//       queryKey: ['dept-budget-plan-by-year', selectedPlan.dept_id],
+//     });
+//     refreshDeptPlans();
+//   }, [selectedPlan, activePlan, refreshDeptPlans, queryClient]);
 
-    // Silently refresh past year plans so updated obligation amounts appear
-    // without wiping local Form2 state (Form2 handles its own optimistic update,
-    // but we also need the props to reflect truth for the next render cycle).
-    try {
-      const [pastResult, oblResult] = await Promise.allSettled([
-        API.get(`/department-budget-plans/by-dept-year/${selectedPlan.dept_id}/${activePlan.year - 1}`),
-        API.get(`/department-budget-plans/by-dept-year/${selectedPlan.dept_id}/${activePlan.year - 2}`),
-      ]);
-      if (pastResult.status === 'fulfilled') setPastYearPlan(pastResult.value.data.data);
-      if (oblResult.status === 'fulfilled') setObligationYearPlan(oblResult.value.data.data);
-    } catch { /* silent */ }
-
-    // Also refresh the sidebar list (non-blocking — don't await)
-    fetchAll();
-  }, [selectedPlan, activePlan, fetchAll]);
+// ── Called by Form2 when an item is saved ─────────────────────────────────
+  // Refetches the department list so BudgetComparisonBanner reflects the
+  // new totals. Runs once per save (saves only fire on blur, not per keystroke).
+  const handleItemUpdate = useCallback(() => {
+    refreshDeptPlans();
+  }, [refreshDeptPlans]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-//   const handleApprove = async () => {
-//     if (!approveTarget) return;
-//     setActing(true);
-//     try {
-//       await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
-//       toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
-//       setApproveTarget(null);
-//       fetchAll();
-//     } catch (err: any) {
-//       toast.error(err?.response?.data?.message ?? 'Failed to approve.');
-//     } finally { setActing(false); }
-//   };
+  const handleAcknowledge = async (plan: DeptPlanWithName) => {
+    setAcknowledging(true);
+    try {
+      await API.post(`/department-budget-plans/${plan.dept_budget_plan_id}/acknowledge`);
+      toast.success(`${plan.dept_abbreviation} proposal moved to review.`);
+      refreshDeptPlans();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to acknowledge.');
+    } finally {
+      setAcknowledging(false);
+    }
+  };
 
-//   const handleReject = async () => {
-//     if (!rejectTarget) return;
-//     setActing(true);
-//     try {
-//       await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
-//       toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
-//       setRejectTarget(null);
-//       fetchAll();
-//     } catch (err: any) {
-//       toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
-//     } finally { setActing(false); }
-//   };
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    setActing(true);
+    try {
+      await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
+      toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
+      setApproveTarget(null);
+      refreshDeptPlans();
+      refreshSubmittedCount();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to approve.');
+    } finally { setActing(false); }
+  };
 
-const handleApprove = async () => {
-  if (!approveTarget) return;
-  setActing(true);
-  try {
-    await API.post(`/department-budget-plans/${approveTarget.dept_budget_plan_id}/approve`);
-    toast.success(`${approveTarget.dept_abbreviation} plan approved.`);
-    setApproveTarget(null);
-    fetchAll();
-    refreshSubmittedCount(); // ← add this
-  } catch (err: any) {
-    toast.error(err?.response?.data?.message ?? 'Failed to approve.');
-  } finally { setActing(false); }
-};
-
-const handleReject = async () => {
-  if (!rejectTarget) return;
-  setActing(true);
-  try {
-    await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
-    toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
-    setRejectTarget(null);
-    fetchAll();
-    refreshSubmittedCount(); // ← add this
-  } catch (err: any) {
-    toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
-  } finally { setActing(false); }
-};
+  const handleReject = async () => {
+    if (!rejectTarget) return;
+    setActing(true);
+    try {
+      await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
+      toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
+      setRejectTarget(null);
+      refreshDeptPlans();
+      refreshSubmittedCount();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to return to draft.');
+    } finally { setActing(false); }
+  };
 
   // ── Filtered list ──────────────────────────────────────────────────────────
-//   const filteredPlans = useMemo(() => {
-//     const q = search.toLowerCase();
-//     if (!q) return deptPlans;
-//     return deptPlans.filter(
-//       p =>
-//         p.dept_name.toLowerCase().includes(q) ||
-//         p.dept_abbreviation.toLowerCase().includes(q)
-//     );
-//   }, [deptPlans, search]);
+  const getCategoryName = useCallback(
+    (p: DeptPlanWithName) =>
+      p.department?.category?.dept_category_name
+      ?? categoryMap[p.department?.dept_category_id ?? -1]
+      ?? null,
+    [categoryMap]
+  );
 
-// Collect unique department categories (requires dept_category on your type — adjust field name as needed)
-const deptCategories = useMemo(() => {
-  const cats = deptPlans
-    .map(p => p.department?.category?.dept_category_name ?? null)
-    .filter((c): c is string => !!c);
-  return Array.from(new Set(cats)).sort();
-}, [deptPlans]);
+  const deptCategories = useMemo(() => {
+    const cats = deptPlans
+      .map(p => getCategoryName(p))
+      .filter((c): c is string => !!c);
+    return Array.from(new Set(cats)).sort();
+  }, [deptPlans, getCategoryName]);
 
-const filteredPlans = useMemo(() => {
-  const q = search.toLowerCase();
-  return deptPlans.filter(p => {
-    const matchSearch =
-      !q ||
-      p.dept_name.toLowerCase().includes(q) ||
-      p.dept_abbreviation.toLowerCase().includes(q);
+  const filteredPlans = useMemo(() => {
+    const q = search.toLowerCase();
+    return deptPlans.filter(p => {
+      const matchSearch =
+        !q ||
+        p.dept_name.toLowerCase().includes(q) ||
+        p.dept_abbreviation.toLowerCase().includes(q);
 
-    const matchStatus =
-      statusFilter === 'all' || p.status === statusFilter;
+      const matchStatus =
+        statusFilter === 'all' || p.status === statusFilter;
 
-    const matchCategory =
-      categoryFilter === 'all' ||
-      (p.department?.category?.dept_category_name ?? '') === categoryFilter;
+      const matchCategory =
+        categoryFilter === 'all' ||
+        (getCategoryName(p) ?? '') === categoryFilter;
 
-    return matchSearch && matchStatus && matchCategory;
-  });
-}, [deptPlans, search, statusFilter, categoryFilter]);
+      return matchSearch && matchStatus && matchCategory;
+    });
+  }, [deptPlans, search, statusFilter, categoryFilter, getCategoryName]);
+
+  const groupedPlans = useMemo(() => {
+    const map = new Map<string, { categoryName: string; categoryId: number; plans: DeptPlanWithName[] }>();
+    filteredPlans.forEach(plan => {
+      const categoryName = getCategoryName(plan) ?? 'Uncategorized';
+      const categoryId    = plan.department?.dept_category_id ?? 9999;
+      if (!map.has(categoryName)) {
+        map.set(categoryName, { categoryName, categoryId, plans: [] });
+      }
+      map.get(categoryName)!.plans.push(plan);
+    });
+    return Array.from(map.values()).sort((a, b) => a.categoryId - b.categoryId);
+  }, [filteredPlans, getCategoryName]);
 
   const counts = useMemo(() => ({
     submitted: deptPlans.filter(p => p.status === 'submitted').length,
@@ -1169,13 +1212,13 @@ const filteredPlans = useMemo(() => {
     Status
   </p>
   <div className="flex flex-col gap-0.5">
-    {(['all', 'draft', 'submitted', 'approved'] as const).map(s => {
+    {(['all', 'draft', 'submitted', 'under_review', 'approved'] as const).map(s => {
       const labels: Record<string, string> = {
-        all: 'All', draft: 'Draft', submitted: 'Submitted', approved: 'Approved',
+        all: 'All', draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review', approved: 'Approved',
       };
       const dots: Record<string, string> = {
         all: 'bg-gray-400', draft: 'bg-amber-400',
-        submitted: 'bg-blue-400', approved: 'bg-emerald-500',
+        submitted: 'bg-blue-400', under_review: 'bg-indigo-400', approved: 'bg-emerald-500',
       };
       const active = statusFilter === s;
       return (
@@ -1213,98 +1256,92 @@ const filteredPlans = useMemo(() => {
     <p className="px-1.5 mb-1 mt-2 text-[9px] font-semibold uppercase tracking-widest text-gray-400">
       Category
     </p>
-    <div className="flex flex-col gap-0.5">
-      {(['all', ...deptCategories]).map(cat => {
-        const active = categoryFilter === cat;
-        return (
-          <button
-            key={cat}
-            onClick={() => setCategoryFilter(cat)}
-            className={cn(
-              'flex items-center gap-2 w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-all truncate',
-              active
-                ? 'bg-gray-900 text-white font-medium'
-                : 'text-gray-600 hover:bg-white/70 hover:text-gray-800',
-            )}
-          >
-            {cat === 'all' ? 'All Categories' : cat}
-          </button>
-        );
-      })}
-    </div>
+    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+      <SelectTrigger className="h-8 text-xs border-gray-200 bg-white">
+        <SelectValue placeholder="All Categories" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">
+          All Categories
+        </SelectItem>
+        {deptCategories.map(cat => (
+          <SelectItem key={cat} value={cat} className="text-xs">
+            {cat}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   </div>
 )}
 
 {/* Divider before list */}
 <div className="border-t border-gray-100 mx-2 mb-2" />
 
-        {/* Department list */}
+        {/* Department list — grouped by category */}
         {filteredPlans.length === 0 ? (
           <p className="px-2.5 py-6 text-xs text-gray-400 text-center">No departments found.</p>
         ) : (
-          filteredPlans.map(plan => {
-            //  console.log(plan.dept_abbreviation, '→', plan.department?.category?.dept_category_name);
-            const cfg    = getStatusCfg(plan.status);
-            const active = plan.dept_budget_plan_id === selectedPlanId;
+          groupedPlans.map(group => (
+            <div key={group.categoryName} className="mb-3 last:mb-0">
+              <p className="px-2.5 mb-1 mt-1 text-[9px] font-semibold uppercase tracking-widest text-gray-400/70 truncate">
+                {group.categoryName}
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {group.plans.map(plan => {
+                  const cfg    = getStatusCfg(plan.status);
+                  const active = plan.dept_budget_plan_id === selectedPlanId;
 
-            return (
-            //   <button
-            //     key={plan.dept_budget_plan_id}
-            //     onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
-            //     className={cn(
-            //       'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all',
-            //       active
-            //         ? 'bg-gray-900 shadow-sm border border-gray-800 text-white'
-            //         : 'text-gray-600 hover:bg-white/70 hover:text-gray-800 border border-transparent',
-            //     )}
-            //   >
-            <button
-                key={plan.dept_budget_plan_id}
-                onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
-                className={cn(
-                  'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all border',
-                  active
-                    ? cn('bg-gray-900 text-white shadow-md', getCatColors(plan.department?.dept_category_id).activeBorder)
-                    : cn(getCatColors(plan.department?.dept_category_id).card, 'text-gray-700'),
-                )}
-              >
-                <DeptAvatar
-                  logo={plan.dept_logo}
-                  abbreviation={plan.dept_abbreviation}
-                  name={plan.dept_name}
-                  deptId={plan.dept_id}
-                  active={active}
-                  size="sm"
-                />
+                  return (
+                    <button
+                      key={plan.dept_budget_plan_id}
+                      onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
+                      className={cn(
+                        'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all border',
+                        active
+                          ? cn('bg-gray-900 text-white shadow-md', getCatColors(plan.department?.dept_category_id).activeBorder)
+                          : cn(getCatColors(plan.department?.dept_category_id).card, 'text-gray-700'),
+                      )}
+                    >
+                      <DeptAvatar
+                        logo={plan.dept_logo}
+                        abbreviation={plan.dept_abbreviation}
+                        name={plan.dept_name}
+                        deptId={plan.dept_id}
+                        active={active}
+                        size="sm"
+                      />
 
-                <div className="flex-1 min-w-0">
-                  <span className={cn(
-                    'text-[12px] font-medium leading-tight block truncate',
-                    active ? 'text-white' : 'text-gray-800',
-                  )}>
-                    {plan.dept_abbreviation
-                      ? plan.dept_abbreviation.replace(/[()]/g, '').trim()
-                      : plan.dept_name}
-                  </span>
-                  {active && (
-                    <span className={cn(
-                      'text-[10px] leading-tight block truncate mt-0.5',
-                      active ? 'text-gray-300' : 'text-gray-400',
-                    )}>
-                      {plan.dept_name}
-                    </span>
-                  )}
-                </div>
+                      <div className="flex-1 min-w-0">
+                        <span className={cn(
+                          'text-[12px] font-medium leading-tight block truncate',
+                          active ? 'text-white' : 'text-gray-800',
+                        )}>
+                          {plan.dept_abbreviation
+                            ? plan.dept_abbreviation.replace(/[()]/g, '').trim()
+                            : plan.dept_name}
+                        </span>
+                        {active && (
+                          <span className={cn(
+                            'text-[10px] leading-tight block truncate mt-0.5',
+                            active ? 'text-gray-300' : 'text-gray-400',
+                          )}>
+                            {plan.dept_name}
+                          </span>
+                        )}
+                      </div>
 
-               <span className={cn(
-                  'text-[9px] font-semibold px-1.5 py-0.5 rounded-full border flex-shrink-0',
-                  active ? 'bg-white/20 text-white border-white/30' : cfg.badge,
-                )}>
-                  {cfg.label}
-                </span>
-              </button>
-            );
-          })
+                      <span className={cn(
+                        'text-[9px] font-semibold px-1.5 py-0.5 rounded-full border flex-shrink-0',
+                        active ? 'bg-white/20 text-white border-white/30' : cfg.badge,
+                      )}>
+                        {cfg.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))
         )}
       </aside>
 
@@ -1372,7 +1409,24 @@ const filteredPlans = useMemo(() => {
       )} />
     </button>
   </div>
-  {!isViewer && selectedPlan.status === 'submitted' && (
+ {!isViewer && selectedPlan.status === 'submitted' && (
+    <>
+      <Button size="sm" variant="outline"
+        onClick={() => setRejectTarget(selectedPlan)}
+        className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+        <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+        Return to Draft
+      </Button>
+      <Button size="sm"
+        onClick={() => handleAcknowledge(selectedPlan)}
+        disabled={acknowledging}
+        className="gap-1.5 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white">
+        <EyeIcon className="w-3.5 h-3.5" />
+        {acknowledging ? 'Starting…' : 'Acknowledge'}
+      </Button>
+    </>
+  )}
+  {!isViewer && selectedPlan.status === 'under_review' && (
     <>
       <Button size="sm" variant="outline"
         onClick={() => setRejectTarget(selectedPlan)}
@@ -1397,6 +1451,18 @@ const filteredPlans = useMemo(() => {
     </Button>
   )}
 </div>
+            </div>
+
+            {/* Progress stepper */}
+            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4">
+              <BudgetPlanStepper
+                status={selectedPlan.status}
+                submittedAt={selectedPlan.submitted_at}
+                acknowledgedAt={selectedPlan.acknowledged_at}
+                approvedAt={selectedPlan.approved_at}
+                createdAt={selectedPlan.created_at}
+                isAdmin={isAdmin}
+              />
             </div>
 
             {/* Forms area */}

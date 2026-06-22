@@ -45,10 +45,10 @@ const PlantillaPage: React.FC = () => {
   const [currentPage, setCurrentPage]     = useState(1);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0 });
+  const [createForm, setCreateForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
   const [editDialogOpen, setEditDialogOpen]     = useState(false);
   const [editingPosition, setEditingPosition]   = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0 });
+  const [editForm, setEditForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
   const [toggleActiveOpen, setToggleActiveOpen] = useState(false);
   const [togglePosition, setTogglePosition]     = useState<any | null>(null);
   const [confirmCreateOpen, setConfirmCreateOpen] = useState(false);
@@ -141,20 +141,26 @@ const PlantillaPage: React.FC = () => {
   const handleConfirmCreate = async () => {
     setConfirmCreateOpen(false);
     try {
-      await API.post('/plantilla-positions', createForm);
+      await API.post('/plantilla-positions', {
+        ...createForm,
+        extension_department_id: createForm.extension_department_id !== '' ? parseInt(createForm.extension_department_id) : null,
+      });
       toast.success('Position created.'); fetchData(); setCreateDialogOpen(false);
-      setCreateForm({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: selectedDeptId || 0 });
+      setCreateForm({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: selectedDeptId || 0, extension_department_id: '' });
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
   const handleEdit = (pos: any) => {
     setEditingPosition(pos);
-    setEditForm({ old_item_number: pos.old_item_number || '', new_item_number: pos.new_item_number, position_title: pos.position_title, salary_grade: pos.salary_grade, dept_id: pos.dept_id });
+    setEditForm({ old_item_number: pos.old_item_number || '', new_item_number: pos.new_item_number, position_title: pos.position_title, salary_grade: pos.salary_grade, dept_id: pos.dept_id, extension_department_id: pos.extension_department_id != null ? String(pos.extension_department_id) : '' });
     setEditDialogOpen(true);
   };
   const handleConfirmUpdate = async () => {
     setConfirmUpdateOpen(false); if (!editingPosition) return;
     try {
-      await API.put(`/plantilla-positions/${editingPosition.plantilla_position_id}`, editForm);
+      await API.put(`/plantilla-positions/${editingPosition.plantilla_position_id}`, {
+        ...editForm,
+        extension_department_id: editForm.extension_department_id !== '' ? parseInt(editForm.extension_department_id) : null,
+      });
       toast.success('Position updated.'); fetchData(); setEditDialogOpen(false); setEditingPosition(null);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
@@ -465,9 +471,19 @@ const PlantillaPage: React.FC = () => {
                 <Input value={(createForm as any)[f.key]} onChange={e => setCreateForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} className="h-9 text-sm" />
               </div>
             ))}
-            <div className="space-y-1.5">
+           <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Salary Grade</Label>
               <Input type="number" min={1} max={40} value={createForm.salary_grade} onChange={e => setCreateForm(p => ({ ...p, salary_grade: parseInt(e.target.value) || 1 }))} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-600">Extension Group <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input
+                type="number" min={1}
+                value={createForm.extension_department_id}
+                onChange={e => setCreateForm(p => ({ ...p, extension_department_id: e.target.value }))}
+                placeholder="Leave blank for main group"
+                className="h-9 text-sm"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Department</Label>
@@ -502,6 +518,16 @@ const PlantillaPage: React.FC = () => {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Salary Grade</Label>
               <Input type="number" min={1} max={40} value={editForm.salary_grade} onChange={e => setEditForm(p => ({ ...p, salary_grade: parseInt(e.target.value) || 1 }))} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-600">Extension Group <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input
+                type="number" min={1}
+                value={editForm.extension_department_id}
+                onChange={e => setEditForm(p => ({ ...p, extension_department_id: e.target.value }))}
+                placeholder="Leave blank for main group"
+                className="h-9 text-sm"
+              />
             </div>
           </div>
           <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">

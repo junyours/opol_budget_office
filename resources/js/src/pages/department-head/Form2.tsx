@@ -6,6 +6,7 @@ import React, {
     useRef,
 } from "react";
 import API from "../../services/api";
+import { useQueries } from "@tanstack/react-query";
 import {
     DepartmentBudgetPlan,
     ExpenseClassification,
@@ -14,6 +15,7 @@ import {
     DepartmentBudgetPlanForm4Item,
 } from "../../types/api";
 import AddItemModal from "./AddItemModal";
+import { BudgetComparisonBanner } from "@/src/components/budget/BudgetComparisonBanner";
 import { Button } from "@/src/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -319,32 +321,44 @@ const Form2: React.FC<Form2Props> = ({
     const currYear = plan.budget_plan?.year;
 
     const [appropriationAipItems, setAppropriationAipItems] = useState<any[]>([]);
-    const aipFetchKey = useRef<string>('');
 
-    // ── Effect: Load AIP items + obligation-year obligations ──────────────────
-
-    useEffect(() => {
     const oblPlanId = obligationYearPlan?.dept_budget_plan_id;
     const appPlanId = pastYearPlan?.dept_budget_plan_id;
-    const fetchKey = `${plan.dept_budget_plan_id}-${oblPlanId ?? 0}-${appPlanId ?? 0}`;
-    if (aipFetchKey.current === fetchKey) return;
-    aipFetchKey.current = fetchKey;
 
-    const currentReq = API.get("/form4-items", {
-        params: { budget_plan_id: plan.dept_budget_plan_id },
+    const [currentForm4Q, oblForm4Q, appForm4Q] = useQueries({
+        queries: [
+            {
+                queryKey: ["form4-items", plan.dept_budget_plan_id ?? "current-pending"],
+                queryFn: () =>
+                    API.get("/form4-items", { params: { budget_plan_id: plan.dept_budget_plan_id } })
+                        .then(r => r.data?.data ?? []),
+                enabled: !!plan.dept_budget_plan_id,
+            },
+            {
+                queryKey: ["form4-items", oblPlanId ?? "obligation-pending"],
+                queryFn: () =>
+                    API.get("/form4-items", { params: { budget_plan_id: oblPlanId } })
+                        .then(r => r.data?.data ?? []),
+                enabled: !!oblPlanId,
+            },
+            {
+                queryKey: ["form4-items", appPlanId ?? "appropriation-pending"],
+                queryFn: () =>
+                    API.get("/form4-items", { params: { budget_plan_id: appPlanId } })
+                        .then(r => r.data?.data ?? []),
+                enabled: !!appPlanId,
+            },
+        ],
     });
-    const obligationReq = oblPlanId
-        ? API.get("/form4-items", { params: { budget_plan_id: oblPlanId } })
-        : Promise.resolve({ data: { data: [] as any[] } });
-    const appropriationReq = appPlanId                  // ← ADD
-        ? API.get("/form4-items", { params: { budget_plan_id: appPlanId } })
-        : Promise.resolve({ data: { data: [] as any[] } });
 
-    Promise.all([currentReq, obligationReq, appropriationReq])
-        .then(([currentRes, oblRes, appRes]) => {
-            const currentItems: any[] = currentRes.data.data ?? [];
-            const obligationItems: any[] = oblRes.data.data ?? [];
-            const appropriationItems: any[] = appRes.data.data ?? [];
+    // ── Effect: Merge AIP items + obligation-year obligations ─────────────────
+
+    useEffect(() => {
+        if (currentForm4Q.isLoading) return;
+        const currentItems: any[] = currentForm4Q.data ?? [];
+        const obligationItems: any[] = oblForm4Q.data ?? [];
+        const appropriationItems: any[] = appForm4Q.data ?? [];
+        (() => {
 
             // existing oblByProgram map...
             const oblByProgram = new Map<number, { itemId: number; obligation: number }>();
@@ -402,9 +416,8 @@ const Form2: React.FC<Form2Props> = ({
                 if (item.oblAipItemId) oblAipItemIdRef.current.set(id, item.oblAipItemId);
                 aipProgramIdRef.current.set(id, item.aip_program_id);
             }
-        })
-        .catch(console.error);
-}, [plan.dept_budget_plan_id, obligationYearPlan?.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]); // ← ADD pastYearPlan dep
+        })();
+    }, [currentForm4Q.data, oblForm4Q.data, appForm4Q.data]);
 
     // ── Effect: Build regular items from plan + pastYear + obligationYear ─────
 
@@ -1440,6 +1453,7 @@ const Form2: React.FC<Form2Props> = ({
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
+        <>
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
                 <div>
@@ -2200,15 +2214,18 @@ const Form2: React.FC<Form2Props> = ({
                                                               item.expense_item_id,
                                                           )!
                                                         : item.pastSem1;
-                                                const sem2Cap =
-                                                    past > 0 ? past : proposed;
-                                                // const dispSem2 =
-                                                //     pastSem1Edits.has(
-                                                //         item.expense_item_id,
-                                                //     )
-                                                //         ? sem2Cap - dispSem1
-                                                //         : item.pastSem2;
-                                                const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
+                                                // const sem2Cap =
+                                                //     past > 0 ? past : proposed;
+                                                // // const dispSem2 =
+                                                // //     pastSem1Edits.has(
+                                                // //         item.expense_item_id,
+                                                // //     )
+                                                // //         ? sem2Cap - dispSem1
+                                                // //         : item.pastSem2;
+                                                // const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
+
+                                                const sem2Cap = past > 0 ? past : 0;
+const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 const sem1Editable =
                                                     isAdmin &&
                                                     isEditable &&
@@ -3312,6 +3329,7 @@ const Form2: React.FC<Form2Props> = ({
                 />
             )}
         </div>
+        </>
     );
 };
 

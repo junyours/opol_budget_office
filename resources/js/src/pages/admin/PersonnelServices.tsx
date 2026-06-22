@@ -112,13 +112,14 @@ interface ApiAssignment {
   effective_date: string | null;
   created_at: string;
   updated_at: string;
-  plantilla_position: {
+ plantilla_position: {
     plantilla_position_id: number;
     old_item_number: string | null;
     new_item_number: string;
     position_title: string;
     salary_grade: number;
     dept_id: number;
+    extension_department_id: number | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -215,6 +216,7 @@ interface PersonnelServiceRow {
   incrementMonths: number;
   savedMonthly: number;
   savedAnnual: number;
+  extensionDeptId: number | null;
 }
 
 const ALLOWANCE_TO_EXPENSE_ITEM: Record<string, string[]> = {
@@ -489,7 +491,13 @@ const handleSettingsChange = async (s: PsSettings) => {
 //     })();
 //   }, []);
 
-useEffect(() => { refresh(); }, []);
+
+// No unconditional refresh on mount — useSalaryMatrix's own caching (inherited
+// from the global QueryClient defaults) is sufficient. If TranchePage activates
+// a new tranche, that page should invalidate ['salary-standard-versions'] itself
+// so any already-mounted PersonnelServices picks it up via React Query's normal
+// invalidation flow, instead of forcing a refetch on every PersonnelServices mount.
+// useEffect(() => { refresh(); }, []);
 
   const { data: departments = [],      isLoading: deptsLoading    } = useQuery<Department[]>({
     queryKey: ['departments'],
@@ -659,16 +667,23 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
         rowSubTotal, incrementRow, rowTotal,
         stepUpDate, baseMonths, incrementMonths,
         savedMonthly, savedAnnual,
+        extensionDeptId: pos.extension_department_id ?? null,
       });
     });
 
     // return rowsByDept;
-    // Sort each department's rows by new item number ascending
+    // Sort each department's rows: by extensionDeptId (null first), then by new item number ascending
     Object.keys(rowsByDept).forEach(deptId => {
       rowsByDept[parseInt(deptId)].sort((a, b) => {
-        const aNum = parseInt(a.newItemNumber, 10) || 0;
-        const bNum = parseInt(b.newItemNumber, 10) || 0;
-        return aNum - bNum;
+        const aExt = a.extensionDeptId ?? -1;
+        const bExt = b.extensionDeptId ?? -1;
+        if (aExt !== bExt) return aExt - bExt;
+        const aNum = parseInt(a.newItemNumber, 10);
+        const bNum = parseInt(b.newItemNumber, 10);
+        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+        if (!isNaN(aNum)) return -1;
+        if (!isNaN(bNum)) return 1;
+        return a.newItemNumber.localeCompare(b.newItemNumber);
       });
     });
 
@@ -831,9 +846,26 @@ if (planLoading || matrixLoading || deptsLoading || assignLoading || deptPlansLo
 if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
   if (!activeVersion) return <div className="p-8 text-center text-yellow-600">No active salary version found.</div>;
 
+  const EXTENSION_DEPT_NAMES: Record<number, string> = {
+    1: 'Motorpool Division',
+  };
+
+  const getExtensionGroupLabel = (id: number | null): string | null => {
+    if (id === null) return null;
+    return EXTENSION_DEPT_NAMES[id] ?? `Extension Group ${id}`;
+  };
+
+  // Editing is only allowed while the plan is still a draft or actively
+  // under review (acknowledged-but-not-yet-decided). Every other status —
+  // submitted (pending acknowledgment), approved, rejected, or anything
+  // future — is locked by default. This is a whitelist on purpose: a new
+  // status added later is locked automatically instead of silently editable.
+  const EDITABLE_STATUSES = ['draft', 'under_review']; // ⚠️ verify 'acknowledged' matches your backend's actual status string for "under review"
+
   const cDeptId   = parseInt(activeTab);
   const cDeptPlan = deptBudgetPlans.find(p => p.dept_id === cDeptId && p.budget_plan_id === activePlan.budget_plan_id);
-  const isSubmitted = cDeptPlan?.status === 'submitted';
+  const planStatus  = cDeptPlan?.status;
+  const isSubmitted = !!planStatus && !EDITABLE_STATUSES.includes(planStatus);
   const COL_TOTAL   = 10;
 
   return (
@@ -864,7 +896,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
       size="lg"
       className="shadow-sm transition-all duration-200 active:scale-95"
       disabled={saving || isSubmitted}
-      title={isSubmitted ? 'Submitted — read only.' : undefined}
+      title={isSubmitted ? `${planStatus ? planStatus.charAt(0).toUpperCase() + planStatus.slice(1) : 'Locked'} — read only.` : undefined}
     >
       {saving
         ? <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Saving…</span>
@@ -881,7 +913,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
         style={{ animationDelay: '60ms' }}
       >
         {isSubmitted
-          ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><strong>Read-only.</strong> This department's plan has been <span className="font-medium">submitted</span>.</div>
+          ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><strong>Read-only.</strong> This department's plan is <span className="font-medium">{planStatus ?? 'locked'}</span> and can no longer be edited.</div>
           : <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"><strong>Save</strong> commits to <span className="font-medium">Form 3</span> and <span className="font-medium">Form 2</span>. When a step increase occurs, a <span className="text-green-700 font-medium">green</span> row shows new-step figures, a <span className="text-blue-700 font-medium">blue</span> row shows the increase, then an <span className="text-orange-600 font-medium">orange</span> row shows the combined total.</div>
         }
       </div>
@@ -1097,7 +1129,39 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                           }
                         </TableCell>
                       </TableRow>
-                    ) : paginated.map((row, idx) => {
+                    ) : (() => {
+                      // Build a flat list that interleaves group headers with rows
+                      let lastExtId: number | null | undefined = undefined; // sentinel: "not yet set"
+                      const items: ({ type: 'header'; label: string } | { type: 'row'; row: PersonnelServiceRow; idx: number })[] = [];
+                      let rowIdx = 0;
+                      paginated.forEach(row => {
+                        const extId = row.extensionDeptId;
+                        if (extId !== lastExtId) {
+                          const label = getExtensionGroupLabel(extId);
+                          if (label !== null) {
+                            items.push({ type: 'header', label });
+                          } else if (lastExtId !== undefined && lastExtId !== null) {
+                            // Returning to main group after an extension group — no header needed
+                          }
+                          lastExtId = extId;
+                        }
+                        items.push({ type: 'row', row, idx: rowIdx++ });
+                      });
+
+                      return items.map((item, i) => {
+                        if (item.type === 'header') {
+                          return (
+                            <TableRow key={`ext-header-${item.label}-${i}`} className="bg-gray-50 border-t-2 border-b border-gray-200">
+                              <TableCell colSpan={COL_TOTAL} className="py-2 px-4">
+                                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                                  {item.label}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+
+                        const { row, idx } = item;
                       const ir = row.incrementRow;
                       // Stagger delay: max 8 rows × 30ms = 240ms cap, feels snappy
                       const rowDelay = `${Math.min(idx, 8) * 30}ms`;
@@ -1223,7 +1287,8 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
 
                         </React.Fragment>
                       );
-                    })}
+                      }); // end items.map
+                    })()}
                   </TableBody>
 
                   {/* {allRows.length > 0 && (
@@ -1424,7 +1489,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                       {/* Column headers */}
                       <div
                         className="grid px-3 py-1.5 bg-gray-100 border-b border-gray-200"
-                        style={{ gridTemplateColumns: ir ? '1fr 88px 88px 88px' : '1fr 88px 88px' }}
+                        style={{ gridTemplateColumns: ir ? '1.8fr 70px 70px 70px' : '1.4fr 88px 88px' }}
                       >
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Item</span>
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-green-600 text-right">Base</span>
@@ -1444,7 +1509,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                               i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60',
                             )}
                             style={{
-                              gridTemplateColumns: ir ? '1fr 88px 88px 88px' : '1fr 88px 88px',
+                              gridTemplateColumns: ir ? '1.8fr 70px 70px 70px' : '1.4fr 88px 88px',
                               animationDelay: `${260 + si * 60 + i * 18}ms`,
                             }}
                           >

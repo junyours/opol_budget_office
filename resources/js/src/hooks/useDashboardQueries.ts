@@ -249,6 +249,17 @@ export function useBudgetPlans() {
   });
 }
 
+// export function useDepartmentBudgetPlans(budgetPlanId: number | undefined) {
+//   return useQuery<DepartmentBudgetPlan[]>({
+//     queryKey: queryKeys.deptBudgetPlans(budgetPlanId!),
+//     queryFn:  () =>
+//       API.get('/department-budget-plans', {
+//         params: { 'filter[budget_plan_id]': budgetPlanId },
+//       }).then(r => r.data?.data ?? []),
+//     enabled:   !!budgetPlanId,
+//     staleTime: 5 * 60 * 1000,
+//   });
+// }
 export function useDepartmentBudgetPlans(budgetPlanId: number | undefined) {
   return useQuery<DepartmentBudgetPlan[]>({
     queryKey: queryKeys.deptBudgetPlans(budgetPlanId!),
@@ -256,20 +267,29 @@ export function useDepartmentBudgetPlans(budgetPlanId: number | undefined) {
       API.get('/department-budget-plans', {
         params: { 'filter[budget_plan_id]': budgetPlanId },
       }).then(r => r.data?.data ?? []),
-    enabled:   !!budgetPlanId,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!budgetPlanId,
   });
 }
 
 /** Shared AIP programs — same key as useBudgetTotals & useAipProgramData */
+// export function useAipPrograms(budgetPlanId: number | undefined) {
+//   return useQuery<any[]>({
+//     queryKey: queryKeys.aipPrograms(budgetPlanId!),
+//     queryFn:  () =>
+//       API.get('/aip-programs', { params: { budget_plan_id: budgetPlanId } })
+//         .then(r => r.data?.data ?? []),
+//     enabled:   !!budgetPlanId,
+//     staleTime: 5 * 60 * 1000,
+//   });
+// }
+
 export function useAipPrograms(budgetPlanId: number | undefined) {
   return useQuery<any[]>({
     queryKey: queryKeys.aipPrograms(budgetPlanId!),
     queryFn:  () =>
       API.get('/aip-programs', { params: { budget_plan_id: budgetPlanId } })
         .then(r => r.data?.data ?? []),
-    enabled:   !!budgetPlanId,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!budgetPlanId,
   });
 }
 

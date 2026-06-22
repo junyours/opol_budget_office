@@ -574,12 +574,14 @@
                 <SidebarFooter className="p-2 border-t border-zinc-100 dark:border-zinc-800">
                      {/* ══ NOTIFICATIONS ══ */}
                 {notifications.length > 0 && (
-                <SidebarNotifications
-                    notifications={notifications}
-                    role={typedUser?.role ?? ''}
-                    markRead={markRead}
-                    markAllRead={markAllRead}
-                />
+                <div className="group-data-[collapsible=icon]:hidden">
+                    <SidebarNotifications
+                        notifications={notifications}
+                        role={typedUser?.role ?? ''}
+                        markRead={markRead}
+                        markAllRead={markAllRead}
+                    />
+                </div>
                 )}
                 <SidebarMenu>
                     <SidebarMenuItem>

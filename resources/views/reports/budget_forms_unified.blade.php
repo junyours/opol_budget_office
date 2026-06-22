@@ -1444,12 +1444,28 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         <tr><td colspan="9" style="font-weight:bold;padding:2px 4px;">{{ $deptName }}</td></tr>
     </thead>
     <tbody>
+    @php
+        $extDeptNames3  = [1 => 'Motorpool Division'];
+        $lastExtId3     = 'SENTINEL_NOT_SET';
+        $form3RowIdx    = 0;
+    @endphp
     @forelse($rows3 as $rIdx => $row)
 @php
-    $fmt3      = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    $thisExt3  = $row['extensionDeptId'] ?? null;
+    $showGrpHdr= ($thisExt3 !== $lastExtId3) && ($thisExt3 !== null);
+    $lastExtId3= $thisExt3;
+    $fmt3      = $form3RowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
     $curAmt3   = (float) ($row['current_amount'] ?? 0);
     $noCurrent = $curAmt3 <= 0;
+    $form3RowIdx++;
 @endphp
+@if($showGrpHdr)
+<tr>
+    <td colspan="9" style="font-weight:bold; font-size:7pt; padding:2px 4px;">
+        {{ $extDeptNames3[$thisExt3] ?? 'Extension Group '.$thisExt3 }}
+    </td>
+</tr>
+@endif
 <tr>
     <td class="c" style="width:2%;font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
     <td class="c" style="width:2%;font-size:6pt;">{{ $row['new_item_number'] }}</td>
@@ -1461,11 +1477,11 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         @endif
     </td>
     <td class="c" style="font-size:6.5pt;">
-        {{ $row['salary_grade'] }}<br>{{ $row['step_current'] ?? '' }}
+        {{ $row['step_current'] ? $row['salary_grade'] : '' }}<br>{{ $row['step_current'] ?? '' }}
     </td>
     <td class="r">{!! $curAmt3 > 0 ? $fmt3($curAmt3) : '' !!}</td>
     <td class="c" style="font-size:6.5pt;">
-        {{ $row['salary_grade'] }}<br>{{ $row['step_proposed'] ?? '' }}
+        {{ $row['step_proposed'] ? $row['salary_grade'] : '' }}<br>{{ $row['step_proposed'] ?? '' }}
     </td>
     <td class="r">
         {!! $fmt3($row['proposed_amount'] ?? 0) !!}
@@ -1616,15 +1632,15 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
 <table class="data-table">
     <thead>
         <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
+            <td style="width:8%;padding:0;border:none;"></td>
+            <td style="width:17%;padding:0;border:none;"></td>
+            <td style="width:12%;padding:0;border:none;"></td>
+            <td style="width:17%;padding:0;border:none;"></td>
+            <td style="width:8%;padding:0;border:none;"></td>
+            <td style="width:8%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:20;padding:0;border:none;"></td>
-            <td style="width:9%;padding:0;border:none;"></td>
-            <td style="width:15%;padding:0;border:none;"></td>
-            <td style="width:9%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
             <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:10%;padding:0;border:none;"></td>
-            <td style="width:11%;padding:0;border:none;"></td>
         </tr>
         <tr>
             <th rowspan="2">AIP Reference</th>
@@ -1640,10 +1656,10 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
     <tbody>
     @forelse($pageRows4 as $row4)
     <tr>
-        <td class="c">{{ $row4['aip_reference_code'] ?? '' }}</td>
+       <td class="c" style="font-size:5pt;word-break:break-all;">{{ $row4['aip_reference_code'] ?? '' }}</td>
         <td>{{ $row4['program_description'] ?? '' }}</td>
-        <td class="c">{{ $row4['major_final_output'] ?? 'Imprvd Svcs' }}</td>
-        <td style="font-size:6pt">{{ $row4['performance_indicator'] ?? '' }}</td>
+       <td class="c" style="font-size:6pt;">{{ $row4['major_final_output'] ?? 'Imprvd Svcs' }}</td>
+        <td style="font-size:6pt;">{{ $row4['performance_indicator'] ?? '' }}</td>
         <td class="c">{{ $row4['target'] ?? '' }}</td>
         <td class="r">{!! $row4['ps_amount']    > 0 ? $pesoInt($row4['ps_amount'])    : '-' !!}</td>
         <td class="r">{!! $row4['mooe_amount']  > 0 ? $pesoInt($row4['mooe_amount'])  : '-' !!}</td>
@@ -1658,9 +1674,9 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
     <tfoot>
         <tr class="subtotal">
             <td colspan="5" style="font-weight:bold;text-align:left;">Total for SPAs</td>
-            <td class="r">{!! $pesoInt($grandPS) !!}</td>
-            <td class="r">{!! $pesoInt($grandMOOE) !!}</td>
-            <td class="r">{!! $pesoInt($grandCO) !!}</td>
+            <td class="r">{!! $grandPS > 0 ? $pesoInt($grandPS) : '-' !!}</td>
+            <td class="r">{!! $grandMOOE > 0 ? $pesoInt($grandMOOE) : '-' !!}</td>
+            <td class="r">{!! $grandCO > 0 ? $pesoInt($grandCO) : '-' !!}</td>
             <td class="r">{!! $pesoInt($grandAmt4) !!}</td>
         </tr>
     </tfoot>

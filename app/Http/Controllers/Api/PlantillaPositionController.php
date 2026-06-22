@@ -13,12 +13,13 @@ class PlantillaPositionController extends BaseMasterCrudController
     protected function rules($id = null): array
     {
         return [
-            'old_item_number' => ['nullable', 'string', 'max:100'],
-            'new_item_number' => ['nullable', 'string', 'max:100'],
-            'position_title'  => [$id ? 'sometimes' : 'required', 'string', 'max:255'],
-            'salary_grade'    => [$id ? 'sometimes' : 'required', 'integer', 'min:1'],
-            'dept_id'         => [$id ? 'sometimes' : 'required', 'exists:departments,dept_id'],
-            'is_active'       => ['sometimes', 'boolean'],
+            'old_item_number'          => ['nullable', 'string', 'max:100'],
+            'new_item_number'          => ['nullable', 'string', 'max:100'],
+            'position_title'           => [$id ? 'sometimes' : 'required', 'string', 'max:255'],
+            'salary_grade'             => [$id ? 'sometimes' : 'required', 'integer', 'min:1'],
+            'dept_id'                  => [$id ? 'sometimes' : 'required', 'exists:departments,dept_id'],
+            'extension_department_id'  => ['nullable', 'integer', 'min:1'],
+            'is_active'                => ['sometimes', 'boolean'],
         ];
     }
 
@@ -42,26 +43,28 @@ class PlantillaPositionController extends BaseMasterCrudController
         $this->authorize('create', PlantillaPosition::class);
 
         $validated = $request->validate([
-            'positions' => ['required', 'array', 'min:1'],
-            'positions.*.old_item_number' => ['nullable', 'string', 'max:100'],
-            'positions.*.new_item_number' => ['nullable', 'string', 'max:100'],
-            'positions.*.position_title'  => ['required', 'string', 'max:255'],
-            'positions.*.salary_grade'    => ['required', 'integer', 'min:1'],
-            'positions.*.dept_id'         => ['required', 'exists:departments,dept_id'],
-            'positions.*.is_active'       => ['sometimes', 'boolean'],
+            'positions'                                => ['required', 'array', 'min:1'],
+            'positions.*.old_item_number'                => ['nullable', 'string', 'max:100'],
+            'positions.*.new_item_number'                => ['nullable', 'string', 'max:100'],
+            'positions.*.position_title'                 => ['required', 'string', 'max:255'],
+            'positions.*.salary_grade'                   => ['required', 'integer', 'min:1'],
+            'positions.*.dept_id'                        => ['required', 'exists:departments,dept_id'],
+            'positions.*.extension_department_id'        => ['nullable', 'integer', 'min:1'],
+            'positions.*.is_active'                      => ['sometimes', 'boolean'],
         ]);
 
         DB::transaction(function () use ($validated) {
             $positions = collect($validated['positions'])->map(function ($item) {
                 return [
-                    'old_item_number' => $item['old_item_number'] ?? null,
-                    'new_item_number' => $item['new_item_number'] ?? null,
-                    'position_title'  => $item['position_title'],
-                    'salary_grade'    => $item['salary_grade'],
-                    'dept_id'         => $item['dept_id'],
-                    'is_active'       => $item['is_active'] ?? true,
-                    'created_at'      => now(),
-                    'updated_at'      => now(),
+                    'old_item_number'         => $item['old_item_number'] ?? null,
+                    'new_item_number'         => $item['new_item_number'] ?? null,
+                    'position_title'          => $item['position_title'],
+                    'salary_grade'            => $item['salary_grade'],
+                    'dept_id'                 => $item['dept_id'],
+                    'extension_department_id' => $item['extension_department_id'] ?? null,
+                    'is_active'               => $item['is_active'] ?? true,
+                    'created_at'              => now(),
+                    'updated_at'              => now(),
                 ];
             })->toArray();
 

@@ -2530,9 +2530,22 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
                     ? (float) $proposed->annual_increment
                     : null,
                 'increase_decrease'   => $increaseDecrease,
+                'extensionDeptId'     => $plantilla?->extension_department_id ?? null,
             ];
             $newItemNo++;
         }
+
+        // Sort: main group (null) first, then extension groups by id, each by new_item_number
+        usort($rows, function ($a, $b) {
+            $aExt = $a['extensionDeptId'] ?? null;
+            $bExt = $b['extensionDeptId'] ?? null;
+            $aExtVal = $aExt ?? -1;
+            $bExtVal = $bExt ?? -1;
+            if ($aExtVal !== $bExtVal) return $aExtVal - $bExtVal;
+            $aNum = is_numeric($a['new_item_number']) ? (int)$a['new_item_number'] : PHP_INT_MAX;
+            $bNum = is_numeric($b['new_item_number']) ? (int)$b['new_item_number'] : PHP_INT_MAX;
+            return $aNum - $bNum;
+        });
 
         return [
             'rows'            => $rows,

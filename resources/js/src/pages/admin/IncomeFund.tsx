@@ -720,10 +720,14 @@ const savePastObligation = useCallback(
   const isPastEditable = (row: DisplayRow) =>
     !row.isSubtotal && !row.isGrandTotal;
 
-  const isViewer   = user?.role === "viewer";
+//   const isViewer   = user?.role === "viewer";
+//   const isAdmin    = user?.role === "admin" || user?.role === "super-admin";
+//   const canEditPastAndSem1   = isAdmin;
+//   const canEditBudgetYear    = isAdmin || user?.role === "department-head";
+const isViewer   = user?.role === "viewer";
   const isAdmin    = user?.role === "admin" || user?.role === "super-admin";
   const canEditPastAndSem1   = isAdmin;
-  const canEditBudgetYear    = isAdmin || user?.role === "department-head";
+  const canEditBudgetYear    = isAdmin;
 
   // ── Table renderer ─────────────────────────────────────────────────────────
 

@@ -37,13 +37,11 @@ const PlantillaOfPersonnelPage: React.FC = () => {
   const [personnels,         setPersonnels]         = useState<Personnel[]>([])
   const [loading,            setLoading]            = useState(true)
   const [saving,             setSaving]             = useState(false)
-  const [sorting,            setSorting]            = useState(false)
   const [activeTab,          setActiveTab]          = useState<number | null>(null)
   const [assignments,        setAssignments]        = useState<AssignmentDraft[]>([])
   const [initialSnapshot,    setInitialSnapshot]    = useState<AssignmentDraft[]>([])
   const [pendingTab,         setPendingTab]         = useState<number | null>(null)
   const [showUnsavedDialog,  setShowUnsavedDialog]  = useState(false)
-  const [showSortDialog,     setShowSortDialog]     = useState(false)
 
   const dbAssignmentMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -127,93 +125,72 @@ const PlantillaOfPersonnelPage: React.FC = () => {
     }
   }
 
-  const handleSortAndRenumber = async () => {
-  setSorting(true)
-  try {
-    const allPositions = [...plantillaPositions]
+  // ── Pure sorting helper — no API calls, no side effects ────────────────────
+  // Takes a snapshot of positions (with up-to-date `assignments` arrays) and
+  // returns the full renumbered order:
+  //   Per department, in dept_order:
+  //     Group A (extension_department_id = null): assigned (SG desc) → vacant (SG desc)
+  //     Group B, C... (extension_department_id ascending): assigned (SG desc) → vacant (SG desc)
+  //   Then globally at the end, inactive positions:
+  //     Group A (no extension) → Group B, C... (extension asc), each SG desc
+  const computeRenumbering = (positions: PlantillaWithAssignment[]) => {
     const deptOrder = departments.map(d => d.dept_id)
 
-    // Build assigned position IDs from the DB-loaded assignments on ALL positions,
-    // then override with the current tab's draft state (which may have unsaved changes).
     const assignedPositionIds = new Set<number>()
-
-    allPositions.forEach(pos => {
-      // Use the loaded assignments from the API for non-active-tab departments
-      const hasDbAssignment = (pos.assignments?.length ?? 0) > 0 &&
-        pos.assignments![0]?.personnel_id != null
-
-      if (pos.dept_id !== activeTab) {
-        // Not the current tab — trust the DB data
-        if (hasDbAssignment) {
-          assignedPositionIds.add(pos.plantilla_position_id)
-        }
-      } else {
-        // Current tab — use the live draft state instead
-        const draft = assignments.find(a => a.positionId === pos.plantilla_position_id)
-        if (draft?.personnelId != null) {
-          assignedPositionIds.add(pos.plantilla_position_id)
-        }
-      }
+    positions.forEach(pos => {
+      const hasAssignment = (pos.assignments?.length ?? 0) > 0 && pos.assignments![0]?.personnel_id != null
+      if (hasAssignment) assignedPositionIds.add(pos.plantilla_position_id)
     })
+
+    const extensionGroupsFor = (list: PlantillaWithAssignment[]): (number | null)[] => {
+      const ids = Array.from(
+        new Set(
+          list
+            .map(p => p.extension_department_id ?? null)
+            .filter((id): id is number => id !== null)
+        )
+      ).sort((a, b) => a - b)
+      return [null, ...ids]
+    }
 
     const activeNumbered: { pos: PlantillaWithAssignment; newNumber: number }[] = []
 
     deptOrder.forEach(deptId => {
-      const deptPositions = allPositions.filter(p => p.dept_id === deptId)
+      const deptPositions = positions.filter(p => p.dept_id === deptId && p.is_active)
 
-      // Tier 1: active + assigned → SG desc
-      const assigned = deptPositions
-        .filter(p => p.is_active && assignedPositionIds.has(p.plantilla_position_id))
-        .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+      extensionGroupsFor(deptPositions).forEach(extId => {
+        const groupPositions = deptPositions.filter(p => (p.extension_department_id ?? null) === extId)
 
-      // Tier 2: active + vacant → SG desc
-      const vacant = deptPositions
-        .filter(p => p.is_active && !assignedPositionIds.has(p.plantilla_position_id))
-        .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+        const assigned = groupPositions
+          .filter(p => assignedPositionIds.has(p.plantilla_position_id))
+          .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
 
-      ;[...assigned, ...vacant].forEach(pos => {
-        activeNumbered.push({ pos, newNumber: activeNumbered.length + 1 })
+        const vacant = groupPositions
+          .filter(p => !assignedPositionIds.has(p.plantilla_position_id))
+          .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+
+        ;[...assigned, ...vacant].forEach(pos => {
+          activeNumbered.push({ pos, newNumber: activeNumbered.length + 1 })
+        })
       })
     })
 
-    // Tier 3: inactive → SG desc, globally at the end
-    const inactive = allPositions
-      .filter(p => !p.is_active)
-      .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+    // Inactive — globally at the end (not per department), but still split
+    // by extension group: no-extension first, then extension id ascending.
+    const inactivePositions = positions.filter(p => !p.is_active)
+    const inactiveNumbered: { pos: PlantillaWithAssignment; newNumber: number }[] = []
 
-    const inactiveNumbered = inactive.map((pos, i) => ({
-      pos,
-      newNumber: activeNumbered.length + i + 1,
-    }))
-
-    const allNumbered = [...activeNumbered, ...inactiveNumbered]
-
-    await API.post('/plantilla-positions/renumber', {
-      positions: allNumbered.map(({ pos, newNumber }) => ({
-        plantilla_position_id: pos.plantilla_position_id,
-        new_item_number:       String(newNumber),
-      })),
+    extensionGroupsFor(inactivePositions).forEach(extId => {
+      inactivePositions
+        .filter(p => (p.extension_department_id ?? null) === extId)
+        .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+        .forEach(pos => {
+          inactiveNumbered.push({ pos, newNumber: activeNumbered.length + inactiveNumbered.length + 1 })
+        })
     })
 
-    // Update local state
-    const numberMap = new Map(
-      allNumbered.map(({ pos, newNumber }) => [pos.plantilla_position_id, String(newNumber)])
-    )
-    setPlantillaPositions(prev =>
-      prev.map(p => ({
-        ...p,
-        new_item_number: numberMap.get(p.plantilla_position_id) ?? p.new_item_number,
-      }))
-    )
-
-    toast.success('Positions sorted and renumbered successfully.')
-  } catch (err: any) {
-    toast.error(`Failed to renumber: ${err?.response?.data?.message || err?.message || 'Unknown error'}`)
-  } finally {
-    setSorting(false)
-    setShowSortDialog(false)
+    return [...activeNumbered, ...inactiveNumbered]
   }
-}
 
   // ── Personnel combobox ────────────────────────────────────────────────────
 
@@ -303,29 +280,51 @@ const PlantillaOfPersonnelPage: React.FC = () => {
   const handleSave = async () => {
     setSaving(true)
     try {
+      // 1) Save assignment changes for the active department
       const payload = assignments.map(a => ({
         plantilla_position_id: a.positionId,
         personnel_id:          a.personnelId,
         assignment_date:       a.assignmentDate ? format(a.assignmentDate, 'yyyy-MM-dd') : null,
       }))
       await API.post('/plantilla-assignments/bulk', { assignments: payload })
-      toast.success('Assignments saved.')
-      setPlantillaPositions(prev =>
-        prev.map(pos => {
-          if (pos.dept_id !== activeTab) return pos
-          const saved = assignments.find(a => a.positionId === pos.plantilla_position_id)
-          if (!saved) return pos
-          return {
-            ...pos,
-            assignments: saved.personnelId
-              ? [{ personnel_id: saved.personnelId, assignment_date: saved.assignmentDate?.toISOString() ?? null, effective_date: saved.assignmentDate?.toISOString() ?? null }]
-              : [],
-          }
-        })
+
+      // Reflect the saved assignments locally so the renumber step below
+      // has up-to-date assignment data to work with.
+      const updatedPositions = plantillaPositions.map(pos => {
+        if (pos.dept_id !== activeTab) return pos
+        const saved = assignments.find(a => a.positionId === pos.plantilla_position_id)
+        if (!saved) return pos
+        return {
+          ...pos,
+          assignments: saved.personnelId
+            ? [{ personnel_id: saved.personnelId, assignment_date: saved.assignmentDate?.toISOString() ?? null, effective_date: saved.assignmentDate?.toISOString() ?? null }]
+            : [],
+        }
+      })
+
+      // 2) Re-sort & renumber ALL departments using the freshly-updated data
+      const allNumbered = computeRenumbering(updatedPositions)
+
+      await API.post('/plantilla-positions/renumber', {
+        positions: allNumbered.map(({ pos, newNumber }) => ({
+          plantilla_position_id: pos.plantilla_position_id,
+          new_item_number:       String(newNumber),
+        })),
+      })
+
+      const numberMap = new Map(
+        allNumbered.map(({ pos, newNumber }) => [pos.plantilla_position_id, String(newNumber)])
       )
+      const finalPositions = updatedPositions.map(p => ({
+        ...p,
+        new_item_number: numberMap.get(p.plantilla_position_id) ?? p.new_item_number,
+      }))
+
+      setPlantillaPositions(finalPositions)
       setInitialSnapshot(assignments)
-    } catch {
-      toast.error('Failed to save assignments.')
+      toast.success('Assignments saved and positions renumbered.')
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.response?.data?.message || err?.message || 'Unknown error'}`)
     } finally {
       setSaving(false)
     }
@@ -343,21 +342,7 @@ const PlantillaOfPersonnelPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">Plantilla of Personnel</h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Sort & Renumber button */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowSortDialog(true)}
-            disabled={sorting}
-            className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900"
-            title="Sort positions by priority and reassign item numbers globally"
-          >
-            {sorting
-              ? <><span className="w-3 h-3 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />Sorting…</>
-              : <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5h10M3 8h6M3 11h3M11 9l2 2 2-2M13 7v4"/></svg>Sort &amp; Renumber</>
-            }
-          </Button>
-          {/* Save assignments button */}
+          {/* Save assignments button — also re-sorts & renumbers all positions */}
           {activeTab && (
             <Button size="sm" onClick={handleSave}
               disabled={saving || !hasUnsavedChanges}
@@ -520,7 +505,7 @@ const PlantillaOfPersonnelPage: React.FC = () => {
       )}
 
       {/* Sort & Renumber confirmation dialog */}
-      <AlertDialog open={showSortDialog} onOpenChange={setShowSortDialog}>
+      {/* <AlertDialog open={showSortDialog} onOpenChange={setShowSortDialog}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[15px] font-semibold">Sort &amp; Renumber All Positions?</AlertDialogTitle>
@@ -546,7 +531,7 @@ const PlantillaOfPersonnelPage: React.FC = () => {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog> */}
 
       {/* Unsaved changes dialog */}
       <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>

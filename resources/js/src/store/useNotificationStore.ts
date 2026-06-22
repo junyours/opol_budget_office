@@ -91,16 +91,34 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
   },
 
   markRead: async (id: string) => {
-    await API.post(`/notifications/${id}/read`);
-    set(state => ({
-      notifications: state.notifications.filter(n => n.id !== id),
-      unreadCount:   Math.max(0, state.unreadCount - 1),
-    }));
+    // Optimistic — flip read_at locally, keep the notification in the list
+    set(state => {
+      const wasUnread = state.notifications.find(n => n.id === id && !n.read_at);
+      return {
+        notifications: state.notifications.map(n =>
+          n.id === id && !n.read_at ? { ...n, read_at: new Date().toISOString() } : n
+        ),
+        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+      };
+    });
+    try {
+      await API.post(`/notifications/${id}/read`);
+    } catch {
+      // best-effort; UI already updated optimistically
+    }
   },
 
   markAllRead: async () => {
-    await API.post('/notifications/read-all');
-    set({ notifications: [], unreadCount: 0 });
+    const now = new Date().toISOString();
+    set(state => ({
+      notifications: state.notifications.map(n => (n.read_at ? n : { ...n, read_at: now })),
+      unreadCount: 0,
+    }));
+    try {
+      await API.post('/notifications/read-all');
+    } catch {
+      // best-effort
+    }
     lastFetchedAt = 0; // allow immediate refetch after user action
   },
 

@@ -69,9 +69,16 @@ class DepartmentBudgetPlanPolicy
             && (int) $user->dept_id === (int) $plan->dept_id;
     }
 
-    public function approve(User $user): bool
+    public function acknowledge(User $user, DepartmentBudgetPlan $plan): bool
     {
-        return in_array($user->role, ['admin', 'super-admin']);
+        return $plan->status === 'submitted'
+            && in_array($user->role, ['admin', 'super-admin']);
+    }
+
+    public function approve(User $user, DepartmentBudgetPlan $plan): bool
+    {
+        return in_array($user->role, ['admin', 'super-admin'])
+            && $plan->status === 'under_review';
     }
 
     public function reject(User $user): bool

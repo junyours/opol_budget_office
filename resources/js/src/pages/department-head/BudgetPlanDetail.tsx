@@ -26,6 +26,8 @@ import {
 import { toast } from 'sonner';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
 import { cn } from '@/src/lib/utils';
+import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
+import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
 import {
   CheckCircleIcon,
   ArrowTrendingUpIcon,
@@ -54,6 +56,11 @@ const statusConfig: Record<string, { label: string; badge: string; dot: string }
     badge: 'text-blue-700 bg-blue-50 border-blue-200',
     dot:   'bg-blue-400',
   },
+  under_review: {
+    label: 'Under Review',
+    badge: 'text-indigo-700 bg-indigo-50 border-indigo-200',
+    dot:   'bg-indigo-400',
+  },
   approved: {
     label: 'Approved',
     badge: 'text-emerald-700 bg-emerald-50 border-emerald-200',
@@ -61,177 +68,10 @@ const statusConfig: Record<string, { label: string; badge: string; dot: string }
   },
 };
 
+
+
 // ─── Budget Comparison Banner ─────────────────────────────────────────────────
 
-interface BudgetComparisonBannerProps {
-  plan:           DepartmentBudgetPlan;
-  pastYearPlan:   DepartmentBudgetPlan | null;
-}
-
-const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({
-  plan,
-  pastYearPlan,
-}) => {
-  const [pastAipTotal,    setPastAipTotal]    = useState(0);
-  const [currentAipTotal, setCurrentAipTotal] = useState(0);
-  const [aipLoading,      setAipLoading]      = useState(true);
-
-  useEffect(() => {
-    setAipLoading(true);
-    const currentReq = API.get('/form4-items', {
-      params: { budget_plan_id: plan.dept_budget_plan_id },
-    });
-    const pastReq = pastYearPlan
-      ? API.get('/form4-items', { params: { budget_plan_id: pastYearPlan.dept_budget_plan_id } })
-      : Promise.resolve({ data: { data: [] as any[] } });
-
-    Promise.all([currentReq, pastReq])
-      .then(([curRes, pastRes]) => {
-        const curItems:  any[] = curRes.data.data  ?? [];
-        const pastItems: any[] = pastRes.data.data ?? [];
-        setCurrentAipTotal(curItems.reduce((s, i)  => s + (parseFloat(i.total_amount) || 0), 0));
-        setPastAipTotal   (pastItems.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0));
-      })
-      .catch(console.error)
-      .finally(() => setAipLoading(false));
-  }, [plan.dept_budget_plan_id, pastYearPlan?.dept_budget_plan_id]);
-
-  const pastForm2Total = useMemo(
-    () => (pastYearPlan?.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
-    [pastYearPlan],
-  );
-  const currentForm2Total = useMemo(
-    () => (plan.items ?? []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
-    [plan.items],
-  );
-
-  const pastTotal    = pastForm2Total    + pastAipTotal;
-  const currentTotal = currentForm2Total + currentAipTotal;
-  const diff         = currentTotal - pastTotal;
-  const diffPct      = pctOf(pastTotal, diff);
-  const threshold    = pastTotal * 1.1;
-  const isOver       = pastTotal > 0 && currentTotal > threshold;
-  const excess       = isOver ? currentTotal - threshold : 0;
-  const prevYear     = Number(plan.budget_plan?.year) - 1;
-  const currYear     = plan.budget_plan?.year;
-
-  return (
-    <div className={cn(
-      'rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-center gap-3',
-      isOver ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
-    )}>
-
-      {/* ── Appropriation card (blue) ── */}
-      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] bg-blue-50 border border-blue-200">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400">
-          Appropriation {prevYear}
-        </span>
-        {aipLoading ? (
-          <span className="h-5 w-28 rounded bg-blue-100 animate-pulse" />
-        ) : pastTotal === 0 ? (
-          <span className="text-[14px] font-semibold text-blue-400">No data</span>
-        ) : (
-          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-blue-700">
-            {fmtP(pastTotal)}
-          </span>
-        )}
-        <span className="text-[11px] text-blue-300">Prior year</span>
-      </div>
-
-      {/* Arrow */}
-      <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 flex-shrink-0 hidden sm:block" />
-
-      {/* ── Proposed card (always orange) ── */}
-      <div className="flex flex-col gap-0.5 rounded-lg px-3.5 py-2.5 min-w-[140px] border bg-orange-50 border-orange-200">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
-          Proposed {currYear}
-        </span>
-        {aipLoading ? (
-          <span className="h-5 w-28 rounded bg-orange-100 animate-pulse" />
-        ) : (
-          <span className="text-[18px] font-bold font-mono tabular-nums leading-tight text-orange-700">
-            {fmtP(currentTotal)}
-          </span>
-        )}
-        <span className="text-[11px] text-orange-300">Current proposal</span>
-      </div>
-
-      {/* ── Inc / Dec chip ── */}
-      {!aipLoading && pastTotal > 0 && (
-        <div className={cn(
-          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium flex-shrink-0 border',
-          isOver        ? 'bg-red-100 border-red-300 text-red-700'
-          : diff > 0    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-          : diff < 0    ? 'bg-sky-50 border-sky-200 text-sky-600'
-          :               'bg-gray-100 border-gray-200 text-gray-500',
-        )}>
-          {isOver
-            ? <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-            : diff > 0
-            ? <ArrowTrendingUpIcon     className="w-3.5 h-3.5" />
-            : diff < 0
-            ? <ArrowTrendingDownIcon   className="w-3.5 h-3.5" />
-            : <MinusIcon               className="w-3.5 h-3.5" />
-          }
-          {isOver ? (
-            <>
-              <span>+{fmtP(excess)} over ceiling</span>
-              <span className="opacity-60">({((excess / threshold) * 100).toFixed(2)}% excess)</span>
-            </>
-          ) : (
-            <>
-              <span>{diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}</span>
-              <span className="opacity-60">({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(2)}%)</span>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="flex-1" />
-
-      {/* ── Status message ── */}
-      {!aipLoading && (
-        <div className="flex items-start gap-2 flex-shrink-0">
-          {isOver ? (
-            <div className="flex items-start gap-2">
-              <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-semibold text-red-700">
-                  Above 10% Appropriation Ceiling
-                </span>
-                <span className="text-[11px] text-red-500">
-                  Ceiling: <span className="font-mono font-medium">{fmtP(threshold)}</span>
-                </span>
-                <span className="text-[10px] text-red-400 italic">
-                  Proposed amount exceeds the 10% growth ceiling.
-                </span>
-              </div>
-            </div>
-          ) : pastTotal === 0 ? (
-            <span className="text-[11px] text-gray-400 italic">No prior-year data for comparison.</span>
-          ) : (
-            <>
-              <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-medium text-emerald-600">
-                  Within 10% Appropriation Ceiling
-                </span>
-                <span className="text-[11px] text-gray-400">
-                  Suggested limit: <span className="font-mono font-medium text-gray-500">{fmtP(threshold)}</span>
-                </span>
-                <span className="text-[10px] text-gray-400 italic">
-                  For reference only — final budget is at the department head's discretion.
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 const BudgetPlanDetail: React.FC = () => {
   const { id }   = useParams<{ id: string }>();
@@ -376,22 +216,34 @@ const BudgetPlanDetail: React.FC = () => {
         )}
         {plan.status === 'submitted' && (
           <span className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg font-medium">
-            Awaiting admin approval
+            Waiting for the Budget Officer to acknowledge
           </span>
         )}
-        {plan.status === 'approved' && (
+        {plan.status === 'under_review' && (
+          <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg font-medium">
+            Budget Officer is reviewing your proposal
+          </span>
+        )}
+        {/* {plan.status === 'approved' && (
           <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5">
             <CheckCircleIcon className="w-3.5 h-3.5" />
             Approved
           </span>
-        )}
+        )} */}
+      </div>
+
+     {/* ── Progress stepper ── */}
+      <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 mb-4">
+        <BudgetPlanStepper
+          status={plan.status}
+          submittedAt={plan.submitted_at}
+          acknowledgedAt={plan.acknowledged_at}
+          approvedAt={plan.approved_at}
+        />
       </div>
 
       {/* ── Budget comparison banner (always visible, above tabs) ── */}
-      <BudgetComparisonBanner
-        plan={plan}
-        pastYearPlan={pastYearPlan}
-      />
+      <BudgetComparisonBanner plan={plan} pastYearPlan={pastYearPlan} />
 
       {/* ── Forms Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

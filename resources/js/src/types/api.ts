@@ -82,10 +82,14 @@ export interface DepartmentBudgetPlanItem {
 
 export interface DepartmentBudgetPlan {
   dept_budget_plan_id: number;
-  budget_plan_id: number;      // 👈 new parent ID
+  budget_plan_id: number;      // new parent ID
   year: number;                // kept (can be derived or accessor)
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected';
   dept_id: number;
+  submitted_at: string | null;
+  acknowledged_at: string | null;
+  approved_at: string | null;
+  returned_at: string | null;
   created_at: string;
   updated_at: string;
   items: DepartmentBudgetPlanItem[];
@@ -112,11 +116,23 @@ export interface DepartmentCategory {
 //   category?: DepartmentCategory;
 // }
 
+// export interface Department {
+//   dept_id: number;
+//   dept_name: string;
+//   dept_abbreviation: string;
+//   dept_category_id: number;
+//   mandate: string | null;
+//   special_provisions: string | null;
+//   logo: string | null;
+//   category?: DepartmentCategory | null;
+// }
+
 export interface Department {
   dept_id: number;
   dept_name: string;
   dept_abbreviation: string;
   dept_category_id: number;
+  sort_order: number;
   mandate: string | null;
   special_provisions: string | null;
   logo: string | null;
@@ -153,6 +169,7 @@ export interface PlantillaPosition {
   position_title: string;
   salary_grade: number;
   dept_id: number;
+  extension_department_id: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

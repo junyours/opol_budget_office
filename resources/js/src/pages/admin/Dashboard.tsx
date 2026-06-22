@@ -235,16 +235,18 @@ const ApprovalProgressCard: React.FC<{
   totalWithPlan: number;
   approvedDepts: Department[];
   submittedDepts: Department[];
+  underReviewDepts: Department[];
   draftDepts: Department[];
-}> = ({ style, completion, totalWithPlan, approvedDepts, submittedDepts, draftDepts }) => {
+}> = ({ style, completion, totalWithPlan, approvedDepts, submittedDepts, underReviewDepts, draftDepts }) => {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [visible, setVisible] = useState(true);
 
   const statuses = [
-    { label: "Approved",  depts: approvedDepts,  color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#10b981" }} /> },
-    { label: "Submitted", depts: submittedDepts, color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} /> },
-    { label: "Draft",     depts: draftDepts,     color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} /> },
+    { label: "Approved",     depts: approvedDepts,    color: "#10b981", icon: <CheckCircleIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#10b981" }} /> },
+    { label: "Under Review", depts: underReviewDepts,  color: "#8b5cf6", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#8b5cf6" }} /> },
+    { label: "Submitted",    depts: submittedDepts,    color: "#3b82f6", icon: <DocumentTextIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} /> },
+    { label: "Draft",        depts: draftDepts,        color: "#f59e0b", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} /> },
   ];
 
   useEffect(() => {
@@ -483,13 +485,14 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
     }
   };
 
-  const draftDepts     = useMemo(() => deptBudgetPlans.filter(p => p.status === 'draft').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
-  const submittedDepts = useMemo(() => deptBudgetPlans.filter(p => p.status === 'submitted').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
-  const approvedDepts  = useMemo(() => deptBudgetPlans.filter(p => p.status === 'approved').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
-  const withPlanIds    = new Set(deptBudgetPlans.map(p => p.dept_id));
-  const missingDepts   = departments.filter(d => !withPlanIds.has(d.dept_id));
-  const totalWithPlan  = draftDepts.length + submittedDepts.length + approvedDepts.length;
-  const completion     = totalWithPlan > 0 ? Math.round((approvedDepts.length / totalWithPlan) * 100) : 0;
+  const draftDepts       = useMemo(() => deptBudgetPlans.filter(p => p.status === 'draft').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const submittedDepts   = useMemo(() => deptBudgetPlans.filter(p => p.status === 'submitted').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const underReviewDepts = useMemo(() => deptBudgetPlans.filter(p => p.status === 'under_review').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const approvedDepts    = useMemo(() => deptBudgetPlans.filter(p => p.status === 'approved').map(p => p.department).filter(Boolean) as Department[], [deptBudgetPlans]);
+  const withPlanIds      = new Set(deptBudgetPlans.map(p => p.dept_id));
+  const missingDepts     = departments.filter(d => !withPlanIds.has(d.dept_id));
+  const totalWithPlan    = draftDepts.length + submittedDepts.length + underReviewDepts.length + approvedDepts.length;
+  const completion       = totalWithPlan > 0 ? Math.round((approvedDepts.length / totalWithPlan) * 100) : 0;
 
   const allocLoading = mdfLoading || ldrLoading;
   const specialExpLoading = expLoading;
@@ -714,6 +717,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
               totalWithPlan={totalWithPlan}
               approvedDepts={approvedDepts}
               submittedDepts={submittedDepts}
+              underReviewDepts={underReviewDepts}
               draftDepts={draftDepts}
             />
 
@@ -788,7 +792,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                         const sub   = !isLoaded ? "text-blue-400"                  : isOver ? "text-rose-400"                 : "text-emerald-500";
                         const subMono = !isLoaded ? "text-blue-500"                : isOver ? "text-rose-500"                 : "text-emerald-600";
                         return (
-                          <div className={cn("col-span-3 rounded-2xl border p-3.5", bg)}>
+                          <div className={cn("col-span-6 rounded-2xl border p-3.5", bg)}>
                             <p className={cn("text-[10px] font-medium uppercase tracking-widest mb-2 flex items-center gap-1", label)}>
                               <ArrowTrendingDownIcon className={cn("w-3 h-3", icon)} />Expenditures
                             </p>
@@ -820,57 +824,6 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                           </div>
                         );
                       })()}
-{/* Per Capita */}
-<div className="col-span-3 rounded-2xl border border-violet-100 bg-violet-50 p-3.5 flex flex-col justify-between">
-  <div>
-    <div className="flex items-center gap-1.5 mb-2">
-      <p className="text-eyebrow text-violet-500">Per Capita</p>
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button className="text-violet-300 hover:text-violet-500 transition-colors">
-              <InformationCircleIcon className="w-3.5 h-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent
-            side="top"
-            className="max-w-[200px] text-center text-xs leading-snug"
-          >
-            Rounded to the nearest centavo. Multiplying back by population
-            may not exactly equal the total due to rounding.
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-
-    {!fundsReady ? (
-      <Shimmer className="h-7 w-28 rounded-lg" />
-    ) : perCapita !== null ? (
-      <>
-        <p className="text-metric text-violet-700 tracking-tight leading-none">
-          {peso(perCapita)}
-        </p>
-        <p className="text-meta font-mono text-violet-400 mt-1">
-          approx. · per person
-        </p>
-      </>
-    ) : (
-      <p className="text-violet-300 font-bold text-lg">—</p>
-    )}
-  </div>
-
-  <div className="mt-3 pt-2.5 border-t border-violet-200 space-y-0.5">
-    <p className="text-meta text-violet-400">
-      Population:{" "}
-      <span className="font-semibold text-violet-600">
-        {POPULATION.count.toLocaleString("en-PH")}
-      </span>
-    </p>
-    <p className="text-meta text-violet-400">
-      {POPULATION.year} {POPULATION.surveyor}
-    </p>
-  </div>
-</div>
 
 
 
@@ -1091,7 +1044,7 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
 
 
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-3 gap-3">
                   <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
                     <p className="text-eyebrow text-zinc-500 mb-2">Overall Local Source</p>
                     <Money
@@ -1113,6 +1066,56 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                       sub="text-indigo-400"
                     />
                     <p className="text-[9px] text-indigo-400 mt-1">GF Total (incl. NTA) + Special Accounts</p>
+                  </div>
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50 p-3.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <p className="text-eyebrow text-violet-500">Per Capita</p>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button className="text-violet-300 hover:text-violet-500 transition-colors">
+                                <InformationCircleIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-[200px] text-center text-xs leading-snug"
+                            >
+                              Rounded to the nearest centavo. Multiplying back by population
+                              may not exactly equal the total due to rounding.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+
+                      {!fundsReady ? (
+                        <Shimmer className="h-7 w-28 rounded-lg" />
+                      ) : perCapita !== null ? (
+                        <>
+                          <p className="text-metric text-violet-700 tracking-tight leading-none">
+                            {peso(perCapita)}
+                          </p>
+                          <p className="text-meta font-mono text-violet-400 mt-1">
+                            approx. · per person
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-violet-300 font-bold text-lg">—</p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-violet-200 space-y-0.5">
+                      <p className="text-meta text-violet-400">
+                        Population:{" "}
+                        <span className="font-semibold text-violet-600">
+                          {POPULATION.count.toLocaleString("en-PH")}
+                        </span>
+                      </p>
+                      <p className="text-meta text-violet-400">
+                        {POPULATION.year} {POPULATION.surveyor}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -1250,12 +1253,11 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                     </div>
                     <CarouselContent className="-ml-3">
                       {[
-                        { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: shExpTotal,  cal: shCal,  accentColor: "#8b5cf6" },
-                        { label: "OCC",            abbr: "OCC", data: occ, expV: occExpTotal, cal: occCal, accentColor: "#0ea5e9" },
-                        { label: "Public Market",  abbr: "PM",  data: pm,  expV: pmExpTotal,  cal: pmCal,  accentColor: "#f59e0b" },
+                        { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: exp.shExpenditure,  cal: shCal,  accentColor: "#8b5cf6" },
+                        { label: "OCC",            abbr: "OCC", data: occ, expV: exp.occExpenditure, cal: occCal, accentColor: "#0ea5e9" },
+                        { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b" },
                       ].map(({ label, abbr, data, expV, cal, accentColor }) => {
                         const rev  = data?.total ?? 0;
-                        // const unap = Math.max(0, rev - expV - cal);
                         const unap = rev - expV - cal;
                         const uPos = unap >= 0;
                         const qrfV = cal * 0.30;
@@ -1284,8 +1286,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                                 </div>
                               </div>
                               {fundsReady && (data?.nonTaxRevenue ?? 0) > 0 && (
-                                <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
-                                  <div className="px-3 py-2 flex items-center justify-between border-b border-zinc-100">
+                                <div className="rounded-xl border border-zinc-200 bg-white p-3 space-y-2.5">
+                                  <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
                                       <ExclamationTriangleIcon className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
                                       <div>
@@ -1293,23 +1295,52 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                                         <p className="text-[10px] text-zinc-400">of Non-Tax Revenue</p>
                                       </div>
                                     </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-semibold text-zinc-800">{pesoC(cal)}</p>
-                                      <p className="text-xs text-zinc-400 font-mono">{peso(cal)}</p>
+                                    <span className="text-sm font-bold text-zinc-900 tabular-nums">{peso(cal)}</span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {/* 30% QRF */}
+                                    <div className="rounded-xl bg-rose-50 border border-rose-100 p-3 space-y-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-rose-700">30% QRF</p>
+                                        <span className="text-[9px] font-semibold text-rose-600 bg-rose-100 rounded px-1.5 py-0.5">reserved</span>
+                                      </div>
+                                      <div className="flex items-baseline gap-1">
+                                        <p className="text-base font-bold text-rose-800">{peso(qrfV)}</p>
+                                        <p className="text-[10px] text-rose-400">/ {peso(qrfV)}</p>
+                                      </div>
+                                      <p className="text-[10px] text-rose-500">reserved · not yet disbursed</p>
+                                      <div className="h-1 bg-rose-200 rounded-full overflow-hidden">
+                                        <div className="h-full w-full bg-rose-400 rounded-full" />
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] text-rose-500">Available</span>
+                                        <span className="text-[10px] font-bold font-mono text-rose-700">{peso(qrfV)}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* 70% Pre-Disaster */}
+                                    <div className="rounded-xl bg-orange-50 border border-orange-100 p-3 space-y-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">70% Pre-Disaster</p>
+                                        <span className="text-[9px] font-semibold text-orange-600 bg-orange-100 rounded px-1.5 py-0.5">0%</span>
+                                      </div>
+                                      <div className="flex items-baseline gap-1">
+                                        <p className="text-base font-bold text-orange-800">{peso(0)}</p>
+                                        <p className="text-[10px] text-orange-400">/ {peso(preV)}</p>
+                                      </div>
+                                      <p className="text-[10px] text-orange-500">allocated</p>
+                                      <div className="h-1 bg-orange-200 rounded-full overflow-hidden">
+                                        <div className="h-full bg-orange-400 rounded-full transition-all duration-700" style={{ width: "0%" }} />
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] text-orange-500">Remaining</span>
+                                        <span className="text-[10px] font-bold font-mono text-orange-700">{peso(preV)}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="grid grid-cols-2">
-                                    <div className="px-3 py-2 border-r border-zinc-100">
-                                      <p className="text-[10px] font-semibold uppercase text-zinc-500">30% QRF</p>
-                                      <p className="text-sm font-semibold text-zinc-700">{pesoC(qrfV)}</p>
-                                      <p className="text-xs text-zinc-400 font-mono">{peso(qrfV)}</p>
-                                    </div>
-                                    <div className="px-3 py-2">
-                                      <p className="text-[10px] font-semibold uppercase text-zinc-500">70% Pre-Disaster</p>
-                                      <p className="text-sm font-semibold text-zinc-700">{pesoC(preV)}</p>
-                                      <p className="text-xs text-zinc-400 font-mono">{peso(preV)}</p>
-                                    </div>
-                                  </div>
+
+                                  <p className="text-[9px] text-zinc-300 text-right">JMC 2013-1 · R.A. 10121</p>
                                 </div>
                               )}
                               <div className={cn("rounded-xl border px-3 py-2 flex items-center justify-between", uPos ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>

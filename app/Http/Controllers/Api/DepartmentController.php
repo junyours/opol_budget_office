@@ -13,11 +13,41 @@ class DepartmentController extends BaseMasterCrudController
     /**
      * Display a listing of departments with their categories.
      */
+    // public function index()
+    // {
+    //     $this->authorize('viewAny', $this->modelClass);
+    //     $departments = $this->modelClass::with('category')->get();
+    //     return $this->success($departments);
+    // }
     public function index()
     {
         $this->authorize('viewAny', $this->modelClass);
-        $departments = $this->modelClass::with('category')->get();
+        $departments = $this->modelClass::with('category')
+            ->orderBy('dept_category_id')
+            ->orderBy('sort_order')
+            ->get();
         return $this->success($departments);
+    }
+
+    /**
+     * Persist a new sort order for departments (scoped per-category).
+     */
+    public function reorder(Request $request)
+    {
+        $this->authorize('update', $this->modelClass);
+
+        $validated = $request->validate([
+            'departments'              => 'required|array|min:1',
+            'departments.*.dept_id'    => 'required|exists:departments,dept_id',
+            'departments.*.sort_order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($validated['departments'] as $row) {
+            $this->modelClass::where('dept_id', $row['dept_id'])
+                ->update(['sort_order' => $row['sort_order']]);
+        }
+
+        return $this->success(['message' => 'Order updated']);
     }
 
     /**

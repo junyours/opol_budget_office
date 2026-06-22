@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan, DepartmentBudgetPlanForm4Item } from '../../types/api';
@@ -79,13 +80,43 @@ const TD_MONO = 'px-4 py-3 text-[12px] font-mono tabular-nums text-right text-gr
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
-  const [items, setItems]                       = useState<DepartmentBudgetPlanForm4Item[]>([]);
-  const [existingPrograms, setExistingPrograms] = useState<AIPProgram[]>([]);
-  const [loading, setLoading]                   = useState(true);
-//   const [seeding, setSeeding]                   = useState(false);
+  const queryClient = useQueryClient();
+  const planId = plan.dept_budget_plan_id;
+  const deptId = plan.dept_id;
 
-const [seeding, setSeeding]                   = useState(false);
+  const itemsQ = useQuery<DepartmentBudgetPlanForm4Item[]>({
+    queryKey: ['form4-items', planId],
+    queryFn: () =>
+      API.get('/form4-items', { params: { budget_plan_id: planId } }).then(r =>
+        (r.data.data || []).map((item: any) => ({
+          ...item,
+          ps_amount:    parseFloat(item.ps_amount)    || 0,
+          mooe_amount:  parseFloat(item.mooe_amount)  || 0,
+          co_amount:    parseFloat(item.co_amount)    || 0,
+          total_amount: parseFloat(item.total_amount) || 0,
+          sem1_amount:  parseFloat(item.sem1_amount)  || 0,
+          sem2_amount:  parseFloat(item.sem2_amount)  || 0,
+        }))
+      ),
+    enabled: !!planId,
+  });
+
+  const programsQ = useQuery({
+    queryKey: ['aip-programs', deptId],
+    queryFn: () =>
+      API.get('/aip-programs', { params: { dept_id: deptId } }).then(r => r.data.data || []),
+    enabled: !!deptId,
+  });
+
+  const items: DepartmentBudgetPlanForm4Item[] = itemsQ.data ?? [];
+  const existingPrograms: AIPProgram[] = programsQ.data ?? [];
+  const loading = (itemsQ.isLoading && !!planId) || (programsQ.isLoading && !!deptId);
+
+  const [seeding, setSeeding] = useState(false);
   const seededPlanId = useRef<number | null>(null);
+
+  const fetchItems = () => itemsQ.refetch();
+  const fetchExistingPrograms = () => programsQ.refetch();
 //    const [validProgramIds, setValidProgramIds] = useState<Set<number>>(new Set());
 
   const [modalOpen, setModalOpen]             = useState(false);
@@ -138,22 +169,22 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
 //   }, [plan.dept_budget_plan_id]);
 
 
-  const fetchItems = async () => {
-    try {
-      const res = await API.get('/form4-items', { params: { budget_plan_id: plan.dept_budget_plan_id } });
-      setItems((res.data.data || []).map((item: any) => ({
-        ...item,
-        ps_amount:    parseFloat(item.ps_amount)    || 0,
-        mooe_amount:  parseFloat(item.mooe_amount)  || 0,
-        co_amount:    parseFloat(item.co_amount)    || 0,
-        total_amount: parseFloat(item.total_amount) || 0,
-        sem1_amount:  parseFloat(item.sem1_amount)  || 0,
-        sem2_amount:  parseFloat(item.sem2_amount)  || 0,
-      })));
-    } catch (err) {
-      console.error('Failed to fetch Form 4 items', err);
-    }
-  };
+//   const fetchItems = async () => {
+//     try {
+//       const res = await API.get('/form4-items', { params: { budget_plan_id: plan.dept_budget_plan_id } });
+//       setItems((res.data.data || []).map((item: any) => ({
+//         ...item,
+//         ps_amount:    parseFloat(item.ps_amount)    || 0,
+//         mooe_amount:  parseFloat(item.mooe_amount)  || 0,
+//         co_amount:    parseFloat(item.co_amount)    || 0,
+//         total_amount: parseFloat(item.total_amount) || 0,
+//         sem1_amount:  parseFloat(item.sem1_amount)  || 0,
+//         sem2_amount:  parseFloat(item.sem2_amount)  || 0,
+//       })));
+//     } catch (err) {
+//       console.error('Failed to fetch Form 4 items', err);
+//     }
+//   };
 
   // Fetches form4 items from appropriation year (year-1) and obligation year (year-2)
   // and returns the set of aip_program_ids that have actual amounts.
@@ -204,23 +235,23 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
 //     }
 //   };
 
-useEffect(() => {
-    const init = async () => {
-      await Promise.all([fetchItems(), fetchExistingPrograms()]);
-      setLoading(false);
-    };
-    init();
-  }, [plan.dept_budget_plan_id]);
+// useEffect(() => {
+//     const init = async () => {
+//       await Promise.all([fetchItems(), fetchExistingPrograms()]);
+//       setLoading(false);
+//     };
+//     init();
+//   }, [plan.dept_budget_plan_id]);
 
-  const fetchExistingPrograms = async () => {
-    if (!plan.dept_id) return;
-    try {
-      const res = await API.get('/aip-programs', { params: { dept_id: plan.dept_id } });
-      setExistingPrograms(res.data.data || []);
-    } catch (err) {
-      console.error('Failed to fetch AIP programs', err);
-    }
-  };
+//   const fetchExistingPrograms = async () => {
+//     if (!plan.dept_id) return;
+//     try {
+//       const res = await API.get('/aip-programs', { params: { dept_id: plan.dept_id } });
+//       setExistingPrograms(res.data.data || []);
+//     } catch (err) {
+//       console.error('Failed to fetch AIP programs', err);
+//     }
+//   };
 
 //   const seedPastPrograms = async (
 //     currentItems: DepartmentBudgetPlanForm4Item[],

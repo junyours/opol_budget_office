@@ -109,6 +109,29 @@ function useDepartments() {
   });
 }
 
+// function useAipMasterList() {
+//   return useQuery<AipProgramRaw[]>({
+//     queryKey: ["aip-programs-master"],
+//     queryFn: async () => {
+//       const res = await API.get("/aip-programs");
+//       return res.data?.data ?? [];
+//     },
+//     staleTime: 5 * 60 * 1000,
+//   });
+// }
+
+// function useAipAmounts(planId: number | null) {
+//   return useQuery<AipProgram[]>({
+//     queryKey: ["aip-programs-amounts", planId],
+//     queryFn: () =>
+//       API.get("/aip-programs", { params: { budget_plan_id: planId } }).then(
+//         (r) => r.data?.data ?? []
+//       ),
+//     enabled: !!planId,
+//     staleTime: 5 * 60 * 1000,
+//   });
+// }
+
 function useAipMasterList() {
   return useQuery<AipProgramRaw[]>({
     queryKey: ["aip-programs-master"],
@@ -116,7 +139,6 @@ function useAipMasterList() {
       const res = await API.get("/aip-programs");
       return res.data?.data ?? [];
     },
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -128,7 +150,6 @@ function useAipAmounts(planId: number | null) {
         (r) => r.data?.data ?? []
       ),
     enabled: !!planId,
-    staleTime: 5 * 60 * 1000,
   });
 }
 

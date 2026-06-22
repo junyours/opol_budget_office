@@ -98,7 +98,6 @@ function useExpenseClassItems() {
     queryKey: ["expense-class-items"],
     queryFn: () =>
       API.get("/expense-class-items").then((r) => r.data?.data ?? []),
-    staleTime: 5 * 60 * 1000,
   });
 }
 

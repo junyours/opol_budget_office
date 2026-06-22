@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan } from '../../types/api';
@@ -42,6 +43,7 @@ interface SnapshotRow {
     old_item_number: string | null;
     new_item_number: string | null;
     position_title: string;
+    extension_department_id: number | null;
   };
   personnel?: {
     first_name: string;
@@ -115,16 +117,14 @@ type MergedRow = {
   currMonthly: number;
   currAnnual: number;
   currStepUpDate: string | null;
-  annualIncrement: number | null;
+ annualIncrement: number | null;
   diff: number;
+  extensionDeptId: number | null;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin = false }) => {
-  const [currentRows, setCurrentRows] = useState<SnapshotRow[]>([]);
-  const [pastRows,    setPastRows]    = useState<SnapshotRow[]>([]);
-  const [loading,     setLoading]     = useState(true);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
   // ── Confirm dialog state ──
   const [confirmRow,  setConfirmRow]  = useState<MergedRow | null>(null);
@@ -135,28 +135,35 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
   // Only admins can see/use the trash column
   const canDelete = isEditable && isAdmin;
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [currRes, pastRes] = await Promise.all([
-        API.get(`/department-budget-plans/${plan.dept_budget_plan_id}/plantilla-assignments`),
-        pastYearPlan
-          ? API.get(`/department-budget-plans/${pastYearPlan.dept_budget_plan_id}/plantilla-assignments`)
-          : Promise.resolve({ data: { data: [] } }),
-      ]);
-      // setCurrentRows((currRes.data.data || []).map(parseRow));
-      const savedRows = (currRes.data.data || []).map(parseRow)
-          .filter((r: SnapshotRow) => r.dept_bp_from3_assignment_id != null);
-      setCurrentRows(savedRows);
-      setPastRows((pastRes.data.data   || []).map(parseRow));
-    } catch (err) {
-      console.error('Failed to fetch Form 3 assignments', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const planId = plan.dept_budget_plan_id;
+  const pastPlanId = pastYearPlan?.dept_budget_plan_id;
 
-  useEffect(() => { fetchData(); }, [plan, pastYearPlan]);
+  const [currQ, pastQ] = useQueries({
+    queries: [
+      {
+        queryKey: ['plantilla-assignments', planId],
+        queryFn: () =>
+          API.get(`/department-budget-plans/${planId}/plantilla-assignments`)
+            .then(r => r.data?.data ?? []),
+        enabled: !!planId,
+      },
+      {
+        queryKey: ['plantilla-assignments', pastPlanId ?? 'none'],
+        queryFn: () =>
+          API.get(`/department-budget-plans/${pastPlanId}/plantilla-assignments`)
+            .then(r => r.data?.data ?? []),
+        enabled: !!pastPlanId,
+      },
+    ],
+  });
+
+  const currentRows: SnapshotRow[] = (currQ.data ?? [])
+    .map(parseRow)
+    .filter((r: SnapshotRow) => r.dept_bp_from3_assignment_id != null);
+  const pastRows: SnapshotRow[] = (pastQ.data ?? []).map(parseRow);
+  const loading = (currQ.isLoading && !!planId) || (pastQ.isLoading && !!pastPlanId);
+
+  const queryClient = useQueryClient();
 
   const handleDeleteConfirmed = async () => {
     const row = confirmRow;
@@ -169,8 +176,8 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
         `/department-budget-plans/${plan.dept_budget_plan_id}/plantilla-assignments/${row.snapshotId}`
       );
       toast.success(`${row.positionTitle} removed from snapshot.`);
-      setCurrentRows(prev =>
-        prev.filter(r => r.dept_bp_from3_assignment_id !== row.snapshotId)
+      queryClient.setQueryData(['plantilla-assignments', planId], (old: any[] = []) =>
+        old.filter(r => r.dept_bp_from3_assignment_id !== row.snapshotId)
       );
     } catch (err: any) {
       toast.error(`Failed to remove: ${err?.response?.data?.message ?? err.message}`);
@@ -270,10 +277,20 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
       currStepUpDate:  proposed?.step_effective_date ?? null,
       annualIncrement: proposed?.annual_increment ?? null,
       diff:            (proposed?.annual_rate ?? 0) - (prior?.annual_rate ?? 0),
+      extensionDeptId: proposed?.plantilla_position?.extension_department_id
+        ?? prior?.plantilla_position?.extension_department_id
+        ?? null,
     };
   });
 
+  const EXTENSION_DEPT_NAMES: Record<number, string> = {
+    1: 'Motorpool Division',
+  };
+
   rows.sort((a, b) => {
+    const aExt = a.extensionDeptId ?? -1;
+    const bExt = b.extensionDeptId ?? -1;
+    if (aExt !== bExt) return aExt - bExt;
     const aNum = a.newItem === '–' ? Infinity : parseInt(a.newItem, 10);
     const bNum = b.newItem === '–' ? Infinity : parseInt(b.newItem, 10);
     if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
@@ -341,16 +358,30 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                     No plantilla assignments for this department.
                   </td>
                 </tr>
-              ) : rows.map((row, idx) => {
-                const isDeleting = row.snapshotId ? deletingIds.has(row.snapshotId) : false;
-                return (
-                  <tr
-                    key={idx}
-                    className={cn(
-                      'hover:bg-gray-50/60 transition-colors',
-                      isDeleting && 'opacity-40 pointer-events-none',
-                    )}
-                  >
+              ) : (() => {
+                let lastExtId: number | null | undefined = undefined;
+                return rows.map((row, idx) => {
+                  const extId = row.extensionDeptId;
+                  const showHeader = extId !== null && extId !== lastExtId;
+                  lastExtId = extId;
+                  const isDeleting = row.snapshotId ? deletingIds.has(row.snapshotId) : false;
+                  return (
+                    <React.Fragment key={idx}>
+                      {showHeader && (
+                        <tr className="bg-gray-50 border-t-2 border-b border-gray-200">
+                          <td colSpan={canDelete ? 12 : 11} className="px-4 py-2">
+                            <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                              {EXTENSION_DEPT_NAMES[extId!] ?? `Extension Group ${extId}`}
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      <tr
+                        className={cn(
+                          'hover:bg-gray-50/60 transition-colors',
+                          isDeleting && 'opacity-40 pointer-events-none',
+                        )}
+                      >
                     <td className={cn(TD_BASE, 'text-gray-500 text-center')}>{row.oldItem}</td>
                     <td className={cn(TD_BASE, 'text-gray-500 text-center')}>{row.newItem}</td>
                     <td className={cn(TD_BASE, 'text-gray-800 font-medium')}>{row.positionTitle}</td>
@@ -430,9 +461,11 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                         </button>
                       </td>
                     )}
-                  </tr>
+                      </tr>
+                    </React.Fragment>
                 );
-              })}
+              });
+              })()}
             </tbody>
 
             {/* Grand Total */}

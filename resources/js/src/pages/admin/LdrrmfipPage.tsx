@@ -1,5 +1,6 @@
 // components/admin/LdrrmfipPage.tsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { LoadingState } from "@/src/components/states/LoadingState";
@@ -9,7 +10,7 @@ import { Label } from "@/src/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/src/components/ui/tooltip";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/src/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -117,14 +118,17 @@ import { LdrrmfipTableSkeleton } from "@/src/components/skeleton-loader/Ldrrmfip
 export default function LdrrmfipPage() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
-  const [sources,     setSources]     = useState<FundSource[]>([]);
-  const [activeSource,setActiveSource]= useState<string>("general-fund");
-  const [categories,  setCategories]  = useState<Category[]>([]);
+//   const [sources,     setSources]     = useState<FundSource[]>([]);
+//   const [activeSource,setActiveSource]= useState<string>("general-fund");
+//   const [categories,  setCategories]  = useState<Category[]>([]);
 
-  // Per-source state
-  const [groupsMap,  setGroupsMap]  = useState<Record<string, CategoryGroup[]>>({});
-  const [summaryMap, setSummaryMap] = useState<Record<string, Summary>>({});
-  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+//   // Per-source state
+//   const [groupsMap,  setGroupsMap]  = useState<Record<string, CategoryGroup[]>>({});
+//   const [summaryMap, setSummaryMap] = useState<Record<string, Summary>>({});
+//   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+
+const [activeSource, setActiveSource] = useState<string>("general-fund");
+  const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem,   setEditItem]   = useState<LdrrmfipItem | null>(null);
@@ -154,63 +158,131 @@ export default function LdrrmfipPage() {
   //     if (srcs.length > 0) setActiveSource(srcs[0].id);
   //   }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
   // }, []);
-  const { user } = useAuth();
-// const isViewer = user?.role === "viewer";
-// const isViewer = !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
-const isEligibleDeptHead = user?.role === 'department-head' && (() => {
-  const dept = (user as any)?.department;
-  if (!dept) return false;
-  const n = (dept.dept_name ?? '').toLowerCase();
-  const c = (dept.dept_abbreviation ?? '').toLowerCase();
-  return n.includes('opol community') || n.includes('slaughterhouse') ||
-         n.includes('public market') || ['occ','pm','sh'].includes(c);
-})();
+//   const { user } = useAuth();
+// // const isViewer = user?.role === "viewer";
+// // const isViewer = !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
+// const isEligibleDeptHead = user?.role === 'department-head' && (() => {
+//   const dept = (user as any)?.department;
+//   if (!dept) return false;
+//   const n = (dept.dept_name ?? '').toLowerCase();
+//   const c = (dept.dept_abbreviation ?? '').toLowerCase();
+//   return n.includes('opol community') || n.includes('slaughterhouse') ||
+//          n.includes('public market') || ['occ','pm','sh'].includes(c);
+// })();
 
-const isViewer = isEligibleDeptHead || !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
+// const isViewer = isEligibleDeptHead || !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
 
-useEffect(() => {
-  Promise.all([
-    API.get("/ldrrmfip/sources"),
-    API.get("/ldrrmfip/categories"),
-  ]).then(([srcRes, catRes]) => {
-    let srcs: FundSource[] = srcRes.data.data ?? [];
+// useEffect(() => {
+//   Promise.all([
+//     API.get("/ldrrmfip/sources"),
+//     API.get("/ldrrmfip/categories"),
+//   ]).then(([srcRes, catRes]) => {
+//     let srcs: FundSource[] = srcRes.data.data ?? [];
 
-    // Filter sources based on role + URL path (mirrors IncomeFundPage)
-    if (user?.role === "department-head") {
-      const path = window.location.pathname;
-      if (path.includes("sh-cf"))  srcs = srcs.filter(s => s.id === "sh");
-      else if (path.includes("occ-cf")) srcs = srcs.filter(s => s.id === "occ");
-      else if (path.includes("pm-cf"))  srcs = srcs.filter(s => s.id === "pm");
+//     // Filter sources based on role + URL path (mirrors IncomeFundPage)
+//     if (user?.role === "department-head") {
+//       const path = window.location.pathname;
+//       if (path.includes("sh-cf"))  srcs = srcs.filter(s => s.id === "sh");
+//       else if (path.includes("occ-cf")) srcs = srcs.filter(s => s.id === "occ");
+//       else if (path.includes("pm-cf"))  srcs = srcs.filter(s => s.id === "pm");
+//     }
+
+//     setCategories(catRes.data.data ?? []);
+//     setSources(srcs);
+//     if (srcs.length > 0) setActiveSource(srcs[0].id);
+//   }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
+// }, [user]);
+
+const { user } = useAuth();
+  const isEligibleDeptHead = user?.role === 'department-head' && (() => {
+    const dept = (user as any)?.department;
+    if (!dept) return false;
+    const n = (dept.dept_name ?? '').toLowerCase();
+    const c = (dept.dept_abbreviation ?? '').toLowerCase();
+    return n.includes('opol community') || n.includes('slaughterhouse') ||
+           n.includes('public market') || ['occ','pm','sh'].includes(c);
+  })();
+
+  const isViewer = isEligibleDeptHead || !['admin', 'super-admin', 'admin-ldrrmo'].includes(user?.role ?? '');
+
+  const { data: metadata } = useQuery<{ sources: FundSource[]; categories: Category[] }>({
+    queryKey: ['ldrrmfip-metadata', user?.role, (user as any)?.department?.dept_abbreviation],
+    queryFn: async () => {
+      const [srcRes, catRes] = await Promise.all([
+        API.get("/ldrrmfip/sources"),
+        API.get("/ldrrmfip/categories"),
+      ]);
+      let srcs: FundSource[] = srcRes.data.data ?? [];
+
+      if (user?.role === "department-head") {
+        const path = window.location.pathname;
+        if (path.includes("sh-cf"))  srcs = srcs.filter(s => s.id === "sh");
+        else if (path.includes("occ-cf")) srcs = srcs.filter(s => s.id === "occ");
+        else if (path.includes("pm-cf"))  srcs = srcs.filter(s => s.id === "pm");
+      }
+
+      return { sources: srcs, categories: catRes.data.data ?? [] };
+    },
+    enabled: !!user,
+  });
+
+  const sources    = metadata?.sources    ?? [];
+  const categories = metadata?.categories ?? [];
+
+  // Default the active tab to the first available source once metadata loads
+  useEffect(() => {
+    if (sources.length > 0 && !sources.some(s => s.id === activeSource)) {
+      setActiveSource(sources[0].id);
     }
-
-    setCategories(catRes.data.data ?? []);
-    setSources(srcs);
-    if (srcs.length > 0) setActiveSource(srcs[0].id);
-  }).catch(() => toast.error("Failed to load LDRRMFIP metadata."));
-}, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sources]);
 
   // ── Load data for the active source whenever it or the plan changes ────────
 
-  const fetchSource = useCallback(async (source: string) => {
-    if (!activePlanId) return;
-    setLoadingMap(prev => ({ ...prev, [source]: true }));
-    try {
-      const [groupsRes, summaryRes] = await Promise.all([
-        API.get("/ldrrmfip",         { params: { budget_plan_id: activePlanId, source } }),
-        API.get("/ldrrmfip/summary", { params: { budget_plan_id: activePlanId, source } }),
-      ]);
-      setGroupsMap(prev  => ({ ...prev,  [source]: groupsRes.data.data   ?? [] }));
-      setSummaryMap(prev => ({ ...prev,  [source]: summaryRes.data.data  ?? null }));
-    } catch {
-      toast.error(`Failed to load data for ${source}.`);
-    } finally {
-      setLoadingMap(prev => ({ ...prev, [source]: false }));
-    }
+//   const fetchSource = useCallback(async (source: string) => {
+//     if (!activePlanId) return;
+//     setLoadingMap(prev => ({ ...prev, [source]: true }));
+//     try {
+//       const [groupsRes, summaryRes] = await Promise.all([
+//         API.get("/ldrrmfip",         { params: { budget_plan_id: activePlanId, source } }),
+//         API.get("/ldrrmfip/summary", { params: { budget_plan_id: activePlanId, source } }),
+//       ]);
+//       setGroupsMap(prev  => ({ ...prev,  [source]: groupsRes.data.data   ?? [] }));
+//       setSummaryMap(prev => ({ ...prev,  [source]: summaryRes.data.data  ?? null }));
+//     } catch {
+//       toast.error(`Failed to load data for ${source}.`);
+//     } finally {
+//       setLoadingMap(prev => ({ ...prev, [source]: false }));
+//     }
+//   }, [activePlanId]);
+
+//   useEffect(() => {
+//     if (activePlanId && activeSource) fetchSource(activeSource);
+//   }, [activePlanId, activeSource, fetchSource]);
+const fetchSourceData = useCallback(async (source: string) => {
+    const [groupsRes, summaryRes] = await Promise.all([
+      API.get("/ldrrmfip",         { params: { budget_plan_id: activePlanId, source } }),
+      API.get("/ldrrmfip/summary", { params: { budget_plan_id: activePlanId, source } }),
+    ]);
+    return {
+      groups:  (groupsRes.data.data  ?? []) as CategoryGroup[],
+      summary: (summaryRes.data.data ?? null) as Summary | null,
+    };
   }, [activePlanId]);
 
-  useEffect(() => {
-    if (activePlanId && activeSource) fetchSource(activeSource);
-  }, [activePlanId, activeSource, fetchSource]);
+  const { data: activeSourceData, isLoading: activeSourceLoading } = useQuery<{ groups: CategoryGroup[]; summary: Summary | null }>({
+    queryKey: ['ldrrmfip-source', activePlanId, activeSource],
+    queryFn:  () => fetchSourceData(activeSource),
+    enabled:  !!activePlanId && !!activeSource,
+  });
+
+  const groupsMap  = { [activeSource]: activeSourceData?.groups  ?? [] };
+  const summaryMap = { [activeSource]: activeSourceData?.summary ?? null };
+  const loadingMap = { [activeSource]: activeSourceLoading };
+
+  const fetchSource = useCallback((source: string) => {
+    queryClient.invalidateQueries({ queryKey: ['ldrrmfip-source', activePlanId, source] });
+  }, [activePlanId, queryClient]);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -666,6 +738,14 @@ useEffect(() => {
       {/* ── Add / Edit Dialog ──────────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {/* <DialogHeader>
+            <DialogTitle className="text-section-title">
+              {editItem ? "Edit Item" : "Add New Item"}
+              <span className="ml-2 text-subtitle font-normal">
+                — {sourceFundLabel(activeSourceObj)}
+              </span>
+            </DialogTitle>
+          </DialogHeader> */}
           <DialogHeader>
             <DialogTitle className="text-section-title">
               {editItem ? "Edit Item" : "Add New Item"}
@@ -673,6 +753,9 @@ useEffect(() => {
                 — {sourceFundLabel(activeSourceObj)}
               </span>
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {editItem ? "Edit an existing LDRRMFIP item." : "Add a new LDRRMFIP item to this category."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-4 py-2">

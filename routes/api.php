@@ -64,8 +64,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // ── Core Resources ─────────────────────────────────────────────────────────
     Route::apiResource('users',                     UserController::class);
     Route::apiResource('department-categories',     DepartmentCategoryController::class);
+    // Route::apiResource('departments',               DepartmentController::class);
+    // Route::post('departments/{department}/upload',  [DepartmentController::class, 'update']);
     Route::apiResource('departments',               DepartmentController::class);
     Route::post('departments/{department}/upload',  [DepartmentController::class, 'update']);
+    Route::post('departments/reorder',               [DepartmentController::class, 'reorder']);
 
     Route::apiResource('expense-classifications',   ExpenseClassificationController::class);
     Route::apiResource('expense-class-items',       ExpenseClassItemController::class);
@@ -99,6 +102,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/department-budget-plans/by-dept-year/{dept}/{year}', [DepartmentBudgetPlanController::class, 'findByDeptAndYear']);
     Route::apiResource('department-budget-plans', DepartmentBudgetPlanController::class);
     Route::post('department-budget-plans/{department_budget_plan}/submit',  [DepartmentBudgetPlanController::class, 'submit']);
+    Route::post('department-budget-plans/{department_budget_plan}/acknowledge', [DepartmentBudgetPlanController::class, 'acknowledge']);
     Route::post('department-budget-plans/{department_budget_plan}/approve', [DepartmentBudgetPlanController::class, 'approve']);
     Route::post('department-budget-plans/{department_budget_plan}/reject',  [DepartmentBudgetPlanController::class, 'reject']);
     Route::apiResource('department-budget-plans.items', BudgetPlanForm2ItemController::class);

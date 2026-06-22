@@ -18,6 +18,7 @@ use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
 use App\Models\User;
 use App\Notifications\BudgetProposalSubmitted;
+use App\Notifications\BudgetProposalAcknowledged;
 use App\Notifications\BudgetProposalApproved;
 use App\Notifications\BudgetProposalReturned;
 
@@ -193,7 +194,10 @@ class DepartmentBudgetPlanController extends BaseApiController
         return response()->json(['message' => 'Only draft plans can be submitted.'], 422);
     }
 
-    $department_budget_plan->update(['status' => 'submitted']);
+    $department_budget_plan->update([
+        'status'       => 'submitted',
+        'submitted_at' => now(),
+    ]);
 
     // ── Notify admins ─────────────────────────────────────────────────────
     $department_budget_plan->load('department', 'budgetPlan');
@@ -204,15 +208,44 @@ class DepartmentBudgetPlanController extends BaseApiController
     return $this->success(['message' => 'Submitted successfully.']);
 }
 
+public function acknowledge(DepartmentBudgetPlan $department_budget_plan)
+{
+    $this->authorize('acknowledge', $department_budget_plan);
+
+    if ($department_budget_plan->status !== 'submitted') {
+        return response()->json(['message' => 'Only submitted plans can be acknowledged.'], 422);
+    }
+
+   $department_budget_plan->update([
+        'status'          => 'under_review',
+        'acknowledged_at' => now(),
+    ]);
+
+    // ── Notify department head ────────────────────────────────────────────
+    $department_budget_plan->load('department', 'budgetPlan');
+    $deptHead = User::where('dept_id', $department_budget_plan->dept_id)
+                    ->where('role', 'department-head')
+                    ->first();
+    if ($deptHead) {
+        $deptHead->notify(new BudgetProposalAcknowledged($department_budget_plan));
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    return $this->success(['message' => 'Marked as under review.']);
+}
+
 public function approve(DepartmentBudgetPlan $department_budget_plan)
 {
     $this->authorize('approve', $department_budget_plan);
 
-    if ($department_budget_plan->status !== 'submitted') {
-        return response()->json(['message' => 'Only submitted plans can be approved.'], 422);
+    if ($department_budget_plan->status !== 'under_review') {
+        return response()->json(['message' => 'Only plans currently under review can be approved.'], 422);
     }
 
-    $department_budget_plan->update(['status' => 'approved']);
+    $department_budget_plan->update([
+        'status'      => 'approved',
+        'approved_at' => now(),
+    ]);
 
     // ── Notify department head ────────────────────────────────────────────
     $department_budget_plan->load('department', 'budgetPlan');
@@ -231,7 +264,13 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
 {
     $this->authorize('reject', $department_budget_plan);
 
-    $department_budget_plan->update(['status' => 'draft']);
+    $department_budget_plan->update([
+        'status'          => 'draft',
+        'returned_at'     => now(),
+        'submitted_at'    => null,
+        'acknowledged_at' => null,
+        'approved_at'     => null,
+    ]);
 
     // ── Notify department head ────────────────────────────────────────────
     $department_budget_plan->load('department', 'budgetPlan');
@@ -310,9 +349,10 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
                     'effective_date'              => null,
                     'assignment_date'             => null,
                     'plantilla_position'          => $item->plantillaPosition ? [
-                        'old_item_number' => $item->plantillaPosition->old_item_number,
-                        'new_item_number' => $item->plantillaPosition->new_item_number,
-                        'position_title'  => $item->plantillaPosition->position_title,
+                        'old_item_number'          => $item->plantillaPosition->old_item_number,
+                        'new_item_number'          => $item->plantillaPosition->new_item_number,
+                        'position_title'           => $item->plantillaPosition->position_title,
+                        'extension_department_id'  => $item->plantillaPosition->extension_department_id,
                     ] : null,
                     'personnel' => $item->personnel ? [
                         'first_name'  => $item->personnel->first_name,
@@ -402,9 +442,10 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
                     'assignment_date'             => $assignment->assignment_date?->toDateString(),
                     'effective_date'              => $assignment->assignment_date?->toDateString(),
                     'plantilla_position'          => $position ? [
-                        'old_item_number' => $position->old_item_number,
-                        'new_item_number' => $position->new_item_number,
-                        'position_title'  => $position->position_title,
+                        'old_item_number'          => $position->old_item_number,
+                        'new_item_number'          => $position->new_item_number,
+                        'position_title'           => $position->position_title,
+                        'extension_department_id'  => $position->extension_department_id,
                     ] : null,
                     'personnel' => $personnel ? [
                         'first_name'  => $personnel->first_name,

@@ -1,5 +1,6 @@
 // components/admin/PsComputation.tsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { toast } from "sonner";
@@ -283,35 +284,36 @@ function PsSkeleton() {
 export default function PsComputation() {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
-  const [data,    setData]    = useState<PsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const [totalIncome,  setTotalIncome]  = useState(0);
   const [nonRecurring, setNonRecurring] = useState(0);
   const [excessAmount, setExcessAmount] = useState(0);
 
   const savedRef     = useRef({ total_income: 0, non_recurring_income: 0, excess_amount: 0 });
   const activePlanId = activePlan?.budget_plan_id ?? null;
+  const queryClient  = useQueryClient();
 
-  const fetchData = useCallback(async () => {
-    if (!activePlanId) return;
-    setLoading(true);
-    try {
+  const { data, isLoading: loading } = useQuery<PsResponse>({
+    queryKey: ['ps-computation', activePlanId],
+    queryFn: async () => {
       const res = await API.get<PsResponse>(`/ps-computation?budget_plan_id=${activePlanId}`);
-      const d = res.data;
-      setData(d);
-      setTotalIncome(d.manual.total_income);
-      setNonRecurring(d.manual.non_recurring_income);
-      setExcessAmount(d.manual.excess_amount);
-      savedRef.current = { ...d.manual };
-    } catch {
-      toast.error("Failed to load PS computation data.");
-    } finally {
-      setLoading(false);
-    }
-  }, [activePlanId]);
+      return res.data;
+    },
+    enabled: !!activePlanId,
+  });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Keep editable local fields in sync whenever fresh data arrives
+  useEffect(() => {
+    if (!data) return;
+    setTotalIncome(data.manual.total_income);
+    setNonRecurring(data.manual.non_recurring_income);
+    setExcessAmount(data.manual.excess_amount);
+    savedRef.current = { ...data.manual };
+  }, [data]);
+
+  const refetchData = useCallback(() => {
+    if (!activePlanId) return;
+    queryClient.invalidateQueries({ queryKey: ['ps-computation', activePlanId] });
+  }, [activePlanId, queryClient]);
 
   const save = useCallback((
     patch: Partial<{ total_income: number; non_recurring_income: number; excess_amount: number }>
@@ -329,10 +331,10 @@ export default function PsComputation() {
         non_recurring_income: payload.non_recurring_income,
         excess_amount:        payload.excess_amount,
       };
-      fetchData();
+      refetchData();
     });
     toast.promise(promise, { loading: "Saving…", success: "Saved", error: "Save failed" });
-  }, [activePlanId, totalIncome, nonRecurring, excessAmount, fetchData]);
+  }, [activePlanId, totalIncome, nonRecurring, excessAmount, refetchData]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
 

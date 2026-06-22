@@ -58,8 +58,7 @@ export function useForm7GeneralFund(planId: number | undefined) {
     queryFn:  () =>
       API.get('/form7', { params: { budget_plan_id: planId } })
         .then(r => r.data.data),
-    enabled:   !!planId,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!planId,
   });
 }
 
@@ -139,7 +138,6 @@ export function useForm7SpecialAccount(
         grand_total: { ...ZERO_SUB, total: grandTotal },
       };
     },
-    enabled:   !!planId && !!dept,  // ← KEY FIX: wait for dept to resolve
-    staleTime: 5 * 60 * 1000,
+    enabled: !!planId && !!dept,  // ← KEY FIX: wait for dept to resolve
   });
 }

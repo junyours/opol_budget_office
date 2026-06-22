@@ -48,9 +48,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
+// import { useState, useEffect, useCallback, useRef } from 'react';
+// import axios from 'axios';
+// import { useState, useEffect, useCallback, useRef } from 'react';
+// import axios from 'axios';
+// import API from '../services/api'; // ← adjust this relative path to match where api.ts actually lives relative to this file
 
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import API from '../services/api';
 // ─────────────────────────────────────────────────────────────────────────────
 // PS Aggregate Totals
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,10 +141,14 @@ export function useGetTotalAmount(
     try {
       const params: Record<string, unknown> = {};
       if (planId) params.budget_plan_id = planId;
-      const { data } = await axios.get<{
+    //   const { data } = await axios.get<{
+    //     success: boolean;
+    //     data: { key: TotalKey; label: string; total: number; budget_plan_id: number };
+    //   }>(`${base}/totals/${k}`, { params });
+    const { data } = await API.get<{
         success: boolean;
         data: { key: TotalKey; label: string; total: number; budget_plan_id: number };
-      }>(`${base}/totals/${k}`, { params });
+      }>(`/totals/${k}`, { params });
       setState({
         total:        data.data.total        ?? 0,
         label:        data.data.label        ?? k,
@@ -201,10 +212,10 @@ export function useGetAllTotals(options: UseTotalOptions = {}): UseAllTotalsRetu
     try {
       const params: Record<string, unknown> = {};
       if (planId) params.budget_plan_id = planId;
-      const { data } = await axios.get<{
+      const { data } = await API.get<{
         success: boolean;
         data: { budget_plan_id: number; totals: Record<string, TotalEntry> };
-      }>(`${base}/totals`, { params });
+      }>(`/totals`, { params });
       setState({
         totals:       (data.data.totals ?? {}) as Partial<Record<TotalKey, TotalEntry>>,
         budgetPlanId: data.data.budget_plan_id ?? null,
@@ -344,92 +355,147 @@ export interface UseIncomeFundTotalsReturn {
  *   // Financial Assistance to Barangays
  *   data.aidToBarangays.amount
  */
+// export function useGetIncomeFundTotals(
+//   options: UseTotalOptions = {}
+// ): UseIncomeFundTotalsReturn {
+//   const { budgetPlanId = null, enabled = true, baseUrl = '/api' } = options;
+
+//   const [state, setState] = useState<Omit<UseIncomeFundTotalsReturn, 'refetch'>>({
+//     data: null, raw: null, budgetPlanId: null, loading: false, error: null,
+//   });
+
+//   const latestRef = useRef({ budgetPlanId, baseUrl });
+//   useEffect(() => { latestRef.current = { budgetPlanId, baseUrl }; });
+
+//   const fetchDerived = useCallback(async () => {
+//     const { budgetPlanId: planId, baseUrl: base } = latestRef.current;
+//     setState(prev => ({ ...prev, loading: true, error: null }));
+//     try {
+//       const params: Record<string, unknown> = {};
+//       if (planId) params.budget_plan_id = planId;
+
+//       const { data: res } = await API.get<{
+//         success: boolean;
+//         data: IncomeFundDerivedResponse;
+//       }>(`/totals/income-fund-derived`, { params });
+
+//       const r = res.data;
+
+//       // Balance check: infraProgram + debtServices should equal ldf20 (rounded)
+//       const balanced =
+//         Math.round(r.infrastructure_program + r.debt_services) ===
+//         Math.round(r.ldf_20pct);
+
+//       const structured: IncomeFundDerivedData = {
+//         ldf20: {
+//           amount:      r.ldf_20pct,
+//           ntaProposed: r.nta_proposed,
+//           rate:        0.2,
+//         },
+//         infraProgram: {
+//           amount:       r.infrastructure_program,
+//           ldf20:        r.ldf_20pct,
+//           debtServices: r.debt_services,
+//           balanced,
+//         },
+//         debtServices: {
+//           amount: r.debt_services,
+//         },
+//         ldrrmf5: {
+//           amount:           r.ldrrmf_5pct,
+//           grandTotalIncome: r.grand_total_income,
+//           rate:             0.05,
+//         },
+//         qrf30: {
+//           amount:  r.qrf_30pct,
+//           ldrrmf5: r.ldrrmf_5pct,
+//           rate:    0.3,
+//         },
+//         pda70: {
+//           amount:  r.pda_70pct,
+//           ldrrmf5: r.ldrrmf_5pct,
+//           rate:    0.7,
+//         },
+//         aidToBarangays: {
+//           amount: r.aid_to_barangays,
+//         },
+//       };
+
+//       setState({
+//         data:         structured,
+//         raw:          r,
+//         budgetPlanId: r.budget_plan_id ?? null,
+//         loading:      false,
+//         error:        null,
+//       });
+//     } catch (err: unknown) {
+//       const message =
+//         (axios.isAxiosError(err) && err.response?.data?.message) ||
+//         (err instanceof Error && err.message) ||
+//         'Failed to fetch income-fund derived totals.';
+//       setState(prev => ({ ...prev, loading: false, error: String(message) }));
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     if (!enabled) return;
+//     fetchDerived();
+//   }, [budgetPlanId, enabled, fetchDerived]);
+
+//   return { ...state, refetch: fetchDerived };
+// }
+
 export function useGetIncomeFundTotals(
   options: UseTotalOptions = {}
 ): UseIncomeFundTotalsReturn {
-  const { budgetPlanId = null, enabled = true, baseUrl = '/api' } = options;
+  const { budgetPlanId = null, enabled = true } = options;
 
-  const [state, setState] = useState<Omit<UseIncomeFundTotalsReturn, 'refetch'>>({
-    data: null, raw: null, budgetPlanId: null, loading: false, error: null,
-  });
-
-  const latestRef = useRef({ budgetPlanId, baseUrl });
-  useEffect(() => { latestRef.current = { budgetPlanId, baseUrl }; });
-
-  const fetchDerived = useCallback(async () => {
-    const { budgetPlanId: planId, baseUrl: base } = latestRef.current;
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    try {
+  const { data: structured, isLoading: loading, error: queryError, refetch } = useQuery<{
+    data: IncomeFundDerivedData;
+    raw: IncomeFundDerivedResponse;
+    budgetPlanId: number | null;
+  }>({
+    queryKey: ['income-fund-derived', budgetPlanId],
+    queryFn: async () => {
       const params: Record<string, unknown> = {};
-      if (planId) params.budget_plan_id = planId;
+      if (budgetPlanId) params.budget_plan_id = budgetPlanId;
 
-      const { data: res } = await axios.get<{
+      const { data: res } = await API.get<{
         success: boolean;
         data: IncomeFundDerivedResponse;
-      }>(`${base}/totals/income-fund-derived`, { params });
+      }>(`/totals/income-fund-derived`, { params });
 
       const r = res.data;
-
-      // Balance check: infraProgram + debtServices should equal ldf20 (rounded)
       const balanced =
         Math.round(r.infrastructure_program + r.debt_services) ===
         Math.round(r.ldf_20pct);
 
-      const structured: IncomeFundDerivedData = {
-        ldf20: {
-          amount:      r.ldf_20pct,
-          ntaProposed: r.nta_proposed,
-          rate:        0.2,
-        },
+      const data: IncomeFundDerivedData = {
+        ldf20: { amount: r.ldf_20pct, ntaProposed: r.nta_proposed, rate: 0.2 },
         infraProgram: {
-          amount:       r.infrastructure_program,
-          ldf20:        r.ldf_20pct,
+          amount: r.infrastructure_program,
+          ldf20: r.ldf_20pct,
           debtServices: r.debt_services,
           balanced,
         },
-        debtServices: {
-          amount: r.debt_services,
-        },
-        ldrrmf5: {
-          amount:           r.ldrrmf_5pct,
-          grandTotalIncome: r.grand_total_income,
-          rate:             0.05,
-        },
-        qrf30: {
-          amount:  r.qrf_30pct,
-          ldrrmf5: r.ldrrmf_5pct,
-          rate:    0.3,
-        },
-        pda70: {
-          amount:  r.pda_70pct,
-          ldrrmf5: r.ldrrmf_5pct,
-          rate:    0.7,
-        },
-        aidToBarangays: {
-          amount: r.aid_to_barangays,
-        },
+        debtServices: { amount: r.debt_services },
+        ldrrmf5: { amount: r.ldrrmf_5pct, grandTotalIncome: r.grand_total_income, rate: 0.05 },
+        qrf30: { amount: r.qrf_30pct, ldrrmf5: r.ldrrmf_5pct, rate: 0.3 },
+        pda70: { amount: r.pda_70pct, ldrrmf5: r.ldrrmf_5pct, rate: 0.7 },
+        aidToBarangays: { amount: r.aid_to_barangays },
       };
 
-      setState({
-        data:         structured,
-        raw:          r,
-        budgetPlanId: r.budget_plan_id ?? null,
-        loading:      false,
-        error:        null,
-      });
-    } catch (err: unknown) {
-      const message =
-        (axios.isAxiosError(err) && err.response?.data?.message) ||
-        (err instanceof Error && err.message) ||
-        'Failed to fetch income-fund derived totals.';
-      setState(prev => ({ ...prev, loading: false, error: String(message) }));
-    }
-  }, []);
+      return { data, raw: r, budgetPlanId: r.budget_plan_id ?? null };
+    },
+    enabled: enabled && !!budgetPlanId,
+  });
 
-  useEffect(() => {
-    if (!enabled) return;
-    fetchDerived();
-  }, [budgetPlanId, enabled, fetchDerived]);
-
-  return { ...state, refetch: fetchDerived };
+  return {
+    data:         structured?.data ?? null,
+    raw:          structured?.raw ?? null,
+    budgetPlanId: structured?.budgetPlanId ?? null,
+    loading,
+    error:        queryError ? (queryError as Error).message : null,
+    refetch:      () => { refetch(); },
+  };
 }

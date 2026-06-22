@@ -17,11 +17,13 @@ class PlantillaPosition extends Model
         'position_title',
         'salary_grade',
         'dept_id',
+        'extension_department_id',
         'is_active',
     ];
 
     protected $casts = [
         'salary_grade' => 'integer',
+        'extension_department_id' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -40,5 +42,5 @@ class PlantillaPosition extends Model
             // only the latest assignment per position
             return $this->hasOne(PlantillaAssignment::class, 'plantilla_position_id')->latest('effective_date');
         }
-    
+
 }

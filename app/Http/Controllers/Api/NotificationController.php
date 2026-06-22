@@ -13,9 +13,9 @@ class NotificationController extends BaseApiController
     public function index(): JsonResponse
     {
         $user = Auth::user();
-        $notifications = $user->unreadNotifications()
+        $notifications = $user->notifications()       // ← all, not unreadNotifications()
             ->latest()
-            ->take(10)
+            ->take(50)                                  // ← bell shows a longer history
             ->get()
             ->map(fn ($n) => [
                 'id'                  => $n->id,
@@ -27,6 +27,7 @@ class NotificationController extends BaseApiController
                 'dept_budget_plan_id' => $n->data['dept_budget_plan_id'] ?? null,
                 'budget_year'         => $n->data['budget_year']        ?? null,
                 'created_at'          => $n->created_at,
+                'read_at'             => $n->read_at,     // ← ADD THIS
             ]);
 
         return $this->success([

@@ -245,9 +245,21 @@ class LEPReportController extends Controller
                         ? (float) $proposed->annual_increment
                         : null,
                     'increase_decrease'   => $increaseDecrease,
+                    'extensionDeptId'     => $plantilla?->extension_department_id ?? null,
                 ];
                 $newItemNo++;
             }
+
+            usort($rows, function ($a, $b) {
+                $aExt = $a['extensionDeptId'] ?? null;
+                $bExt = $b['extensionDeptId'] ?? null;
+                $aExtVal = $aExt ?? -1;
+                $bExtVal = $bExt ?? -1;
+                if ($aExtVal !== $bExtVal) return $aExtVal - $bExtVal;
+                $aNum = is_numeric($a['new_item_number']) ? (int)$a['new_item_number'] : PHP_INT_MAX;
+                $bNum = is_numeric($b['new_item_number']) ? (int)$b['new_item_number'] : PHP_INT_MAX;
+                return $aNum - $bNum;
+            });
 
             $totalCurrent  = array_sum(array_column($rows, 'current_amount'));
             $totalProposed = array_sum(array_column($rows, 'proposed_amount'));

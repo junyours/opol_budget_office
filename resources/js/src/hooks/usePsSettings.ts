@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import API from '@/src/services/api';
 import {
     PsSettings,
@@ -19,22 +20,31 @@ function mergeWithDefaults(saved: Partial<PsSettings>): PsSettings {
 }
 
 export function usePsSettings() {
-    const [settings, setSettings] = useState<PsSettings>(DEFAULT_SETTINGS);
-    const [loading,  setLoading]  = useState(true);
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        API.get('/ps-settings')
-            .then(r => setSettings(mergeWithDefaults(r.data.data ?? {})))
-            .catch(() => setSettings(DEFAULT_SETTINGS))
-            .finally(() => setLoading(false));
+    const { data, isLoading } = useQuery<PsSettings>({
+        queryKey: ['ps-settings'],
+        queryFn: () =>
+            API.get('/ps-settings')
+                .then(r => mergeWithDefaults(r.data.data ?? {}))
+                .catch(() => DEFAULT_SETTINGS),
+    });
+
+    // Local optimistic override so callers can still do setSettings(s) for instant UI feedback
+    const [localOverride, setLocalOverride] = useState<PsSettings | null>(null);
+    const settings = localOverride ?? data ?? DEFAULT_SETTINGS;
+
+    const setSettings = useCallback((s: PsSettings) => {
+        setLocalOverride(s);
     }, []);
 
     const save = useCallback(async (s: PsSettings) => {
         const r = await API.put('/ps-settings', s);
         const updated = mergeWithDefaults(r.data.data ?? s);
-        setSettings(updated);
+        queryClient.setQueryData(['ps-settings'], updated);
+        setLocalOverride(null); // clear override now that cache has the saved value
         return updated;
-    }, []);
+    }, [queryClient]);
 
-    return { settings, setSettings, loading, save };
+    return { settings, setSettings, loading: isLoading, save };
 }

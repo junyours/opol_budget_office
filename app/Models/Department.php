@@ -11,6 +11,14 @@ class Department extends Model
 
     protected $table      = 'departments';
     protected $primaryKey = 'dept_id';
+    // protected $fillable   = [
+    //     'dept_name',
+    //     'dept_abbreviation',
+    //     'dept_category_id',
+    //     'mandate',
+    //     'special_provisions',
+    //     'logo',
+    // ];
     protected $fillable   = [
         'dept_name',
         'dept_abbreviation',
@@ -18,6 +26,7 @@ class Department extends Model
         'mandate',
         'special_provisions',
         'logo',
+        'sort_order',
     ];
 
     public function category()
@@ -44,5 +53,5 @@ class Department extends Model
         return $this->hasMany(DepartmentBudgetPlan::class, 'dept_id', 'dept_id');
     }
 
-    
+
 }

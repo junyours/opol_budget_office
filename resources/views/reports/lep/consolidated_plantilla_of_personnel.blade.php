@@ -64,15 +64,15 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     <th colspan="2">Item No.</th>
     <th rowspan="2" style="width:27%;">Position Title</th>
     <th rowspan="2" style="width:20%;">Name of Incumbent</th>
-    <th colspan="2" style="line-height:1.2;>
+    <th colspan="2" style="line-height:1.2;">
       Current Year Authorized Rate / Annum<br>
       <?php if($lep_lbc_current) echo $lep_lbc_current . '<br>'; ?>
-      <span style="font-size:6pt;"><?php echo $lep_tranche_current ?? 'No Data'; ?></span>
+      <?php if($lep_tranche_current) echo '<span style="font-size:6pt;">' . $lep_tranche_current . '</span>'; ?>
     </th>
     <th colspan="2" style="line-height:1.2;">
       Budget Year <?php echo $proposed_year; ?> Proposed Rate / Annum<br>
       <?php if($lep_lbc_proposed) echo $lep_lbc_proposed . '<br>'; ?>
-      <span style="font-size:6pt;"><?php echo $lep_tranche_proposed ?? 'No Data'; ?></span>
+      <?php if($lep_tranche_proposed) echo '<span style="font-size:6pt;">' . $lep_tranche_proposed . '</span>'; ?>
     </th>
     <th rowspan="2" style="width:11%;">Increase/<br>Decrease</th>
   </tr>
@@ -123,12 +123,23 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           </td>
         </tr>
 
+        @php $lepExtLastId = 'SENTINEL'; $lepExtNames = [1 => 'Motorpool Division']; $lepRowIdx = 0; @endphp
         @forelse($rows as $rIdx => $row)
         @php
-          $fmt       = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
-          $noCurrent = ($row['current_amount'] <= 0);
-          $curAmt    = $row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0);
+          $lepThisExt  = $row['extensionDeptId'] ?? null;
+          $lepShowHdr  = ($lepThisExt !== $lepExtLastId) && ($lepThisExt !== null);
+          $lepExtLastId= $lepThisExt;
+          $fmt         = $lepRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+          $noCurrent   = ($row['current_amount'] <= 0);
+          $lepRowIdx++;
         @endphp
+        @if($lepShowHdr)
+        <tr>
+            <td colspan="9" style="font-weight:bold; font-size:7pt; padding:2px 4px;">
+                {{ $lepExtNames[$lepThisExt] ?? 'Extension Group '.$lepThisExt }}
+            </td>
+        </tr>
+        @endif
         <tr style="line-height:1.2;">
           <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
           <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
@@ -144,13 +155,13 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             $curAmt    = (float) ($row['current_amount'] ?? 0);
             $noCurrent = $curAmt <= 0;
         @endphp
-        <td class="c" style="font-size:6pt;">
-            {{ $row['salary_grade'] ?? '' }}<br>
+       <td class="c" style="font-size:6pt;">
+            {{ $row['step_current'] ? ($row['salary_grade'] ?? '') : '' }}<br>
             {{ $row['step_current'] ?? '' }}
         </td>
         <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
           <td class="c" style="font-size:6pt;">
-            {{ $row['salary_grade'] ?? '' }}<br>
+            {{ $row['step_proposed'] ? ($row['salary_grade'] ?? '') : '' }}<br>
             {{ $row['step_proposed'] ?? '' }}
           </td>
           <td class="r">
@@ -254,12 +265,23 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             </td>
           </tr>
 
+          @php $lepSaExtLastId = 'SENTINEL'; $lepSaExtNames = [1 => 'Motorpool Division']; $lepSaRowIdx = 0; @endphp
           @forelse($rows as $rIdx => $row)
           @php
-            $fmt       = $rIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
-            $noCurrent = ($row['current_amount'] <= 0);
-            $curAmt    = $row['current_amount'] > 0 ? $row['current_amount'] : ($row['proposed_amount'] ?? 0);
+            $lepSaThisExt  = $row['extensionDeptId'] ?? null;
+            $lepSaShowHdr  = ($lepSaThisExt !== $lepSaExtLastId) && ($lepSaThisExt !== null);
+            $lepSaExtLastId= $lepSaThisExt;
+            $fmt           = $lepSaRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+            $noCurrent     = ($row['current_amount'] <= 0);
+            $lepSaRowIdx++;
           @endphp
+          @if($lepSaShowHdr)
+          <tr>
+              <td colspan="9" style="background:#f5f5f5;border-top:2px solid #999;border-bottom:1px solid #ccc;padding:3px 6px;font-weight:bold;font-size:6pt;text-transform:uppercase;letter-spacing:0.08em;color:#444;">
+                  {{ $lepSaExtNames[$lepSaThisExt] ?? 'Extension Group '.$lepSaThisExt }}
+              </td>
+          </tr>
+          @endif
           <tr style="line-height:1.2;">
             <td class="c" style="font-size:6pt;">{{ $row['old_item_number'] ?? '' }}</td>
             <td class="c" style="font-size:6pt;">{{ $row['new_item_number'] }}</td>
@@ -276,12 +298,12 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
                 $noCurrent = $curAmt <= 0;
             @endphp
             <td class="c" style="font-size:6pt;">
-                {{ $row['salary_grade'] ?? '' }}<br>
+                {{ $row['step_current'] ? ($row['salary_grade'] ?? '') : '' }}<br>
                 {{ $row['step_current'] ?? '' }}
             </td>
             <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
             <td class="c" style="font-size:6pt;">
-              {{ $row['salary_grade'] ?? '' }}<br>
+              {{ $row['step_proposed'] ? ($row['salary_grade'] ?? '') : '' }}<br>
               {{ $row['step_proposed'] ?? '' }}
             </td>
             <td class="r">

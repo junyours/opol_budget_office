@@ -41,16 +41,29 @@ class AuthController extends Controller
         }
 
         // Clean up only THIS user's expired tokens on login
+    //     $user->tokens()->where('expires_at', '<', now())->delete();
+
+    //     // return response()->json([
+    //     //     'user'  => $user,
+    //     //     'token' => $user->createToken('auth-token')->plainTextToken, // expiry handled by sanctum.php
+    //     // ]);
+
+    //     return response()->json([
+    //         'user'  => $user,
+    //         'token' => $user->createToken('auth-token')->plainTextToken,
+    //     ]);
+    // }
+
+    // Clean up only THIS user's expired tokens on login
         $user->tokens()->where('expires_at', '<', now())->delete();
 
-        // return response()->json([
-        //     'user'  => $user,
-        //     'token' => $user->createToken('auth-token')->plainTextToken, // expiry handled by sanctum.php
-        // ]);
+        $expiresAt = config('sanctum.expiration')
+            ? now()->addMinutes(config('sanctum.expiration'))
+            : null;
 
         return response()->json([
             'user'  => $user,
-            'token' => $user->createToken('auth-token')->plainTextToken,
+            'token' => $user->createToken('auth-token', ['*'], $expiresAt)->plainTextToken,
         ]);
     }
 
@@ -77,11 +90,24 @@ class AuthController extends Controller
             return response()->json(['message' => 'Incorrect password.'], 422);
         }
 
-        $user->tokens()->where('expires_at', '<', now())->delete();
+    //     $user->tokens()->where('expires_at', '<', now())->delete();
+
+    //     return response()->json([
+    //         'user'  => $user,
+    //         'token' => $user->createToken('auth-token')->plainTextToken,
+    //     ]);
+    // }
+
+    // public function logout(Request $request)
+    $user->tokens()->where('expires_at', '<', now())->delete();
+
+        $expiresAt = config('sanctum.expiration')
+            ? now()->addMinutes(config('sanctum.expiration'))
+            : null;
 
         return response()->json([
             'user'  => $user,
-            'token' => $user->createToken('auth-token')->plainTextToken,
+            'token' => $user->createToken('auth-token', ['*'], $expiresAt)->plainTextToken,
         ]);
     }
 

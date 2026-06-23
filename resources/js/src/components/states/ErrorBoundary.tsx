@@ -5,14 +5,14 @@ import { Separator } from "@/src/components/ui/separator";
 import { AlertTriangle, RefreshCw, Home, ChevronDown, ChevronUp, WifiOff, FileX, ServerCrash } from "lucide-react";
 import { useState } from "react";
 
-type ErrorType = "chunk" | "not-found" | "server" | "unknown";
+type ErrorType = "chunk" | "not-found" | "server" | "unknown" | "offline";
 
 function getErrorType(error: unknown): ErrorType {
   if (
     error instanceof TypeError &&
     error.message.includes("Failed to fetch dynamically imported module")
   ) {
-    return "chunk";
+    return navigator.onLine ? "chunk" : "offline";
   }
   if (isRouteErrorResponse(error)) {
     return error.status === 404 ? "not-found" : "server";
@@ -24,6 +24,13 @@ const ERROR_CONFIG: Record<
   ErrorType,
   { icon: React.ReactNode; title: string; description: string; badge: string; badgeVariant: "destructive" | "secondary" | "outline" }
 > = {
+  offline: {
+    icon: <WifiOff className="h-10 w-10 text-amber-500" />,
+    title: "You're Offline",
+    description: "It looks like you've lost your internet connection. Check your network and try again.",
+    badge: "No Connection",
+    badgeVariant: "secondary",
+  },
   chunk: {
     icon: <WifiOff className="h-10 w-10 text-amber-500" />,
     title: "App Updated",
@@ -64,7 +71,7 @@ export default function ErrorBoundary() {
   const config = ERROR_CONFIG[errorType];
 
   // Auto-reload once for chunk errors
-  if (errorType === "chunk") {
+  if (errorType === "chunk" && navigator.onLine) {
     const alreadyReloaded = sessionStorage.getItem("chunk-error-reload");
     if (!alreadyReloaded) {
       sessionStorage.setItem("chunk-error-reload", "1");
@@ -110,7 +117,7 @@ export default function ErrorBoundary() {
           </div>
 
           {/* Error detail (non-chunk) */}
-          {errorMessage && errorType !== "chunk" && (
+          {errorMessage && errorType !== "chunk" && errorType !== "offline" && (
             <div className="rounded-md bg-muted px-4 py-3">
               <p className="text-xs font-mono text-muted-foreground break-all">
                 {statusCode && <span className="font-semibold text-foreground mr-2">{statusCode}</span>}
@@ -123,10 +130,10 @@ export default function ErrorBoundary() {
 
           {/* Actions */}
           <div className="flex flex-col gap-2">
-            {errorType === "chunk" ? (
+           {errorType === "chunk" || errorType === "offline" ? (
               <Button className="w-full" onClick={() => window.location.reload()}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Reload App
+                {errorType === "offline" ? "Try Again" : "Reload App"}
               </Button>
             ) : (
               <>

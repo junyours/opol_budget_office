@@ -528,7 +528,9 @@ const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
   // const ldrrmfPieTotal = qrf + ldrrmf70Actual;
   const ldrrmfPieTotal = qrf + ldrrmf70Actual; // qrf is always fully reserved
   const mdfPieValue    = mdfActual;
-  const gfUnap         = Math.max(0, (gf?.total ?? 0) - exp.gfExpenditure - mdfPieValue - ldrrmfPieTotal);
+  //const gfUnap         = Math.max(0, (gf?.total ?? 0) - exp.gfExpenditure - mdfPieValue - ldrrmfPieTotal);
+
+  const gfUnap = (gf?.total ?? 0) - exp.gfExpenditure - mdfPieValue - ldrrmfPieTotal;
 
   const shCal        = (sh?.nonTaxRevenue  ?? 0) * 0.05;
   const occCal       = (occ?.nonTaxRevenue ?? 0) * 0.05;
@@ -549,7 +551,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
     { name: "20% MDF",                value: mdfPieValue,       color: "#f59e0b" },
     { name: "5% · 30% QRF",          value: qrf,               color: "#f43f5e" },
     { name: "5% · 70% Pre-Disaster",  value: ldrrmf70Actual,    color: "#fb923c" },
-    { name: "Unappropriated Balance", value: gfUnap,            color: "#10b981" },
+    //{ name: "Unappropriated Balance", value: gfUnap,            color: "#10b981" },
+    { name: "Unappropriated Balance", value: Math.abs(gfUnap),  color: gfUnap >= 0 ? "#10b981" : "#ef4444" },
   ].filter(d => d.value > 0) : [];
 
   const specialPie = fundsReady && specialTotal > 0 ? [

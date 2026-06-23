@@ -144,6 +144,8 @@ const ExpenditurePage = React.lazy(
    () => import("../pages/common/BagOngOpol")
  );
 
+const NoInternet = React.lazy(() => import("../components/states/NoInternet"));
+
 
 /* ------------------ Suspense Wrapper ------------------ */
 
@@ -192,17 +194,50 @@ const GuestRoute = () => {
 
 //   return <Outlet />;
 // };
+// const ProtectedRoute = () => {
+//   const { user, loading } = useAuth();
+//   const location = useLocation();
+
+//   if (loading) return <LoadingState />;
+
+//   if (!user) {
+//     return <Navigate to="/login" replace />;
+//   }
+
+
+
+//   return <Outlet />;
+// };
+
 const ProtectedRoute = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  React.useEffect(() => {
+    const onOnline  = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online",  onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online",  onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   if (loading) return <LoadingState />;
+
+  if (!isOnline) {
+    return (
+      <React.Suspense fallback={<LoadingState />}>
+        <NoInternet />
+      </React.Suspense>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
-
 
   return <Outlet />;
 };

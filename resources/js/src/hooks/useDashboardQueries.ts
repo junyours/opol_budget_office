@@ -8,8 +8,8 @@ import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 
 // export interface FundData { total: number; nta: number; nonTaxRevenue: number }
 export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number }
-export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
-
+// export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
+export interface DeptExpenditure { dept_id: number; abbr: string; total: number; categoryId: number }
 export interface SpecialAccountExpenditures {
   sh:       number;
   occ:      number;
@@ -381,19 +381,41 @@ export function useDeptExpenditures(
           (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
         );
         const aip = aipByDept.get(dp.dept_id) ?? 0;
-        return {
-          dept_id: dp.dept_id,
-          abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
-          total:   form2 + aip,
+//         return {
+//           dept_id: dp.dept_id,
+//           abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
+//           total:   form2 + aip,
+//         };
+//       })
+//       .filter((r: DeptExpenditure) => r.total > 0)
+//       .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
+//   }, [deptPlans, aipPrograms, departments, budgetPlanId]);
+
+//   return { data, isLoading };
+// }
+// export function useSpecialDeptExpenditures(
+
+return {
+          dept_id:    dp.dept_id,
+          abbr:       d.dept_abbreviation ?? d.dept_name.slice(0, 6),
+          total:      form2 + aip,
+          categoryId: d.dept_category_id,
         };
       })
       .filter((r: DeptExpenditure) => r.total > 0)
-      .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
+      .sort((a: DeptExpenditure, b: DeptExpenditure) => {
+        const da = deptMap.get(a.dept_id);
+        const db = deptMap.get(b.dept_id);
+        const catA = (da?.dept_category_id ?? 0) * 10000 + (da?.sort_order ?? 0);
+        const catB = (db?.dept_category_id ?? 0) * 10000 + (db?.sort_order ?? 0);
+        return catA - catB;
+      });
   }, [deptPlans, aipPrograms, departments, budgetPlanId]);
 
   return { data, isLoading };
 }
 export function useSpecialDeptExpenditures(
+
   budgetPlanId: number | undefined,
   departments: Department[],
 ): { data: DeptExpenditure[]; isLoading: boolean } {
@@ -423,10 +445,25 @@ export function useSpecialDeptExpenditures(
           (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
         );
         const aip = aipByDept.get(dp.dept_id) ?? 0;
-        return {
-          dept_id: dp.dept_id,
-          abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
-          total:   form2 + aip,
+//         return {
+//           dept_id: dp.dept_id,
+//           abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
+//           total:   form2 + aip,
+//         };
+//       })
+//       .filter((r: DeptExpenditure) => r.total > 0)
+//       .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
+//   }, [deptPlans, aipPrograms, departments, budgetPlanId]);
+
+//   return { data, isLoading };
+// }
+// export function useSpecialAccountExpenditures(
+
+return {
+          dept_id:    dp.dept_id,
+          abbr:       d.dept_abbreviation ?? d.dept_name.slice(0, 6),
+          total:      form2 + aip,
+          categoryId: d.dept_category_id,
         };
       })
       .filter((r: DeptExpenditure) => r.total > 0)
@@ -436,6 +473,7 @@ export function useSpecialDeptExpenditures(
   return { data, isLoading };
 }
 export function useSpecialAccountExpenditures(
+
   budgetPlanId: number | undefined,
   departments: Department[],
 ): { data: SpecialAccountExpenditures; isLoading: boolean } {

@@ -55,8 +55,11 @@ useDepartments, useBudgetPlans, useDepartmentBudgetPlans,
   useCreateBudgetPlan,
 } from "../../hooks/useDashboardQueries";
 
+// import { BudgetAreaChart } from "@/src/components/charts/BudgetAreaChart";
+// import { BreakdownCard } from "@/src/components/cards/BreakdownCard";
 import { BudgetAreaChart } from "@/src/components/charts/BudgetAreaChart";
 import { BreakdownCard } from "@/src/components/cards/BreakdownCard";
+import { SectorAllocationCard } from "@/src/components/cards/SectorAllocationCard";
 
 import { useNotificationStore } from "@/src/store/useNotificationStore";
 import { BellIcon } from "@heroicons/react/24/outline";
@@ -192,7 +195,7 @@ function UnapBadge({ value, compact = false }: { value: number; compact?: boolea
     )}>
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pos ? "#10b981" : "#ef4444" }} />
-        <p className={cn("font-semibold uppercase tracking-widest truncate", compact ? "text-[10px]" : "text-xs", pos ? "text-emerald-700" : "text-red-600")}>Unappropriated Balance</p>
+        <p className={cn("font-semibold uppercase tracking-widest truncate", compact ? "text-[10px]" : "text-xs", pos ? "text-emerald-700" : "text-red-600")}>{pos ? "Unappropriated Balance" : "Over-Appropriated"}</p>
       </div>
       <p className={cn("font-semibold font-mono tabular-nums ml-2 flex-shrink-0", compact ? "text-xs" : "text-sm", pos ? "text-emerald-700" : "text-red-600")}>
         {pos ? "+" : ""}{peso(value)}
@@ -544,7 +547,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
   const perCapita  = overallEstimatedIncome > 0 ? overallEstimatedIncome / POPULATION.count : null;
   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
   const specialCal   = shCal + occCal + pmCal;
-  const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
+//   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
+const specialUnap  = specialTotal - specialExp - specialCal;
 
   const gfPie = fundsReady && (gf?.total ?? 0) > 0 ? [
     { name: "Expenditures",           value: exp.gfExpenditure, color: "#a1a1aa" },
@@ -925,8 +929,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                               <div className={cn("rounded-lg border px-2 py-1.5", gfUnap >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
                                 <div className="flex items-center gap-1 mb-0.5">
                                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981" }} />
-                                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
-                                    Unappropriated Balance
+                                 <p className={cn("text-[10px] font-semibold uppercase tracking-widest", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
+                                    {gfUnap >= 0 ? "Unappropriated Balance" : "Over-Appropriated"}
                                   </p>
                                 </div>
                                 <p className={cn("text-sm font-semibold font-mono", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
@@ -1147,6 +1151,20 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                     </div>
                   )}
                 </div>
+               {!deptExpLoading && deptExp.length > 0 && (
+                  <div className="flex items-center gap-4 mb-3">
+                    {[
+                      { label: "General Public Svc", color: "var(--color-cat-1, #3b82f6)" },
+                      { label: "Social Services",    color: "var(--color-cat-2, #f43f5e)" },
+                      { label: "Economic Services",  color: "var(--color-cat-3, #22c55e)" },
+                    ].map(s => (
+                      <div key={s.label} className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: s.color }} />
+                        <span className="text-[10px] font-medium text-zinc-400">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {deptExpLoading ? (
                   <Shimmer className="h-44 w-full" />
                 ) : deptExp.length === 0 ? (
@@ -1171,7 +1189,14 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
                       <YAxis tickFormatter={v => pesoC(v)} tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 600 }} tickLine={false} axisLine={false} width={56} />
                       <RechartsTooltip content={<BarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
                       <Bar dataKey="total" name="Expenditure" radius={[4, 4, 0, 0]}>
-                        {deptExp.map((_, i) => <Cell key={i} fill={`hsl(${220 + i * 18}, 70%, ${62 - i * 2}%)`} />)}
+                        {deptExp.map((d, i) => {
+                          const fill =
+                            d.categoryId === 1 ? "var(--color-cat-1, #3b82f6)" :
+                            d.categoryId === 2 ? "var(--color-cat-2, #f43f5e)" :
+                            d.categoryId === 3 ? "var(--color-cat-3, #22c55e)" :
+                                                 "var(--color-cat-4, #f59e0b)";
+                          return <Cell key={i} fill={fill} />;
+                        })}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1366,8 +1391,8 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
 
 
 
-{/* Recent Activity */}
-<RecentActivityCard style={st(9)} activePlanYear={activePlan?.year ?? null} />
+{/* Sector Allocation by Fund */}
+<SectorAllocationCard planId={planId} style={st(9)} />
               {/* Quick Links */}
               {/* <Card style={st(8)} className="p-5">
                 <p className="text-eyebrow mb-4">Quick Links</p>

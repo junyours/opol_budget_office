@@ -11,11 +11,12 @@ import {
 import { useIncomeFundGrandTotal } from '@/src/hooks/useIncomeFundGrandTotal';
 import { useForm4Items } from '@/src/hooks/useForm4Items';
 import { useCalamityFund } from '@/src/hooks/useCalamityFund';
+import { useQuery } from '@tanstack/react-query';
+import API from '@/src/services/api';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt   = (n: number) => Math.round(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
-const fmtP  = (n: number) => `₱${fmt(n)}`;
+const fmtP  = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pctOf = (base: number, diff: number) =>
   base === 0 ? (diff === 0 ? 0 : 100) : (diff / base) * 100;
 
@@ -65,7 +66,28 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
   const isSpecialAccount = !!incomeSource;
 
   const { data: calamityFundData } = useCalamityFund(plan.budget_plan?.budget_plan_id, incomeSource);
-  const calamityTotal = parseFloat(String(calamityFundData?.calamity_fund ?? 0)) || 0;
+
+  // Actual allocated calamity amounts from LDRRMFIP items (not the theoretical 5% split)
+  // mirrors the dashboard's useLdrrmfSummarySource so this banner reflects real entered data.
+  const { data: ldrrmfActual } = useQuery<{ reserved30: number; total70: number }>({
+    queryKey: ['ldrrmf-summary', plan.budget_plan?.budget_plan_id, incomeSource],
+    queryFn: () =>
+      API.get('/ldrrmfip/summary', {
+        params: { budget_plan_id: plan.budget_plan?.budget_plan_id, source: incomeSource },
+      })
+        .then(r => {
+          const d = r.data?.data ?? r.data;
+          return {
+            reserved30: Number(d?.reserved_30 ?? 0),
+            total70:    Number(d?.total_70pct  ?? 0),
+          };
+        })
+        .catch(() => ({ reserved30: 0, total70: 0 })),
+    enabled: !!plan.budget_plan?.budget_plan_id && isSpecialAccount,
+  });
+  // QRF (30%) is always fixed/reserved regardless of allocation — use the theoretical split.
+  // Only Pre-Disaster (70%) reflects what's actually been allocated to LDRRMFIP items.
+  const calamityTotal = (calamityFundData?.quick_response ?? 0) + (ldrrmfActual?.total70 ?? 0);
 
   // Special accounts (SH / OCC / PM) are self-funded: their ceiling is their own
   // Income Fund grand total, not the 10% prior-year growth rule.
@@ -134,7 +156,7 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
               </span>
             </span>
           ) : (
-            <span className="text-[22px] font-bold text-gray-800 tracking-tight font-mono tabular-nums leading-tight">
+            <span className="text-[22px] font-bold text-orange-600 tracking-tight font-mono tabular-nums leading-tight">
               {fmtP(currentExclCal)}
             </span>
           )}
@@ -161,11 +183,18 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
               : <MinusIcon className="w-3.5 h-3.5" />
             }
             {isOver
-              ? <span>+{fmtP(excess)} over ceiling</span>
+              ? <span>
+                  +{fmtP(excess)} over ceiling
+                  {!isSpecialAccount && pastTotal > 0 && (
+                    <span className="opacity-70 ml-1">
+                     ({((ceilingBasis / pastTotal - 1) * 100).toFixed(2)}% over prior year)
+                    </span>
+                  )}
+                </span>
               : <span>
                   {diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}
                   <span className="opacity-60 ml-1">
-                    ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+                    ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(2)}%)
                   </span>
                 </span>
             }
@@ -194,9 +223,9 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
                   <span className="text-[11px] text-gray-500">
                     {isSpecialAccount ? 'Income Fund total' : 'Ceiling'}:{' '}
                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
-                    {' '}·{' '}
-                    Excess:{' '}
-                    <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span>
+                    {/* {' '}·{' '} */}
+                    {/* Excess:{' '}
+                    <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span> */}
                   </span>
                   {isSpecialAccount && (
                     <span className="text-[10px] text-gray-400 italic">

@@ -101,7 +101,7 @@ const EMPTY_FORM = {
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
-const enPH  = (v: number) => v === 0 ? "–" : Math.round(v).toLocaleString("en-PH");
+const enPH  = (v: number) => v === 0 ? "–" : v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const peso  = (v: number) => v === 0 ? "–" : `₱ ${Math.round(Math.abs(v)).toLocaleString("en-PH")}`;
 
 // ─── Sub-header label for the fund source ─────────────────────────────────────
@@ -597,18 +597,36 @@ const fetchSourceData = useCallback(async (source: string) => {
 
       {/* ── Summary footer ── */}
       {summary && categoriesWithItems.length > 0 && (() => {
+        // const calamityFund  = summary.calamity_fund;
+        // const qrf30         = calamityFund * 0.30;
+        // const predis70limit = calamityFund * 0.70;
+        // const allocated     = summary.total_70pct;
+
+        // return (
+        //   <>
+        //     {allocated > predis70limit && (
+        //       <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-3">
+        //         <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+        //         <p className="text-table-secondary font-semibold text-red-700">
+        //           Over budget by ₱ {(allocated - predis70limit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — allocated items exceed the 70% Pre-Disaster ceiling.
+        //         </p>
+        //       </div>
+        //     )}
+
         const calamityFund  = summary.calamity_fund;
         const qrf30         = calamityFund * 0.30;
         const predis70limit = calamityFund * 0.70;
         const allocated     = summary.total_70pct;
+        const overBudgetAmt = allocated - predis70limit;
+        const isOverBudget  = overBudgetAmt > 0.01; // tolerance for floating-point rounding
 
         return (
           <>
-            {allocated > predis70limit && (
+            {isOverBudget && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
                 <p className="text-table-secondary font-semibold text-red-700">
-                  Over budget by ₱ {(allocated - predis70limit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — allocated items exceed the 70% Pre-Disaster ceiling.
+                  Over budget by ₱ {overBudgetAmt.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — allocated items exceed the 70% Pre-Disaster ceiling.
                 </p>
               </div>
             )}
@@ -621,7 +639,7 @@ const fetchSourceData = useCallback(async (source: string) => {
                       Total (70% of the 5% CF, Preparedness Fund for CY{year})</span>
                     </td>
                     <td className="px-5 py-3 text-right w-52">
-                      <span className={cn("text-table-grand-total", allocated > predis70limit ? "text-red-600" : "")}>
+                      <span className={cn("text-table-grand-total", isOverBudget ? "text-red-600" : "")}>
                         ₱ {allocated.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       <span className="text-meta block">
@@ -832,7 +850,7 @@ const fetchSourceData = useCallback(async (source: string) => {
             <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between border border-gray-200">
               <span className="text-field-label">Total (MOOE + CO)</span>
               <span className="text-table-grand-total">
-                ₱ {Math.round((parseFloat(form.mooe as string) || 0) + (parseFloat(form.co as string) || 0)).toLocaleString("en-PH")}
+                ₱ {((parseFloat(form.mooe as string) || 0) + (parseFloat(form.co as string) || 0)).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>

@@ -6,7 +6,7 @@ import React, {
     useRef,
 } from "react";
 import API from "../../services/api";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
     DepartmentBudgetPlan,
     ExpenseClassification,
@@ -98,6 +98,8 @@ function ensureAnim() {
 const fmt = (n: number) =>
     Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
 const fmtP = (n: number) => `₱${fmt(n)}`;
+const fmtP2 = (n: number) =>
+    `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pctOf = (past: number, d: number) =>
     past === 0 ? (d === 0 ? 0 : 100) : (d / past) * 100;
 const clr = (v: number) =>
@@ -311,6 +313,31 @@ const Form2: React.FC<Form2Props> = ({
         loading: calamityLoading,
         isSpecialAccount,
     } = useCalamityFund(plan.budget_plan?.budget_plan_id, incomeSource);
+
+    // Actual allocated amounts from LDRRMFIP items (not the theoretical 70/30 split) —
+    // mirrors the dashboard's useLdrrmfSummarySource so Form2 reflects real entered data.
+    const { data: ldrrmfActual } = useQuery<{ reserved30: number; total70: number }>({
+        queryKey: ["ldrrmf-summary", plan.budget_plan?.budget_plan_id, incomeSource],
+        queryFn: () =>
+            API.get("/ldrrmfip/summary", {
+                params: { budget_plan_id: plan.budget_plan?.budget_plan_id, source: incomeSource },
+            })
+                .then((r) => {
+                    const d = r.data?.data ?? r.data;
+                    return {
+                        reserved30: Number(d?.reserved_30 ?? 0),
+                        total70: Number(d?.total_70pct ?? 0),
+                    };
+                })
+                .catch(() => ({ reserved30: 0, total70: 0 })),
+        enabled: !!plan.budget_plan?.budget_plan_id && isSpecialAccount,
+    });
+
+    // QRF (30%) is always fixed/reserved regardless of allocation — use the theoretical split.
+    // Only Pre-Disaster (70%) reflects what's actually been allocated to LDRRMFIP items.
+    const calamityActualPre   = ldrrmfActual?.total70 ?? 0;
+    const calamityActualQrf   = calamityData?.quick_response ?? 0;
+    const calamityActualTotal = calamityActualPre + calamityActualQrf;
 
     const expenseItemMap = useMemo(
         () => new Map(expenseItems.map((i) => [i.expense_class_item_id, i])),
@@ -555,21 +582,34 @@ const Form2: React.FC<Form2Props> = ({
         (id: number, field: DraftField, raw: number) => {
             const key = `${id}_${field}`;
             if (inputDraft.has(key)) return inputDraft.get(key)!;
-            if (field === "obligation") return raw === 0 ? "" : raw.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return comma(raw);
+            // if (field === "obligation") return raw === 0 ? "" : raw.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // return comma(raw);
+            return raw === 0 ? "" : raw.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         },
         [inputDraft],
     );
 
-    const setDraft = useCallback((key: string, digits: string) => {
-        const isDecimalKey = !key.startsWith("aip_") && key.endsWith("_obligation");
+    const cursorRef = useRef<{ el: HTMLInputElement; pos: number } | null>(null);
+
+    const setDraft = useCallback((key: string, digits: string, el?: HTMLInputElement, cursorPos?: number) => {
+        if (el !== undefined && cursorPos !== undefined) {
+            cursorRef.current = { el, pos: cursorPos };
+        }
         setInputDraft((prev) =>
             new Map(prev).set(
                 key,
-                digits === "" ? "" : isDecimalKey ? digits : Number(digits).toLocaleString("en-US"),
+                digits === "" ? "" : digits,
             ),
         );
     }, []);
+
+    useEffect(() => {
+        if (cursorRef.current) {
+            const { el, pos } = cursorRef.current;
+            el.setSelectionRange(pos, pos);
+            cursorRef.current = null;
+        }
+    });
 
     const clearDraft = useCallback((key: string) => {
         setInputDraft((prev) => {
@@ -578,11 +618,6 @@ const Form2: React.FC<Form2Props> = ({
             return n;
         });
     }, []);
-
-    const parseDigits = (rawValue: string): number => {
-    const digits = rawValue.replace(/[^0-9.]/g, "");
-    return digits === "" ? 0 : parseFloat(digits);
-};
 
     // ── Handlers: proposed amount ─────────────────────────────────────────────
 
@@ -1245,13 +1280,10 @@ const Form2: React.FC<Form2Props> = ({
     // ── Unified comma-input helpers ───────────────────────────────────────────
 
     const handleCommaInput = useCallback(
-        (id: number, field: DraftField, rawValue: string) => {
-            const isDecimalField = field === "obligation";
-            const digits = isDecimalField
-                ? rawValue.replace(/[^0-9.]/g, "")
-                : rawValue.replace(/[^0-9]/g, "");
-            setDraft(`${id}_${field}`, digits);
-            const num = digits === "" ? 0 : isDecimalField ? parseFloat(digits) : parseInt(digits, 10);
+        (id: number, field: DraftField, rawValue: string, el?: HTMLInputElement, cursorPos?: number) => {
+            const digits = rawValue.replace(/[^0-9.]/g, "");
+            setDraft(`${id}_${field}`, digits, el, cursorPos);
+            const num = digits === "" ? 0 : parseFloat(digits);
             if (field === "proposed")
                 setItems((prev) =>
                     prev.map((i) =>
@@ -1363,16 +1395,7 @@ const Form2: React.FC<Form2Props> = ({
         () => aipItems.reduce((s, i) => s + i.total_amount, 0),
         [aipItems],
     );
-    const calamityTotal = calamityData?.calamity_fund ?? 0;
-
-    // const aipObligationTotal = useMemo(
-    //     () =>
-    //         aipItems.reduce(
-    //             (s, i) => s + ((i as any).obligation_amount ?? 0),
-    //             0,
-    //         ),
-    //     [aipItems],
-    // );
+    const calamityTotal = calamityActualTotal;
 
     const aipObligationTotal = useMemo(
         () =>
@@ -1397,23 +1420,6 @@ const Form2: React.FC<Form2Props> = ({
         [aipItems],
     );
 
-    // const grandFinal = useMemo(
-    //     () => ({
-    //         ...grandTotals,
-    //         proposed:
-    //             grandTotals.proposed +
-    //             aipTotal +
-    //             (isSpecialAccount ? calamityTotal : 0),
-    //         obligation: grandTotals.obligation + aipObligationTotal,
-    //     }),
-    //     [
-    //         grandTotals,
-    //         aipTotal,
-    //         aipObligationTotal,
-    //         isSpecialAccount,
-    //         calamityTotal,
-    //     ],
-    // );
     const grandFinal = useMemo(
         () => ({
             ...grandTotals,
@@ -1466,241 +1472,6 @@ const Form2: React.FC<Form2Props> = ({
                     </h3>
                 </div>
             </div>
-
-            {/* {cardView ? (
-              <div className="p-4 flex flex-col gap-3">
-                {itemsByClassification.map((cls) => {
-                  if (cls.items.length === 0) return null;
-                  const label = cls.expense_class_name === 'Prop/Plant/Eqpt'
-                    ? 'Capital Outlay (CO)'
-                    : cls.expense_class_name;
-                  const clsPast = cls.items.reduce((s, i) => s + i.pastTotal, 0);
-                  const clsProp = cls.items.reduce((s, i) => s + Number(i.total_amount), 0);
-                  const clsDiff = clsProp - clsPast;
-                  const clsPct = pctOf(clsPast, clsDiff);
-                  return (
-                    <div key={cls.expense_class_id}>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">{label}</p>
-                      <div className="flex flex-col gap-2">
-                        {cls.items.map((item, idx) => {
-                          const past = item.pastTotal;
-                          const proposed = Number(item.total_amount);
-                          const d = proposed - past;
-                          const p = pctOf(past, d);
-                          return (
-                            <div
-                              key={item.expense_item_id}
-                              className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
-                              style={{
-                                opacity: 0,
-                                animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
-                              }}
-                            >
-                              <div className="flex-1 min-w-[180px]">
-                                <p className="text-[12px] font-medium text-gray-800 leading-tight">
-                                  {item.expense_item?.expense_class_item_name ?? '—'}
-                                </p>
-                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                  {item.expense_item?.expense_class_item_acc_code ?? '—'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-5 flex-wrap">
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
-                                  <span className="text-[13px] font-mono font-semibold text-blue-700">
-                                    {past === 0 ? '–' : fmtP(past)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
-                                  <span className="text-[13px] font-mono font-semibold text-orange-700">
-                                    {proposed === 0 ? '–' : fmtP(proposed)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-end min-w-[80px]">
-                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                                  <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
-                                    {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-end min-w-[60px]">
-                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
-                                  <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
-                                    {past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
-                                  </span>
-                                </div>
-                                {isAdmin && (
-                                  <div className="flex flex-col items-end min-w-[140px]">
-                                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
-                                    {isEditable ? (
-                                      <input
-                                        type="text"
-                                        value={item.recommendation ?? ''}
-                                        onChange={(e) => handleRecommendationChange(item.expense_item_id, e.target.value)}
-                                        onBlur={() => handleRecommendationBlur(item.expense_item_id)}
-                                        placeholder="Add note…"
-                                        maxLength={255}
-                                        className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
-                                      />
-                                    ) : (
-                                      <span className="text-[12px] text-gray-600">{item.recommendation || '–'}</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
-                        <div className="flex-1 min-w-[180px]">
-                          <p className="text-[11px] font-semibold text-gray-600">Total {label}</p>
-                        </div>
-                        <div className="flex items-center gap-5 flex-wrap">
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
-                            <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP(clsPast)}</span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
-                            <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP(clsProp)}</span>
-                          </div>
-                          <div className="flex flex-col items-end min-w-[80px]">
-                            <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                            <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
-                              {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP(clsDiff)}
-                            </span>
-                          </div>
-                          <div className="flex flex-col items-end min-w-[60px]">
-                            <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
-                            <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
-                              {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {aipItems.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">Special Programs (AIP)</p>
-                    <div className="flex flex-col gap-2">
-                      {aipItems.map((item, idx) => {
-                        const appTotal = (item as any).app_total ?? 0;
-                        const proposed = item.total_amount;
-                        const d = proposed - appTotal;
-                        const p = pctOf(appTotal, d);
-                        return (
-                          <div
-                            key={item.dept_bp_form4_item_id}
-                            className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
-                            style={{
-                              opacity: 0,
-                              animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
-                            }}
-                          >
-                            <div className="flex-1 min-w-[180px]">
-                              <p className="text-[12px] font-medium text-gray-800 leading-tight">{item.program_description || '—'}</p>
-                              <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.aip_reference_code || '—'}</p>
-                            </div>
-                            <div className="flex items-center gap-5 flex-wrap">
-                              <div className="flex flex-col items-end">
-                                <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
-                                <span className="text-[13px] font-mono font-semibold text-blue-700">{appTotal === 0 ? '–' : fmtP(appTotal)}</span>
-                              </div>
-                              <div className="flex flex-col items-end">
-                                <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
-                                <span className="text-[13px] font-mono font-semibold text-orange-700">{proposed === 0 ? '–' : fmtP(proposed)}</span>
-                              </div>
-                              <div className="flex flex-col items-end min-w-[80px]">
-                                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                                <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
-                                  {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-end min-w-[60px]">
-                                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
-                                <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
-                                  {appTotal === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
-                                </span>
-                              </div>
-                              {isAdmin && (
-                                <div className="flex flex-col items-end min-w-[140px]">
-                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
-                                  {isEditable ? (
-                                    <input
-                                      type="text"
-                                      value={(item as any).recommendation ?? ''}
-                                      onChange={(e) => handleAipRecChange(item.dept_bp_form4_item_id, e.target.value)}
-                                      onBlur={() => handleAipRecBlur(item.dept_bp_form4_item_id)}
-                                      placeholder="Add note…"
-                                      maxLength={255}
-                                      className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
-                                    />
-                                  ) : (
-                                    <span className="text-[12px] text-gray-600">{(item as any).recommendation || '–'}</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                         </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-gray-900 text-white rounded-xl px-4 py-3 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <div className="flex-1 min-w-[180px]">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                      Grand Total
-                      {isSpecialAccount && calamityTotal > 0 && (
-                        <span className="ml-2 text-[9px] font-normal text-gray-500 normal-case tracking-normal">
-                          incl. 5% Calamity Fund
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-5 flex-wrap">
-                    {isAdmin && (
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-semibold uppercase tracking-widest text-green-400">Obligation</span>
-                        <span className="text-[13px] font-mono font-bold text-green-300">
-                          {grandFinal.obligation === 0 ? '–' : fmtP(grandFinal.obligation)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">Appropriation</span>
-                      <span className="text-[13px] font-mono font-bold text-blue-300">
-                        {fmtP(grandFinal.pastTotal)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Proposed</span>
-                      <span className="text-[13px] font-mono font-bold text-orange-300">
-                        {fmtP(grandFinal.proposed)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end min-w-[80px]">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                      <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
-                        {gtDiff === 0 ? '-' : fmtP(gtDiff)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end min-w-[60px]">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">%</span>
-                      <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
-                        {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : ( */}
-
 
             {cardView ? (
   <div className="p-4 flex flex-col gap-3">
@@ -1758,7 +1529,10 @@ const Form2: React.FC<Form2Props> = ({
                           type="text"
                           inputMode="numeric"
                           value={getDraftValue(item.expense_item_id, "proposed", proposed)}
-                          onChange={(e) => handleCommaInput(item.expense_item_id, "proposed", e.target.value)}
+                          onChange={(e) => {
+                            const pos = e.target.selectionStart ?? e.target.value.length;
+                            handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
+                          }}
                           onBlur={() => handleCommaBlur(item.expense_item_id, "proposed")}
                           disabled={isSaving}
                           className="text-[13px] font-mono font-semibold text-orange-700 w-28 h-8 px-2 rounded border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 text-right"
@@ -1813,18 +1587,18 @@ const Form2: React.FC<Form2Props> = ({
                 <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
                   Appropriation ({prevYear})
                 </span>
-                <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP(clsPast)}</span>
+                <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP2(clsPast)}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
                   Proposed ({currYear})
                 </span>
-                <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP(clsProp)}</span>
+                <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP2(clsProp)}</span>
               </div>
               <div className="flex flex-col items-end min-w-[80px]">
                 <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
                 <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
-                  {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP(clsDiff)}
+                  {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP2(clsDiff)}
                 </span>
               </div>
               <div className="flex flex-col items-end min-w-[60px]">
@@ -1909,6 +1683,81 @@ const Form2: React.FC<Form2Props> = ({
             );
           })}
         </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex-1 min-w-[180px]">
+            <p className="text-[11px] font-semibold text-gray-600">Total Special Programs</p>
+          </div>
+          <div className="flex items-center gap-5 flex-wrap">
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                Appropriation ({prevYear})
+              </span>
+              <span className="text-[13px] font-mono font-semibold text-blue-700">{aipAppTotal === 0 ? '–' : fmtP2(aipAppTotal)}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                Proposed ({currYear})
+              </span>
+              <span className="text-[13px] font-mono font-semibold text-orange-700">{aipTotal === 0 ? '–' : fmtP2(aipTotal)}</span>
+            </div>
+            <div className="flex flex-col items-end min-w-[80px]">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+              <span className={cn('text-[13px] font-mono font-semibold', clr(aipTotal - aipAppTotal))}>
+                {(aipTotal - aipAppTotal) === 0 ? '–' : ((aipTotal - aipAppTotal) > 0 ? '+' : '') + fmtP2(aipTotal - aipAppTotal)}
+              </span>
+            </div>
+            <div className="flex flex-col items-end min-w-[60px]">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+              <span className={cn('text-[13px] font-mono font-semibold', clr(aipTotal - aipAppTotal))}>
+                {aipAppTotal === 0 && (aipTotal - aipAppTotal) === 0 ? '–' : `${pctOf(aipAppTotal, aipTotal - aipAppTotal).toFixed(2)}%`}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {isSpecialAccount && (
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">5% Calamity Fund</p>
+        <div className="flex flex-col gap-2">
+          {([
+            { code: '5% × 70%', label: 'Pre-Disaster Preparedness', note: '(70% of 5% Calamity Fund)', value: calamityData?.pre_disaster },
+            { code: '5% × 30%', label: 'Quick Response Fund (QRF)', note: '(30% of 5% Calamity Fund)', value: calamityData?.quick_response },
+          ] as const).map((row) => (
+            <div key={row.code} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-[12px] font-medium text-gray-800 leading-tight">{row.label}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{row.code} <span className="text-gray-400">{row.note}</span></p>
+              </div>
+              <div className="flex items-center gap-5 flex-wrap">
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                    Proposed ({currYear})
+                  </span>
+                  <span className="text-[13px] font-mono font-semibold text-orange-700">
+                    {calamityLoading ? '…' : row.value ? fmtP(row.value) : '–'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex-1 min-w-[180px]">
+            <p className="text-[11px] font-semibold text-gray-600">Total 5% Calamity Fund</p>
+          </div>
+          <div className="flex items-center gap-5 flex-wrap">
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                Proposed ({currYear})
+              </span>
+              <span className="text-[13px] font-mono font-semibold text-orange-700">
+                {calamityLoading ? '…' : calamityTotal > 0 ? fmtP2(calamityTotal) : '–'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     )}
 
@@ -1937,7 +1786,7 @@ const Form2: React.FC<Form2Props> = ({
             Appropriation ({prevYear})
           </span>
           <span className="text-[13px] font-mono font-bold text-blue-300">
-            {fmtP(grandFinal.pastTotal)}
+            {fmtP2(grandFinal.pastTotal)}
           </span>
         </div>
         <div className="flex flex-col items-end">
@@ -1945,13 +1794,13 @@ const Form2: React.FC<Form2Props> = ({
             Proposed ({currYear})
           </span>
           <span className="text-[13px] font-mono font-bold text-orange-300">
-            {fmtP(grandFinal.proposed)}
+            {fmtP2(grandFinal.proposed)}
           </span>
         </div>
         <div className="flex flex-col items-end min-w-[80px]">
           <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
           <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
-            {gtDiff === 0 ? '-' : fmtP(gtDiff)}
+            {gtDiff === 0 ? '-' : fmtP2(gtDiff)}
           </span>
         </div>
         <div className="flex flex-col items-end min-w-[60px]">
@@ -2045,23 +1894,7 @@ const Form2: React.FC<Form2Props> = ({
                                         : i.pastSem1),
                                 0,
                             );
-                            // const clsSem2 = cls.items.reduce((s, i) => {
-                            //     if (pastSem1Edits.has(i.expense_item_id)) {
-                            //         const sem1 = pastSem1Edits.get(
-                            //             i.expense_item_id,
-                            //         )!;
-                            //         return (
-                            //             s +
-                            //             Math.max(
-                            //                 (i.pastTotal > 0
-                            //                     ? i.pastTotal
-                            //                     : 0) - sem1,
-                            //                 0,
-                            //             )
-                            //         );
-                            //     }
-                            //     return s + i.pastSem2;
-                            // }, 0);
+
                             const clsSem2 = cls.items.reduce((s, i) => {
                                 const sem1 = pastSem1Edits.has(i.expense_item_id)
                                     ? pastSem1Edits.get(i.expense_item_id)!
@@ -2111,38 +1944,7 @@ const Form2: React.FC<Form2Props> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                {/* {canEdit && isAdmin && (
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
-                                                                onClick={() =>
-                                                                    setModalState(
-                                                                        {
-                                                                            isOpen: true,
-                                                                            classificationId:
-                                                                                cls.expense_class_id,
-                                                                            classificationName:
-                                                                                cls.expense_class_name,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PlusIcon className="w-3.5 h-3.5" />{" "}
-                                                                Add Item
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent
-                                                            side="left"
-                                                            className="text-xs"
-                                                        >
-                                                            Add item in{" "}
-                                                            {cls.abbreviation}
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                )} */}
+
                                                 {canEdit && (
     <Tooltip>
         <TooltipTrigger asChild>
@@ -2214,15 +2016,6 @@ const Form2: React.FC<Form2Props> = ({
                                                               item.expense_item_id,
                                                           )!
                                                         : item.pastSem1;
-                                                // const sem2Cap =
-                                                //     past > 0 ? past : proposed;
-                                                // // const dispSem2 =
-                                                // //     pastSem1Edits.has(
-                                                // //         item.expense_item_id,
-                                                // //     )
-                                                // //         ? sem2Cap - dispSem1
-                                                // //         : item.pastSem2;
-                                                // const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
 
                                                 const sem2Cap = past > 0 ? past : 0;
 const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
@@ -2311,17 +2104,10 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                               )!
                                                                             : item.pastObligation,
                                                                     )}
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        handleCommaInput(
-                                                                            item.expense_item_id,
-                                                                            "obligation",
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
+                                                                    onChange={(e) => {
+                                                        const pos = e.target.selectionStart ?? e.target.value.length;
+                                                        handleCommaInput(item.expense_item_id, "obligation", e.target.value, e.target, pos);
+                                                    }}
                                                                     onBlur={() =>
                                                                         handleCommaBlur(
                                                                             item.expense_item_id,
@@ -2353,17 +2139,10 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                         "sem1",
                                                                         dispSem1,
                                                                     )}
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        handleCommaInput(
-                                                                            item.expense_item_id,
-                                                                            "sem1",
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
+                                                                    onChange={(e) => {
+                                                                        const pos = e.target.selectionStart ?? e.target.value.length;
+                                                                        handleCommaInput(item.expense_item_id, "sem1", e.target.value, e.target, pos);
+                                                                    }}
                                                                     onBlur={() =>
                                                                         handleCommaBlur(
                                                                             item.expense_item_id,
@@ -2427,17 +2206,10 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                         "proposed",
                                                                         proposed,
                                                                     )}
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        handleCommaInput(
-                                                                            item.expense_item_id,
-                                                                            "proposed",
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
+                                                                    onChange={(e) => {
+                                                                        const pos = e.target.selectionStart ?? e.target.value.length;
+                                                                        handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
+                                                                    }}
                                                                     onBlur={() =>
                                                                         handleCommaBlur(
                                                                             item.expense_item_id,
@@ -2570,7 +2342,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                 );
                                                             return clsObl === 0
                                                                 ? "–"
-                                                                : fmtP(clsObl);
+                                                                : fmtP2(clsObl);
                                                         })()}
                                                     </td>
                                                 )}
@@ -2581,7 +2353,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         C_CUR_SUB,
                                                     )}
                                                 >
-                                                    {fmtP(clsSem1)}
+                                                    {fmtP2(clsSem1)}
                                                 </td>
                                                 <td
                                                     className={cn(
@@ -2590,7 +2362,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         C_CUR_SUB,
                                                     )}
                                                 >
-                                                    {fmtP(clsSem2)}
+                                                    {fmtP2(clsSem2)}
                                                 </td>
                                                 <td
                                                     className={cn(
@@ -2599,7 +2371,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         C_CUR_SUB,
                                                     )}
                                                 >
-                                                    {fmtP(clsPast)}
+                                                    {fmtP2(clsPast)}
                                                 </td>
                                                 <td
                                                     className={cn(
@@ -2608,7 +2380,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         C_PRO_SUB,
                                                     )}
                                                 >
-                                                    {fmtP(clsProp)}
+                                                    {fmtP2(clsProp)}
                                                 </td>
                                                 <td
                                                     className={cn(
@@ -2619,7 +2391,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 >
                                                     {clsDiff === 0
                                                         ? "–"
-                                                        : fmtP(clsDiff)}
+                                                        : fmtP2(clsDiff)}
                                                 </td>
                                                 <td
                                                     className={cn(
@@ -2787,22 +2559,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                             >
                                                 {fmtP(item.total_amount)}
                                             </td>
-                                            {/* <td
-                                                className={cn(
-                                                    TD_M,
-                                                    "text-emerald-600",
-                                                )}
-                                            >
-                                                {fmtP(item.total_amount)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    TD_M,
-                                                    "text-emerald-600",
-                                                )}
-                                            >
-                                                100.00%
-                                            </td> */}
+
                                             {(() => {
     const appTotal = (item as any).app_total ?? 0;
     const proposed = item.total_amount;
@@ -2885,26 +2642,15 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 : fmtP(aipObligationTotal)}
                                         </td>
                                     )}
-                                    {/* <td
-                                        className={cn(
-                                            "bg-gray-100 border-l",
-                                            C_APP_SUB,
-                                        )}
-                                    />
-                                    <td
-                                        className={cn("bg-gray-100", C_APP_SUB)}
-                                    />
-                                    <td
-                                        className={cn("bg-gray-100", C_APP_SUB)}
-                                    /> */}
+
                                     <td className={cn(TD_M, "font-semibold text-gray-700 border-l", C_CUR_SUB)}>
-                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_sem1 ?? 0), 0))}
+                                        {fmtP2(aipItems.reduce((s, i) => s + ((i as any).app_sem1 ?? 0), 0))}
                                     </td>
                                     <td className={cn(TD_M, "font-semibold text-gray-700", C_CUR_SUB)}>
-                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_sem2 ?? 0), 0))}
+                                        {fmtP2(aipItems.reduce((s, i) => s + ((i as any).app_sem2 ?? 0), 0))}
                                     </td>
                                     <td className={cn(TD_M, "font-semibold text-gray-700", C_CUR_SUB)}>
-                                        {fmtP(aipItems.reduce((s, i) => s + ((i as any).app_total ?? 0), 0))}
+                                        {fmtP2(aipItems.reduce((s, i) => s + ((i as any).app_total ?? 0), 0))}
                                     </td>
                                     <td
                                         className={cn(
@@ -2913,7 +2659,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                             C_PRO_SUB,
                                         )}
                                     >
-                                        {fmtP(aipTotal)}
+                                        {fmtP2(aipTotal)}
                                     </td>
                                     <td
                                         className={cn(
@@ -2921,7 +2667,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                             "font-semibold text-emerald-600 bg-gray-100",
                                         )}
                                     >
-                                        {aipTotal === 0 ? "–" : fmtP(aipTotal)}
+                                        {aipTotal === 0 ? "–" : fmtP2(aipTotal)}
                                     </td>
                                     <td
                                         className={cn(
@@ -2973,21 +2719,21 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 </tr>
 
                                 {(
-                                    [
-                                        {
-                                            code: "5% × 70%",
-                                            label: "Pre-Disaster Preparedness",
-                                            note: "(70% of 5% Calamity Fund)",
-                                            value: calamityData?.pre_disaster,
-                                        },
-                                        {
-                                            code: "5% × 30%",
-                                            label: "Quick Response Fund (QRF)",
-                                            note: "(30% of 5% Calamity Fund)",
-                                            value: calamityData?.quick_response,
-                                        },
-                                    ] as const
-                                ).map((row) => {
+                    [
+                        {
+                            code: "5% × 70%",
+                            label: "Pre-Disaster Preparedness",
+                            note: "(70% of 5% Calamity Fund)",
+                            value: calamityActualPre,
+                        },
+                        {
+                            code: "5% × 30%",
+                            label: "Quick Response Fund (QRF)",
+                            note: "(30% of 5% Calamity Fund)",
+                            value: calamityActualQrf,
+                        },
+                    ] as const
+                ).map((row) => {
                                     const delay = Math.min(gIdx++ * 18, 280);
                                     return (
                                         <tr
@@ -3126,7 +2872,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 …
                                             </span>
                                         ) : calamityTotal > 0 ? (
-                                            fmtP(calamityTotal)
+                                            fmtP2(calamityTotal)
                                         ) : (
                                             "–"
                                         )}
@@ -3138,7 +2884,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         )}
                                     >
                                         {calamityTotal > 0
-                                            ? fmtP(calamityTotal)
+                                            ? fmtP2(calamityTotal)
                                             : "–"}
                                     </td>
                                     <td
@@ -3198,7 +2944,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                     >
                                         {grandFinal.obligation === 0
                                             ? "–"
-                                            : fmtP(grandFinal.obligation)}
+                                            : fmtP2(grandFinal.obligation)}
                                     </td>
                                 )}
                                 <td
@@ -3207,7 +2953,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         C_CUR_GT,
                                     )}
                                 >
-                                    {fmtP(grandFinal.pastSem1)}
+                                    {fmtP2(grandFinal.pastSem1)}
                                 </td>
                                 <td
                                     className={cn(
@@ -3215,7 +2961,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         C_CUR_GT,
                                     )}
                                 >
-                                    {fmtP(grandFinal.pastSem2)}
+                                    {fmtP2(grandFinal.pastSem2)}
                                 </td>
                                 <td
                                     className={cn(
@@ -3223,7 +2969,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         C_CUR_GT,
                                     )}
                                 >
-                                    {fmtP(grandFinal.pastTotal)}
+                                    {fmtP2(grandFinal.pastTotal)}
                                 </td>
                                 <td
                                     className={cn(
@@ -3231,7 +2977,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         C_PRO_GT,
                                     )}
                                 >
-                                    {fmtP(grandFinal.proposed)}
+                                    {fmtP2(grandFinal.proposed)}
                                 </td>
                                 <td
                                     className={cn(
@@ -3239,7 +2985,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         clr(gtDiff),
                                     )}
                                 >
-                                    {gtDiff === 0 ? "–" : fmtP(gtDiff)}
+                                    {gtDiff === 0 ? "–" : fmtP2(gtDiff)}
                                 </td>
                                 <td
                                     className={cn(

@@ -317,6 +317,25 @@ export function useMdfFund(budgetPlanId: number | undefined) {
   });
 }
 
+// export function useLdrrmfSummary(budgetPlanId: number | undefined) {
+export function useLdrrmfSummarySource(budgetPlanId: number | undefined, source: string) {
+  return useQuery<{ reserved30: number; total70: number }>({
+    queryKey: ['ldrrmf-summary', budgetPlanId, source],
+    queryFn: () =>
+      API.get('/ldrrmfip/summary', { params: { budget_plan_id: budgetPlanId, source } })
+        .then(r => {
+          const d = r.data?.data ?? r.data;
+          return { reserved30: Number(d?.reserved_30 ?? 0), total70: Number(d?.total_70pct ?? 0) };
+        })
+        .catch((err: any) => {
+          if (err?.response?.status === 404) return { reserved30: 0, total70: 0 };
+          throw err;
+        }),
+    enabled: !!budgetPlanId,
+    retry: false,
+  });
+}
+
 export function useLdrrmfSummary(budgetPlanId: number | undefined) {
   return useQuery<{ reserved30: number; total70: number }>({
     queryKey: queryKeys.ldrrmfSummary(budgetPlanId!),

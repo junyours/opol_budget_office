@@ -9,11 +9,17 @@ import { Button }    from "@/src/components/ui/button";
 import { Separator } from "@/src/components/ui/separator";
 import { Badge }     from "@/src/components/ui/badge";
 import { cn }        from "@/src/lib/utils";
+// import {
+//   CheckCircleIcon, XCircleIcon, CameraIcon,
+//   UserIcon, KeyIcon, ShieldCheckIcon,
+// } from "@heroicons/react/24/outline";
+// import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
 import {
-  CheckCircleIcon, XCircleIcon, CameraIcon,
-  UserIcon, KeyIcon, ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
-import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
+  CheckCircle2, XCircle, Camera,
+  User, KeyRound, ShieldCheck,
+  Eye, EyeOff, CheckCircle,
+} from "lucide-react";
+import { Progress } from "@/src/components/ui/progress";
 import API from "@/src/services/api";
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -107,6 +113,18 @@ export default function ProfilePage() {
   const [pwErrors,  setPwErrors]  = useState<Partial<PasswordForm & { general: string }>>({});
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw,     setShowNewPw]     = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  const pwStrengthScore = PASSWORD_RULES.filter(r => r.test(pwForm.password)).length;
+  const pwStrengthLabel =
+    pwStrengthScore <= 1 ? "Weak" :
+    pwStrengthScore <= 3 ? "Average" : "Strong";
+  const pwStrengthColor =
+    pwStrengthScore <= 1 ? "bg-red-500" :
+    pwStrengthScore <= 3 ? "bg-amber-400" : "bg-emerald-500";
+  const pwStrengthValue = (pwStrengthScore / PASSWORD_RULES.length) * 100;
 
   // ── avatar ──────────────────────────────────────────────────────────────────
   const fileRef                           = useRef<HTMLInputElement>(null);
@@ -349,7 +367,7 @@ export default function ProfilePage() {
                 className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-zinc-900 border-2 border-white flex items-center justify-center hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Change photo"
               >
-                <CameraIcon className="w-3.5 h-3.5 text-white" />
+                <Camera className="w-3.5 h-3.5 text-white" />
               </button>
               <input
                 ref={fileRef}
@@ -395,7 +413,7 @@ export default function ProfilePage() {
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center">
-              <UserIcon className="w-4 h-4 text-blue-600" />
+              <User className="w-4 h-4 text-blue-600" />
             </div>
             <div>
               <CardTitle className="text-[15px] font-semibold text-zinc-900">Personal Information</CardTitle>
@@ -491,7 +509,7 @@ export default function ProfilePage() {
             )}
             {profileSuccess && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                <CheckCircleSolid className="w-4 h-4" /> Profile updated successfully
+                <CheckCircle className="w-4 h-4" /> Profile updated successfully
               </span>
             )}
             <Button
@@ -517,7 +535,7 @@ export default function ProfilePage() {
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center">
-              <KeyIcon className="w-4 h-4 text-amber-600" />
+              <KeyRound className="w-4 h-4 text-amber-600" />
             </div>
             <div>
               <CardTitle className="text-[15px] font-semibold text-zinc-900">Change Password</CardTitle>
@@ -534,13 +552,23 @@ export default function ProfilePage() {
             <Label htmlFor="current_password" className="text-xs font-medium text-zinc-700">
               Current Password <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="current_password"
-              type="password"
-              value={pwForm.current_password}
-              onChange={e => setPwForm(p => ({ ...p, current_password: e.target.value }))}
-              className={cn("h-9 text-sm", pwErrors.current_password && "border-red-400 focus-visible:ring-red-300")}
-            />
+           <div className="relative">
+              <Input
+                id="current_password"
+                type={showCurrentPw ? "text" : "password"}
+                value={pwForm.current_password}
+                onChange={e => setPwForm(p => ({ ...p, current_password: e.target.value }))}
+                className={cn("h-9 text-sm pr-10", pwErrors.current_password && "border-red-400 focus-visible:ring-red-300")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPw(v => !v)}
+                tabIndex={-1}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                {showCurrentPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.current_password && <p className="text-[11px] text-red-500">{pwErrors.current_password}</p>}
           </div>
 
@@ -548,38 +576,70 @@ export default function ProfilePage() {
             <Label htmlFor="password" className="text-xs font-medium text-zinc-700">
               New Password <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="password"
-              type="password"
-              value={pwForm.password}
-              onChange={e => setPwForm(p => ({ ...p, password: e.target.value }))}
-              className={cn("h-9 text-sm", pwErrors.password && "border-red-400 focus-visible:ring-red-300")}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showNewPw ? "text" : "password"}
+                value={pwForm.password}
+                onChange={e => setPwForm(p => ({ ...p, password: e.target.value }))}
+                className={cn("h-9 text-sm pr-10", pwErrors.password && "border-red-400 focus-visible:ring-red-300")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPw(v => !v)}
+                tabIndex={-1}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.password && <p className="text-[11px] text-red-500">{pwErrors.password}</p>}
 
             {pwForm.password.length > 0 && (
-              <div className="mt-2 p-3 rounded-lg bg-zinc-50 border border-zinc-100 space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1">
-                  <ShieldCheckIcon className="w-3 h-3" /> Password Requirements
-                </p>
-                {PASSWORD_RULES.map(rule => {
-                  const ok = rule.test(pwForm.password);
-                  return (
-                    <div
-                      key={rule.label}
-                      className={cn(
-                        "flex items-center gap-2 text-[12px] font-medium transition-colors",
-                        ok ? "text-emerald-600" : "text-zinc-400"
-                      )}
-                    >
-                      {ok
-                        ? <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                        : <XCircleIcon    className="w-3.5 h-3.5 text-zinc-300 flex-shrink-0" />
-                      }
-                      {rule.label}
-                    </div>
-                  );
-                })}
+              <div className="mt-2 p-3 rounded-lg bg-zinc-50 border border-zinc-100 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Password Strength
+                  </p>
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-wide",
+                    pwStrengthScore <= 1 ? "text-red-500" :
+                    pwStrengthScore <= 3 ? "text-amber-500" : "text-emerald-600"
+                  )}>
+                    {pwStrengthLabel}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${pwStrengthValue}%`,
+                      backgroundColor:
+                        pwStrengthScore <= 1 ? "#ef4444" :
+                        pwStrengthScore <= 3 ? "#f59e0b" : "#10b981",
+                    }}
+                  />
+                </div>
+                <div className="pt-1 space-y-1.5">
+                  {PASSWORD_RULES.map(rule => {
+                    const ok = rule.test(pwForm.password);
+                    return (
+                      <div
+                        key={rule.label}
+                        className={cn(
+                          "flex items-center gap-2 text-[12px] font-medium transition-colors",
+                          ok ? "text-emerald-600" : "text-zinc-400"
+                        )}
+                      >
+                        {ok
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                          : <XCircle     className="w-3.5 h-3.5 text-zinc-300 flex-shrink-0" />
+                        }
+                        {rule.label}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -588,20 +648,30 @@ export default function ProfilePage() {
             <Label htmlFor="password_confirmation" className="text-xs font-medium text-zinc-700">
               Confirm New Password <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="password_confirmation"
-              type="password"
-              value={pwForm.password_confirmation}
-              onChange={e => setPwForm(p => ({ ...p, password_confirmation: e.target.value }))}
-              className={cn(
-                "h-9 text-sm",
-                pwErrors.password_confirmation && "border-red-400 focus-visible:ring-red-300",
-                !pwErrors.password_confirmation &&
-                  pwForm.password_confirmation &&
-                  pwForm.password === pwForm.password_confirmation &&
-                  "border-emerald-400 focus-visible:ring-emerald-300",
-              )}
-            />
+            <div className="relative">
+              <Input
+                id="password_confirmation"
+                type={showConfirmPw ? "text" : "password"}
+                value={pwForm.password_confirmation}
+                onChange={e => setPwForm(p => ({ ...p, password_confirmation: e.target.value }))}
+                className={cn(
+                  "h-9 text-sm pr-10",
+                  pwErrors.password_confirmation && "border-red-400 focus-visible:ring-red-300",
+                  !pwErrors.password_confirmation &&
+                    pwForm.password_confirmation &&
+                    pwForm.password === pwForm.password_confirmation &&
+                    "border-emerald-400 focus-visible:ring-emerald-300",
+                )}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPw(v => !v)}
+                tabIndex={-1}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                {showConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.password_confirmation && (
               <p className="text-[11px] text-red-500">{pwErrors.password_confirmation}</p>
             )}
@@ -609,7 +679,7 @@ export default function ProfilePage() {
               pwForm.password_confirmation &&
               pwForm.password === pwForm.password_confirmation && (
               <p className="text-[11px] text-emerald-600 flex items-center gap-1">
-                <CheckCircleSolid className="w-3.5 h-3.5" /> Passwords match
+                <CheckCircle className="w-3.5 h-3.5" /> Passwords match
               </p>
             )}
           </div>
@@ -623,7 +693,7 @@ export default function ProfilePage() {
           <div className="flex items-center justify-end gap-3 pt-2">
             {pwSuccess && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                <CheckCircleSolid className="w-4 h-4" /> Password changed successfully
+                <CheckCircle className="w-4 h-4" /> Password changed successfully
               </span>
             )}
             <Button

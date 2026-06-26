@@ -50,7 +50,8 @@ import {
 // } from "../../hooks/useDashboardQueries";
 useDepartments, useBudgetPlans, useDepartmentBudgetPlans,
   useAllFunds,
-  useMdfFund, useLdrrmfSummary, useDeptExpenditures,
+//   useMdfFund, useLdrrmfSummary, useDeptExpenditures,
+useMdfFund, useLdrrmfSummary, useLdrrmfSummarySource, useDeptExpenditures,
   useSpecialDeptExpenditures,
   useCreateBudgetPlan,
 } from "../../hooks/useDashboardQueries";
@@ -72,20 +73,21 @@ const getInitials = (d: Department) =>
 
 const peso = (v: number) => `₱${v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// REPLACE WITH
 const pesoC = (v: number): string => {
   if (v >= 1_000_000_000) {
-    const n = Math.floor(v / 1_000_000) / 1_000;
-    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}B`;
+    const n = v / 1_000_000_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}B`;
   }
   if (v >= 1_000_000) {
-    const n = Math.floor(v / 1_000) / 1_000;
-    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}M`;
+    const n = v / 1_000_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
   }
   if (v >= 1_000) {
-    const n = Math.floor(v / 1) / 1_000;
-    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}K`;
+    const n = v / 1_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}K`;
   }
-  return `₱${Math.floor(v).toLocaleString('en-PH')}`;
+  return `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const st = (i: number): React.CSSProperties => ({ animationDelay: `${i * 60}ms` });
@@ -460,17 +462,22 @@ const AdminDashboard: React.FC = () => {
   const pm  = funds?.pm  ?? null;
 
   const { data: mdfAllocated = 0, isLoading: mdfLoading } = useMdfFund(planId);
-  const { data: ldrrmfData,       isLoading: ldrLoading  } = useLdrrmfSummary(planId);
+//   const { data: ldrrmfData,       isLoading: ldrLoading  } = useLdrrmfSummary(planId);
+const { data: ldrrmfData,       isLoading: ldrLoading  } = useLdrrmfSummary(planId);
+const { data: ldrrmfSh  = { reserved30: 0, total70: 0 } } = useLdrrmfSummarySource(planId, 'sh');
+const { data: ldrrmfOcc = { reserved30: 0, total70: 0 } } = useLdrrmfSummarySource(planId, 'occ');
+const { data: ldrrmfPm  = { reserved30: 0, total70: 0 } } = useLdrrmfSummarySource(planId, 'pm');
 //   const { data: deptExp = [],     isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
 const { data: deptExp = [],        isLoading: deptExpLoading }        = useDeptExpenditures(planId, departments);
 const { data: specialDeptExp = [], isLoading: specialDeptExpLoading } = useSpecialDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
-  const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
-const occExpTotal = exp.occExpenditure + exp.occCalamity;
-const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
+//   const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
+// const occExpTotal = exp.occExpenditure + exp.occCalamity;
+// const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
 
-  const gfLocalSource = gf?.localSource ?? 0;
+//   const gfLocalSource = gf?.localSource ?? 0;
+const gfLocalSource = gf?.localSource ?? 0;
   const overallTotal  = gfLocalSource + (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
 
   const createPlan = useCreateBudgetPlan();
@@ -544,11 +551,38 @@ const specialTotal = (sh?.total ?? 0) + (occ?.total ?? 0) + (pm?.total ?? 0);
 
   // TODO: replace with DB fetch when population table is ready
   const POPULATION = { count: 66_836, year: 2024, surveyor: "POPCEN" } as const;
-  const perCapita  = overallEstimatedIncome > 0 ? overallEstimatedIncome / POPULATION.count : null;
+//   const perCapita  = overallEstimatedIncome > 0 ? overallEstimatedIncome / POPULATION.count : null;
+// //   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
+// //   const specialCal   = shCal + occCal + pmCal;
+// // //   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
+// // const specialUnap  = specialTotal - specialExp - specialCal;
+// const specialExp   = shExpTotal + occExpTotal + pmExpTotal; // already includes calamity (shExpTotal = expenditure + calamity)
+//   const specialCal   = shCal + occCal + pmCal;
+// //   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
+// const specialUnap  = specialTotal - specialExp; // do NOT subtract specialCal again — it's already folded into specialExp
+
+const perCapita  = overallEstimatedIncome > 0 ? overallEstimatedIncome / POPULATION.count : null;
+
+  // QRF (30%) is always treated as reserved/used. The 70% Pre-Disaster portion
+  // only counts what's actually been allocated (ldrrmf items entered) —
+  // NOT the full theoretical 70% ceiling, even if nothing has been allocated yet.
+  const shQrf  = shCal  * 0.30;
+  const occQrf = occCal * 0.30;
+  const pmQrf  = pmCal  * 0.30;
+
+  const shExpTotal  = exp.shExpenditure;
+const occExpTotal = exp.occExpenditure;
+const pmExpTotal  = exp.pmExpenditure;
+
+const combinedQrf        = shQrf + occQrf + pmQrf;
+const combinedPreDisaster = ldrrmfSh.total70 + ldrrmfOcc.total70 + ldrrmfPm.total70;
+const combinedCalamity   = combinedQrf + combinedPreDisaster;
+
   const specialExp   = shExpTotal + occExpTotal + pmExpTotal;
-  const specialCal   = shCal + occCal + pmCal;
-//   const specialUnap  = Math.max(0, specialTotal - specialExp - specialCal);
-const specialUnap  = specialTotal - specialExp - specialCal;
+  const specialCal   = shCal + occCal + pmCal; // kept for the "5% Calamity (combined)" display card only
+  const specialUnap = specialTotal - specialExp - combinedCalamity;
+
+
 
   const gfPie = fundsReady && (gf?.total ?? 0) > 0 ? [
     { name: "Expenditures",           value: exp.gfExpenditure, color: "#a1a1aa" },
@@ -812,18 +846,18 @@ const specialUnap  = specialTotal - specialExp - specialCal;
                               <div className="mt-2 space-y-0.5">
                                 <div className="flex items-center justify-between">
                                   <span className={cn("text-[9px]", sub)}>Dept. expenses</span>
-                                  <span className={cn("text-[9px] font-mono", subMono)}>{pesoC(exp.gfExpenditure)}</span>
+                                  <span className={cn("text-[9px] font-mono", subMono)}>{peso(exp.gfExpenditure)}</span>
                                 </div>
                                 {mdfActual > 0 && (
                                   <div className="flex items-center justify-between">
                                     <span className="text-[9px] text-zinc-400">20% MDF</span>
-                                    <span className="text-[9px] font-mono text-zinc-500">{pesoC(mdfActual)}</span>
+                                   <span className="text-[9px] font-mono text-zinc-500">{peso(mdfActual)}</span>
                                   </div>
                                 )}
                                 {ldrrmfPieTotal > 0 && (
                                   <div className="flex items-center justify-between">
                                     <span className="text-[9px] text-zinc-400">5% LDRRMF</span>
-                                    <span className="text-[9px] font-mono text-zinc-500">{pesoC(ldrrmfPieTotal)}</span>
+                                    <span className="text-[9px] font-mono text-zinc-500">{peso(ldrrmfPieTotal)}</span>
                                   </div>
                                 )}
                               </div>
@@ -1043,13 +1077,11 @@ const specialUnap  = specialTotal - specialExp - specialCal;
                     <BanknotesIcon className="w-5 h-5 text-indigo-500" />
                   </div>
                   <div>
-                    <p className="text-eyebrow">Combined Estimted Revenue</p>
+                    <p className="text-eyebrow">Combined Estimated Revenue</p>
                     <p className="text-section-title mt-0.5">Overall Income Fund</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-
-
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-3">
                   <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
@@ -1253,18 +1285,37 @@ const specialUnap  = specialTotal - specialExp - specialCal;
                         <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Combined Revenue</p>
                         <Money v={!fundsReady ? null : specialTotal} loading={!fundsReady} size="md" />
                       </div>
-                      <div>
-                        <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
-                        <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
-                      </div>
-                      {fundsReady && (
-                        <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-2.5 py-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">5% Calamity (combined)</p>
-                          <p className="text-sm font-semibold text-zinc-800">{pesoC(specialCal)}</p>
-                          <p className="text-xs text-zinc-400 font-mono">{peso(specialCal)}</p>
-                        </div>
-                      )}
-                      {fundsReady && !specialExpLoading && <UnapBadge value={specialUnap} compact />}
+
+<div>
+  <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
+  <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
+</div>
+{fundsReady && (
+  <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-2.5 py-2 space-y-1.5">
+    <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">
+      5% Calamity (combined)
+    </p>
+    <p className="text-sm font-semibold text-zinc-800">{pesoC(combinedCalamity)}</p>
+    <p className="text-xs text-zinc-400 font-mono">{peso(combinedCalamity)}</p>
+    <div className="border-t border-zinc-200 pt-1.5 space-y-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-rose-400" />
+          <p className="text-[10px] text-zinc-400">30% QRF</p>
+        </div>
+        <p className="text-[10px] font-mono text-rose-500">{peso(combinedQrf)}</p>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-orange-400" />
+          <p className="text-[10px] text-zinc-400">70% Pre-Disaster</p>
+        </div>
+        <p className="text-[10px] font-mono text-orange-500">{peso(combinedPreDisaster)}</p>
+      </div>
+    </div>
+  </div>
+)}
+{fundsReady && !specialExpLoading && <UnapBadge value={specialUnap} compact />}
                     </div>
                   </div>
 
@@ -1281,15 +1332,26 @@ const specialUnap  = specialTotal - specialExp - specialCal;
                     </div>
                     <CarouselContent className="-ml-3">
                       {[
-                        { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: exp.shExpenditure,  cal: shCal,  accentColor: "#8b5cf6" },
-                        { label: "OCC",            abbr: "OCC", data: occ, expV: exp.occExpenditure, cal: occCal, accentColor: "#0ea5e9" },
-                        { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b" },
-                      ].map(({ label, abbr, data, expV, cal, accentColor }) => {
+                        // { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: exp.shExpenditure,  cal: shCal,  accentColor: "#8b5cf6" },
+                        // { label: "OCC",            abbr: "OCC", data: occ, expV: exp.occExpenditure, cal: occCal, accentColor: "#0ea5e9" },
+                        // { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b" },
+                        { label: "Slaughterhouse", abbr: "SH",  data: sh,  expV: exp.shExpenditure,  cal: shCal,  accentColor: "#8b5cf6", allocated70: ldrrmfSh.total70  },
+        { label: "OCC",            abbr: "OCC", data: occ, expV: exp.occExpenditure, cal: occCal, accentColor: "#0ea5e9", allocated70: ldrrmfOcc.total70 },
+        { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b", allocated70: ldrrmfPm.total70  },
+                    //   ].map(({ label, abbr, data, expV, cal, accentColor }) => {
+                    ].map(({ label, abbr, data, expV, cal, accentColor, allocated70 }) => {
+                        // const rev  = data?.total ?? 0;
+                        // const unap = rev - expV - cal;
+                        // const uPos = unap >= 0;
+                        // const qrfV = cal * 0.30;
+                        // const preV = cal * 0.70;
                         const rev  = data?.total ?? 0;
-                        const unap = rev - expV - cal;
-                        const uPos = unap >= 0;
                         const qrfV = cal * 0.30;
                         const preV = cal * 0.70;
+                        // 70% Pre-Disaster only counts what's actually allocated, not the theoretical ceiling
+                        const calActual = qrfV + allocated70;
+                        const unap = rev - expV - calActual;
+                        const uPos = unap >= 0;
                         return (
                           <CarouselItem key={abbr} className="pl-3 basis-full">
                             <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
@@ -1351,19 +1413,24 @@ const specialUnap  = specialTotal - specialExp - specialCal;
                                     <div className="rounded-xl bg-orange-50 border border-orange-100 p-3 space-y-1.5">
                                       <div className="flex items-center justify-between">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">70% Pre-Disaster</p>
-                                        <span className="text-[9px] font-semibold text-orange-600 bg-orange-100 rounded px-1.5 py-0.5">0%</span>
+                                        {/* <span className="text-[9px] font-semibold text-orange-600 bg-orange-100 rounded px-1.5 py-0.5">0%</span> */}
+                                        <span className="text-[9px] font-semibold text-orange-600 bg-orange-100 rounded px-1.5 py-0.5">{preV > 0 ? `${Math.round((allocated70 / preV) * 100)}%` : "0%"}</span>
                                       </div>
                                       <div className="flex items-baseline gap-1">
-                                        <p className="text-base font-bold text-orange-800">{peso(0)}</p>
+<p className="text-base font-bold text-orange-800">{peso(allocated70)}</p>
+                                        {/* <p className="text-base font-bold text-orange-800">{peso(0)}</p> */}
                                         <p className="text-[10px] text-orange-400">/ {peso(preV)}</p>
                                       </div>
                                       <p className="text-[10px] text-orange-500">allocated</p>
                                       <div className="h-1 bg-orange-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-orange-400 rounded-full transition-all duration-700" style={{ width: "0%" }} />
+                                        {/* <div className="h-full bg-orange-400 rounded-full transition-all duration-700" style={{ width: "0%" }} />
+                                        */}
+                                        <div className="h-full bg-orange-400 rounded-full transition-all duration-700" style={{ width: preV > 0 ? `${Math.min(100, (allocated70 / preV) * 100)}%` : "0%" }} />
                                       </div>
                                       <div className="flex items-center justify-between">
                                         <span className="text-[10px] text-orange-500">Remaining</span>
-                                        <span className="text-[10px] font-bold font-mono text-orange-700">{peso(preV)}</span>
+                                        {/* <span className="text-[10px] font-bold font-mono text-orange-700">{peso(preV)}</span> */}
+                                        <span className="text-[10px] font-bold font-mono text-orange-700">{peso(Math.max(0, preV - allocated70))}</span>
                                       </div>
                                     </div>
                                   </div>

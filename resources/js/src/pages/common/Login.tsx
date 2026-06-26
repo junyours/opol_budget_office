@@ -354,7 +354,7 @@ export default function Login() {
 
       <div className="login-wrap min-h-screen bg-zinc-50 flex flex-col">
         <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
-          <div className="w-full max-w-5xl bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="w-full max-w-5xl bg-white border border-zinc-200 rounded-2xl shadow-md overflow-hidden">
             <div className="flex flex-col lg:flex-row">
 
               {/* ══ LEFT PANEL ══ */}

@@ -251,7 +251,8 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
                       <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
                     </span>
                     <span className="text-[10px] text-gray-400 italic">
-                      Total proposed expenditure (incl. calamity fund) is matched against this department's Income Fund grand total.
+                      Incl. calamity fund · matched against<br />
+                      department's Income Fund total.
                     </span>
                   </div>
                 </>

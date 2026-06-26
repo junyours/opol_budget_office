@@ -66,6 +66,8 @@ import { useNotificationStore } from "@/src/store/useNotificationStore";
 import { BellIcon } from "@heroicons/react/24/outline";
 import { formatDistanceToNow } from "date-fns"; // optional — or use a simple formatter below
 
+import { PsLimitationCard } from "@/src/components/cards/PsLimitationCard";
+
 const getInitials = (d: Department) =>
   (d.dept_abbreviation ?? d.dept_name).slice(0, 2).toUpperCase();
 
@@ -91,6 +93,9 @@ const pesoC = (v: number): string => {
 };
 
 const st = (i: number): React.CSSProperties => ({ animationDelay: `${i * 60}ms` });
+
+// Treat anything that rounds to ₱0.00 as fully appropriated (avoids float-precision false positives)
+const isZeroAmount = (v: number) => Math.round(v * 100) === 0;
 
 const PieTip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
@@ -197,10 +202,12 @@ function UnapBadge({ value, compact = false }: { value: number; compact?: boolea
     )}>
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pos ? "#10b981" : "#ef4444" }} />
-        <p className={cn("font-semibold uppercase tracking-widest truncate", compact ? "text-[10px]" : "text-xs", pos ? "text-emerald-700" : "text-red-600")}>{pos ? "Unappropriated Balance" : "Over-Appropriated"}</p>
+        <p className={cn("font-semibold uppercase tracking-widest truncate", compact ? "text-[10px]" : "text-xs", isZeroAmount(value) ? "text-zinc-500" : pos ? "text-emerald-700" : "text-red-600")}>
+          {isZeroAmount(value) ? "Fully Appropriated" : pos ? "Unappropriated Balance" : "Over-Appropriated"}
+        </p>
       </div>
       <p className={cn("font-semibold font-mono tabular-nums ml-2 flex-shrink-0", compact ? "text-xs" : "text-sm", pos ? "text-emerald-700" : "text-red-600")}>
-        {pos ? "+" : ""}{peso(value)}
+        {pos ? "+" : ""}{peso(Math.abs(value))}
       </p>
     </div>
   );
@@ -599,12 +606,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
     { name: "Public Market",  value: pm?.total  ?? 0, color: "#f59e0b" },
   ].filter(d => d.value > 0) : [];
 
-  const quickLinks = [
-    { label: "Budget Plans",       href: "/admin/budget-plans",       icon: DocumentTextIcon,          iconColor: "text-blue-500"    },
-    { label: "Departments",        href: "/admin/departments",         icon: BuildingOffice2Icon,       iconColor: "text-violet-500"  },
-    { label: "Salary Tranche",     href: "/admin/tranche",             icon: BriefcaseIcon,             iconColor: "text-orange-500"  },
-    { label: "Income Fund",        href: "/admin/income-general-fund", icon: BanknotesIcon,             iconColor: "text-emerald-600" },
-    { label: "Personnel Services", href: "/admin/personnel-services",  icon: UserGroupIcon,             iconColor: "text-cyan-600"    },
+ const quickLinks = [
     { label: "LBP Reports",        href: "/admin/reports",             icon: ChartBarIcon,              iconColor: "text-indigo-500"  },
     { label: "Stmt. of Indebt.",   href: "/admin/lbp-form5",           icon: ClipboardDocumentListIcon, iconColor: "text-rose-500"    },
     { label: "20% MDF Fund",       href: "/admin/mdf-fund",            icon: CurrencyDollarIcon,        iconColor: "text-amber-600"   },
@@ -963,12 +965,12 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                               <div className={cn("rounded-lg border px-2 py-1.5", gfUnap >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
                                 <div className="flex items-center gap-1 mb-0.5">
                                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981" }} />
-                                 <p className={cn("text-[10px] font-semibold uppercase tracking-widest", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
-                                    {gfUnap >= 0 ? "Unappropriated Balance" : "Over-Appropriated"}
+                               <p className={cn("text-[10px] font-semibold uppercase tracking-widest", isZeroAmount(gfUnap) ? "text-zinc-500" : gfUnap > 0 ? "text-emerald-700" : "text-red-600")}>
+                                    {isZeroAmount(gfUnap) ? "Fully Appropriated" : gfUnap > 0 ? "Unappropriated Balance" : "Over-Appropriated"}
                                   </p>
                                 </div>
                                 <p className={cn("text-sm font-semibold font-mono", gfUnap >= 0 ? "text-emerald-700" : "text-red-600")}>
-                                  {gfUnap >= 0 ? "+" : ""}{peso(gfUnap)}
+                                  {gfUnap >= 0 ? "+" : ""}{peso(Math.abs(gfUnap))}
                                 </p>
                               </div>
                             </div>
@@ -1235,7 +1237,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                 )}
               </Card>
 
-              {/* <BreakdownCard activePlan={activePlan} style={st(7)} /> */}
+              <PsLimitationCard planId={planId} style={st(7)} />
             </div>
 
             {/* RIGHT */}
@@ -1394,24 +1396,38 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
         { label: "Public Market",  abbr: "PM",  data: pm,  expV: exp.pmExpenditure,  cal: pmCal,  accentColor: "#f59e0b", allocated70: ldrrmfPm.total70  },
                     //   ].map(({ label, abbr, data, expV, cal, accentColor }) => {
                     ].map(({ label, abbr, data, expV, cal, accentColor, allocated70 }) => {
-                        // const rev  = data?.total ?? 0;
-                        // const unap = rev - expV - cal;
-                        // const uPos = unap >= 0;
-                        // const qrfV = cal * 0.30;
-                        // const preV = cal * 0.70;
                         const rev  = data?.total ?? 0;
                         const qrfV = cal * 0.30;
                         const preV = cal * 0.70;
-                        // 70% Pre-Disaster only counts what's actually allocated, not the theoretical ceiling
                         const calActual = qrfV + allocated70;
                         const unap = rev - expV - calActual;
                         const uPos = unap >= 0;
+
+                        // Find the dept_id for this special account by abbreviation
+                        const deptEntry = departments.find(d =>
+                          (d.dept_abbreviation ?? "").toUpperCase() === abbr.toUpperCase()
+                        );
+                        const handleViewDept = () => {
+                          if (!deptEntry) return;
+                          navigate("/admin/lbp-forms", { state: { deptId: deptEntry.dept_id } });
+                        };
+
                         return (
                           <CarouselItem key={abbr} className="pl-3 basis-full">
                             <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
-                              <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: accentColor }} />
-                                <p className="text-sm font-semibold text-zinc-800 uppercase tracking-wide">{label}</p>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: accentColor }} />
+                                  <p className="text-sm font-semibold text-zinc-800 uppercase tracking-wide">{label}</p>
+                                </div>
+                                {deptEntry && (
+                                  <button
+                                    onClick={handleViewDept}
+                                    className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-800 transition-colors font-medium"
+                                  >
+                                    View <ChevronRightIcon className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="bg-white rounded-xl p-3 border border-zinc-100">
@@ -1495,10 +1511,12 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                               <div className={cn("rounded-xl border px-3 py-2 flex items-center justify-between", uPos ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
                                 <div className="flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: uPos ? "#10b981" : "#ef4444" }} />
-                                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest", uPos ? "text-emerald-700" : "text-red-600")}>Unappropriated Balance</p>
+                                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest", isZeroAmount(unap) ? "text-zinc-500" : uPos ? "text-emerald-700" : "text-red-600")}>
+                                    {isZeroAmount(unap) ? "Fully Appropriated" : uPos ? "Unappropriated Balance" : "Over-Appropriated"}
+                                  </p>
                                 </div>
                                 <p className={cn("text-sm font-semibold font-mono", uPos ? "text-emerald-700" : "text-red-600")}>
-                                  {uPos ? "+" : ""}{peso(unap)}
+                                  {uPos ? "+" : ""}{peso(Math.abs(unap))}
                                 </p>
                               </div>
                             </div>
@@ -1514,21 +1532,25 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
 
 {/* Sector Allocation by Fund */}
 <SectorAllocationCard planId={planId} style={st(9)} />
-              {/* Quick Links */}
-              {/* <Card style={st(8)} className="p-5">
-                <p className="text-eyebrow mb-4">Quick Links</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {quickLinks.map(link => (
-                    <button key={link.href} onClick={() => navigate(link.href)}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-center hover:bg-zinc-100 hover:border-zinc-200 transition-all group">
-                      <div className="w-8 h-8 rounded-xl bg-white border border-zinc-100 flex items-center justify-center">
-                        <link.icon className={cn("w-4 h-4", link.iconColor)} />
-                      </div>
-                      <span className="text-[10px] font-medium text-zinc-600 group-hover:text-zinc-900 leading-tight">{link.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </Card> */}
+
+{/* Quick Links */}
+<Card style={st(10)} className="px-5 py-5">
+  <p className="text-eyebrow mb-4">Quick Links</p>
+  <div className="flex items-center gap-3">
+    {quickLinks.map(link => (
+      <button
+        key={link.href}
+        onClick={() => navigate(link.href)}
+        className="flex-1 flex flex-col items-center justify-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-4 hover:bg-zinc-100 hover:border-zinc-200 transition-all group min-w-0"
+      >
+        <link.icon className={cn("w-5 h-5 flex-shrink-0", link.iconColor)} />
+        <span className="text-[11px] font-semibold text-zinc-600 group-hover:text-zinc-900 text-center leading-tight">
+          {link.label}
+        </span>
+      </button>
+    ))}
+  </div>
+</Card>
 
             </div>
           </div>

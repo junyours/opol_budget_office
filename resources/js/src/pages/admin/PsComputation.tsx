@@ -64,8 +64,8 @@ interface PsResponse {
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 const enPH = (v: number) =>
-  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    .format(Math.round(Math.abs(v)));
+  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(Math.abs(v));
 
 const fmtSigned = (v: number): string => {
   if (v === 0) return "–";
@@ -356,15 +356,16 @@ export default function PsComputation() {
 
   // ── Live computations ─────────────────────────────────────────────────────
   const liveRealized    = totalIncome - nonRecurring;
-  const liveLimitation  = liveRealized * 0.45;
-  const liveTotalPs     = top?.total_ps_gf ?? 0;
-  const terminalLeaveGF = top?.terminal_leave_gf ?? 0;
-  const monetizationGF  = top?.monetization_gf  ?? 0;
-  const liveWaived      = terminalLeaveGF + monetizationGF;
-  const liveAllowable   = liveLimitation - liveWaived;
+const liveLimitation  = liveRealized * 0.45;
+const liveTotalPs     = top?.total_ps_gf ?? 0;
+const terminalLeaveGF = top?.terminal_leave_gf ?? 0;
+const monetizationGF  = top?.monetization_gf  ?? 0;
+const liveWaived      = terminalLeaveGF + monetizationGF;
+const liveNetPs       = liveTotalPs - liveWaived;
+const liveAllowable   = liveLimitation - liveNetPs;
   const utilisationPct  = liveLimitation > 0
-    ? Math.round((liveTotalPs / liveLimitation) * 100)
-    : 0;
+  ? Math.round((liveNetPs / liveLimitation) * 100)
+  : 0;
 
   // ── Table row helpers ─────────────────────────────────────────────────────
 
@@ -619,7 +620,7 @@ export default function PsComputation() {
                 {fmtSignedPeso(liveAllowable)}
               </p>
               <p className="text-[10px] text-gray-400 mt-1.5">
-                PS Limitation − Waived Items
+                PS Limitation − Net Annual PS Budget
               </p>
             </div>
 
@@ -667,30 +668,36 @@ export default function PsComputation() {
                 />
               </div>
               <div className="mt-1.5 flex justify-between text-[10px] text-gray-400">
-                <span>{fmtSignedPeso(liveTotalPs)}</span>
-                <span>of {fmtSignedPeso(liveLimitation)}</span>
-              </div>
+  <span>{fmtSignedPeso(liveNetPs)}</span>
+  <span>of {fmtSignedPeso(liveLimitation)}</span>
+</div>
             </div>
 
             {/* Key figures */}
-            <SummaryCard
-              label="Total PS"
-              value={fmtSignedPeso(liveTotalPs)}
-              sub="Derived from dept budget plans"
-              accent="blue"
-            />
-            <SummaryCard
-              label="PS Limitation (45%)"
-              value={fmtSignedPeso(liveLimitation)}
-              sub={`Based on ${incYear} realized income`}
-              accent="gray"
-            />
-            <SummaryCard
-              label="Total Waived Items"
-              value={fmtSignedPeso(liveWaived)}
-              sub="Terminal Leave + Monetization"
-              accent="gray"
-            />
+<SummaryCard
+  label="PS Limitation (45%)"
+  value={fmtSignedPeso(liveLimitation)}
+  sub={`Based on ${incYear} realized income`}
+  accent="gray"
+/>
+<SummaryCard
+  label="Total PS"
+  value={fmtSignedPeso(liveTotalPs)}
+  sub="Derived from dept budget plans"
+  accent="blue"
+/>
+<SummaryCard
+  label="Total Waived Items"
+  value={fmtSignedPeso(liveWaived)}
+  sub="Terminal Leave + Monetization"
+  accent="gray"
+/>
+<SummaryCard
+  label="Net Annual PS Budget"
+  value={fmtSignedPeso(liveNetPs)}
+  sub="Total PS − Waived Items"
+  accent="blue"
+/>
 
           </div>
         </div>

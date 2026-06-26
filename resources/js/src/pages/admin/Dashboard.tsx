@@ -275,7 +275,7 @@ const ApprovalProgressCard: React.FC<{
 } satisfies ChartConfig;
 
   return (
-    <Card style={style} className="col-span-6 lg:col-span-5 p-4 flex flex-col">
+    <Card style={style} className="col-span-12 lg:col-span-5 p-3 sm:p-4 flex flex-col">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
           <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
@@ -644,7 +644,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
   return (
     <>
       <style>{`@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
-      <div className="p-5 pb-10">
+      <div className="p-3 sm:p-5 pb-10">
         <div className="space-y-4">
 
           {/* Header */}
@@ -672,11 +672,11 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
           </div>
 
           {/* ── ROW 1 ── */}
-          <div className="grid grid-cols-12 gap-4 items-stretch">
+          <div className="grid grid-cols-12 gap-3 sm:gap-4 items-stretch">
 
             {/* Active Plan */}
             <Card style={st(1)} onClick={() => navigate("/admin/budget-plans")}
-              className="col-span-6 lg:col-span-3 p-4 relative overflow-hidden flex flex-col">
+  className="col-span-6 lg:col-span-3 p-3 sm:p-4 relative overflow-hidden flex flex-col">
               {activePlan && (
                 <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
                   <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 opacity-60" />
@@ -709,7 +709,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
 
             {/* Departments */}
             <Card style={st(2)} onClick={() => navigate("/admin/departments")}
-              className="col-span-6 lg:col-span-2 p-4 flex flex-col">
+  className="col-span-6 lg:col-span-2 p-3 sm:p-4 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
                   <BuildingOffice2Icon className="w-4 h-4 text-violet-500" />
@@ -730,7 +730,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
 
             {/* Salary Tranche */}
             <Card style={st(3)} onClick={() => navigate("/admin/tranche")}
-              className="col-span-6 lg:col-span-2 p-4 flex flex-col">
+  className="col-span-6 lg:col-span-2 p-3 sm:p-4 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
                   <BriefcaseIcon className="w-4 h-4 text-orange-500" />
@@ -765,10 +765,10 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
           </div>
 
           {/* ── ROW 2 ── */}
-          <div className="grid grid-cols-12 gap-4 items-start">
+          <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start">
 
             {/* LEFT */}
-            <div className="col-span-12 lg:col-span-7 space-y-4">
+            <div className="col-span-12 lg:col-span-7 space-y-3 sm:space-y-4">
 
               {/* General Fund */}
               <Card style={st(5)} className="overflow-hidden">
@@ -801,7 +801,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Estimated Revenue</p>
                       <Money v={!fundsReady ? null : (gf?.total ?? 0)} loading={!fundsReady} size="lg" />
                     </div> */}
-                    <div className="col-span-6 bg-blue-50 rounded-2xl border border-blue-100 p-3.5 flex items-stretch gap-3">
+                    <div className="col-span-12 sm:col-span-6 bg-blue-50 rounded-2xl border border-blue-100 p-3 sm:p-3.5 flex items-stretch gap-3">
                       <div className="flex-1">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400 mb-2">Total Local Source</p>
                         <Money v={!fundsReady ? null : gfLocalSource} loading={!fundsReady} size="lg" cls="text-blue-700" sub="text-blue-400" />
@@ -833,7 +833,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                         const sub   = !isLoaded ? "text-blue-400"                  : isOver ? "text-rose-400"                 : "text-emerald-500";
                         const subMono = !isLoaded ? "text-blue-500"                : isOver ? "text-rose-500"                 : "text-emerald-600";
                         return (
-                          <div className={cn("col-span-6 rounded-2xl border p-3.5", bg)}>
+                          <div className={cn("col-span-12 sm:col-span-6 rounded-2xl border p-3 sm:p-3.5", bg)}>
                             <p className={cn("text-[10px] font-medium uppercase tracking-widest mb-2 flex items-center gap-1", label)}>
                               <ArrowTrendingDownIcon className={cn("w-3 h-3", icon)} />Expenditures
                             </p>
@@ -1083,7 +1083,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-3">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
                     <p className="text-eyebrow text-zinc-500 mb-2">Overall Local Source</p>
                     <Money
@@ -1239,7 +1239,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
             </div>
 
             {/* RIGHT */}
-            <div className="col-span-12 lg:col-span-5 space-y-4">
+            <div className="col-span-12 lg:col-span-5 space-y-3 sm:space-y-4">
 
               {/* Special Accounts */}
               <Card style={st(7)} className="overflow-hidden">
@@ -1259,8 +1259,9 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                   </button>
                 </div>
                 <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center justify-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                    <div className="flex flex-col items-center justify-between h-full gap-0">
+                      {/* Pie chart */}
                       {!fundsReady ? (
                         <Shimmer className="w-28 h-28 rounded-full" />
                       ) : specialPie.length > 0 ? (
@@ -1278,44 +1279,97 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                           <p className="text-[9px] text-zinc-300 text-center leading-tight px-2">No revenue data</p>
                         </div>
                       )}
+
+                      {/* Calamity radial */}
+                      {fundsReady && combinedCalamity > 0 && (() => {
+                        const calChartConfig = {
+                          qrf:         { label: "30% QRF",          color: "#f43f5e" },
+                          predisaster: { label: "70% Pre-Disaster", color: "#fb923c" },
+                        } satisfies ChartConfig;
+                        const calChartData = [{ qrf: combinedQrf, predisaster: combinedPreDisaster }];
+                        const CalTip = ({ active, payload }: any) => {
+                          if (!active || !payload?.length) return null;
+                          return (
+                            <div className="bg-white border border-zinc-200 rounded-xl shadow-lg px-3 py-2 space-y-1 min-w-[160px]">
+                              {payload.map((p: any) => (
+                                <div key={p.dataKey} className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
+                                    <span className="text-[10px] font-semibold text-zinc-600">{calChartConfig[p.dataKey as keyof typeof calChartConfig]?.label}</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-semibold text-zinc-800">{peso(p.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        };
+                        return (
+                          <ChartContainer config={calChartConfig} className="mx-auto w-full" style={{ height: 130 }}>
+  <RadialBarChart data={calChartData} endAngle={180} innerRadius={50} outerRadius={100} cy="60%">
+                              <PolarGrid gridType="circle" radialLines={false} stroke="none" />
+                              <RadialBar dataKey="qrf"         stackId="a" cornerRadius={5} fill="var(--color-qrf)"         className="stroke-transparent stroke-2" />
+                              <RadialBar dataKey="predisaster" stackId="a" cornerRadius={5} fill="var(--color-predisaster)" className="stroke-transparent stroke-2" />
+                              <RechartsTooltip content={<CalTip />} cursor={false} />
+                              <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                                <RechartsLabel
+                                  content={(props: any) => {
+                                    const vb = props?.viewBox as { cx?: number; cy?: number } | undefined;
+                                    if (!vb?.cx || !vb?.cy) return null;
+                                    return (
+                                      <text x={vb.cx} y={vb.cy} textAnchor="middle">
+                                        <tspan x={vb.cx} y={vb.cy - 10} style={{ fontSize: 15, fontWeight: 700, fill: "#18181b" }}>
+  {pesoC(combinedCalamity)}
+</tspan>
+<tspan x={vb.cx} y={vb.cy + 6} style={{ fontSize: 10, fill: "#71717a" }}>
+  {peso(combinedCalamity)}
+</tspan>
+<tspan x={vb.cx} y={vb.cy + 20} style={{ fontSize: 8, fontWeight: 700, fill: "#f43f5e", letterSpacing: 0.5 }}>
+  5% CALAMITY FUND COMBINED
+</tspan>
+                                      </text>
+                                    );
+                                  }}
+                                />
+                              </PolarRadiusAxis>
+                            </RadialBarChart>
+                          </ChartContainer>
+                        );
+                      })()}
                     </div>
 
-                    <div className="flex flex-col justify-center gap-2.5">
+                    <div className="flex flex-col justify-start sm:justify-center gap-2.5">
                       <div>
                         <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Combined Revenue</p>
                         <Money v={!fundsReady ? null : specialTotal} loading={!fundsReady} size="md" />
                       </div>
-
-<div>
-  <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
-  <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
-</div>
-{fundsReady && (
-  <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-2.5 py-2 space-y-1.5">
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">
-      5% Calamity (combined)
-    </p>
-    <p className="text-sm font-semibold text-zinc-800">{pesoC(combinedCalamity)}</p>
-    <p className="text-xs text-zinc-400 font-mono">{peso(combinedCalamity)}</p>
-    <div className="border-t border-zinc-200 pt-1.5 space-y-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-rose-400" />
-          <p className="text-[10px] text-zinc-400">30% QRF</p>
-        </div>
-        <p className="text-[10px] font-mono text-rose-500">{peso(combinedQrf)}</p>
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-orange-400" />
-          <p className="text-[10px] text-zinc-400">70% Pre-Disaster</p>
-        </div>
-        <p className="text-[10px] font-mono text-orange-500">{peso(combinedPreDisaster)}</p>
+                      <div>
+                        <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 mb-1">Expenditures</p>
+                        <Money v={specialExpLoading ? null : specialExp} loading={specialExpLoading} size="sm" />
+                      </div>
+                      <div className="space-y-2">
+  <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">5% Calamity Breakdown</p>
+  <div className="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5 flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <span className="w-2 h-2 rounded-full flex-shrink-0 bg-rose-400" />
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-600">30% QRF</p>
+        <p className="text-[9px] text-rose-400">Quick Response Fund</p>
       </div>
     </div>
+    <p className="text-sm font-bold font-mono text-rose-700">{peso(combinedQrf)}</p>
   </div>
-)}
-{fundsReady && !specialExpLoading && <UnapBadge value={specialUnap} compact />}
+  <div className="rounded-xl bg-orange-50 border border-orange-100 px-3 py-2.5 flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <span className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-400" />
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-600">70% Pre-Disaster</p>
+        <p className="text-[9px] text-orange-400">Mitigation & Preparedness</p>
+      </div>
+    </div>
+    <p className="text-sm font-bold font-mono text-orange-700">{peso(combinedPreDisaster)}</p>
+  </div>
+</div>
+                      {fundsReady && !specialExpLoading && <UnapBadge value={specialUnap} compact />}
                     </div>
                   </div>
 

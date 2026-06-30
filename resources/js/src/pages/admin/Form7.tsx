@@ -17,11 +17,10 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number): string =>
-  n === 0 ? '—' : Math.round(n).toLocaleString('en-PH', { maximumFractionDigits: 0 });
+  n === 0 ? '—' : n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtPeso = (n: number): string =>
-  '₱\u00A0' + Math.round(n).toLocaleString('en-PH', { maximumFractionDigits: 0 });
-
+  '₱\u00A0' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // ─── Column definitions ───────────────────────────────────────────────────────
 
 const COLUMNS = [
@@ -227,7 +226,10 @@ const StandardRows: React.FC<{
       {rows.map((row, rIdx) => (
         <tr key={rIdx} className="hover:bg-gray-50/40 border-b border-gray-50">
           <td className="border-r border-gray-100 px-3 py-2 text-center text-[10px] text-gray-300 font-mono">{rIdx + 1}</td>
-          <td className="border-r border-gray-100 px-3 py-2 text-gray-800 pl-8 text-[11px]">{row.item_name}</td>
+          <td className={cn(
+            'border-r border-gray-100 px-3 py-2 text-gray-800 text-[11px]',
+            row.item_name === 'Interest' ? 'pl-16 text-gray-500 italic' : 'pl-8',
+          )}>{row.item_name}</td>
           <td className="border-r border-gray-100 px-3 py-2 text-center font-mono text-gray-400 text-[10px]">{row.account_code || '—'}</td>
           {COLUMNS.map(c => {
             const isSectorCol = SECTOR_KEYS.includes(c.key as ColKey);
@@ -316,9 +318,24 @@ function Form7Table({
           </thead>
 
           <tbody>
-            {sections.map((section, sIdx) => {
+            {/* {sections.map((section, sIdx) => {
               const isFe = section.section_code === 'FE';
+              return ( */}
+              {sections.map((section, sIdx) => {
               return (
+                // <React.Fragment key={section.section_code}>
+                //   <tr className="bg-gray-50/80 border-t border-b border-gray-200">
+                //     <td className="border-r border-gray-200 px-3 py-2.5 text-center text-[10px] text-gray-400" />
+                //     <td colSpan={2 + COLUMNS.length} className="px-3 py-2.5 font-semibold text-gray-900 text-[11px] uppercase tracking-wide">
+                //       {section.section_label}
+                //     </td>
+                //   </tr>
+
+                //   {isFe && !isSpecialAccount ? (
+                //     <FeRows obligations={section.obligations ?? []} isFirstSection={sIdx === 0} />
+                //   ) : (
+                //     <StandardRows rows={section.rows} isSpecialAccount={isSpecialAccount} />
+                //   )}
                 <React.Fragment key={section.section_code}>
                   <tr className="bg-gray-50/80 border-t border-b border-gray-200">
                     <td className="border-r border-gray-200 px-3 py-2.5 text-center text-[10px] text-gray-400" />
@@ -327,11 +344,7 @@ function Form7Table({
                     </td>
                   </tr>
 
-                  {isFe && !isSpecialAccount ? (
-                    <FeRows obligations={section.obligations ?? []} isFirstSection={sIdx === 0} />
-                  ) : (
-                    <StandardRows rows={section.rows} isSpecialAccount={isSpecialAccount} />
-                  )}
+                  <StandardRows rows={section.rows} isSpecialAccount={isSpecialAccount} />
 
                   <SubtotalRow
                     label={`Total ${section.section_code}`}

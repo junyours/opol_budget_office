@@ -134,8 +134,8 @@
             label: "Income & Expenditures",
             items: [
                 { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin", "viewer"] },
-                { name: "Income Funds",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
-                { name: "SA Income Consolidated", href: "/admin/consolidated-special-income", icon: TableCellsIcon,      iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
+                { name: "Income GF & SA",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
+                { name: "Consolidated Income (SA)", href: "/admin/consolidated-special-income", icon: TableCellsIcon,      iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
                 { name: "Personnel Services",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin", "viewer"] },
                 { name: "Obligations & Budget",   href: "/admin/lbp-form6",                   icon: DocumentTextIcon,    iconBg: "bg-teal-100",    iconColor: "text-teal-600",    roles: ["super-admin", "admin", "viewer"] },
                 { name: "Allocation by Sector",   href: "/admin/lbp-form7",                   icon: TableCellsIcon,      iconBg: "bg-indigo-100",  iconColor: "text-indigo-600",  roles: ["super-admin", "admin", "viewer"] },
@@ -143,7 +143,8 @@
                 { name: "20% MDF",                href: "/admin/mdf-fund",                    icon: HeroPiggyIcon,       iconBg: "bg-amber-100",   iconColor: "text-amber-600",   roles: ["super-admin", "admin", "viewer"] },
                 { name: "5% CF",                  href: "/admin/ldrrmfip",                    icon: ShieldCheckIcon,     iconBg: "bg-red-100",     iconColor: "text-red-600",     roles: ["super-admin", "admin", "viewer"] },
                 { name: "5% SA Consolidated",     href: "/admin/ldrrmf-plan",                 icon: DocumentChartBarIcon,iconBg: "bg-orange-100",  iconColor: "text-orange-600",  roles: ["super-admin", "admin", "viewer"] },
-                { name: "Summary of Expenditures", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin", "viewer"] },
+                { name: "Summary by Office", href: "/admin/summary-expenditures",   icon: ListBulletIcon, iconBg: "bg-zinc-100",   iconColor: "text-zinc-600",   roles: ["super-admin", "admin", "viewer"] },
+                { name: "Comparative Summary", href: "/admin/comparative-summary", icon: DocumentChartBarIcon, iconBg: "bg-blue-100", iconColor: "text-blue-600", roles: ["super-admin", "admin"] },
 
             ] as NavItem[],
             },
@@ -175,7 +176,7 @@
             {
       label: "Unified Plans",
       items: [
-        { name: "Special Plans", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-pink-100", iconColor: "text-pink-600", roles: ["super-admin", "admin", "viewer"] },
+        { name: "Attributions", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-pink-100", iconColor: "text-pink-600", roles: ["super-admin", "admin", "viewer"] },
       ] as NavItem[],
     },
     {

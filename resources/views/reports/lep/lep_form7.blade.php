@@ -25,11 +25,11 @@ $pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp
 
 $pa = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return $pesoSign . ' - ';
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
-    return number_format((float)$n, 0);
+    return number_format((float)$n, 2);
 };
 @endphp
 
@@ -64,7 +64,7 @@ $nf = function($n): string {
 </div>
 
 {{-- ── Data table ── --}}
-<table class="data-table" style="width:100%; table-layout:fixed; font-size:6.5pt;">
+<table class="data-table" style="width:100%; table-layout:fixed; font-size:5.5pt;">
     <colgroup>
         @if(!$isSpecial)
         <col style="width:30%;">
@@ -111,16 +111,16 @@ $nf = function($n): string {
             <th>Total</th>
         </tr>
         <tr>
-            <th style="font-weight:normal; font-size:6pt;">(1)</th>
-            <th style="font-weight:normal; font-size:6pt;">(2)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(1)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(2)</th>
             @if(!$isSpecial)
-            <th style="font-weight:normal; font-size:6pt;">(3)</th>
-            <th style="font-weight:normal; font-size:6pt;">(4)</th>
-            <th style="font-weight:normal; font-size:6pt;">(5)</th>
-            <th style="font-weight:normal; font-size:6pt;">(6)</th>
-            <th style="font-weight:normal; font-size:6pt;">(7)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(3)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(4)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(5)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(6)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(7)</th>
             @else
-            <th style="font-weight:normal; font-size:6pt;">(3)</th>
+            <th style="font-weight:normal; font-size:5.5pt;">(3)</th>
             @endif
         </tr>
     </thead>
@@ -159,64 +159,9 @@ $nf = function($n): string {
     </tr>
 
     {{-- ════════════════════════════════════════════════════
-         FE — Financial Expenses (debt obligations)
+         PS / MOOE / CO / SPA / FE — standard item rows
     ════════════════════════════════════════════════════ --}}
-    @if($section['section_code'] === 'FE')
-        @if(!$isSpecial)
-            {{-- General fund: show sector columns --}}
-            @foreach($section['obligations'] ?? [] as $ob)
-            <tr>
-                <td class="l" style="padding-left:10px; font-weight:bold;">
-                    {{ $ob['creditor'] }}@if(!empty($ob['purpose'])) &mdash; {{ $ob['purpose'] }}@endif
-                </td>
-                <td></td>
-                <td colspan="5"></td>
-            </tr>
-            <tr>
-                <td class="l" style="padding-left:18px; font-style:italic;">Principal</td>
-                <td></td>
-                <td class="r">{!! $nf($ob['principal']) !!}</td>
-                <td class="r"> - </td>
-                <td class="r"> - </td>
-                <td class="r"> - </td>
-                <td class="r">{!! $nf($ob['principal']) !!}</td>
-            </tr>
-            <tr>
-                <td class="l" style="padding-left:18px; font-style:italic;">Interest</td>
-                <td></td>
-                <td class="r">{!! $nf($ob['interest']) !!}</td>
-                <td class="r"> - </td>
-                <td class="r"> - </td>
-                <td class="r"> - </td>
-                <td class="r">{!! $nf($ob['interest']) !!}</td>
-            </tr>
-            @endforeach
-        @else
-            {{-- Special account: single total column --}}
-            @foreach($section['obligations'] ?? [] as $ob)
-            <tr>
-                <td class="l" style="padding-left:10px; font-weight:bold;" colspan="2">
-                    {{ $ob['creditor'] }}@if(!empty($ob['purpose'])) &mdash; {{ $ob['purpose'] }}@endif
-                </td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="l" style="padding-left:18px; font-style:italic;">Principal</td>
-                <td></td>
-                <td class="r">{!! $nf($ob['principal']) !!}</td>
-            </tr>
-            <tr>
-                <td class="l" style="padding-left:18px; font-style:italic;">Interest</td>
-                <td></td>
-                <td class="r">{!! $nf($ob['interest']) !!}</td>
-            </tr>
-            @endforeach
-        @endif
-
-    {{-- ════════════════════════════════════════════════════
-         PS / MOOE / CO / SPA — standard item rows
-    ════════════════════════════════════════════════════ --}}
-    @elseif(!$isSpecial)
+    @if(!$isSpecial)
         @foreach($section['rows'] ?? [] as $rIdx => $row)
         <tr>
             <td class="l" style="padding-left:8px;">{{ $row['item_name'] }}</td>

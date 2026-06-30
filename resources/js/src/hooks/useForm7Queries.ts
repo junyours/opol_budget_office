@@ -66,78 +66,11 @@ export function useForm7SpecialAccount(
   source: SpecialAccountId,
   planId: number | undefined
 ) {
-  const { data: departments = [] } = useQuery<{ dept_id: number; dept_abbreviation: string | null; dept_name: string }[]>({
-    queryKey: ['departments'],
-    queryFn:  () => API.get('/departments').then(r => r.data?.data ?? []),
-  });
-
-  const abbr = source.toUpperCase();
-  const dept = departments.find(d => (d.dept_abbreviation ?? '').toUpperCase() === abbr);
-
   return useQuery<Form7Data>({
     queryKey: form7QueryKeys.specialAccount(source, planId!),
-    queryFn:  async () => {
-      const res = await API.get('/department-budget-plans', {
-        params: { 'filter[budget_plan_id]': planId },
-      });
-      const plans: any[] = res.data?.data ?? [];
-      const deptPlan = plans.find((p: any) => p.dept_id === dept!.dept_id);
-      const items: any[] = deptPlan?.items ?? [];
-
-      const sectionMap = new Map<string, { code: string; label: string; rows: Form7Row[] }>();
-
-      items.forEach((item: any) => {
-        const amt = parseFloat(String(item.total_amount)) || 0;
-        if (amt === 0) return;
-
-        const classId   = item.expense_item?.classification?.expense_class_id
-                       ?? item.expense_item?.expense_class_id
-                       ?? 2;
-        const codeMap:  Record<number, string> = { 1: 'PS', 2: 'MOOE', 3: 'FE', 4: 'CO' };
-        const labelMap: Record<number, string> = {
-          1: 'Personal Services',
-          2: 'Maintenance and Other Operating Expenses',
-          3: 'Financial Expenses',
-          4: 'Capital Outlay',
-        };
-        const code  = codeMap[classId]  ?? 'MOOE';
-        const label = labelMap[classId] ?? 'Other';
-
-        if (!sectionMap.has(code)) sectionMap.set(code, { code, label, rows: [] });
-
-        sectionMap.get(code)!.rows.push({
-          item_name:               item.expense_item?.expense_class_item_name ?? `Item ${item.expense_item_id}`,
-          account_code:            item.expense_item?.expense_class_item_acc_code ?? '',
-          general_public_services: 0,
-          social_services:         0,
-          economic_services:       0,
-          other_services:          0,
-          total:                   amt,
-        });
-      });
-
-      const ZERO_SUB: SectionSubtotal = {
-        general_public_services: 0, social_services: 0,
-        economic_services: 0, other_services: 0, total: 0,
-      };
-
-      const sections: Form7Section[] = [];
-      sectionMap.forEach(({ code, label, rows }) => {
-        const sectionTotal = rows.reduce((s, r) => s + r.total, 0);
-        sections.push({
-          section_code:  code,
-          section_label: label,
-          rows,
-          subtotal: { ...ZERO_SUB, total: sectionTotal },
-        });
-      });
-
-      const grandTotal = sections.reduce((s, sec) => s + sec.subtotal.total, 0);
-      return {
-        sections: { sections, grand_total: { ...ZERO_SUB, total: grandTotal } },
-        grand_total: { ...ZERO_SUB, total: grandTotal },
-      };
-    },
-    enabled: !!planId && !!dept,  // ← KEY FIX: wait for dept to resolve
+    queryFn:  () =>
+      API.get('/form7', { params: { budget_plan_id: planId, filter: source } })
+        .then(r => r.data.data),
+    enabled: !!planId,
   });
 }

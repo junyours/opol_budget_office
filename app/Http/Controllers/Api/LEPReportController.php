@@ -1343,24 +1343,27 @@ private function buildOneLepForm7(
         if ($col) $deptPlanCategoryMap[$row->dept_budget_plan_id] = $col;
     }
 
+    // For special accounts: SA category maps to null (excluded from sector
+    // columns), so build a fallback map pointing to 'general_public_services'
+    // so rows still load — the blade renders them in the Total column only.
+    if ($isSpecial && $deptId && empty($deptPlanCategoryMap)) {
+        $saOnlyPlanIds = \DB::table('department_budget_plans')
+            ->where('budget_plan_id', $budgetPlanId)
+            ->where('dept_id', $deptId)
+            ->pluck('dept_budget_plan_id');
+        foreach ($saOnlyPlanIds as $pid) {
+            $deptPlanCategoryMap[$pid] = 'general_public_services';
+        }
+    }
+
     // ── PS / MOOE / CO rows from dept_bp_form2_items ─────────────────────
     $form2Rows = $this->lepForm7BuildForm2Rows($budgetPlanId, $deptPlanCategoryMap);
 
-    // ── FE obligations (general fund only) ───────────────────────────────
-    $feObligations = [];
-    $feSubtotal    = $this->lepForm7ZeroSubtotal();
-    if (!$isSpecial) {
-        $feObligations = $this->lepForm7BuildFeObligations($budgetPlanId);
-        $feTotal       = 0.0;
-        foreach ($feObligations as $ob) $feTotal += $ob['principal'] + $ob['interest'];
-        $feSubtotal = [
-            'general_public_services' => $feTotal,
-            'social_services'         => 0.0,
-            'economic_services'       => 0.0,
-            'other_services'          => 0.0,
-            'total'                   => $feTotal,
-        ];
-    }
+    // ── FE rows (20% MDF + debt + LDRRMF for GF; calamity split for SA) ─
+        $saSource      = $isSpecial && $deptId ? $this->resolveSourceKey(\App\Models\Department::find($deptId)) : null;
+        $feRows        = $this->lepForm7BuildFeRows($budgetPlanId, $isSpecial, $saSource);
+        $feSubtotal    = $this->lepForm7SumRows($feRows);
+        $feObligations = []; // kept for blade compatibility
 
     // ── SPA rows from dept_bp_form4_items ────────────────────────────────
     $aipRows = $this->lepForm7BuildAipRows($budgetPlanId, $deptPlanCategoryMap);
@@ -1388,8 +1391,8 @@ private function buildOneLepForm7(
         [
             'section_code'  => 'FE',
             'section_label' => 'Financial Expenses, (F.E.)',
-            'rows'          => [],
-            'obligations'   => $feObligations,
+            'rows'          => $feRows,
+            'obligations'   => [],
             'subtotal'      => $feSubtotal,
         ],
         [
@@ -1533,6 +1536,105 @@ private function lepForm7BuildFeObligations(int $budgetPlanId): array
         ];
     }
     return $obligations;
+}
+
+private function lepForm7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string $source = null): array
+{
+    $rows = [];
+
+    if (!$isSpecial) {
+        // ── General Fund: 20% MDF regular items (flat) ────────────────────
+        $plan        = BudgetPlan::findOrFail($budgetPlanId);
+        $currentPlan = BudgetPlan::where('year', (int)$plan->year - 1)->first();
+        $pastPlan    = BudgetPlan::where('year', (int)$plan->year - 2)->first();
+
+        $relevantPlanIds = array_values(array_filter([
+            $budgetPlanId,
+            $currentPlan?->budget_plan_id,
+            $pastPlan?->budget_plan_id,
+        ]));
+
+        $categories = \App\Models\MdfCategory::orderBy('sort_order')
+            ->with([
+                'items' => function ($q) use ($relevantPlanIds) {
+                    $q->where('is_active', true)
+                      ->whereNull('obligation_id')
+                      ->orderBy('sort_order')
+                      ->with([
+                          'snapshots' => fn ($sq) => $sq->whereIn('budget_plan_id', $relevantPlanIds),
+                      ]);
+                },
+            ])
+            ->get();
+
+        foreach ($categories as $cat) {
+            foreach ($cat->items as $item) {
+                $proposed = (float) ($item->snapshots->keyBy('budget_plan_id')->get($budgetPlanId)?->total_amount ?? 0);
+                if ($proposed == 0) continue;
+                $rows[] = [
+                    'item_name'               => $item->name,
+                    'account_code'            => $item->account_code ?? '',
+                    'general_public_services' => $proposed,
+                    'social_services'         => 0.0,
+                    'economic_services'       => 0.0,
+                    'other_services'          => 0.0,
+                    'total'                   => $proposed,
+                ];
+            }
+        }
+
+        // ── Debt service items ─────────────────────────────────────────────
+        $obligations  = \App\Models\DebtObligation::where('is_active', true)
+            ->orderBy('sort_order')->orderBy('obligation_id')->get();
+        $debtPayments = \App\Models\DebtPayment::whereIn('obligation_id', $obligations->pluck('obligation_id'))
+            ->where('budget_plan_id', $budgetPlanId)->get()->groupBy('obligation_id');
+
+        foreach ($obligations as $ob) {
+            $payment = $debtPayments->get($ob->obligation_id)?->first();
+            if (!$payment) continue;
+            $principal = (float) ($payment->principal_due ?? 0);
+            $interest  = (float) ($payment->interest_due  ?? 0);
+            if ($principal > 0) {
+                $rows[] = ['item_name' => $ob->creditor . ' - Principal', 'account_code' => '',
+                    'general_public_services' => $principal, 'social_services' => 0.0,
+                    'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $principal];
+            }
+            if ($interest > 0) {
+                $rows[] = ['item_name' => $ob->creditor . ' - Interest', 'account_code' => '',
+                    'general_public_services' => $interest, 'social_services' => 0.0,
+                    'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $interest];
+            }
+        }
+
+        // ── 5% LDRRMF lines ───────────────────────────────────────────────
+        $calamity5 = $this->computeCalamityFundLep($budgetPlanId, 'general-fund');
+        $qrf30     = round($calamity5 * 0.30, 2);
+        $pda70     = round($calamity5 * 0.70, 2);
+        if ($calamity5 > 0) {
+            $rows[] = ['item_name' => '5% LDRRMF: Quick Response Fund (30% QRF)', 'account_code' => '5-02',
+                'general_public_services' => $qrf30, 'social_services' => 0.0,
+                'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $qrf30];
+            $rows[] = ['item_name' => '70% Pre-Disaster Preparedness Fund', 'account_code' => '5-02',
+                'general_public_services' => $pda70, 'social_services' => 0.0,
+                'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $pda70];
+        }
+    } else {
+        // ── Special Account: only 5% calamity split ───────────────────────
+        if (!$source) return [];
+        $calamity5 = $this->computeCalamityFundLep($budgetPlanId, $source);
+        $qrf30     = round($calamity5 * 0.30, 2);
+        $pda70     = round($calamity5 * 0.70, 2);
+        if ($calamity5 > 0) {
+            $rows[] = ['item_name' => '5% Calamity Fund: Quick Response Fund (30% QRF)', 'account_code' => '9000-2-01-001',
+                'general_public_services' => 0.0, 'social_services' => 0.0,
+                'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $qrf30];
+            $rows[] = ['item_name' => '70% Pre-Disaster Preparedness Fund', 'account_code' => '9000-2-02-001',
+                'general_public_services' => 0.0, 'social_services' => 0.0,
+                'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $pda70];
+        }
+    }
+
+    return $rows;
 }
 
 // ── AIP / SPA rows ────────────────────────────────────────────────────────

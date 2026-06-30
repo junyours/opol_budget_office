@@ -20,6 +20,8 @@ const fmtP  = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDi
 const pctOf = (base: number, diff: number) =>
   base === 0 ? (diff === 0 ? 0 : 100) : (diff / base) * 100;
 
+const GENERAL_FUND_CEILING_PCT = 0.092; // ← change this to e.g. 0.15 for 15%
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BudgetComparisonBannerProps {
@@ -102,7 +104,8 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
   const diffPct   = pctOf(pastTotal, diff);
 
   const ceilingLoading = isSpecialAccount ? incomeGrandLoading : false;
-  const threshold       = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * 1.1;
+//   const threshold       = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * 1.1;
+const threshold = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * (1 + GENERAL_FUND_CEILING_PCT);
   const ceilingBasis     = isSpecialAccount ? currentInclCal : currentExclCal;
   const isOver = isSpecialAccount
     ? (!ceilingLoading && threshold > 0 && ceilingBasis > threshold)
@@ -218,7 +221,8 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[13px] font-semibold text-red-700">
-                    {isSpecialAccount ? 'Above Income Fund ceiling' : 'Above 10% appropriation ceiling'}
+                    {/* {isSpecialAccount ? 'Above Income Fund ceiling' : 'Above 10% appropriation ceiling'} */}
+                    {isSpecialAccount ? 'Above Income Fund ceiling' : `Above ${+(GENERAL_FUND_CEILING_PCT * 100).toFixed(2).replace(/\.?0+$/, '')}% appropriation ceiling`}
                   </span>
                   <span className="text-[11px] text-gray-500">
                     {isSpecialAccount ? 'Income Fund total' : 'Ceiling'}:{' '}
@@ -266,7 +270,9 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[13px] font-semibold text-emerald-700">
-                    Within 10% appropriation ceiling
+                    {/* Within 10% appropriation ceiling */}
+                    {/* {`Within ${GENERAL_FUND_CEILING_PCT * 100}% appropriation ceiling`} */}
+                    `Within ${+(GENERAL_FUND_CEILING_PCT * 100).toFixed(2).replace(/\.?0+$/, '')}% appropriation ceiling`
                   </span>
                   <span className="text-[11px] text-gray-500">
                     Ceiling:{' '}

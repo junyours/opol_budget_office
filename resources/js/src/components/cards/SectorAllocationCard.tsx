@@ -358,9 +358,13 @@ function useSaForm7Summary(planId: number | undefined) {
       items.forEach((item: any) => {
         const amt = parseFloat(String(item.total_amount)) || 0;
         if (amt === 0) return;
-        const classId = item.expense_item?.classification?.expense_class_id ?? item.expense_item?.expense_class_id ?? 2;
-        const codeMap: Record<number,string> = { 1:"PS", 2:"MOOE", 3:"FE", 4:"CO" };
-        const code = codeMap[classId] ?? "MOOE";
+        // const classId = item.expense_item?.classification?.expense_class_id ?? item.expense_item?.expense_class_id ?? 2;
+        // const codeMap: Record<number,string> = { 1:"PS", 2:"MOOE", 3:"FE", 4:"CO" };
+        // const code = codeMap[classId] ?? "MOOE";
+
+        const rawAbbr = String(item.expense_item?.classification?.abbreviation ?? "").toUpperCase();
+        const code = ["PS","MOOE","FE","CO"].includes(rawAbbr) ? rawAbbr : "MOOE";
+        
         if (!sectionMap.has(code)) sectionMap.set(code, { ...ZERO_SUB });
         sectionMap.get(code)!.total += amt;
       });

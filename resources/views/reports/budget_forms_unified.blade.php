@@ -2031,14 +2031,14 @@ $forms6      = $data['forms'];   // array of { label, source, is_special, rows, 
 // Formatters
 $pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $pa = function($n) use ($pesoSign): string {
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $nf = function($n): string {   // number only, blank when 0
-    if ((float)$n == 0) return '0';
-    return number_format((float)$n, 0);
+    if ((float)$n == 0) return '0.00';
+    return number_format((float)$n, 2);
 };
 @endphp
 
@@ -2125,9 +2125,12 @@ foreach ($rows as $r) { $computeAmount($r); }
 
         $indent = str_repeat('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;', max(0, $level + 1));
 
+        // Force peso sign on 2.1 and 2.2 (parent rows of budgetary requirements)
+        $forcePeso = in_array($code, ['2.1', '2.2']);
+
         if ($isSection) {
             $displayAmt = '';
-        } elseif ($showPeso) {
+        } elseif ($showPeso || $forcePeso) {
             $displayAmt = $pf($amount);
             if ($displayAmt === '') $displayAmt = $pesoSign . ' - ';
         } else {
@@ -2239,11 +2242,11 @@ $forms7  = $data['forms'];
 
 $pa = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return $pesoSign . ' - ';
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
-    return number_format((float)$n, 0);
+    return number_format((float)$n, 2);
 };
 @endphp
 
@@ -2252,7 +2255,7 @@ $nf = function($n): string {
 $sections   = $form7['sections']    ?? [];
 $grandTotal = $form7['grand_total'] ?? null;
 $isSpecial  = $form7['is_special'];
-$colCount   = $isSpecial ? 3 : 7;
+$colCount   = 7; // always 7 columns — SA sector cols show — but are still rendered
 @endphp
 
 <div class="page">
@@ -2270,7 +2273,6 @@ $colCount   = $isSpecial ? 3 : 7;
 
 <table class="data-table" style="font-size:6.5pt;">
     <thead>
-    @if(!$isSpecial)
     <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
         <td style="width:30%;padding:0;border:none;"></td>
         <td style="width:10%;padding:0;border:none;"></td>
@@ -2280,33 +2282,22 @@ $colCount   = $isSpecial ? 3 : 7;
         <td style="width:12%;padding:0;border:none;"></td>
         <td style="width:12%;padding:0;border:none;"></td>
     </tr>
-    @else
-    <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
-        <td style="width:70%;padding:0;border:none;"></td>
-        <td style="width:12%;padding:0;border:none;"></td>
-        <td style="width:18%;padding:0;border:none;"></td>
-    </tr>
-    @endif
         <tr>
             <th style="text-align:left;">Particulars</th>
             <th>Account<br>Code</th>
-            @if(!$isSpecial)
             <th>General<br>Public<br>Service</th>
             <th>Social<br>Services</th>
             <th>Economic<br>Services</th>
             <th>Other<br>Services</th>
-            @endif
             <th>{{ $isSpecial ? $form7['label'].' Total' : 'Total' }}</th>
         </tr>
         <tr class="col-num">
             <td>(1)</td>
             <td>(2)</td>
-            @if(!$isSpecial)
             <td>(3)</td>
             <td>(4)</td>
             <td>(5)</td>
             <td>(6)</td>
-            @endif
             <td>{{ $isSpecial ? '(3)' : '(7)' }}</td>
         </tr>
     </thead>
@@ -2319,54 +2310,8 @@ $colCount   = $isSpecial ? 3 : 7;
         <td colspan="{{ $colCount }}">{{ $section['section_label'] }}</td>
     </tr>
 
-    {{-- ── FE section — general fund (has sector columns) ── --}}
-    @if($section['section_code'] === 'FE' && !$isSpecial)
-        @foreach($section['obligations'] ?? [] as $obIdx => $ob)
-        <tr>
-            <td class="l" colspan="6" style="padding-left:12pt;font-weight:bold;">{{ $ob['creditor'] }}@if(!empty($ob['purpose'])) ({{ $ob['purpose'] }})@endif</td>
-            <td></td>
-        </tr>
-        <tr>
-            <td class="l" style="padding-left:18pt;font-style:italic;">Principal</td>
-            <td></td>
-            <td class="r">{!! $nf($ob['principal']) !!}</td>
-            <td class="r"> - </td>
-            <td class="r"> - </td>
-            <td class="r"> - </td>
-            <td class="r">{!! $nf($ob['principal']) !!}</td>
-        </tr>
-        <tr>
-            <td class="l" style="padding-left:18pt;font-style:italic;">Interest</td>
-            <td></td>
-            <td class="r">{!! $nf($ob['interest']) !!}</td>
-            <td class="r"> - </td>
-            <td class="r"> - </td>
-            <td class="r"> - </td>
-            <td class="r">{!! $nf($ob['interest']) !!}</td>
-        </tr>
-        @endforeach
-
-    {{-- ── FE section — special account (no sector columns) ── --}}
-    @elseif($section['section_code'] === 'FE' && $isSpecial)
-        @foreach($section['obligations'] ?? [] as $obIdx => $ob)
-        <tr>
-            <td class="l" colspan="2" style="padding-left:12pt;font-weight:bold;">{{ $ob['creditor'] }}@if(!empty($ob['purpose'])) ({{ $ob['purpose'] }})@endif</td>
-            <td></td>
-        </tr>
-        <tr>
-            <td class="l" style="padding-left:18pt;font-style:italic;">Principal</td>
-            <td class="r">{!! $nf($ob['principal']) !!}</td>
-            <td></td>
-        </tr>
-        <tr>
-            <td class="l" style="padding-left:18pt;font-style:italic;">Interest</td>
-            <td class="r">{!! $nf($ob['interest']) !!}</td>
-            <td></td>
-        </tr>
-        @endforeach
-
-    {{-- ── Standard rows (PS / MOOE / CO / SPA) — general fund ── --}}
-    @elseif(!$isSpecial)
+    {{-- ── Standard rows (PS / MOOE / CO / SPA / FE) — general fund ── --}}
+    @if(!$isSpecial)
         @foreach($section['rows'] ?? [] as $rIdx => $row)
         <tr>
             <td class="l" style="padding-left:6pt;">{{ $row['item_name'] }}</td>
@@ -2379,12 +2324,16 @@ $colCount   = $isSpecial ? 3 : 7;
         </tr>
         @endforeach
 
-    {{-- ── Standard rows — special account ── --}}
+    {{-- ── Standard rows — special account (sector cols show dash) ── --}}
     @else
         @foreach($section['rows'] ?? [] as $rIdx => $row)
         <tr>
             <td class="l" style="padding-left:6pt;">{{ $row['item_name'] }}</td>
             <td class="c" style="font-size:6pt;">{{ $row['account_code'] ?? '' }}</td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
             <td class="r">{!! $rIdx === 0 ? $pa($row['total']) : $nf($row['total']) !!}</td>
         </tr>
         @endforeach
@@ -2406,6 +2355,10 @@ $colCount   = $isSpecial ? 3 : 7;
     <tr class="subtotal">
         <td class="l">Total {{ $section['section_code'] }}</td>
         <td></td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
         <td class="r">{!! $pa($section['subtotal']['total']) !!}</td>
     </tr>
     @endif
@@ -2426,11 +2379,15 @@ $colCount   = $isSpecial ? 3 : 7;
             <td class="r">{!! $pa($grandTotal['total']) !!}</td>
         </tr>
     </tfoot>
-    @else
+   @else
     <tfoot>
         <tr class="grand-total">
             <td class="l">Grand Total</td>
             <td></td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
             <td class="r">{!! $pa($grandTotal['total']) !!}</td>
         </tr>
     </tfoot>

@@ -19,11 +19,13 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "@/src/components/ui/pagination";
 // import { MoreHorizontalIcon } from "lucide-react";
-import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+// import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ExcelUploadModal } from './ExcelUploadModal';
 import { LoadingState } from '../../components/states/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
 import API from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import { Department } from '../../types/api';
 import { cn } from '@/src/lib/utils';
 import { DeptDots } from '@/src/components/ui/DeptDots';
@@ -31,6 +33,9 @@ import { DeptDots } from '@/src/components/ui/DeptDots';
 const ITEMS_PER_PAGE = 10;
 
 const PlantillaPage: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super-admin';
+
   const [positions, setPositions]           = useState<any[]>([]);
   const [departments, setDepartments]       = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null);
@@ -51,6 +56,8 @@ const PlantillaPage: React.FC = () => {
   const [editForm, setEditForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
   const [toggleActiveOpen, setToggleActiveOpen] = useState(false);
   const [togglePosition, setTogglePosition]     = useState<any | null>(null);
+  const [deleteOpen, setDeleteOpen]             = useState(false);
+  const [deletePosition, setDeletePosition]     = useState<any | null>(null);
   const [confirmCreateOpen, setConfirmCreateOpen] = useState(false);
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; pos: any } | null>(null);
@@ -174,13 +181,31 @@ const PlantillaPage: React.FC = () => {
     setCtxMenu({ x, y, pos });
     };
 
-  const confirmToggleActive = async () => {
+//   const confirmToggleActive = async () => {
+//     if (!togglePosition) return;
+//     try {
+//       await API.patch(`/plantilla-positions/${togglePosition.plantilla_position_id}`, { is_active: !togglePosition.is_active });
+//       toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'}.`); fetchData();
+//     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
+//     finally { setToggleActiveOpen(false); setTogglePosition(null); }
+//   };
+
+const confirmToggleActive = async () => {
     if (!togglePosition) return;
     try {
       await API.patch(`/plantilla-positions/${togglePosition.plantilla_position_id}`, { is_active: !togglePosition.is_active });
       toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'}.`); fetchData();
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
     finally { setToggleActiveOpen(false); setTogglePosition(null); }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletePosition) return;
+    try {
+      await API.delete(`/plantilla-positions/${deletePosition.plantilla_position_id}`);
+      toast.success('Position deleted.'); fetchData();
+    } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to delete.'); }
+    finally { setDeleteOpen(false); setDeletePosition(null); }
   };
 
   const parsePlantillaRow = (row: any[]) => {
@@ -443,11 +468,28 @@ const PlantillaPage: React.FC = () => {
           : 'text-emerald-700 hover:bg-emerald-50'
       )}
     >
-      {ctxMenu.pos.is_active
+      {/* {ctxMenu.pos.is_active
         ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
         : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
       }
     </button>
+  </div>
+)} */}
+
+{ctxMenu.pos.is_active
+        ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
+        : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
+      }
+    </button>
+    {!ctxMenu.pos.is_active && isSuperAdmin && (
+      <button
+        onClick={() => { setCtxMenu(null); setDeletePosition(ctxMenu.pos); setDeleteOpen(true); }}
+        className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-700 hover:bg-red-50 transition-colors"
+      >
+        <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
+        Delete Position
+      </button>
+    )}
   </div>
 )}
 
@@ -585,7 +627,26 @@ const PlantillaPage: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ExcelUploadModal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload Plantilla Positions" entityName="plantilla positions" confirmationDescription="These positions will be bulk-inserted into the database." parseRow={parsePlantillaRow} requiredColumns={['old_item_number','new_item_number','position_title','salary_grade','dept_id']} onSave={savePlantilla} headerRowsToSkip={1} duplicateChecker={duplicateChecker} />
+      {/* Delete */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold">Delete position?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              <span className="font-medium text-gray-700">{deletePosition?.position_title}</span> will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild><Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button></AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700" onClick={confirmDelete}>Delete</Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ExcelUploadModal isOpen={uploadOpen}
+      onClose={() => setUploadOpen(false)} title="Upload Plantilla Positions" entityName="plantilla positions" confirmationDescription="These positions will be bulk-inserted into the database." parseRow={parsePlantillaRow} requiredColumns={['old_item_number','new_item_number','position_title','salary_grade','dept_id']} onSave={savePlantilla} headerRowsToSkip={1} duplicateChecker={duplicateChecker} />
     </div>
   );
 };

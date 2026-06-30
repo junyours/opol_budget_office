@@ -38,6 +38,33 @@ class PlantillaPositionController extends BaseMasterCrudController
         return $this->success($positions);
     }
 
+    /**
+     * Override base destroy: only super-admins may delete, and only
+     * inactive positions may be deleted.
+     */
+    public function destroy($id)
+    {
+        $model = PlantillaPosition::findOrFail($id);
+
+        $this->authorize('delete', $model);
+
+        if (request()->user()?->role !== 'super-admin') {
+            return response()->json([
+                'message' => 'Only super-admins can delete plantilla positions.',
+            ], 403);
+        }
+
+        if ($model->is_active) {
+            return response()->json([
+                'message' => 'Only inactive positions can be deleted.',
+            ], 422);
+        }
+
+        $model->delete();
+
+        return $this->success(['message' => 'Plantilla position deleted.']);
+    }
+
     public function bulkStore(Request $request)
     {
         $this->authorize('create', PlantillaPosition::class);

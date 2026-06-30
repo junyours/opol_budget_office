@@ -620,7 +620,7 @@ const liveAllowable   = liveLimitation - liveNetPs;
                 {fmtSignedPeso(liveAllowable)}
               </p>
               <p className="text-[10px] text-gray-400 mt-1.5">
-                PS Limitation − Net Annual PS Budget
+                PS Limitation − Net Annual Total PS
               </p>
             </div>
 
@@ -693,7 +693,7 @@ const liveAllowable   = liveLimitation - liveNetPs;
   accent="gray"
 />
 <SummaryCard
-  label="Net Annual PS Budget"
+  label="Net Annual Total PS"
   value={fmtSignedPeso(liveNetPs)}
   sub="Total PS − Waived Items"
   accent="blue"

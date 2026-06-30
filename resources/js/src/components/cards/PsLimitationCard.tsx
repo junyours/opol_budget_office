@@ -264,7 +264,7 @@ export function PsLimitationCard({
           <div className={cn("px-3", isOver ? "bg-red-50" : "bg-cyan-50")}>
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-1.5">
-                <p className="text-[11.5px] font-bold text-zinc-900">Net Annual PS Budget</p>
+                <p className="text-[11.5px] font-bold text-zinc-900">Net Annual Total PS</p>
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>

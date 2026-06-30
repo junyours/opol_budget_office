@@ -71,7 +71,7 @@ const fmtNum = (val: number | null | undefined): string => {
 
 const fmtPct = (val: number | null | undefined): string => {
   if (val === null || val === undefined) return "–";
-  return val.toFixed(1) + "%";
+  return val.toFixed(2) + "%";
 };
 
 const fmtInput = (val: number | null | undefined): string => {

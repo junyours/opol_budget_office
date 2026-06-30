@@ -37,7 +37,7 @@ interface Form6Row {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
-  Math.round(n).toLocaleString('en-PH', { maximumFractionDigits: 0 });
+  n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const toRows = (raw: unknown): Form6Row[] =>
   Array.isArray(raw) ? (raw as Form6Row[]) : [];
@@ -46,13 +46,19 @@ const toRows = (raw: unknown): Form6Row[] =>
 
 const PS_DERIVED_CODES = new Set(['1.1', '1.2', '1.3', '1.5', '1.6', '1.7', '1.8']);
 
+// const INCOME_DERIVED_CODES = new Set([
+//   '2.1', '2.1.1', '2.1.2',
+//   '2.2', '2.2.1', '2.2.2',
+//   '2.3',
+// ]);
+
 const INCOME_DERIVED_CODES = new Set([
-  '2.1', '2.1.1', '2.1.2',
-  '2.2', '2.2.1', '2.2.2',
+  '2.1.1', '2.1.2',
+  '2.2.1', '2.2.2',
   '2.3',
 ]);
 
-const FORCE_PESO_SIGN = new Set(['2.1']);
+const FORCE_PESO_SIGN = new Set(['2.1', '2.2']);
 
 const isExternallyDerived = (code: string) =>
   PS_DERIVED_CODES.has(code) || INCOME_DERIVED_CODES.has(code);
@@ -295,17 +301,22 @@ const Form6Panel: React.FC<Form6PanelProps> = ({
   budgetYear, derivedData, derivedLoading, onSync, showSyncButton,
 }) => {
 
-  const getDerivedAmount = useCallback(
+//   const getDerivedAmount = useCallback(
+//     (code: string, fallback: number): number => {
+//       if (!derivedData) return fallback;
+//       switch (code) {
+//         case '2.1':   return derivedData.ldf20.amount;
+//         case '2.1.1': return derivedData.infraProgram.amount;
+//         case '2.1.2': return derivedData.debtServices.amount;
+//         case '2.2':   return derivedData.ldrrmf5.amount;
+const getDerivedAmount = useCallback(
     (code: string, fallback: number): number => {
-      if (!derivedData) return fallback;
       switch (code) {
-        case '2.1':   return derivedData.ldf20.amount;
-        case '2.1.1': return derivedData.infraProgram.amount;
-        case '2.1.2': return derivedData.debtServices.amount;
-        case '2.2':   return derivedData.ldrrmf5.amount;
-        case '2.2.1': return derivedData.qrf30.amount;
-        case '2.2.2': return derivedData.pda70.amount;
-        case '2.3':   return derivedData.aidToBarangays.amount;
+        case '2.1.1': return fallback; // stored in DB after sync
+        case '2.1.2': return fallback; // stored in DB after sync
+        case '2.2.1': return derivedData?.qrf30.amount        ?? fallback;
+        case '2.2.2': return derivedData?.pda70.amount        ?? fallback;
+        case '2.3':   return derivedData?.aidToBarangays.amount ?? fallback;
         default:      return fallback;
       }
     },
@@ -343,17 +354,27 @@ const Form6Panel: React.FC<Form6PanelProps> = ({
     [computedAmounts, getDerivedAmount],
   );
 
-  const grandTotal = useMemo(() => {
+//   const grandTotal = useMemo(() => {
+//     const childCodes = new Set(rows.map(r => r.parent_code).filter(Boolean));
+//     return rows.reduce((sum, r) => {
+//       if (r.is_section) return sum;
+//       const hasChildren = childCodes.has(r.code);
+//       if (INCOME_DERIVED_CODES.has(r.code)) {
+//         const parentIsDerived = r.parent_code ? INCOME_DERIVED_CODES.has(r.parent_code) : false;
+//         return parentIsDerived ? sum : sum + getAmount(r);
+//       }
+//       if (!hasChildren) return sum + getAmount(r);
+//       return sum;
+//     }, 0);
+//   }, [rows, getAmount]);
+
+const grandTotal = useMemo(() => {
     const childCodes = new Set(rows.map(r => r.parent_code).filter(Boolean));
     return rows.reduce((sum, r) => {
       if (r.is_section) return sum;
-      const hasChildren = childCodes.has(r.code);
-      if (INCOME_DERIVED_CODES.has(r.code)) {
-        const parentIsDerived = r.parent_code ? INCOME_DERIVED_CODES.has(r.parent_code) : false;
-        return parentIsDerived ? sum : sum + getAmount(r);
-      }
-      if (!hasChildren) return sum + getAmount(r);
-      return sum;
+      // Skip parent rows that have children — only sum leaf nodes
+      if (childCodes.has(r.code)) return sum;
+      return sum + getAmount(r);
     }, 0);
   }, [rows, getAmount]);
 

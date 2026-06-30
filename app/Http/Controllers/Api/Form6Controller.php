@@ -318,6 +318,26 @@ class Form6Controller extends BaseApiController
         // ── 2. Grand total income (for 5% LDRRMF) ─────────────────────────
         $grandTotal  = $this->incomeGrandTotal($budgetPlanId, 'general-fund');
 
+        // // ── 3. Debt services ───────────────────────────────────────────────
+        // $debtSvc = (float) DB::table('debt_payments')
+        //     ->where('budget_plan_id', $budgetPlanId)
+        //     ->selectRaw('COALESCE(SUM(principal_due + interest_due), 0) as total')
+        //     ->value('total');
+
+        // // ── 4. Aid to Barangays ────────────────────────────────────────────
+        // $aidToBarangay = $this->aidToBarangays($budgetPlanId);
+
+        // // ── 5. Derived values ──────────────────────────────────────────────
+        // $ldf20          = round($ntaProposed * 0.20, 2);
+        // $ldrrmf5        = round($grandTotal   * 0.05, 2);
+        // $qrf30          = round($ldrrmf5      * 0.30, 2);
+        // $pda70          = round($ldrrmf5      * 0.70, 2);
+        // $debtSvcRounded = round($debtSvc,             2);
+        // $aidBargy       = round($aidToBarangay,        2);
+        // $infraProgram   = ($ldf20 > 0 && $debtSvcRounded > 0)
+        //                     ? round($ldf20 - $debtSvcRounded, 2)
+        //                     : 0.0;
+
         // ── 3. Debt services ───────────────────────────────────────────────
         $debtSvc = (float) DB::table('debt_payments')
             ->where('budget_plan_id', $budgetPlanId)
@@ -327,16 +347,19 @@ class Form6Controller extends BaseApiController
         // ── 4. Aid to Barangays ────────────────────────────────────────────
         $aidToBarangay = $this->aidToBarangays($budgetPlanId);
 
-        // ── 5. Derived values ──────────────────────────────────────────────
+        // ── 5. Infrastructure Program = sum of MDF non-debt proposed totals ─
+        // Covers: General Public Services + Social Services + Infrastructure
+        // Projects (all non-debt-servicing MDF categories).
+        $infraProgram = $this->mdfNonDebtProposedTotal($budgetPlanId);
+
+        // ── 6. Derived values ──────────────────────────────────────────────
         $ldf20          = round($ntaProposed * 0.20, 2);
         $ldrrmf5        = round($grandTotal   * 0.05, 2);
         $qrf30          = round($ldrrmf5      * 0.30, 2);
         $pda70          = round($ldrrmf5      * 0.70, 2);
         $debtSvcRounded = round($debtSvc,             2);
         $aidBargy       = round($aidToBarangay,        2);
-        $infraProgram   = ($ldf20 > 0 && $debtSvcRounded > 0)
-                            ? round($ldf20 - $debtSvcRounded, 2)
-                            : 0.0;
+        $infraProgram   = round($infraProgram,         2);
 
         $synced = $this->upsertOtherRows(
             $budgetPlanId, $source, $userId,
@@ -349,6 +372,17 @@ class Form6Controller extends BaseApiController
             'message'      => 'Form 6 values synced from Income Fund, Debt Services, and AIP.',
             'source'       => $source,
             'warnings'     => $synced['warnings'],
+            // 'debug' => [
+            //     'nta_proposed'           => $ntaProposed,
+            //     'ldf_20pct'              => $ldf20,
+            //     'grand_total_income'     => $grandTotal,
+            //     'ldrrmf_5pct'            => $ldrrmf5,
+            //     'qrf_30pct'              => $qrf30,
+            //     'pda_70pct'              => $pda70,
+            //     'debt_services'          => $debtSvcRounded,
+            //     'aid_to_barangays'       => $aidBargy,
+            //     'infrastructure_program' => $infraProgram,
+            // ],
             'debug' => [
                 'nta_proposed'           => $ntaProposed,
                 'ldf_20pct'              => $ldf20,
@@ -359,6 +393,7 @@ class Form6Controller extends BaseApiController
                 'debt_services'          => $debtSvcRounded,
                 'aid_to_barangays'       => $aidBargy,
                 'infrastructure_program' => $infraProgram,
+                'infra_source'           => 'mdf_non_debt_proposed_total',
             ],
             'data'           => $this->freshRows($budgetPlanId, $source),
             'budget_plan_id' => $budgetPlanId,
@@ -511,6 +546,40 @@ class Form6Controller extends BaseApiController
             'level'             => $tpl->level,
             'amount'            => $item ? (float) $item->amount : 0.0,
         ];
+    }
+
+    /**
+     * Sum of MDF proposed amounts across all NON-debt-servicing categories.
+     * This is the Infrastructure Program value for Form 6 code 2.1.1.
+     * Covers: General Public Services + Social Services + Infrastructure Projects.
+     */
+    protected function mdfNonDebtProposedTotal(int $budgetPlanId): float
+    {
+        // Get all non-debt-servicing MDF category IDs
+        $nonDebtCategoryIds = DB::table('mdf_categories')
+            ->where('is_debt_servicing', false)
+            ->pluck('category_id');
+
+        if ($nonDebtCategoryIds->isEmpty()) {
+            return 0.0;
+        }
+
+        // Get all active non-debt item IDs under those categories
+        $itemIds = DB::table('mdf_items')
+            ->whereIn('category_id', $nonDebtCategoryIds)
+            ->where('is_active', true)
+            ->whereNull('obligation_id')
+            ->pluck('item_id');
+
+        if ($itemIds->isEmpty()) {
+            return 0.0;
+        }
+
+        // Sum their proposed (total_amount) snapshots for this budget plan
+        return (float) DB::table('mdf_snapshots')
+            ->whereIn('item_id', $itemIds)
+            ->where('budget_plan_id', $budgetPlanId)
+            ->sum('total_amount');
     }
 
     protected function collectDescendantIds(int $parentId): array

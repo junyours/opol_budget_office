@@ -117,6 +117,10 @@ const SummaryOfExpenditures = React.lazy(
   () => import("../pages/admin/SummaryOfExpenditures")
 );
 
+const ComparativeSummaryPage = React.lazy(
+  () => import("../pages/admin/ComparativeSummaryPage")
+);
+
 const DepartmentReportsPage = React.lazy(
     () => import('../components/report/DepartmentReportPage')
   );
@@ -521,6 +525,10 @@ const router = createBrowserRouter([
                     {
                     path: "admin/settings",
                     element: Lazy(SettingsPage),
+                },
+                {
+                    path: "admin/comparative-summary",
+                    element: Lazy(ComparativeSummaryPage),
                 },
 
                 ],

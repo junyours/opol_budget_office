@@ -20,7 +20,7 @@ const fmtP  = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDi
 const pctOf = (base: number, diff: number) =>
   base === 0 ? (diff === 0 ? 0 : 100) : (diff / base) * 100;
 
-const GENERAL_FUND_CEILING_PCT = 0.092; // ← change this to e.g. 0.15 for 15%
+const GENERAL_FUND_CEILING_PCT = 0.1; // ← change this to e.g. 0.15 for 15%
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

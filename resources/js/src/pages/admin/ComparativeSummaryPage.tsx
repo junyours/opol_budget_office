@@ -19,11 +19,11 @@ interface PabRow {
 
 // General Funds
 const GENERAL_FUND_ROWS: PabRow[] = [
-    { label: "Personnel Services (PS)", prev: 132104560, curr: 150516675.47 },
-    { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 106097748, curr: 123673744.00 },
-    { label: "Financial Expenses (FE)", prev: 87359957, curr: 95935288.90 },
+    { label: "Personnel Services (PS)", prev: 132104560, curr: 151860452.90 },
+    { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 106097748, curr: 123829944.00 },
+    { label: "Financial Expenses (FE)", prev: 87359957, curr: 95935288.56 },
     { label: "Capital Outlay (CO)", prev: 4765000, curr: 10588000.00 },
-    { label: "Special Programs (SPA)", prev: 89951305, curr: 109540530.00 },
+    { label: "Special Programs (SPA)", prev: 89951305, curr: 103282500.00 },
 ];
 
 // Estimated Income (single row, sits above General Funds table)
@@ -42,7 +42,7 @@ const SA_ESTIMATED_INCOME_ROW: PabRow = {
 
 // Special Accounts
 const SPECIAL_ACCOUNT_ROWS: PabRow[] = [
-    { label: "Personnel Services (PS)", prev: 41559972, curr: 43741164 },
+    { label: "Personnel Services (PS)", prev: 41559972, curr: 44017540.86 },
     { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 21517749, curr: 21991580 },
     { label: "Capital Outlay (CO)", prev: 12073709, curr: 6600000 },
     { label: "Financial Expenses (FE)", prev: 4507970, curr: 4518000 },
@@ -169,6 +169,9 @@ const ComparativeSummaryPage: React.FC = () => {
                 </p>
                 <h2 className="text-[20px] font-semibold text-gray-900 mt-0.5">
                     Proposed Annual Budget — Appropriation {PAB_YEAR_PREV} vs Proposed {PAB_YEAR_CURR}
+                </h2>
+                <h2 className="text-[20px] font-semibold text-gray-900 mt-0.5">
+                    AS OF JULY 2, 2026
                 </h2>
             </div>
 

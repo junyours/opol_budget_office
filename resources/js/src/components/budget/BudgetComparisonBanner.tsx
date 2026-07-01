@@ -110,7 +110,10 @@ const threshold = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * (1 + 
   const isOver = isSpecialAccount
     ? (!ceilingLoading && threshold > 0 && ceilingBasis > threshold)
     : (pastTotal > 0 && ceilingBasis > threshold);
-  const excess    = isOver ? ceilingBasis - threshold : 0;
+//   const excess    = isOver ? ceilingBasis - threshold : 0;
+const excess    = isOver ? ceilingBasis - threshold : 0;
+  const remaining    = threshold - ceilingBasis; // positive = headroom left, negative = amount over ceiling
+  const remainingPct = pctOf(threshold, remaining); // remaining as % of ceiling
   const prevYear  = Number(plan.budget_plan?.year) - 1;
   const currYear  = plan.budget_plan?.year;
 
@@ -195,9 +198,9 @@ const threshold = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * (1 + 
                   )}
                 </span>
               : <span>
-                  {diff === 0 ? '±0' : (diff > 0 ? '+' : '')}{fmtP(diff)}
+                  +{fmtP(remaining)}
                   <span className="opacity-60 ml-1">
-                    ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(2)}%)
+                    ({remainingPct.toFixed(2)}% left)
                   </span>
                 </span>
             }
@@ -227,9 +230,7 @@ const threshold = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * (1 + 
                   <span className="text-[11px] text-gray-500">
                     {isSpecialAccount ? 'Income Fund total' : 'Ceiling'}:{' '}
                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
-                    {/* {' '}·{' '} */}
-                    {/* Excess:{' '}
-                    <span className="font-mono font-medium text-red-600">{fmtP(excess)}</span> */}
+                    
                   </span>
                   {isSpecialAccount && (
                     <span className="text-[10px] text-gray-400 italic">
@@ -270,13 +271,14 @@ const threshold = isSpecialAccount ? (incomeGrandTotal ?? 0) : pastTotal * (1 + 
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[13px] font-semibold text-emerald-700">
-                    {/* Within 10% appropriation ceiling */}
-                    {/* {`Within ${GENERAL_FUND_CEILING_PCT * 100}% appropriation ceiling`} */}
-                    `Within ${+(GENERAL_FUND_CEILING_PCT * 100).toFixed(2).replace(/\.?0+$/, '')}% appropriation ceiling`
+                    {`Within ${+(GENERAL_FUND_CEILING_PCT * 100).toFixed(2).replace(/\.?0+$/, '')}% appropriation ceiling`}
                   </span>
                   <span className="text-[11px] text-gray-500">
                     Ceiling:{' '}
                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
+                    {' '}·{' '}
+                    Remaining:{' '}
+                    <span className="font-mono font-medium text-emerald-700">{fmtP(remaining)}</span>
                   </span>
                 </div>
               </>

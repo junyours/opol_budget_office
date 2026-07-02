@@ -179,10 +179,16 @@
         { name: "Attributions", href: "/admin/plans", icon: ClipboardDocumentListIcon, iconBg: "bg-pink-100", iconColor: "text-pink-600", roles: ["super-admin", "admin", "viewer"] },
       ] as NavItem[],
     },
+    // {
+    //   label: "Reports",
+    //   items: [
+    //     { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin", "viewer"] },
+    //   ] as NavItem[],
+    // },
     {
       label: "Reports",
       items: [
-        { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin", "viewer"] },
+        { name: "LBP Forms", href: "/admin/reports-unified", icon: DocumentTextIcon, iconBg: "bg-violet-100", iconColor: "text-violet-600", roles: ["super-admin", "admin"] },
       ] as NavItem[],
     },
             {

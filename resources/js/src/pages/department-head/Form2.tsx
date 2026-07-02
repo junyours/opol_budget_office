@@ -1454,6 +1454,11 @@ const Form2: React.FC<Form2Props> = ({
 
     let gIdx = 0;
 
+    // Fixed-width grid so number columns line up across item rows, subtotals, and grand total
+    const CARD_NUM_GRID = isAdmin
+        ? 'grid grid-cols-[130px_130px_110px_70px_140px] gap-x-4 items-center'
+        : 'grid grid-cols-[130px_130px_110px_70px] gap-x-4 items-center';
+
     // ─────────────────────────────────────────────────────────────────────────
     // Render
     // ─────────────────────────────────────────────────────────────────────────
@@ -1511,7 +1516,7 @@ const Form2: React.FC<Form2Props> = ({
                       {item.expense_item?.expense_class_item_acc_code ?? '—'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-5 flex-wrap">
+                  <div className={CARD_NUM_GRID}>
                     <div className="flex flex-col items-end">
                       <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
                         Appropriation ({prevYear})
@@ -1582,7 +1587,7 @@ const Form2: React.FC<Form2Props> = ({
             <div className="flex-1 min-w-[180px]">
               <p className="text-[11px] font-semibold text-gray-600">Total {label}</p>
             </div>
-            <div className="flex items-center gap-5 flex-wrap">
+            <div className={CARD_NUM_GRID}>
               <div className="flex flex-col items-end">
                 <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
                   Appropriation ({prevYear})
@@ -1607,6 +1612,7 @@ const Form2: React.FC<Form2Props> = ({
                   {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
                 </span>
               </div>
+              {isAdmin && <div className="min-w-[140px]" />}
             </div>
           </div>
         </div>
@@ -1635,7 +1641,7 @@ const Form2: React.FC<Form2Props> = ({
                   <p className="text-[12px] font-medium text-gray-800 leading-tight">{item.program_description || '—'}</p>
                   <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.aip_reference_code || '—'}</p>
                 </div>
-                <div className="flex items-center gap-5 flex-wrap">
+                <div className={CARD_NUM_GRID}>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
                       Appropriation ({prevYear})
@@ -1687,7 +1693,7 @@ const Form2: React.FC<Form2Props> = ({
           <div className="flex-1 min-w-[180px]">
             <p className="text-[11px] font-semibold text-gray-600">Total Special Programs</p>
           </div>
-          <div className="flex items-center gap-5 flex-wrap">
+          <div className={CARD_NUM_GRID}>
             <div className="flex flex-col items-end">
               <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
                 Appropriation ({prevYear})
@@ -1712,6 +1718,7 @@ const Form2: React.FC<Form2Props> = ({
                 {aipAppTotal === 0 && (aipTotal - aipAppTotal) === 0 ? '–' : `${pctOf(aipAppTotal, aipTotal - aipAppTotal).toFixed(2)}%`}
               </span>
             </div>
+            {isAdmin && <div className="min-w-[140px]" />}
           </div>
         </div>
       </div>
@@ -1772,15 +1779,7 @@ const Form2: React.FC<Form2Props> = ({
           )}
         </p>
       </div>
-      <div className="flex items-center gap-5 flex-wrap">
-        {isAdmin && (
-          <div className="flex flex-col items-end">
-            {/* <span className="text-[9px] font-semibold uppercase tracking-widest text-green-400">Obligation</span> */}
-            {/* <span className="text-[13px] font-mono font-bold text-green-300"> */}
-              {/* {grandFinal.obligation === 0 ? '–' : fmtP(grandFinal.obligation)} */}
-            {/* </span> */}
-          </div>
-        )}
+      <div className={CARD_NUM_GRID}>
         <div className="flex flex-col items-end">
           <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
             Appropriation ({prevYear})
@@ -1809,6 +1808,7 @@ const Form2: React.FC<Form2Props> = ({
             {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
           </span>
         </div>
+        {isAdmin && <div />}
       </div>
     </div>
   </div>

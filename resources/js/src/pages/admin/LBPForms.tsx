@@ -1410,7 +1410,7 @@ const handleAcknowledge = async () => {
               {/* Action buttons */}
 <div className="flex items-center gap-2 flex-shrink-0">
   <div className="flex items-center gap-1.5 mr-1">
-    <span className="text-[10px] text-gray-400 font-medium">REVIEW</span>
+    <span className="text-[10px] text-gray-400 font-medium">Review Mode</span>
     <button
       onClick={() => setCardView(v => !v)}
       className={cn(

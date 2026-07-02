@@ -444,15 +444,33 @@ const router = createBrowserRouter([
                 element: Lazy(SummaryOfExpenditures),
                 },
 
-                {
-                    path: 'admin/reports-unified',
-                    element: Lazy(UnifiedReportsPage),
-                },
-            {
+        //         {
+        //             path: 'admin/reports-unified',
+        //             element: Lazy(UnifiedReportsPage),
+        //         },
+        //     {
+        //         path: "admin/expenditure",
+        //         element: Lazy(ExpenditurePage),
+        //     },
+
+        //     ],
+        //   },
+        {
                 path: "admin/expenditure",
                 element: Lazy(ExpenditurePage),
             },
 
+            ],
+          },
+
+          /* ---------------- Admin/Super-Admin only: Unified Reports ---------------- */
+          {
+            element: <RoleRoute roles={["admin", "super-admin"]} />,
+            children: [
+              {
+                path: "admin/reports-unified",
+                element: Lazy(UnifiedReportsPage),
+              },
             ],
           },
 

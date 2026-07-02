@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
@@ -140,8 +141,18 @@ const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
     const handler = (e: MouseEvent) => {
       if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtxMenu(null);
     };
+    const closeOnScroll = () => setCtxMenu(null);
+
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    // Close the menu on any scroll so it doesn't stay "stuck" to the viewport
+    // while the row it belongs to moves underneath it. `capture: true` catches
+    // scroll events from the table's inner scroll container too, not just window.
+    window.addEventListener('scroll', closeOnScroll, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
   }, [ctxMenu]);
 
 const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item) => {
@@ -743,8 +754,9 @@ const handleDeleteRequest = async (itemId: number) => {
         </table>
       </div>
 
-      {/* ── Context Menu — exactly like AipProgramsTab ── */}
-      {ctxMenu && (
+      {/* ── Context Menu — portaled to <body> so it isn't affected by
+             transformed/overflow ancestors (e.g. the panel entrance animation) ── */}
+      {ctxMenu && createPortal(
         <div
           ref={ctxRef}
           style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
@@ -772,7 +784,8 @@ const handleDeleteRequest = async (itemId: number) => {
             <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
             {deleteChecking ? 'Checking…' : 'Delete'}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Add / Edit Dialog ── */}

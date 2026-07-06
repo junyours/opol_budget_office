@@ -35,7 +35,8 @@
         import { useNotificationStore } from '@/src/store/useNotificationStore';
         import { useNotificationPoller } from '@/src/hooks/useNotificationPoller';
         import { SidebarNotifications } from '@/src/components/sidebar/SidebarNotifications';
-        interface User {
+        import { useReviewModeStore } from '@/src/store/useReviewModeStore';
+        export interface User {
         user_id: number; username: string; fname: string; mname?: string; lname: string;
         role: string; dept_id?: number; department?: Department;
         is_online?: boolean; is_active?: boolean;
@@ -48,7 +49,7 @@
         return `/storage/${avatar}`;
         }
 
-        const isEligibleDepartment = (u: User | null) => {
+        export const isEligibleDepartment = (u: User | null) => {
         if (!u || u.role !== "department-head" || !u.department) return false;
         const n = u.department.dept_name?.toLowerCase() ?? "";
         const c = u.department.dept_abbreviation?.toLowerCase() ?? "";
@@ -88,7 +89,7 @@
         iconBg: string; iconColor: string; roles: string[];
         }
 
-        const buildNavGroups = (user: User | null, eligible: boolean) => {
+        export const buildNavGroups = (user: User | null, eligible: boolean) => {
         const deptCode = user?.department?.dept_abbreviation?.toLowerCase();
         return [
             {
@@ -273,11 +274,12 @@
         </span>
         );
 
-        export function AppSidebar() {
+       export function AppSidebar() {
         const { user, logout, loading } = useAuth();
         const navigate  = useNavigate();
         const location  = useLocation();
-        const { state } = useSidebar();
+        const { state, setOpen } = useSidebar();
+        const reviewMode = useReviewModeStore(s => s.reviewMode);
         const [showLogout, setShowLogout] = useState(false);
         const [animKey,    setAnimKey]    = useState(0);
         const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -312,6 +314,24 @@
             if (prevState.current !== state && state === "expanded") setAnimKey(k => k + 1);
             prevState.current = state;
         }, [state]);
+
+        // Keep a ref to the latest setOpen so the review-mode effect below can call it
+        // without depending on it directly — setOpen's identity changes every time `open`
+        // changes, which would otherwise re-fire the effect on every manual toggle and
+        // force the sidebar back closed right after the user opens it.
+        const setOpenRef = useRef(setOpen);
+        setOpenRef.current = setOpen;
+
+        // Auto-collapse to icon-only the moment Review Mode turns on, and auto-restore
+        // when it turns off. Only fires on actual reviewMode transitions — manually
+        // toggling the sidebar afterwards (while still in review mode) is left alone.
+        const prevReviewMode = useRef(reviewMode);
+        useEffect(() => {
+            if (prevReviewMode.current !== reviewMode) {
+                setOpenRef.current(!reviewMode);
+                prevReviewMode.current = reviewMode;
+            }
+        }, [reviewMode]);
 
         if (loading) return null;
 

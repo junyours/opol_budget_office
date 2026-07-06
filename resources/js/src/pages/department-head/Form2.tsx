@@ -5,6 +5,7 @@ import React, {
     useCallback,
     useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import API from "../../services/api";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
@@ -15,7 +16,9 @@ import {
     DepartmentBudgetPlanForm4Item,
 } from "../../types/api";
 import AddItemModal from "./AddItemModal";
-import { BudgetComparisonBanner } from "@/src/components/budget/BudgetComparisonBanner";
+// BudgetComparisonBanner import removed — component was never rendered in this file.
+// If you intended to show it (e.g. near the Form 2 header), let me know and I'll wire it in
+// with the right props instead of just deleting the import.
 import { Button } from "@/src/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -23,7 +26,8 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, BanknotesIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { Switch } from "@/src/components/ui/switch";
 import { cn } from "@/src/lib/utils";
 import { useCalamityFund } from "../../hooks/useCalamityFund";
 import {
@@ -109,6 +113,31 @@ const comma = (n: number) =>
 
 const normRec = (v: string | null | undefined): string | null =>
     v === "" ? null : (v ?? null);
+
+// Hard ceiling for any peso amount field (proposed, sem1, obligation, etc.) —
+// prevents huge typed values from overflowing into Infinity% once divided.
+const MAX_AMOUNT = 999999999.99;
+
+// Clamps a raw digit string (already stripped of non-numeric chars) so its
+// parsed value never exceeds MAX_AMOUNT. Returns the digits unchanged if
+// they're empty, not yet a valid number (e.g. mid-typing "12."), or already
+// within range.
+const clampAmountDigits = (digits: string): string => {
+    if (digits === "") return digits;
+    const num = parseFloat(digits);
+    if (isNaN(num)) return digits;
+    if (num > MAX_AMOUNT) return MAX_AMOUNT.toFixed(2);
+    return digits;
+};
+
+// Pressing Enter in any of these amount/recommendation inputs blurs the field,
+// which triggers the existing onBlur save handlers (same as clicking away / tabbing out).
+const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        e.currentTarget.blur();
+    }
+};
 
 const getSourceForDepartment = (dept?: {
     dept_abbreviation?: string;
@@ -211,7 +240,16 @@ const SubHeader: React.FC<SubHeaderProps> = ({
                     className={cn(TH, "border-t-2 border-gray-300")}
                     rowSpan={2}
                 >
-                    Recommendation
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="cursor-help border-b border-dotted border-gray-400">
+                                Recommendation
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs max-w-[220px]">
+                            Budget officer's note on this item — visible only to admins.
+                        </TooltipContent>
+                    </Tooltip>
                 </th>
             )}
         </tr>
@@ -291,6 +329,89 @@ const Form2: React.FC<Form2Props> = ({
         classificationName: string;
     } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<ItemWithMeta | null>(null);
+
+    // ── Move-to / context menu (card review mode) ─────────────────────────────
+    const [ctxMenuItem, setCtxMenuItem] = useState<ItemWithMeta | null>(null);
+    const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number } | null>(null);
+    const ctxMenuRef = useRef<HTMLDivElement>(null);
+
+    // ── Review mode: collapsible classifications + keyboard focus navigation ──
+    // Default Personal Services to collapsed when Review Mode is active on mount.
+    // This only sets the initial state — the user can still manually expand it.
+    const [collapsedClasses, setCollapsedClasses] = useState<Set<number>>(
+        () => (cardView ? new Set([PS_CLASS_ID]) : new Set()),
+    );
+    const [aipCollapsed, setAipCollapsed] = useState(false);
+
+    // If Review Mode is toggled on while Form2 is already mounted, also default
+    // Personal Services to collapsed at that moment (still freely re-expandable after).
+    const prevCardViewRef = useRef(cardView);
+    useEffect(() => {
+        if (!prevCardViewRef.current && cardView) {
+            setCollapsedClasses(new Set([PS_CLASS_ID]));
+        }
+        prevCardViewRef.current = cardView;
+    }, [cardView]);
+    const toggleClassCollapsed = useCallback((classId: number) => {
+        setCollapsedClasses((prev) => {
+            const n = new Set(prev);
+            if (n.has(classId)) n.delete(classId); else n.add(classId);
+            return n;
+        });
+    }, []);
+
+    const [focusedCardKey, setFocusedCardKey] = useState<string | null>(null);
+    const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const setCardRef = useCallback((key: string) => (el: HTMLDivElement | null) => {
+        if (el) cardRefs.current.set(key, el);
+        else cardRefs.current.delete(key);
+    }, []);
+    const [moveSource, setMoveSource] = useState<ItemWithMeta | null>(null);
+    const [moveSearch, setMoveSearch] = useState('');
+    const [moveDestination, setMoveDestination] = useState<ItemWithMeta | null>(null);
+    const [moving, setMoving] = useState(false);
+    const [moveAmountDraft, setMoveAmountDraft] = useState('');   // raw ₱ amount typed by user
+    const [movePercentDraft, setMovePercentDraft] = useState(''); // raw % typed by user
+    const [moveInputMode, setMoveInputMode] = useState<'amount' | 'percent'>('amount');
+    const [moveAnchorPos, setMoveAnchorPos] = useState<{ x: number; y: number } | null>(null);
+    const [moveClassFilter, setMoveClassFilter] = useState<string>('all');
+    const moveModalRef = useRef<HTMLDivElement>(null);
+
+    // Close the move panel on outside click / scroll — same pattern as the ctx menu
+    useEffect(() => {
+        if (!moveSource) return;
+        const handler = (e: MouseEvent) => {
+            if (moveModalRef.current && !moveModalRef.current.contains(e.target as Node)) {
+                setMoveSource(null);
+                setMoveDestination(null);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [moveSource]);
+
+    // Same pattern as Form4's ctxMenu: mousedown-outside + scroll(capture) closes it,
+    // and the menu itself is portaled to <body> so it's never clipped/misaligned
+    // by the panel's animated/overflow ancestors.
+    useEffect(() => {
+        if (!ctxMenuItem) return;
+        const handler = (e: MouseEvent) => {
+            if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
+                setCtxMenuItem(null);
+                setCtxMenuPos(null);
+            }
+        };
+        const closeOnScroll = () => {
+            setCtxMenuItem(null);
+            setCtxMenuPos(null);
+        };
+        document.addEventListener('mousedown', handler);
+        window.addEventListener('scroll', closeOnScroll, true);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            window.removeEventListener('scroll', closeOnScroll, true);
+        };
+    }, [ctxMenuItem]);
 
     // ── Refs (never cause re-renders — used in async handlers) ────────────────
 
@@ -969,6 +1090,255 @@ const Form2: React.FC<Form2Props> = ({
         }
     }, [deleteTarget, plan.dept_budget_plan_id, onItemUpdate]);
 
+    // ── Card click → context menu (admin + review/card mode only) ─────────────
+    const handleCardContextClick = useCallback(
+        (e: React.MouseEvent, item: ItemWithMeta) => {
+            if (!isAdmin || !cardView) return;
+            const target = e.target as HTMLElement;
+            if (target.closest('input, button, textarea, select')) return; // don't hijack existing inputs/trash icon
+            e.preventDefault();
+            e.stopPropagation();
+            const MENU_W = 180, MENU_H = 95;
+            const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
+            const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
+            setCtxMenuItem(item);
+            setCtxMenuPos({ x, y });
+        },
+        [isAdmin, cardView],
+    );
+
+    const openMoveModal = useCallback(() => {
+        if (!ctxMenuItem) return;
+        setMoveSource(ctxMenuItem);
+        setMoveSearch('');
+        setMoveDestination(null);
+        setMoveClassFilter('all');
+        setMoveInputMode('amount');
+        const fullAmount = Number(ctxMenuItem.total_amount);
+        setMoveAmountDraft(
+            Number.isInteger(fullAmount) ? fullAmount.toString() : fullAmount.toFixed(2),
+        );
+        setMovePercentDraft('100');
+        setMoveAnchorPos(ctxMenuPos); // open the move panel right where the menu was
+        setCtxMenuItem(null);
+        setCtxMenuPos(null);
+    }, [ctxMenuItem, ctxMenuPos]);
+
+    // Raw (unclamped) numeric reading of whichever field the user is typing in —
+    // used to detect and display "exceeds available" errors before we clamp anything.
+    const moveRawAmountNum  = useMemo(() => parseFloat(moveAmountDraft.replace(/[^0-9.]/g, ''))  || 0, [moveAmountDraft]);
+    const moveRawPercentNum = useMemo(() => parseFloat(movePercentDraft.replace(/[^0-9.]/g, '')) || 0, [movePercentDraft]);
+
+    const moveSourceTotal = moveSource ? Number(moveSource.total_amount) : 0;
+
+    const moveAmountExceeds =
+        !!moveSource && moveInputMode === 'amount' && moveRawAmountNum > moveSourceTotal;
+    const movePercentExceeds =
+        !!moveSource && moveInputMode === 'percent' && moveRawPercentNum > 100;
+    const moveInputInvalid = moveAmountExceeds || movePercentExceeds;
+
+    // Parsed + clamped move amount (0 .. full source amount), derived from whichever
+    // input mode is active — direct ₱ amount, or a typed percentage of the source total.
+    // Clamped only for safe internal math (e.g. previewing "remains on source");
+    // the raw values above are what drive the red/error state shown to the user.
+    const moveAmount = useMemo(() => {
+        if (!moveSource) return 0;
+        const sourceTotal = Number(moveSource.total_amount);
+        if (moveInputMode === 'percent') {
+            const clampedPct = Math.min(Math.max(moveRawPercentNum, 0), 100);
+            return Math.round((sourceTotal * clampedPct) / 100);
+        }
+        return Math.min(Math.max(moveRawAmountNum, 0), sourceTotal);
+    }, [moveInputMode, moveRawAmountNum, moveRawPercentNum, moveSource]);
+
+    // Keep the two drafts roughly in sync so switching modes doesn't reset the value
+    const toggleMoveInputMode = useCallback(() => {
+        if (!moveSource) return;
+        const sourceTotal = Number(moveSource.total_amount);
+        if (moveInputMode === 'amount') {
+            const pct = sourceTotal > 0 ? (moveAmount / sourceTotal) * 100 : 0;
+            setMovePercentDraft(pct ? pct.toFixed(2).replace(/\.?0+$/, '') : '');
+            setMoveInputMode('percent');
+        } else {
+            setMoveAmountDraft(moveAmount ? Math.round(moveAmount).toString() : '');
+            setMoveInputMode('amount');
+        }
+    }, [moveInputMode, moveAmount, moveSource]);
+
+    const openRemoveAppropriation = useCallback(() => {
+        if (!ctxMenuItem) return;
+        handleDeleteItem(ctxMenuItem.dept_bp_form2_item_id, ctxMenuItem.expense_item_id);
+        setCtxMenuItem(null);
+        setCtxMenuPos(null);
+    }, [ctxMenuItem, handleDeleteItem]);
+
+    // `items` is Form2's flat state covering every classification — the grouping
+    // in `itemsByClassification` is only a rendering concern, so this candidate
+    // list (and therefore "Move to…") already spans every classification, not
+    // just the source item's own class.
+    const classNameById = useMemo(() => {
+        const map = new Map<number, string>();
+        classifications.forEach((c) => map.set(c.expense_class_id, c.expense_class_name));
+        return map;
+    }, [classifications]);
+
+    // Classifications actually present among move candidates (for the filter chips)
+    const moveClassOptions = useMemo(() => {
+        if (!moveSource) return [];
+        const seen = new Map<number, string>();
+        items.forEach((i) => {
+            if (i.expense_item_id === moveSource.expense_item_id) return;
+            const id = i.expense_item?.expense_class_id;
+            if (id == null) return;
+            const name = classNameById.get(id);
+            if (name) seen.set(id, name);
+        });
+        return Array.from(seen.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.id - b.id);
+    }, [items, moveSource, classNameById]);
+
+    const moveCandidates = useMemo(() => {
+        if (!moveSource) return [];
+        const q = moveSearch.toLowerCase();
+        return items
+            .filter((i) => i.expense_item_id !== moveSource.expense_item_id)
+            .filter((i) =>
+                moveClassFilter === 'all'
+                    ? true
+                    : String(i.expense_item?.expense_class_id) === moveClassFilter,
+            )
+            .filter((i) => {
+                if (!q) return true;
+                const clsName = classNameById.get(i.expense_item?.expense_class_id ?? -1) ?? '';
+                return (
+                    i.expense_item?.expense_class_item_name?.toLowerCase().includes(q) ||
+                    i.expense_item?.expense_class_item_acc_code?.toLowerCase().includes(q) ||
+                    clsName.toLowerCase().includes(q)
+                );
+            })
+            .sort((a, b) => (a.expense_item?.expense_class_id ?? 999) - (b.expense_item?.expense_class_id ?? 999));
+    }, [items, moveSource, moveSearch, moveClassFilter, classNameById]);
+
+    // Appends a new note to an existing recommendation instead of overwriting it.
+    // Notes are stored joined by ";" — a plain-text marker that survives any
+    // backend whitespace trimming and never collides with the commas already
+    // present in peso-formatted amounts (e.g. "₱150,000").
+    const REC_DELIM = ';';
+    const appendRecommendation = (existing: string | null | undefined, note: string): string => {
+        const trimmed = (existing ?? '').trim();
+        return trimmed ? `${trimmed}${REC_DELIM}${note}` : note;
+    };
+
+    // Expands a stored ";"-joined recommendation into separate lines for the
+    // tooltip — no bullets, just one note per line. Single notes (no
+    // delimiter) pass through unchanged.
+    const formatRecommendationTooltip = (rec: string | null | undefined): string => {
+        if (!rec) return '';
+        const parts = rec.split(REC_DELIM).map(p => p.trim()).filter(Boolean);
+        if (parts.length <= 1) return rec;
+        return parts.join('\n');
+    };
+
+    const handleMoveConfirmed = useCallback(async () => {
+        if (!moveSource || !moveDestination) return;
+        const sourceAmt   = Number(moveSource.total_amount);
+        const amountMoved = Math.min(Math.max(moveAmount, 0), sourceAmt); // safety clamp
+        if (amountMoved <= 0) return;
+
+        const sourceRemaining = sourceAmt - amountMoved;
+        const destNewAmt      = Number(moveDestination.total_amount) + amountMoved;
+        const isFullMove       = sourceRemaining === 0;
+        const sourceName = moveSource.expense_item?.expense_class_item_name || 'Item';
+        const destName   = moveDestination.expense_item?.expense_class_item_name || 'Item';
+
+        // Today's date for the note, e.g. "Jul 5, 2026"
+        const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const sourceNote = `Moved ${fmtP(amountMoved)} to "${destName}" (${today})`;
+        const destNote    = `Received ${fmtP(amountMoved)} from "${sourceName}" (${today})`;
+        const sourceNewRec = appendRecommendation(moveSource.recommendation, sourceNote);
+        const destNewRec   = appendRecommendation(moveDestination.recommendation, destNote);
+
+        setMoving(true);
+        const promise = (async () => {
+            // Save/increment destination (amount + appended recommendation)
+            if (moveDestination.dept_bp_form2_item_id === 0) {
+                const res = await API.post(
+                    `/department-budget-plans/${plan.dept_budget_plan_id}/items`,
+                    {
+                        expense_item_id: moveDestination.expense_item_id,
+                        total_amount: destNewAmt,
+                        recommendation: destNewRec,
+                    },
+                );
+                const savedId = res.data.data?.dept_bp_form2_item_id;
+                setItems((prev) =>
+                    prev.map((i) =>
+                        i.expense_item_id === moveDestination.expense_item_id
+                            ? {
+                                  ...i,
+                                  total_amount: destNewAmt,
+                                  recommendation: destNewRec,
+                                  dept_bp_form2_item_id: savedId ?? i.dept_bp_form2_item_id,
+                              }
+                            : i,
+                    ),
+                );
+            } else {
+                await API.put(
+                    `/department-budget-plans/${plan.dept_budget_plan_id}/items/${moveDestination.dept_bp_form2_item_id}`,
+                    { total_amount: destNewAmt, recommendation: destNewRec },
+                );
+                setItems((prev) =>
+                    prev.map((i) =>
+                        i.expense_item_id === moveDestination.expense_item_id
+                            ? { ...i, total_amount: destNewAmt, recommendation: destNewRec }
+                            : i,
+                    ),
+                );
+            }
+
+            // Reduce source by the moved amount (may or may not hit 0), append its own note
+            if (moveSource.dept_bp_form2_item_id > 0) {
+                await API.put(
+                    `/department-budget-plans/${plan.dept_budget_plan_id}/items/${moveSource.dept_bp_form2_item_id}`,
+                    { total_amount: sourceRemaining, recommendation: sourceNewRec },
+                );
+            }
+            setItems((prev) =>
+                prev.map((i) =>
+                    i.expense_item_id === moveSource.expense_item_id
+                        ? { ...i, total_amount: sourceRemaining, recommendation: sourceNewRec }
+                        : i,
+                ),
+            );
+
+            savedValues.current.set(moveDestination.expense_item_id, destNewAmt);
+            savedValues.current.set(moveSource.expense_item_id, sourceRemaining);
+            savedRecommendations.current.set(moveSource.expense_item_id, sourceNewRec);
+            savedRecommendations.current.set(moveDestination.expense_item_id, destNewRec);
+            onItemUpdate();
+        })();
+
+        toast.promise(promise, {
+            loading: 'Moving…',
+            success: isFullMove
+                ? `${fmtP(amountMoved)} of "${sourceName}" moved to "${destName}" — combined total ${fmtP(destNewAmt)}`
+                : `${fmtP(amountMoved)} moved from "${sourceName}" (₱${fmt(sourceRemaining)} remaining) to "${destName}" — new total ${fmtP(destNewAmt)}`,
+            error: (err: any) => `Failed to move: ${err.response?.data?.message || err.message}`,
+        });
+
+        try {
+            await promise;
+        } catch {
+            /* handled by toast */
+        } finally {
+            setMoving(false);
+            setMoveSource(null);
+            setMoveDestination(null);
+        }
+    }, [moveSource, moveDestination, moveAmount, plan.dept_budget_plan_id, onItemUpdate]);
+
     // ── Handlers: recommendation (regular items) ──────────────────────────────
 
     const handleRecommendationChange = useCallback(
@@ -1281,8 +1651,15 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleCommaInput = useCallback(
         (id: number, field: DraftField, rawValue: string, el?: HTMLInputElement, cursorPos?: number) => {
-            const digits = rawValue.replace(/[^0-9.]/g, "");
-            setDraft(`${id}_${field}`, digits, el, cursorPos);
+            const rawDigits = rawValue.replace(/[^0-9.]/g, "");
+            const digits = clampAmountDigits(rawDigits);
+            // If clamping shortened the string (user typed past the cap), pin the
+            // cursor to the end so it doesn't end up past the visible text.
+            const cappedPos =
+                cursorPos !== undefined
+                    ? Math.min(cursorPos, digits.length)
+                    : cursorPos;
+            setDraft(`${id}_${field}`, digits, el, cappedPos);
             const num = digits === "" ? 0 : parseFloat(digits);
             if (field === "proposed")
                 setItems((prev) =>
@@ -1316,7 +1693,9 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleAipCommaInput = useCallback(
         (id: number, field: "obligation" | "sem1", rawValue: string) => {
-            const digits = rawValue.replace(/[^0-9]/g, "");
+            const rawDigits = rawValue.replace(/[^0-9]/g, "");
+            const clamped = clampAmountDigits(rawDigits).replace(/[^0-9]/g, "");
+            const digits = clamped;
             const num = digits === "" ? 0 : parseInt(digits, 10);
             setDraft(`aip_${id}_${field}`, digits);
             if (field === "obligation") {
@@ -1366,6 +1745,8 @@ const Form2: React.FC<Form2Props> = ({
                 })),
         [classifications, items],
     );
+
+
 
     const grandTotals = useMemo(() => {
         let pastSem1 = 0,
@@ -1456,8 +1837,8 @@ const Form2: React.FC<Form2Props> = ({
 
     // Fixed-width grid so number columns line up across item rows, subtotals, and grand total
     const CARD_NUM_GRID = isAdmin
-        ? 'grid grid-cols-[130px_130px_110px_70px_140px] gap-x-4 items-center'
-        : 'grid grid-cols-[130px_130px_110px_70px] gap-x-4 items-center';
+        ? 'grid grid-cols-[280px_280px_180px_140px_260px] gap-x-6 items-center'
+        : 'grid grid-cols-[280px_280px_180px_140px] gap-x-6 items-center';
 
     // ─────────────────────────────────────────────────────────────────────────
     // Render
@@ -1489,10 +1870,30 @@ const Form2: React.FC<Form2Props> = ({
       const clsProp = cls.items.reduce((s, i) => s + Number(i.total_amount), 0);
       const clsDiff = clsProp - clsPast;
       const clsPct = pctOf(clsPast, clsDiff);
+      const isCollapsed = collapsedClasses.has(cls.expense_class_id);
       return (
         <div key={cls.expense_class_id}>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">{label}</p>
-          <div className="flex flex-col gap-2">
+          <button
+            onClick={() => toggleClassCollapsed(cls.expense_class_id)}
+            className="w-full flex items-center justify-between gap-2 mb-3 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 transition-colors group"
+          >
+            <div className="flex items-center gap-2.5">
+              <svg
+                className={cn('w-4 h-4 text-gray-400 transition-transform flex-shrink-0', isCollapsed ? '-rotate-90' : '')}
+                viewBox="0 0 20 20" fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+              <p className="text-[15px] font-bold uppercase tracking-wider text-white">{label}</p>
+            </div>
+            {isCollapsed && (
+              <span className="text-[11px] font-semibold text-gray-400">
+                {cls.items.length} item{cls.items.length === 1 ? '' : 's'} · click to expand
+              </span>
+            )}
+          </button>
+          {!isCollapsed && (
+          <div className="flex flex-col gap-3">
             {cls.items.map((item, idx) => {
               const past = item.pastTotal;
               const proposed = Number(item.total_amount);
@@ -1502,79 +1903,87 @@ const Form2: React.FC<Form2Props> = ({
               return (
                 <div
                   key={item.expense_item_id}
-                  className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                  onClick={(e) => handleCardContextClick(e, item)}
+                  onContextMenu={(e) => { if (isAdmin && cardView) handleCardContextClick(e, item); }}
+                  className={cn(
+                    "bg-white border-2 border-gray-200 rounded-2xl px-6 py-5 flex flex-wrap items-center gap-x-8 gap-y-3 select-none transition-colors",
+                    isAdmin && cardView && "cursor-pointer hover:border-gray-400 hover:shadow-sm",
+                  )}
                   style={{
                     opacity: 0,
                     animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
                   }}
                 >
-                  <div className="flex-1 min-w-[180px]">
-                    <p className="text-[12px] font-medium text-gray-800 leading-tight">
+                  <div className="flex-1 min-w-[220px]">
+                    <p className="text-[17px] font-semibold text-gray-800 leading-tight">
                       {item.expense_item?.expense_class_item_name ?? '—'}
                     </p>
-                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                    <p className="text-[12px] text-gray-400 font-mono mt-1">
                       {item.expense_item?.expense_class_item_acc_code ?? '—'}
                     </p>
                   </div>
                   <div className={CARD_NUM_GRID}>
                     <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-blue-400">
                         Appropriation ({prevYear})
                       </span>
-                      <span className="text-[13px] font-mono font-semibold text-blue-700">
+                      <span className="text-[22px] font-mono font-bold text-blue-700">
                         {past === 0 ? '–' : fmtP(past)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-orange-400">
                         Proposed ({currYear})
                       </span>
                       {isEditable ? (
                         <input
                           type="text"
                           inputMode="numeric"
+                          maxLength={13}
                           value={getDraftValue(item.expense_item_id, "proposed", proposed)}
                           onChange={(e) => {
                             const pos = e.target.selectionStart ?? e.target.value.length;
                             handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
                           }}
                           onBlur={() => handleCommaBlur(item.expense_item_id, "proposed")}
+                          onKeyDown={blurOnEnter}
                           disabled={isSaving}
-                          className="text-[13px] font-mono font-semibold text-orange-700 w-28 h-8 px-2 rounded border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 text-right"
+                          className="text-[22px] font-mono font-bold text-orange-700 w-40 h-11 px-3 rounded-lg border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 text-right"
                         />
                       ) : (
-                        <span className="text-[13px] font-mono font-semibold text-orange-700">
+                        <span className="text-[22px] font-mono font-bold text-orange-700">
                           {proposed === 0 ? '–' : fmtP(proposed)}
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-col items-end min-w-[80px]">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                      <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                    <div className="flex flex-col items-end min-w-[100px]">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                      <span className={cn('text-[18px] font-mono font-bold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
                         {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
                       </span>
                     </div>
-                    <div className="flex flex-col items-end min-w-[60px]">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
-                      <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                    <div className="flex flex-col items-end min-w-[70px]">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+                      <span className={cn('text-[18px] font-mono font-bold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
                         {past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
                       </span>
                     </div>
                     {isAdmin && (
-                      <div className="flex flex-col items-end min-w-[140px]">
-                        <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                      <div className="flex flex-col items-end min-w-[180px]">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
                         {isEditable ? (
                           <input
                             type="text"
                             value={item.recommendation ?? ''}
                             onChange={(e) => handleRecommendationChange(item.expense_item_id, e.target.value)}
                             onBlur={() => handleRecommendationBlur(item.expense_item_id)}
+                            onKeyDown={blurOnEnter}
                             placeholder="Add note…"
                             maxLength={255}
-                            className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                            className="text-[14px] h-9 px-3 rounded-lg border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
                           />
                         ) : (
-                          <span className="text-[12px] text-gray-600">{item.recommendation || '–'}</span>
+                          <span className="text-[14px] text-gray-600">{item.recommendation || '–'}</span>
                         )}
                       </div>
                     )}
@@ -1583,32 +1992,33 @@ const Form2: React.FC<Form2Props> = ({
               );
             })}
           </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+          )}
+          <div className="bg-gray-100 border-2 border-gray-300 rounded-xl px-5 py-4 mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 shadow-sm">
             <div className="flex-1 min-w-[180px]">
-              <p className="text-[11px] font-semibold text-gray-600">Total {label}</p>
+              <p className="text-[15px] font-bold text-gray-800 uppercase tracking-wide">Total {label}</p>
             </div>
             <div className={CARD_NUM_GRID}>
               <div className="flex flex-col items-end">
-                <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-blue-500">
                   Appropriation ({prevYear})
                 </span>
-                <span className="text-[13px] font-mono font-semibold text-blue-700">{clsPast === 0 ? '–' : fmtP2(clsPast)}</span>
+                <span className="text-[24px] font-mono font-bold text-blue-700">{clsPast === 0 ? '–' : fmtP2(clsPast)}</span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-orange-500">
                   Proposed ({currYear})
                 </span>
-                <span className="text-[13px] font-mono font-semibold text-orange-700">{clsProp === 0 ? '–' : fmtP2(clsProp)}</span>
+                <span className="text-[24px] font-mono font-bold text-orange-700">{clsProp === 0 ? '–' : fmtP2(clsProp)}</span>
               </div>
               <div className="flex flex-col items-end min-w-[80px]">
-                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Inc / Dec</span>
+                <span className={cn('text-[20px] font-mono font-bold', clr(clsDiff))}>
                   {clsDiff === 0 ? '–' : (clsDiff > 0 ? '+' : '') + fmtP2(clsDiff)}
                 </span>
               </div>
               <div className="flex flex-col items-end min-w-[60px]">
-                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
-                <span className={cn('text-[13px] font-mono font-semibold', clr(clsDiff))}>
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Percentage</span>
+                <span className={cn('text-[20px] font-mono font-bold', clr(clsDiff))}>
                   {clsPast === 0 && clsDiff === 0 ? '–' : `${clsPct.toFixed(2)}%`}
                 </span>
               </div>
@@ -1621,8 +2031,30 @@ const Form2: React.FC<Form2Props> = ({
 
     {aipItems.length > 0 && (
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">Special Programs (AIP)</p>
-        <div className="flex flex-col gap-2">
+        <button
+          onClick={() => setAipCollapsed(v => !v)}
+          className="w-full flex items-center justify-between gap-2 mb-3 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 transition-colors group"
+        >
+          <div className="flex items-center gap-2.5">
+            <svg
+              className={cn('w-4 h-4 text-gray-400 transition-transform flex-shrink-0', aipCollapsed ? '-rotate-90' : '')}
+              viewBox="0 0 20 20" fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+            <p className="text-[15px] font-bold uppercase tracking-wider text-white">Special Programs (AIP)</p>
+            <span className="text-[10px] font-semibold text-violet-300 bg-violet-950/40 border border-violet-800/40 px-2 py-0.5 rounded-full">
+              From AIP Form 4
+            </span>
+          </div>
+          {aipCollapsed && (
+            <span className="text-[11px] font-semibold text-gray-400">
+              {aipItems.length} item{aipItems.length === 1 ? '' : 's'} · click to expand
+            </span>
+          )}
+        </button>
+        {!aipCollapsed && (
+        <div className="flex flex-col gap-3">
           {aipItems.map((item, idx) => {
             const appTotal = (item as any).app_total ?? 0;
             const proposed = item.total_amount;
@@ -1631,44 +2063,44 @@ const Form2: React.FC<Form2Props> = ({
             return (
               <div
                 key={item.dept_bp_form4_item_id}
-                className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+                className="bg-white border-2 border-gray-200 rounded-2xl px-6 py-5 flex flex-wrap items-center gap-x-8 gap-y-3 select-none"
                 style={{
                   opacity: 0,
                   animation: `_rowIn 260ms cubic-bezier(0.22,1,0.36,1) ${idx * 35}ms both`,
                 }}
               >
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-[12px] font-medium text-gray-800 leading-tight">{item.program_description || '—'}</p>
-                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.aip_reference_code || '—'}</p>
+                <div className="flex-1 min-w-[220px]">
+                  <p className="text-[17px] font-semibold text-gray-800 leading-tight">{item.program_description || '—'}</p>
+                  <p className="text-[12px] text-gray-400 font-mono mt-1">{item.aip_reference_code || '—'}</p>
                 </div>
                 <div className={CARD_NUM_GRID}>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-blue-400">
                       Appropriation ({prevYear})
                     </span>
-                    <span className="text-[13px] font-mono font-semibold text-blue-700">{appTotal === 0 ? '–' : fmtP(appTotal)}</span>
+                    <span className="text-[22px] font-mono font-bold text-blue-700">{appTotal === 0 ? '–' : fmtP(appTotal)}</span>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-orange-400">
                       Proposed ({currYear})
                     </span>
-                    <span className="text-[13px] font-mono font-semibold text-orange-700">{proposed === 0 ? '–' : fmtP(proposed)}</span>
+                    <span className="text-[22px] font-mono font-bold text-orange-700">{proposed === 0 ? '–' : fmtP(proposed)}</span>
                   </div>
-                  <div className="flex flex-col items-end min-w-[80px]">
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-                    <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                  <div className="flex flex-col items-end min-w-[100px]">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+                    <span className={cn('text-[18px] font-mono font-bold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
                       {d === 0 ? '–' : (d > 0 ? '+' : '') + fmtP(d)}
                     </span>
                   </div>
-                  <div className="flex flex-col items-end min-w-[60px]">
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
-                    <span className={cn('text-[13px] font-mono font-semibold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                  <div className="flex flex-col items-end min-w-[70px]">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+                    <span className={cn('text-[18px] font-mono font-bold', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
                       {appTotal === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}
                     </span>
                   </div>
                   {isAdmin && (
-                    <div className="flex flex-col items-end min-w-[140px]">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
+                    <div className="flex flex-col items-end min-w-[180px]">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Recommendation</span>
                       {isEditable ? (
                         <input
                           type="text"
@@ -1677,10 +2109,10 @@ const Form2: React.FC<Form2Props> = ({
                           onBlur={() => handleAipRecBlur(item.dept_bp_form4_item_id)}
                           placeholder="Add note…"
                           maxLength={255}
-                          className="text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
+                          className="text-[14px] h-9 px-3 rounded-lg border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300"
                         />
                       ) : (
-                        <span className="text-[12px] text-gray-600">{(item as any).recommendation || '–'}</span>
+                        <span className="text-[14px] text-gray-600">{(item as any).recommendation || '–'}</span>
                       )}
                     </div>
                   )}
@@ -1689,32 +2121,33 @@ const Form2: React.FC<Form2Props> = ({
             );
           })}
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+        )}
+        <div className="bg-gray-100 border-2 border-gray-300 rounded-xl px-5 py-4 mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 shadow-sm">
           <div className="flex-1 min-w-[180px]">
-            <p className="text-[11px] font-semibold text-gray-600">Total Special Programs</p>
+            <p className="text-[15px] font-bold text-gray-800 uppercase tracking-wide">Total Special Programs</p>
           </div>
           <div className={CARD_NUM_GRID}>
             <div className="flex flex-col items-end">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-blue-500">
                 Appropriation ({prevYear})
               </span>
-              <span className="text-[13px] font-mono font-semibold text-blue-700">{aipAppTotal === 0 ? '–' : fmtP2(aipAppTotal)}</span>
+              <span className="text-[24px] font-mono font-bold text-blue-700">{aipAppTotal === 0 ? '–' : fmtP2(aipAppTotal)}</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-orange-500">
                 Proposed ({currYear})
               </span>
-              <span className="text-[13px] font-mono font-semibold text-orange-700">{aipTotal === 0 ? '–' : fmtP2(aipTotal)}</span>
+              <span className="text-[24px] font-mono font-bold text-orange-700">{aipTotal === 0 ? '–' : fmtP2(aipTotal)}</span>
             </div>
             <div className="flex flex-col items-end min-w-[80px]">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-              <span className={cn('text-[13px] font-mono font-semibold', clr(aipTotal - aipAppTotal))}>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Inc / Dec</span>
+              <span className={cn('text-[20px] font-mono font-bold', clr(aipTotal - aipAppTotal))}>
                 {(aipTotal - aipAppTotal) === 0 ? '–' : ((aipTotal - aipAppTotal) > 0 ? '+' : '') + fmtP2(aipTotal - aipAppTotal)}
               </span>
             </div>
             <div className="flex flex-col items-end min-w-[60px]">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
-              <span className={cn('text-[13px] font-mono font-semibold', clr(aipTotal - aipAppTotal))}>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Percentage</span>
+              <span className={cn('text-[20px] font-mono font-bold', clr(aipTotal - aipAppTotal))}>
                 {aipAppTotal === 0 && (aipTotal - aipAppTotal) === 0 ? '–' : `${pctOf(aipAppTotal, aipTotal - aipAppTotal).toFixed(2)}%`}
               </span>
             </div>
@@ -1768,12 +2201,12 @@ const Form2: React.FC<Form2Props> = ({
       </div>
     )}
 
-    <div className="bg-gray-900 text-white rounded-xl px-4 py-3 mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <div className="bg-gray-900 text-white rounded-2xl px-6 py-5 mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 shadow-lg">
       <div className="flex-1 min-w-[180px]">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+        <p className="text-[13px] font-bold uppercase tracking-widest text-gray-300">
           Grand Total
           {isSpecialAccount && calamityTotal > 0 && (
-            <span className="ml-2 text-[9px] font-normal text-gray-500 normal-case tracking-normal">
+            <span className="ml-2 text-[10px] font-normal text-gray-500 normal-case tracking-normal">
               incl. 5% Calamity Fund
             </span>
           )}
@@ -1781,30 +2214,30 @@ const Form2: React.FC<Form2Props> = ({
       </div>
       <div className={CARD_NUM_GRID}>
         <div className="flex flex-col items-end">
-          <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-400">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-blue-400">
             Appropriation ({prevYear})
           </span>
-          <span className="text-[13px] font-mono font-bold text-blue-300">
+          <span className="text-[26px] font-mono font-bold text-blue-300 leading-tight whitespace-nowrap">
             {fmtP2(grandFinal.pastTotal)}
           </span>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-orange-400">
             Proposed ({currYear})
           </span>
-          <span className="text-[13px] font-mono font-bold text-orange-300">
+          <span className="text-[26px] font-mono font-bold text-orange-300 leading-tight whitespace-nowrap">
             {fmtP2(grandFinal.proposed)}
           </span>
         </div>
         <div className="flex flex-col items-end min-w-[80px]">
-          <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
-          <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Inc / Dec</span>
+          <span className={cn('text-[19px] font-mono font-bold leading-tight whitespace-nowrap', clr(gtDiff))}>
             {gtDiff === 0 ? '-' : fmtP2(gtDiff)}
           </span>
         </div>
         <div className="flex flex-col items-end min-w-[60px]">
-          <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
-          <span className={cn('text-[13px] font-mono font-bold', clr(gtDiff))}>
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Percentage</span>
+          <span className={cn('text-[19px] font-mono font-bold leading-tight whitespace-nowrap', clr(gtDiff))}>
             {grandFinal.pastTotal === 0 && gtDiff === 0 ? '–' : `${gtPct.toFixed(2)}%`}
           </span>
         </div>
@@ -1993,6 +2426,7 @@ const Form2: React.FC<Form2Props> = ({
                                     ) : (
                                         <>
                                             {cls.items.map((item) => {
+                                                const rowIdx = gIdx;
                                                 const delay = Math.min(
                                                     gIdx++ * 18,
                                                     280,
@@ -2114,9 +2548,11 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                             "obligation",
                                                                         )
                                                                     }
+                                                                    onKeyDown={blurOnEnter}
                                                                     disabled={savingObligations.has(
                                                                         item.expense_item_id,
                                                                     )}
+                                                                    tabIndex={1000 + rowIdx}
                                                                     className={
                                                                         inputAppCls
                                                                     }
@@ -2149,9 +2585,11 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                             "sem1",
                                                                         )
                                                                     }
+                                                                    onKeyDown={blurOnEnter}
                                                                     disabled={savingPastItems.has(
                                                                         item.expense_item_id,
                                                                     )}
+                                                                    tabIndex={2000 + rowIdx}
                                                                     className={
                                                                         inputCurCls
                                                                     }
@@ -2201,6 +2639,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                 <input
                                                                     type="text"
                                                                     inputMode="numeric"
+                                                                    maxLength={13}
                                                                     value={getDraftValue(
                                                                         item.expense_item_id,
                                                                         "proposed",
@@ -2216,9 +2655,11 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                             "proposed",
                                                                         )
                                                                     }
+                                                                    onKeyDown={blurOnEnter}
                                                                     disabled={
                                                                         isSaving
                                                                     }
+                                                                    tabIndex={3000 + rowIdx}
                                                                     className={
                                                                         inputCls
                                                                     }
@@ -2290,6 +2731,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                                 item.expense_item_id,
                                                                             )
                                                                         }
+                                                                        onKeyDown={blurOnEnter}
                                                                         disabled={savingRecommendations.has(
                                                                             item.expense_item_id,
                                                                         )}
@@ -2297,16 +2739,23 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                         maxLength={
                                                                             255
                                                                         }
-                                                                        className={
-                                                                            recCls
-                                                                        }
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-gray-500 text-[11px]">
-                                                                        {item.recommendation ||
-                                                                            "–"}
-                                                                    </span>
-                                                                )}
+                                                                        tabIndex={4000 + rowIdx}
+                                                                        title={
+                                                            formatRecommendationTooltip(item.recommendation)
+                                                        }
+                                                        className={
+                                                            recCls
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        className="text-gray-500 text-[11px]"
+                                                        title={formatRecommendationTooltip(item.recommendation)}
+                                                    >
+                                                        {item.recommendation ||
+                                                            "–"}
+                                                    </span>
+                                                )}
                                                             </td>
                                                         )}
                                                     </tr>
@@ -2444,6 +2893,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 </tr>
 
                                 {aipItems.map((item) => {
+                                    const rowIdx = gIdx;
                                     const delay = Math.min(gIdx++ * 18, 280);
                                     const id = item.dept_bp_form4_item_id;
                                     const oblVal = aipOblEdits.has(id)
@@ -2507,10 +2957,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 "obligation",
                                             )
                                         }
+                                                        onKeyDown={blurOnEnter}
                                                         disabled={savingAipObligations.has(
                                                             id,
                                                         )}
                                                         placeholder="0"
+                                                        tabIndex={1000 + rowIdx}
                                                         className={inputAppCls}
                                                     />
                                                 </td>
@@ -2532,7 +2984,9 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         onBlur={() =>
                                                             handleAipCommaBlur(id, "sem1")
                                                         }
+                                                        onKeyDown={blurOnEnter}
                                                         disabled={savingAipSem1.has(id)}
+                                                        tabIndex={2000 + rowIdx}
                                                         className={inputCurCls}
                                                     />
                                                 ) : (
@@ -2599,15 +3053,23 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                     id,
                                                                 )
                                                             }
+                                                            onKeyDown={blurOnEnter}
                                                             disabled={savingAipRecommendations.has(
                                                                 id,
                                                             )}
                                                             placeholder="Add note…"
                                                             maxLength={255}
+                                                            tabIndex={4000 + rowIdx}
+                                                            title={
+                                                                formatRecommendationTooltip((item as any).recommendation)
+                                                            }
                                                             className={recCls}
                                                         />
                                                     ) : (
-                                                        <span className="text-gray-500 text-[11px]">
+                                                        <span
+                                                            className="text-gray-500 text-[11px]"
+                                                            title={formatRecommendationTooltip((item as any).recommendation)}
+                                                        >
                                                             {(item as any)
                                                                 .recommendation ||
                                                                 "–"}
@@ -3056,6 +3518,316 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {ctxMenuItem && ctxMenuPos && createPortal(
+                <div
+                    ref={ctxMenuRef}
+                    style={{ position: 'fixed', top: ctxMenuPos.y, left: ctxMenuPos.x, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[210px] overflow-hidden"
+                >
+                    <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
+                    <div className="px-3 py-2 border-b border-gray-100 mb-1">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[185px]">
+                            {ctxMenuItem.expense_item?.expense_class_item_name ?? 'Item'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={openMoveModal}
+                        className="flex items-center gap-2.5 w-full px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                        <ArrowsRightLeftIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        Move Appropriation
+                    </button>
+                    <div className="my-1 border-t border-gray-100" />
+                    <button
+                        onClick={openRemoveAppropriation}
+                        className="flex items-center gap-2.5 w-full px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                        <TrashIcon className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                        Delete Item
+                    </button>
+                </div>,
+                document.body,
+            )}
+
+            {moveSource && createPortal(
+                (() => {
+                    const PANEL_W = 340, PANEL_H = 520;
+                    const anchor = moveAnchorPos ?? { x: window.innerWidth / 2 - PANEL_W / 2, y: 80 };
+                    const x = Math.min(Math.max(anchor.x, 12), window.innerWidth - PANEL_W - 12);
+                    const y = Math.min(Math.max(anchor.y, 12), window.innerHeight - PANEL_H - 12);
+
+                    return (
+                        <div
+                            ref={moveModalRef}
+                            style={{
+                                position: 'fixed',
+                                top: y,
+                                left: x,
+                                width: PANEL_W,
+                                maxHeight: PANEL_H,
+                                zIndex: 9999,
+                            }}
+                            className="bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col"
+                        >
+                            <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[13px] font-semibold text-gray-900 truncate">
+                                        Move from "{moveSource.expense_item?.expense_class_item_name}"
+                                    </p>
+                                    <button
+                                        onClick={() => { setMoveSource(null); setMoveDestination(null); }}
+                                        className="text-gray-400 hover:text-gray-700 text-[16px] leading-none flex-shrink-0"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                    Available: {fmtP(Number(moveSource.total_amount))}
+                                </p>
+
+                                {/* Amount to move — switch between typing a ₱ amount or a % */}
+                                <div className="mt-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                                            {moveInputMode === 'amount' ? 'Amount to move' : 'Percent to move'}
+                                        </label>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={cn('text-[10px] font-medium', moveInputMode === 'amount' ? 'text-gray-700' : 'text-gray-300')}>
+                                                ₱
+                                            </span>
+                                            <Switch
+                                                checked={moveInputMode === 'percent'}
+                                                onCheckedChange={toggleMoveInputMode}
+                                                className="scale-75"
+                                            />
+                                            <span className={cn('text-[10px] font-medium', moveInputMode === 'percent' ? 'text-gray-700' : 'text-gray-300')}>
+                                                %
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="relative mt-1">
+                                        <span className={cn(
+                                            'absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none',
+                                            moveInputInvalid ? 'text-red-400' : 'text-gray-400',
+                                        )}>
+                                            {moveInputMode === 'amount' ? '₱' : '%'}
+                                        </span>
+                                        {moveInputMode === 'amount' ? (
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={moveAmountDraft}
+                                                onChange={(e) => setMoveAmountDraft(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                onKeyDown={blurOnEnter}
+                                                placeholder="0"
+                                                className={cn(
+                                                    'w-full h-8 pl-6 pr-2.5 text-[12px] font-mono text-right rounded-lg border focus:outline-none focus:ring-2',
+                                                    moveAmountExceeds
+                                                        ? 'border-red-400 text-red-600 focus:ring-red-300 focus:border-red-400'
+                                                        : 'border-gray-200 focus:ring-gray-400',
+                                                )}
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={movePercentDraft}
+                                                onChange={(e) => setMovePercentDraft(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                onKeyDown={blurOnEnter}
+                                                placeholder="0"
+                                                className={cn(
+                                                    'w-full h-8 pl-6 pr-2.5 text-[12px] font-mono text-right rounded-lg border focus:outline-none focus:ring-2',
+                                                    movePercentExceeds
+                                                        ? 'border-red-400 text-red-600 focus:ring-red-300 focus:border-red-400'
+                                                        : 'border-gray-200 focus:ring-gray-400',
+                                                )}
+                                            />
+                                        )}
+                                    </div>
+                                    {moveAmountExceeds && (
+                                        <p className="text-[10px] text-red-500 mt-1 font-medium">
+                                            Amount exceeds available balance of {fmtP(moveSourceTotal)}.
+                                        </p>
+                                    )}
+                                    {movePercentExceeds && (
+                                        <p className="text-[10px] text-red-500 mt-1 font-medium">
+                                            Percentage exceeds 100% ({fmtP(moveSourceTotal)} available).
+                                        </p>
+                                    )}
+                                    {!moveInputInvalid && moveAmount > 0 && (
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            {fmtP(moveAmount)} moves · {fmtP(moveSourceTotal - moveAmount)} remains on source
+                                        </p>
+                                    )}
+                                </div>
+
+                                <input
+                                    type="text"
+                                    value={moveSearch}
+                                    onChange={(e) => setMoveSearch(e.target.value)}
+                                    placeholder="Search destination item…"
+                                    className="mt-3 w-full h-8 px-2.5 text-[12px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                                />
+
+                                {/* Classification filter chips */}
+                                {moveClassOptions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        <button
+                                            onClick={() => setMoveClassFilter('all')}
+                                            className={cn(
+                                                'text-[10px] font-medium px-2 py-1 rounded-full border transition-colors',
+                                                moveClassFilter === 'all'
+                                                    ? 'bg-gray-900 border-gray-900 text-white'
+                                                    : 'border-gray-200 text-gray-500 hover:bg-gray-50',
+                                            )}
+                                        >
+                                            All
+                                        </button>
+                                        {moveClassOptions.map((c) => (
+                                            <button
+                                                key={c.id}
+                                                onClick={() => setMoveClassFilter(String(c.id))}
+                                                className={cn(
+                                                    'text-[10px] font-medium px-2 py-1 rounded-full border transition-colors truncate max-w-[110px]',
+                                                    moveClassFilter === String(c.id)
+                                                        ? 'bg-gray-900 border-gray-900 text-white'
+                                                        : 'border-gray-200 text-gray-500 hover:bg-gray-50',
+                                                )}
+                                                title={c.name}
+                                            >
+                                                {c.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {!moveDestination ? (
+                                <>
+                                    <div className="flex-1 overflow-y-auto py-1">
+                                        {moveCandidates.length === 0 ? (
+                                            <p className="px-4 py-6 text-[12px] text-gray-400 text-center">No matching items.</p>
+                                        ) : (
+                                            moveCandidates.map((cand) => {
+                                                const clsName = classNameById.get(cand.expense_item?.expense_class_id ?? -1);
+                                                return (
+                                                    <button
+                                            key={cand.expense_item_id}
+                                            onClick={() => { if (!moveInputInvalid) setMoveDestination(cand); }}
+                                            disabled={moveInputInvalid}
+                                            className={cn(
+                                                'w-full text-left px-4 py-2 text-[12px] flex items-center justify-between gap-2',
+                                                moveInputInvalid ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50',
+                                            )}
+                                        >
+                                                        <div className="min-w-0">
+                                                            <span className="text-gray-700 truncate block">
+                                                                {cand.expense_item?.expense_class_item_name}
+                                                            </span>
+                                                            {clsName && (
+                                                                <span className="text-[10px] text-gray-400">{clsName}</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-gray-400 font-mono text-[11px] flex-shrink-0">
+                                                            {fmtP(Number(cand.total_amount))}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                    <div className="px-4 py-3 border-t border-gray-100 flex justify-end flex-shrink-0">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            onClick={() => { setMoveSource(null); setMoveDestination(null); }}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </>
+                            ) : (
+                                /* ── Inline confirm step — stays in the same anchored panel ── */
+                                <div className="flex-1 overflow-y-auto px-4 py-4">
+                                    <p className="text-[13px] font-semibold text-gray-900">
+                                        Move {fmtP(moveAmount)}?
+                                    </p>
+                                    <p className="text-[12px] text-gray-500 mt-2 leading-relaxed">
+                                        <span className="font-medium text-gray-700">{fmtP(moveAmount)}</span>{' '}
+                                        from{' '}
+                                        <span className="font-medium text-gray-700">
+                                            {moveSource.expense_item?.expense_class_item_name}
+                                        </span>{' '}
+                                        will be added to{' '}
+                                        <span className="font-medium text-gray-700">
+                                            {moveDestination.expense_item?.expense_class_item_name}
+                                        </span>
+                                        .{' '}
+                                        {moveSource.expense_item?.expense_class_id !== moveDestination.expense_item?.expense_class_id && (
+                                            <>This moves the amount into a different classification.{' '}</>
+                                        )}
+                                        {moveAmount < Number(moveSource.total_amount) ? (
+                                            <>
+                                                The source item will keep{' '}
+                                                <span className="font-medium text-gray-700">
+                                                    {fmtP(Number(moveSource.total_amount) - moveAmount)}
+                                                </span>.
+                                            </>
+                                        ) : (
+                                            <>The source item will be set to ₱0.</>
+                                        )}
+                                        {' '}This cannot be undone.
+                                    </p>
+
+                                    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-[11px] text-gray-400 truncate">
+                                                {moveSource.expense_item?.expense_class_item_name}
+                                            </p>
+                                            <p className="text-[13px] font-mono font-semibold text-gray-700">
+                                                {fmtP(Number(moveSource.total_amount) - moveAmount)}
+                                            </p>
+                                        </div>
+                                        <span className="text-gray-300">→</span>
+                                        <div className="min-w-0 text-right">
+                                            <p className="text-[11px] text-gray-400 truncate">
+                                                {moveDestination.expense_item?.expense_class_item_name}
+                                            </p>
+                                            <p className="text-[13px] font-mono font-semibold text-emerald-600">
+                                                {fmtP(Number(moveDestination.total_amount) + moveAmount)}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 flex justify-end gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            onClick={() => setMoveDestination(null)}
+                                            disabled={moving}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="h-8 text-xs bg-gray-900 hover:bg-gray-800 text-white"
+                                            onClick={handleMoveConfirmed}
+                                            disabled={moving || moveAmount <= 0 || moveInputInvalid}
+                                        >
+                                            {moving ? 'Moving…' : `Move ${fmtP(moveAmount)}`}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })(),
+                document.body,
+            )}
+
+
 
             {pastModalState && pastYearPlan && (
                 <AddItemModal

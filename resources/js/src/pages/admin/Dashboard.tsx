@@ -592,12 +592,12 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
 
 
   const gfPie = fundsReady && (gf?.total ?? 0) > 0 ? [
-    { name: "Expenditures",           value: exp.gfExpenditure, color: "#a1a1aa" },
+    { name: "Expenditures",           value: exp.gfExpenditure, color: "#6366f1" },
     { name: "20% MDF",                value: mdfPieValue,       color: "#f59e0b" },
     { name: "5% · 30% QRF",          value: qrf,               color: "#f43f5e" },
     { name: "5% · 70% Pre-Disaster",  value: ldrrmf70Actual,    color: "#fb923c" },
     //{ name: "Unappropriated Balance", value: gfUnap,            color: "#10b981" },
-    { name: "Unappropriated Balance", value: Math.abs(gfUnap),  color: gfUnap >= 0 ? "#10b981" : "#ef4444" },
+    { name: "Unappropriated Balance", value: Math.abs(gfUnap),  color: gfUnap >= 0 ? "#10b981" : "#f43f5e" },
   ].filter(d => d.value > 0) : [];
 
   const specialPie = fundsReady && specialTotal > 0 ? [
@@ -927,7 +927,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                             <div className="flex-1 space-y-1.5 min-w-0">
                               <div className="flex items-center justify-between gap-1">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#a1a1aa" }} />
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#6366f1" }} />
                                   <span className="text-xs text-zinc-500 font-medium truncate">Expenditures</span>
                                 </div>
                                <span className="text-metric-support font-semibold font-mono flex-shrink-0 text-zinc-700">{peso(exp.gfExpenditure)}</span>
@@ -964,7 +964,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                               </div>
                               <div className={cn("rounded-lg border px-2 py-1.5", gfUnap >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
                                 <div className="flex items-center gap-1 mb-0.5">
-                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981" }} />
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: gfUnap >= 0 ? "#10b981" : "#f43f5e" }} />
                                <p className={cn("text-[10px] font-semibold uppercase tracking-widest", isZeroAmount(gfUnap) ? "text-zinc-500" : gfUnap > 0 ? "text-emerald-700" : "text-red-600")}>
                                     {isZeroAmount(gfUnap) ? "Fully Appropriated" : gfUnap > 0 ? "Unappropriated Balance" : "Over-Appropriated"}
                                   </p>

@@ -12,6 +12,7 @@ import {
 } from "@/src/components/ui/dropdown-menu";
 import { AppSidebar } from "./AppSidebar";
 import { BreadcrumbNav } from "./BreadcrumbNav";
+import { GlobalSearch } from "./GlobalSearch";
 import { useAuth } from "@/src/hooks/useAuth";
 import API from "@/src/services/api";
 import { cn } from "@/src/lib/utils";
@@ -205,44 +206,46 @@ const MainLayout: React.FC = () => {
       <SidebarInset className="min-w-0 overflow-x-hidden">
 
         {/* ── Top Header Bar ──────────────────────────────────────────── */}
-        <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-zinc-200 bg-white px-4">
+        <header className="sticky top-0 z-20 grid grid-cols-[1fr_auto_1fr] items-center gap-3 h-12 border-b border-zinc-200 bg-white px-4">
 
-          {/* Sidebar toggle */}
-          <SidebarTrigger className="text-zinc-400 hover:text-zinc-700 transition-colors -ml-1" />
-
-          {/* Vertical divider */}
-          <div className="h-4 w-px bg-zinc-200 flex-shrink-0" />
-
-          {/* Breadcrumb */}
-          <div className="flex-1 min-w-0">
-            <BreadcrumbNav />
+          {/* LEFT: sidebar toggle + breadcrumb */}
+          <div className="flex items-center gap-3 min-w-0">
+            <SidebarTrigger className="text-zinc-400 hover:text-zinc-700 transition-colors -ml-1 flex-shrink-0" />
+            <div className="h-4 w-px bg-zinc-200 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <BreadcrumbNav />
+            </div>
           </div>
 
-          {/* Notification bell — top right */}
-          <div className={cn("flex items-center flex-shrink-0", !department && "ml-auto")}>
+          {/* CENTER: global page search — truly centered via grid */}
+          <div className="flex justify-center">
+            <GlobalSearch user={user as any} />
+          </div>
+
+          {/* RIGHT: department pill + notifications */}
+          <div className="flex items-center justify-end gap-2.5">
+            {department && (
+              <div className="flex items-center gap-2 flex-shrink-0 pr-2.5 mr-0.5 border-r border-zinc-200 h-6">
+                {department.logo ? (
+                  <img
+                    src={getImageUrl(department.logo)}
+                    alt={department.name}
+                    className="h-5 w-5 rounded-md object-cover border border-zinc-200 flex-shrink-0"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : deptInitials ? (
+                  <div className="h-5 w-5 rounded-md bg-zinc-200 flex items-center justify-center text-[8px] font-bold text-zinc-600 flex-shrink-0">
+                    {deptInitials}
+                  </div>
+                ) : null}
+                <span className="text-[12px] font-semibold text-zinc-700 whitespace-nowrap">
+                  {department.name}
+                </span>
+              </div>
+            )}
+
             <HeaderNotifications role={user?.role ?? ""} />
           </div>
-
-          {/* Department pill — only for department-head */}
-          {department && (
-            <div className="flex items-center gap-2 ml-auto flex-shrink-0 pl-3 border-l border-zinc-100">
-              {department.logo ? (
-                <img
-                  src={getImageUrl(department.logo)}
-                  alt={department.name}
-                  className="h-5 w-5 rounded-md object-cover border border-zinc-200 flex-shrink-0"
-                  onError={(e) => { e.currentTarget.style.display = "none"; }}
-                />
-              ) : deptInitials ? (
-                <div className="h-5 w-5 rounded-md bg-zinc-200 flex items-center justify-center text-[8px] font-bold text-zinc-600 flex-shrink-0">
-                  {deptInitials}
-                </div>
-              ) : null}
-              <span className="text-[12px] font-semibold text-zinc-700 truncate max-w-[180px]">
-                {department.name}
-              </span>
-            </div>
-          )}
         </header>
 
         {/* ── Page Content ────────────────────────────────────────────── */}

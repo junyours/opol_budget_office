@@ -154,6 +154,11 @@ interface RowEdit {
   honoraria: number;
   overtime: number;
   terminalLeave: number;
+  // When true, this position is zeroed out for THIS budget year only — item
+  // number, title, and incumbent still show, but no money is allocated to
+  // Form2/Form3. Unlike deactivating in Plantilla Positions (permanent,
+  // triggers a global renumber), this is a per-year, non-destructive toggle.
+  excluded: boolean;
 }
 
 interface AllowanceResult {
@@ -217,6 +222,7 @@ interface PersonnelServiceRow {
   savedMonthly: number;
   savedAnnual: number;
   extensionDeptId: number | null;
+  excluded: boolean;
 }
 
 const ALLOWANCE_TO_EXPENSE_ITEM: Record<string, string[]> = {
@@ -457,9 +463,20 @@ const handleSettingsChange = async (s: PsSettings) => {
     try { await saveSettings(s); }
     catch { /* toast already shown by caller if needed */ }
 };
-  const handleEditChange = (posId: number, field: keyof RowEdit, value: number) => {
+
+const handleToggleExcluded = (posId: number) => {
     setEdits(prev => {
-      const next = { ...prev, [posId]: { ...(prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0 }), [field]: value } };
+      const current = prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false };
+      const next = { ...prev, [posId]: { ...current, excluded: !current.excluded } };
+      lsSet(LS_EDITS_KEY, next);
+      return next;
+    });
+  };
+
+  const handleEditChange = (posId: number, field: keyof RowEdit, value: number) => {
+
+    setEdits(prev => {
+      const next = { ...prev, [posId]: { ...(prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false }), [field]: value } };
       lsSet(LS_EDITS_KEY, next);
       return next;
     });
@@ -509,6 +526,14 @@ const handleSettingsChange = async (s: PsSettings) => {
     queryFn:  () => API.get('/plantilla-assignments').then(r => r.data?.data ?? []),
   });
 
+  // Every active plantilla position must show a row — assigned or vacant —
+  // even if it has never had an assignment record created for it yet.
+  type PlantillaPositionApi = ApiAssignment['plantilla_position'];
+  const { data: positions = [],        isLoading: positionsLoading } = useQuery<PlantillaPositionApi[]>({
+    queryKey: ['plantilla-positions'],
+    queryFn:  () => API.get('/plantilla-positions').then(r => r.data?.data ?? []),
+  });
+
   const { data: deptBudgetPlans = [],  isLoading: deptPlansLoading } = useQuery<DeptBudgetPlan[]>({
     queryKey: ['dept-budget-plans', activePlan?.budget_plan_id],
     queryFn:  () => API.get('/department-budget-plans', {
@@ -555,6 +580,16 @@ const fetchExpenseClassItems = async (): Promise<ExpenseClassItem[]> => {
     return map;
   }, [matrix]);
 
+  // Map plantilla_position_id → its assignment record, if one exists.
+  // A newly-created vacant position simply won't be in this map.
+  const assignmentByPosition = useMemo(() => {
+    const map = new Map<number, ApiAssignment>();
+    assignments.forEach(a => {
+      if (a.plantilla_position_id != null) map.set(a.plantilla_position_id, a);
+    });
+    return map;
+  }, [assignments]);
+
   const getSalary = (grade: number, step: number) => salaryLookup.get(`${grade}-${step}`) ?? 0;
 
 //   const findExpenseItemId = (key: string): number | null => {
@@ -575,28 +610,43 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
     const bYear  = activePlan.year;
     const rowsByDept: Record<number, PersonnelServiceRow[]> = {};
 
-    assignments.forEach(assign => {
-      const pos = assign.plantilla_position;
-      if (!pos?.is_active) return;
+    positions.forEach(pos => {
+      if (!pos.is_active) return;
       const deptId = pos.dept_id;
       if (!rowsByDept[deptId]) rowsByDept[deptId] = [];
 
-      const { baseStep, nextStep, stepUpDate, baseMonths, incrementMonths } = computeStepInfo(getAssignmentDate(assign), bYear);
+      const assign = assignmentByPosition.get(pos.plantilla_position_id);
+      const assignDate = assign ? getAssignmentDate(assign) : null;
+
+      const { baseStep, nextStep, stepUpDate, baseMonths, incrementMonths } = computeStepInfo(assignDate, bYear);
       const sg      = pos.salary_grade;
       const baseMon = getSalary(sg, baseStep);
       const baseAnn = baseMon * baseMonths;
       const baseAllow = calcAllowances(baseMon, baseMonths, deptId, sg, s, mcRate);
 
-      const edit      = edits[pos.plantilla_position_id] ?? { honoraria: 0, overtime: 0, terminalLeave: 0 };
-      const honoraria = toNumber(edit.honoraria);
-      const overtime  = toNumber(edit.overtime);
-      const termLeave = toNumber(edit.terminalLeave);
+      const edit      = edits[pos.plantilla_position_id] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false };
+      const isExcluded = !!edit.excluded;
+      const honoraria = isExcluded ? 0 : toNumber(edit.honoraria);
+      const overtime  = isExcluded ? 0 : toNumber(edit.overtime);
+      const termLeave = isExcluded ? 0 : toNumber(edit.terminalLeave);
 
-      const rowSubTotal = baseAnn + sumAllowances(baseAllow) + honoraria + overtime + termLeave;
+      // Excluded positions still occupy their row (item number, title,
+      // incumbent stay visible) but contribute zero to every money column
+      // and skip step-increment math entirely for this budget year.
+      const zeroAllow: AllowanceResult = {
+        pera: 0, ra: 0, ta: 0, clothing: 0, subsistence: 0, laundry: 0, productivity: 0,
+        cashGift: 0, midYearBonus: 0, yearEndBonus: 0, magnaCarta1: 0, magnaCarta2: 0,
+        retirementInsurance: 0, pagIbig: 0, philHealth: 0, ecip: 0, otherBenefits: 0,
+      };
+      const effBaseMon   = isExcluded ? 0 : baseMon;
+      const effBaseAnn   = isExcluded ? 0 : baseAnn;
+      const effBaseAllow = isExcluded ? zeroAllow : baseAllow;
+
+      const rowSubTotal = effBaseAnn + sumAllowances(effBaseAllow) + honoraria + overtime + termLeave;
 
       let incrementRow: StepIncrementRow | null = null;
 
-      if (stepUpDate !== null && incrementMonths > 0 && nextStep > baseStep) {
+      if (!isExcluded && stepUpDate !== null && incrementMonths > 0 && nextStep > baseStep) {
         const newMon     = getSalary(sg, nextStep);
         const incrAnn    = newMon * incrementMonths;
         const incrAllow  = calcAllowances(newMon,  incrementMonths, deptId, sg, s, mcRate);
@@ -648,26 +698,37 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
         };
       }
 
-      const rowTotal     = rowSubTotal + (incrementRow?.incrSubTotal ?? 0);
-      const savedMonthly = incrementRow ? incrementRow.monthlyRate : baseMon;
-      const savedAnnual  = baseAnn + (incrementRow?.incrAnnual ?? 0);
+    //   const rowTotal     = rowSubTotal + (incrementRow?.incrSubTotal ?? 0);
+    //   const savedMonthly = incrementRow ? incrementRow.monthlyRate : baseMon;
+    //   const savedAnnual  = baseAnn + (incrementRow?.incrAnnual ?? 0);
+
+    const rowTotal     = rowSubTotal + (incrementRow?.incrSubTotal ?? 0);
+      // Use the *effective* (exclusion-aware) base figures here, not the raw
+      // baseMon/baseAnn — otherwise an excluded position still saves its
+      // full pre-exclusion salary to Form3/Form2 even though its row total
+      // correctly shows ₱0 in this UI. incrementRow is already guaranteed
+      // null when isExcluded (see the `!isExcluded && ...` gate above), so
+      // this naturally collapses to 0 for excluded rows.
+      const savedMonthly = incrementRow ? incrementRow.monthlyRate : effBaseMon;
+      const savedAnnual  = effBaseAnn + (incrementRow?.incrAnnual ?? 0);
 
       rowsByDept[deptId].push({
         positionId: pos.plantilla_position_id, plantillaPositionId: pos.plantilla_position_id,
-        personnelId: assign.personnel_id,
+        personnelId: assign?.personnel_id ?? null,
         oldItemNumber: pos.old_item_number || '', newItemNumber: pos.new_item_number || '',
         positionTitle: pos.position_title,
-        incumbentName: assign.personnel
+        incumbentName: assign?.personnel
           ? `${assign.personnel.last_name}, ${assign.personnel.first_name} ${assign.personnel.middle_name || ''}`.trim()
           : 'Vacant',
         salaryGrade: sg, baseStep,
-        monthlyRate: baseMon, annualRate: baseAnn,
-        ...baseAllow,
+        monthlyRate: effBaseMon, annualRate: effBaseAnn,
+        ...effBaseAllow,
         honoraria, overtime, terminalLeave: termLeave,
         rowSubTotal, incrementRow, rowTotal,
         stepUpDate, baseMonths, incrementMonths,
         savedMonthly, savedAnnual,
         extensionDeptId: pos.extension_department_id ?? null,
+        excluded: isExcluded,
       });
     });
 
@@ -688,7 +749,14 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
     });
 
     return rowsByDept;
-  }, [activePlan, matrix, assignments, edits, settings, salaryLookup]);
+  // `positions` must be a dependency here — it's read inside this memo via
+  // `positions.forEach(...)`. Without it, if the /plantilla-positions query
+  // resolves after activePlan/matrix/assignments/settings/salaryLookup are
+  // already stable, this memo freezes on its first run (often computed with
+  // positions still empty/loading) and never recomputes once positions
+  // actually arrives — hence rows showing 0 until a hard refresh reshuffles
+  // query resolution order.
+  }, [activePlan, matrix, assignments, positions, edits, settings, salaryLookup]);
 
   const departmentTotals = useMemo(() => {
     const totals: Record<number, Record<string, number>> = {};
@@ -749,6 +817,33 @@ const handleSave = async () => {
 
     setSaving(true);
     const savePromise = (async () => {
+      // ── Clean up stale Form3 snapshots ────────────────────────────────────
+      // `rows` only contains positions that are still active (departmentRows
+      // skips inactive ones). If a position was deactivated after being
+      // saved here previously, its old snapshot row is still sitting in this
+      // budget plan's plantilla-assignments and Form3 keeps showing it.
+      // Diff against what's currently saved and delete anything no longer
+      // represented by an active position.
+      // ⚠️ Verify this DELETE route against your backend — it mirrors the
+      // GET Form3.tsx already uses (`/department-budget-plans/{id}/plantilla-assignments`).
+      const existingRes = await API.get(
+        `/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments`
+      );
+      const existingAssignments: any[] = existingRes.data?.data ?? [];
+      const activePositionIds = new Set(rows.map(r => r.plantillaPositionId));
+      const staleAssignments = existingAssignments.filter(
+        (a: any) => !activePositionIds.has(a.plantilla_position_id)
+      );
+      if (staleAssignments.length > 0) {
+        await Promise.all(
+          staleAssignments.map((a: any) =>
+            API.delete(
+              `/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/${a.dept_bp_from3_assignment_id}`
+            )
+          )
+        );
+      }
+
       // await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
       //   assignments: rows.map(row => ({
       //     plantilla_position_id:      row.plantillaPositionId,
@@ -842,7 +937,7 @@ const handleSave = async () => {
 
 //   if (planLoading || matrixLoading || loading) return <LoadingState />;
 // if (planLoading || matrixLoading || loading || settingsLoading) return <LoadingState />;
-if (planLoading || matrixLoading || deptsLoading || assignLoading || deptPlansLoading || settingsLoading) return <LoadingState />;
+if (planLoading || matrixLoading || deptsLoading || assignLoading || deptPlansLoading || settingsLoading || positionsLoading) return <LoadingState />;
 if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
   if (!activeVersion) return <div className="p-8 text-center text-yellow-600">No active salary version found.</div>;
 
@@ -1183,9 +1278,14 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                             <TableCell className="font-medium max-w-[200px]">
                               {searching ? highlightMatch(row.positionTitle, deb) : row.positionTitle}
                             </TableCell>
-                            <TableCell className="text-sm min-w-[160px]">
+                           <TableCell className="text-sm min-w-[160px]">
                               <div className="flex flex-col gap-0.5">
                                 <span>{searching ? highlightMatch(row.incumbentName, deb) : row.incumbentName}</span>
+                                {row.excluded && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 w-fit">
+                                    Excluded from {activePlan.year} budget
+                                  </span>
+                                )}
                                 {row.stepUpDate && ir && (
                                   <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-fit">
                                     <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 10 10"><path d="M5 1.5v7M2 4l3-2.5L8 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1425,11 +1525,31 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
   style={{ animationDelay: '120ms' }}
 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Editable Fields</p>
-                  {[
-                    { label: 'Honoraria',     field: 'honoraria'     as keyof RowEdit },
-                    { label: 'Overtime Pay',  field: 'overtime'      as keyof RowEdit },
-                    { label: 'Terminal Leave',field: 'terminalLeave' as keyof RowEdit },
-                  ].map(({ label, field }, fi) => (
+                  <div className="flex items-center justify-between gap-3 pb-2 mb-1 border-b border-gray-200">
+                    <label className="text-xs text-gray-600 font-medium">
+                      Exclude from {activePlan.year} budget
+                      <span className="block text-[10px] text-gray-400 font-normal">Zeroes this row's money for this year only — item number stays put.</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleExcluded(row.positionId)}
+                      disabled={isSubmitted}
+                      className={cn(
+                        'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none',
+                        (edits[row.positionId]?.excluded) ? 'bg-red-500 border-red-500' : 'bg-gray-200 border-gray-300',
+                      )}
+                    >
+                      <span className={cn(
+                        'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
+                        (edits[row.positionId]?.excluded) ? 'translate-x-[18px]' : 'translate-x-[2px]',
+                      )} />
+                    </button>
+                  </div>
+                  {([
+                    { label: 'Honoraria',     field: 'honoraria'     as const },
+                    { label: 'Overtime Pay',  field: 'overtime'      as const },
+                    { label: 'Terminal Leave',field: 'terminalLeave' as const },
+                  ] satisfies { label: string; field: 'honoraria' | 'overtime' | 'terminalLeave' }[]).map(({ label, field }, fi) => (
                     <div
                       key={field}
                       className="flex items-center justify-between gap-3 ps-animate-sheet-item"
@@ -1438,7 +1558,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                       <label className="text-xs text-gray-600 font-medium w-32 shrink-0">{label}</label>
                       <Input
                         type="number"
-                        value={(edits[row.positionId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0 })[field]}
+                        value={(edits[row.positionId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false })[field]}
                         onChange={e => {
                           handleEditChange(row.positionId, field, parseFloat(e.target.value) || 0);
                           setDetailRow(prev => prev ? { ...prev, [field]: parseFloat(e.target.value) || 0 } : prev);

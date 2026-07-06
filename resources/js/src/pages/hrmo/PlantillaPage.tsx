@@ -63,17 +63,26 @@ const PlantillaPage: React.FC = () => {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; pos: any } | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
 
+  // Raw assignments, kept only so this page can renumber positions the same
+  // way Plantilla of Personnel does — not used for rendering here.
+  const [assignmentsForRenumber, setAssignmentsForRenumber] = useState<any[]>([]);
+
   useEffect(() => { if (selectedDeptId) setCreateForm(p => ({ ...p, dept_id: selectedDeptId })); }, [selectedDeptId]);
   useEffect(() => { if (createDialogOpen) setCreateForm(p => ({ ...p, new_item_number: getNextNewNumber() })); }, [createDialogOpen]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [posRes, deptRes] = await Promise.all([API.get('/plantilla-positions'), API.get('/departments')]);
+      const [posRes, deptRes, assignRes] = await Promise.all([
+        API.get('/plantilla-positions'),
+        API.get('/departments'),
+        API.get('/plantilla-assignments'),
+      ]);
       const posData = posRes.data.data || [];
       const deptData = deptRes.data.data || [];
       setPositions(posData);
       setDepartments(deptData);
+      setAssignmentsForRenumber(assignRes.data.data || []);
       const nums = new Set<string>();
       posData.forEach((p: any) => { if (p.new_item_number) nums.add(p.new_item_number.trim()); });
       setExistingNewNumbers(nums);
@@ -84,6 +93,72 @@ const PlantillaPage: React.FC = () => {
 
   useEffect(() => { fetchData(); }, []);
   useEffect(() => { setCurrentPage(1); }, [debouncedSearch, selectedDeptId]);
+
+  // Same ordering rule as Plantilla of Personnel's "Save Assignments":
+  //   Per department: assigned (SG desc) → vacant (SG desc), grouped by extension_department_id
+  //   Then, globally at the end: inactive positions, same extension/SG ordering.
+  // Runs automatically after create / edit / activate / deactivate so a
+  // position's number is always correct without needing to visit that page.
+  const runRenumber = async (allPositions: any[], allAssignments: any[]) => {
+    const deptOrder = departments.map(d => d.dept_id);
+
+    const assignedPositionIds = new Set<number>();
+    allAssignments.forEach((a: any) => {
+      if (a.personnel_id != null) assignedPositionIds.add(a.plantilla_position_id);
+    });
+
+    const extensionGroupsFor = (list: any[]): (number | null)[] => {
+      const ids = Array.from(
+        new Set(
+          list.map(p => p.extension_department_id ?? null).filter((id): id is number => id !== null)
+        )
+      ).sort((a, b) => a - b);
+      return [null, ...ids];
+    };
+
+    const activeNumbered: { pos: any; newNumber: number }[] = [];
+
+    deptOrder.forEach(deptId => {
+      const deptPositions = allPositions.filter(p => p.dept_id === deptId && p.is_active);
+
+      extensionGroupsFor(deptPositions).forEach(extId => {
+        const groupPositions = deptPositions.filter(p => (p.extension_department_id ?? null) === extId);
+
+        const assigned = groupPositions
+          .filter(p => assignedPositionIds.has(p.plantilla_position_id))
+          .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade));
+
+        const vacant = groupPositions
+          .filter(p => !assignedPositionIds.has(p.plantilla_position_id))
+          .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade));
+
+        [...assigned, ...vacant].forEach(pos => {
+          activeNumbered.push({ pos, newNumber: activeNumbered.length + 1 });
+        });
+      });
+    });
+
+    const inactivePositions = allPositions.filter(p => !p.is_active);
+    const inactiveNumbered: { pos: any; newNumber: number }[] = [];
+
+    extensionGroupsFor(inactivePositions).forEach(extId => {
+      inactivePositions
+        .filter(p => (p.extension_department_id ?? null) === extId)
+        .sort((a, b) => Number(b.salary_grade) - Number(a.salary_grade))
+        .forEach(pos => {
+          inactiveNumbered.push({ pos, newNumber: activeNumbered.length + inactiveNumbered.length + 1 });
+        });
+    });
+
+    const allNumbered = [...activeNumbered, ...inactiveNumbered];
+
+    await API.post('/plantilla-positions/renumber', {
+      positions: allNumbered.map(({ pos, newNumber }) => ({
+        plantilla_position_id: pos.plantilla_position_id,
+        new_item_number:       String(newNumber),
+      })),
+    });
+  };
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -148,11 +223,18 @@ const PlantillaPage: React.FC = () => {
   const handleConfirmCreate = async () => {
     setConfirmCreateOpen(false);
     try {
-      await API.post('/plantilla-positions', {
+      const res = await API.post('/plantilla-positions', {
         ...createForm,
         extension_department_id: createForm.extension_department_id !== '' ? parseInt(createForm.extension_department_id) : null,
       });
-      toast.success('Position created.'); fetchData(); setCreateDialogOpen(false);
+      const newPos = res.data?.data;
+      // The create endpoint's response omits `is_active` — a newly created
+      // position is always active by default, so set it explicitly here.
+      // Without this, runRenumber's `p.is_active` check treats it as falsy
+      // and misfiles it into the "inactive" group (numbered last, globally).
+      const freshPositions = newPos ? [...positions, { ...newPos, is_active: true }] : positions;
+      await runRenumber(freshPositions, assignmentsForRenumber);
+      toast.success('Position created and renumbered.'); fetchData(); setCreateDialogOpen(false);
       setCreateForm({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: selectedDeptId || 0, extension_department_id: '' });
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
@@ -168,7 +250,13 @@ const PlantillaPage: React.FC = () => {
         ...editForm,
         extension_department_id: editForm.extension_department_id !== '' ? parseInt(editForm.extension_department_id) : null,
       });
-      toast.success('Position updated.'); fetchData(); setEditDialogOpen(false); setEditingPosition(null);
+      const freshPositions = positions.map(p =>
+        p.plantilla_position_id === editingPosition.plantilla_position_id
+          ? { ...p, ...editForm, extension_department_id: editForm.extension_department_id !== '' ? parseInt(editForm.extension_department_id) : null }
+          : p
+      );
+      await runRenumber(freshPositions, assignmentsForRenumber);
+      toast.success('Position updated and renumbered.'); fetchData(); setEditDialogOpen(false); setEditingPosition(null);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
 
@@ -194,7 +282,13 @@ const confirmToggleActive = async () => {
     if (!togglePosition) return;
     try {
       await API.patch(`/plantilla-positions/${togglePosition.plantilla_position_id}`, { is_active: !togglePosition.is_active });
-      toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'}.`); fetchData();
+      const freshPositions = positions.map(p =>
+        p.plantilla_position_id === togglePosition.plantilla_position_id
+          ? { ...p, is_active: !togglePosition.is_active }
+          : p
+      );
+      await runRenumber(freshPositions, assignmentsForRenumber);
+      toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'} and renumbered.`); fetchData();
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
     finally { setToggleActiveOpen(false); setTogglePosition(null); }
   };
@@ -267,7 +361,7 @@ const confirmToggleActive = async () => {
     </button>
     <div
             id="plantilla-tabs-scroll"
-            className="flex-1 overflow-x-hidden min-w-0"
+            className="flex-1 overflow-x-auto min-w-0"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
       <div className="flex w-max gap-1">

@@ -232,15 +232,17 @@ const BudgetPlanDetail: React.FC = () => {
         )} */}
       </div>
 
-     {/* ── Progress stepper ── */}
-      <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 mb-4">
-        <BudgetPlanStepper
-          status={plan.status}
-          submittedAt={plan.submitted_at}
-          acknowledgedAt={plan.acknowledged_at}
-          approvedAt={plan.approved_at}
-        />
-      </div>
+     {/* ── Progress stepper — hidden while still a draft ── */}
+      {plan.status !== 'draft' && (
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 mb-4">
+          <BudgetPlanStepper
+            status={plan.status}
+            submittedAt={plan.submitted_at}
+            acknowledgedAt={plan.acknowledged_at}
+            approvedAt={plan.approved_at}
+          />
+        </div>
+      )}
 
       {/* ── Budget comparison banner (always visible, above tabs) ── */}
       <BudgetComparisonBanner plan={plan} pastYearPlan={pastYearPlan} />

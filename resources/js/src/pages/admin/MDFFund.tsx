@@ -115,16 +115,27 @@ const C_BUDG_GT  = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 // ─── Number helpers ───────────────────────────────────────────────────────────
 
 const enPH = (v: number) =>
-  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(v));
+  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
 const fmt      = (v: number | null | undefined) => (!v ? "–" : enPH(v));
 const fmtPeso  = (v: number) => (v === 0 ? "–" : `₱ ${enPH(v)}`);
 const parseNum = (s: string) => { const n = parseFloat(s.replace(/,/g, "").trim()); return isNaN(n) ? 0 : n; };
 const toStr    = (v: number) => (v === 0 ? "" : enPH(v));
 const commaFmt = (raw: string) => {
-  const digits = raw.replace(/[^0-9]/g, "");
-  if (!digits) return "";
-  return parseInt(digits, 10).toLocaleString("en-PH");
+  // Keep digits and at most one decimal point
+  let cleaned = raw.replace(/[^0-9.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+  }
+  if (!cleaned) return "";
+
+  const [intPartRaw, decPart] = cleaned.split(".");
+  const intFormatted = intPartRaw ? parseInt(intPartRaw, 10).toLocaleString("en-PH") : "0";
+
+  if (decPart === undefined) return intFormatted;
+  // Limit to 2 decimal places while typing, but allow "0." / "0.5" mid-entry
+  return `${intFormatted}.${decPart.slice(0, 2)}`;
 };
 
 // ─── AmountInput ──────────────────────────────────────────────────────────────

@@ -79,6 +79,24 @@ const fmtInput = (val: number | null | undefined): string => {
   return Math.round(val).toLocaleString("en-PH");
 };
 
+// Pressing Enter blurs the field, triggering the existing onBlur save handlers.
+const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+};
+
+// Strips everything except digits and a single decimal point (commas allowed as input but stripped first)
+const sanitizeNumericInput = (raw: string): string => {
+  let v = raw.replace(/,/g, "").replace(/[^0-9.]/g, "");
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+  }
+  return v;
+};
+
 // ─── Column color tokens ──────────────────────────────────────────────────────
 const COL_PAST    = "bg-green-50/50  border-green-100";
 const COL_CURR    = "bg-blue-50/40   border-blue-100";
@@ -536,18 +554,18 @@ const update = (rowId: number, field: "current_sem1" | "proposed", value: number
 //     update(rowId, "sem1", n === "" ? null : Number(n));
 //   };
 const handleSem1Change = (rowId: number, raw: string) => {
-    const n = raw.replace(/,/g, "");
+    const n = sanitizeNumericInput(raw);
     update(rowId, "current_sem1", n === "" ? null : Number(n));
   };
 
   const handleAmountChange = (rowId: number, raw: string) => {
-    const n = raw.replace(/,/g, "");
+    const n = sanitizeNumericInput(raw);
     update(rowId, "proposed", n === "" ? null : Number(n));
   };
 
   // WITH THIS:
 const handlePastObligationChange = (rowId: number, raw: string) => {
-  const n = raw.replace(/,/g, "");
+  const n = sanitizeNumericInput(raw);
   const value = n === "" ? null : Number(n);
   setRows((prev) => {
     const copy = [...prev];
@@ -779,7 +797,7 @@ const isViewer   = user?.role === "viewer";
         </thead>
 
         <tbody className="divide-y divide-gray-100">
-          {displayRows.map((row) => {
+          {displayRows.map((row, rowIdx) => {
             const total    = row.current_total ?? 0;
             const proposed = row.proposed ?? 0;
             const increase = proposed - total;
@@ -867,6 +885,8 @@ const isViewer   = user?.role === "viewer";
       const n = e.target.value.replace(/,/g, "");
       savePastObligation(row.id, n === "" ? null : Number(n));
     }}
+    onKeyDown={blurOnEnter}
+    tabIndex={1000 + rowIdx}
     placeholder="0"
   />
 ) : (
@@ -883,6 +903,8 @@ const isViewer   = user?.role === "viewer";
     value={fmtInput(row.current_sem1)}
     onChange={(e) => handleSem1Change(row.id, e.target.value)}
     onBlur={() => saveRow(row.id)}
+    onKeyDown={blurOnEnter}
+    tabIndex={2000 + rowIdx}
     disabled={isSaving}
     placeholder="0"
   />
@@ -906,6 +928,8 @@ const isViewer   = user?.role === "viewer";
     value={fmtInput(row.proposed)}
     onChange={(e) => handleAmountChange(row.id, e.target.value)}
     onBlur={() => saveRow(row.id)}
+    onKeyDown={blurOnEnter}
+    tabIndex={3000 + rowIdx}
     disabled={isSaving}
     placeholder="0"
     autoComplete="off"

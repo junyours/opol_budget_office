@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import {
   HeartIcon,
@@ -148,7 +149,30 @@ const GROUPS = ["Special Purpose", "Annual Plans"] as const;
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const PlansPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>("gad");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get("tab") as TabKey) || "gad";
+  const [activeTab, setActiveTabState] = useState<TabKey>(
+    TABS.some(t => t.key === initialTab) ? initialTab : "gad",
+  );
+
+  // Keep the URL in sync so tabs are shareable / deep-linkable / searchable
+  const setActiveTab = (key: TabKey) => {
+    setActiveTabState(key);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", key);
+      return next;
+    }, { replace: true });
+  };
+
+  // If the user arrives via a link/search result with a different ?tab=, sync it
+  useEffect(() => {
+    const paramTab = searchParams.get("tab") as TabKey | null;
+    if (paramTab && TABS.some(t => t.key === paramTab) && paramTab !== activeTab) {
+      setActiveTabState(paramTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const current   = TABS.find(t => t.key === activeTab)!;
   const Component = current.component;

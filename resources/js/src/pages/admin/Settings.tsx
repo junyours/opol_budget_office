@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 import {
   WrenchScrewdriverIcon,
@@ -134,7 +135,30 @@ type TabKey = typeof ALL_TABS[number]['key'];
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>('tranche');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabKey) || 'tranche';
+  const [activeTab, setActiveTabState] = useState<TabKey>(
+    ALL_TABS.some(t => t.key === initialTab) ? initialTab : 'tranche',
+  );
+
+  // Keep the URL in sync so tabs are shareable / deep-linkable / searchable
+  const setActiveTab = (key: TabKey) => {
+    setActiveTabState(key);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', key);
+      return next;
+    }, { replace: true });
+  };
+
+  // If the user arrives via a link/search result with a different ?tab=, sync it
+  useEffect(() => {
+    const paramTab = searchParams.get('tab') as TabKey | null;
+    if (paramTab && ALL_TABS.some(t => t.key === paramTab) && paramTab !== activeTab) {
+      setActiveTabState(paramTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const current   = ALL_TABS.find(t => t.key === activeTab)!;
   const Component = current.component;

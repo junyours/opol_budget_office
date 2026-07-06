@@ -44,10 +44,12 @@ import { useLocation } from 'react-router-dom';
 
 // import { useNotifications } from '@/src/hooks/useNotifications';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
+import { useReviewModeStore } from '@/src/store/useReviewModeStore';
 
 import { refreshSubmittedCount } from "@/src/hooks/useSubmittedPlanCount";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { Kbd, KbdGroup } from '@/src/components/ui/kbd';
 import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
 import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
 
@@ -980,7 +982,24 @@ const LBPForms: React.FC = () => {
   const [acknowledging,   setAcknowledging]  = useState(false);
   const [statusFilter,   setStatusFilter]   = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [cardView,       setCardView]       = useState<boolean>(false);
+  const { reviewMode: cardView, setReviewMode: setCardView } = useReviewModeStore();
+
+  // ── Shift+R toggles Review Mode (cardView) ──────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'r' || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      const isTyping =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+      if (isTyping) return;
+      e.preventDefault();
+      setCardView(v => !v);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // ── Default selection once plans are loaded ────────────────────────────────
   useEffect(() => {
@@ -1201,7 +1220,10 @@ const handleAcknowledge = async () => {
     <div className="flex h-full min-h-0 overflow-hidden w-full">
 
       {/* ══ LEFT RAIL ══ */}
-      <aside className="w-56 shrink-0 border-r border-gray-100 bg-gray-50/40 flex flex-col py-4 px-2 gap-0.5 overflow-y-auto">
+      <aside className={cn(
+        "shrink-0 border-r border-gray-100 bg-gray-50/40 flex-col py-4 px-2 gap-0.5 overflow-y-auto",
+        cardView ? "hidden" : "w-56 flex",
+      )}>
 
         <div className="px-2.5 mb-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 mb-0.5">
@@ -1411,6 +1433,10 @@ const handleAcknowledge = async () => {
 <div className="flex items-center gap-2 flex-shrink-0">
   <div className="flex items-center gap-1.5 mr-1">
     <span className="text-[10px] text-gray-400 font-medium">Review Mode</span>
+    <KbdGroup className="mr-1">
+      <Kbd>Shift</Kbd>
+      <Kbd>R</Kbd>
+    </KbdGroup>
     <button
       onClick={() => setCardView(v => !v)}
       className={cn(

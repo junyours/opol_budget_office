@@ -1,22 +1,9 @@
-import React, { useState } from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
+import { useQueries } from '@tanstack/react-query';
 import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan } from '../../types/api';
 import { cn } from '@/src/lib/utils';
-import { TrashIcon } from '@heroicons/react/24/outline';
-import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/src/components/ui/alert-dialog';
-import { Button } from '@/src/components/ui/button';
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 
@@ -56,8 +43,8 @@ interface Form3Props {
   plan: DepartmentBudgetPlan;
   pastYearPlan: DepartmentBudgetPlan | null;
   departmentId: number;
-  isEditable: boolean;
-  isAdmin?: boolean;  // ← NEW
+  isEditable?: boolean;
+  isAdmin?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -124,16 +111,9 @@ type MergedRow = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin = false }) => {
-  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
-  // ── Confirm dialog state ──
-  const [confirmRow,  setConfirmRow]  = useState<MergedRow | null>(null);
-
+const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin }) => {
   const currentYear  = plan.budget_plan?.year          ?? plan.budget_plan_id;
   const previousYear = pastYearPlan?.budget_plan?.year ?? pastYearPlan?.budget_plan_id ?? 'Previous';
-
-  // Only admins can see/use the trash column
-  const canDelete = isEditable && isAdmin;
 
   const planId = plan.dept_budget_plan_id;
   const pastPlanId = pastYearPlan?.dept_budget_plan_id;
@@ -162,29 +142,6 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
     .filter((r: SnapshotRow) => r.dept_bp_from3_assignment_id != null);
   const pastRows: SnapshotRow[] = (pastQ.data ?? []).map(parseRow);
   const loading = (currQ.isLoading && !!planId) || (pastQ.isLoading && !!pastPlanId);
-
-  const queryClient = useQueryClient();
-
-  const handleDeleteConfirmed = async () => {
-    const row = confirmRow;
-    if (!row?.snapshotId) return;
-    setConfirmRow(null);
-
-    setDeletingIds(prev => new Set(prev).add(row.snapshotId!));
-    try {
-      await API.delete(
-        `/department-budget-plans/${plan.dept_budget_plan_id}/plantilla-assignments/${row.snapshotId}`
-      );
-      toast.success(`${row.positionTitle} removed from snapshot.`);
-      queryClient.setQueryData(['plantilla-assignments', planId], (old: any[] = []) =>
-        old.filter(r => r.dept_bp_from3_assignment_id !== row.snapshotId)
-      );
-    } catch (err: any) {
-      toast.error(`Failed to remove: ${err?.response?.data?.message ?? err.message}`);
-    } finally {
-      setDeletingIds(prev => { const n = new Set(prev); n.delete(row.snapshotId!); return n; });
-    }
-  };
 
   if (loading) return <LoadingState />;
 
@@ -232,13 +189,24 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
   // Rule: positions/incumbents are driven by the PROPOSED year when it exists.
   // If no proposed data at all, fall back to prior year positions.
 
-  const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
+//   const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
+//   const priorMap    = new Map(pastRows.map(r    => [r.plantilla_position_id, r]));
+
+//   // Determine the master list of position IDs to display
+//   const masterIds: Set<number> = proposedMap.size > 0
+//     ? new Set(proposedMap.keys())          // proposed year drives the rows
+//     : new Set(priorMap.keys());            // fallback: only prior year exists
+
+const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
   const priorMap    = new Map(pastRows.map(r    => [r.plantilla_position_id, r]));
 
-  // Determine the master list of position IDs to display
-  const masterIds: Set<number> = proposedMap.size > 0
-    ? new Set(proposedMap.keys())          // proposed year drives the rows
-    : new Set(priorMap.keys());            // fallback: only prior year exists
+  // Show a position if it has data in EITHER year — not just the current one.
+  // A position deactivated/dropped from the current year's save should still
+  // display its prior-year figures; only the current-year columns go blank
+  // for it. (Previously this only fell back to prior-year IDs when the
+  // current year had zero saved rows at all, which hid any position that
+  // existed only in the prior year whenever the current year had other data.)
+  const masterIds: Set<number> = new Set([...proposedMap.keys(), ...priorMap.keys()]);
 
   const rows: MergedRow[] = Array.from(masterIds).map(pid => {
     const proposed = proposedMap.get(pid);   // 2026 data (orange column)
@@ -307,7 +275,7 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
   const totalCurrAnnual  = rows.reduce((s, r) => s + r.currAnnual,  0);
   const totalDiff        = totalCurrAnnual - totalPastAnnual;
 
-  const colSpanEmpty = canDelete ? 12 : 11;
+  const colSpanEmpty = 11;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -337,7 +305,6 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                   {currentYear} Budget
                 </th>
                 <th rowSpan={2} className={cn(TH_GRAY, 'align-bottom')}>Increase / Decrease</th>
-                {canDelete && <th rowSpan={2} className={cn(TH_GRAY, 'align-bottom w-8')} />}
               </tr>
               <tr>
                 <th className={cn(TH_GRAY, 'border-r border-gray-200')}>Old</th>
@@ -364,24 +331,18 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                   const extId = row.extensionDeptId;
                   const showHeader = extId !== null && extId !== lastExtId;
                   lastExtId = extId;
-                  const isDeleting = row.snapshotId ? deletingIds.has(row.snapshotId) : false;
                   return (
                     <React.Fragment key={idx}>
                       {showHeader && (
                         <tr className="bg-gray-50 border-t-2 border-b border-gray-200">
-                          <td colSpan={canDelete ? 12 : 11} className="px-4 py-2">
+                          <td colSpan={11} className="px-4 py-2">
                             <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
                               {EXTENSION_DEPT_NAMES[extId!] ?? `Extension Group ${extId}`}
                             </span>
                           </td>
                         </tr>
                       )}
-                      <tr
-                        className={cn(
-                          'hover:bg-gray-50/60 transition-colors',
-                          isDeleting && 'opacity-40 pointer-events-none',
-                        )}
-                      >
+                      <tr className="hover:bg-gray-50/60 transition-colors">
                     <td className={cn(TD_BASE, 'text-gray-500 text-center')}>{row.oldItem}</td>
                     <td className={cn(TD_BASE, 'text-gray-500 text-center')}>{row.newItem}</td>
                     <td className={cn(TD_BASE, 'text-gray-800 font-medium')}>{row.positionTitle}</td>
@@ -442,25 +403,6 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                     <td className={cn(TD_BASE, 'font-mono tabular-nums text-right font-semibold', row.diff >= 0 ? 'text-emerald-600' : 'text-red-500')}>
                       {fmtCurrency(row.diff)}
                     </td>
-
-                    {/* Trash — admin only */}
-                    {canDelete && (
-                      <td className={cn(TD_BASE, 'text-center w-8')}>
-                        <button
-                          onClick={() => row.snapshotId ? setConfirmRow(row) : toast.warning('Save snapshot first.')}
-                          disabled={isDeleting}
-                          className={cn(
-                            'transition-colors disabled:opacity-30',
-                            row.snapshotId
-                              ? 'text-gray-300 hover:text-red-500'
-                              : 'text-gray-200 cursor-not-allowed',
-                          )}
-                          title={row.snapshotId ? 'Remove from snapshot' : 'Save snapshot first'}
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    )}
                       </tr>
                     </React.Fragment>
                 );
@@ -483,7 +425,6 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
                 <td className={cn(TD_FT, 'border-l border-gray-700', totalDiff >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                   {fmtCurrency(totalDiff)}
                 </td>
-                {canDelete && <td className="border-l border-gray-700" />}
               </tr>
             </tfoot>
           </table>
@@ -510,41 +451,6 @@ const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin =
           </span>
         </div>
       </div>
-
-      {/* ── Delete confirm dialog ─────────────────────────────────────────── */}
-      <AlertDialog open={!!confirmRow} onOpenChange={o => { if (!o) setConfirmRow(null); }}>
-        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
-              Remove this position?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-gray-500">
-              <span className="font-medium text-gray-700">{confirmRow?.positionTitle}</span>
-              {confirmRow?.incumbentName !== 'Vacant' && (
-                <> — <span className="font-medium text-gray-700">{confirmRow?.incumbentName}</span></>
-              )}{' '}
-              will be removed from this plan's snapshot. This cannot be undone without re-saving
-              from Personnel Services.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">
-                Cancel
-              </Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                size="sm"
-                className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleDeleteConfirmed}
-              >
-                Remove
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

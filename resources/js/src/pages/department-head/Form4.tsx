@@ -811,7 +811,7 @@ const handleDeleteRequest = async (itemId: number) => {
                     onChange={e => setProgramSearch(e.target.value)}
                   />
                 </div>
-                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-56 overflow-y-auto overflow-x-hidden">
                   {filteredPrograms.length === 0 ? (
                     <p className="p-4 text-[12px] text-gray-400 text-center">No matching programs.</p>
                   ) : (
@@ -832,7 +832,7 @@ const handleDeleteRequest = async (itemId: number) => {
                             {program.aip_reference_code && (
                               <span className="text-[10px] text-gray-400 block mb-0.5 font-mono">{program.aip_reference_code}</span>
                             )}
-                            <span className="text-[12px] font-medium text-gray-900 block truncate">{program.program_description}</span>
+                            <span className="text-[12px] font-medium text-gray-900 block whitespace-normal break-words">{program.program_description}</span>
                           </div>
                           {used
                             ? <Badge variant="secondary" className="text-[10px] shrink-0">Already added</Badge>

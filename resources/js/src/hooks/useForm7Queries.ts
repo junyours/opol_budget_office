@@ -74,3 +74,18 @@ export function useForm7SpecialAccount(
     enabled: !!planId,
   });
 }
+
+// ─── Plan lookup (resolve a CY → budget_plan_id) ──────────────────────────────
+
+export interface BudgetPlanSummary {
+  budget_plan_id: number;
+  year:           number;
+}
+
+export function useBudgetPlansList() {
+  return useQuery<BudgetPlanSummary[]>({
+    queryKey: ['budget-plans', 'list'],
+    queryFn:  () =>
+      API.get('/budget-plans').then(r => r.data.data ?? r.data),
+  });
+}

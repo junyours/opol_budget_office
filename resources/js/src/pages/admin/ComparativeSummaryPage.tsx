@@ -1,15 +1,26 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/src/hooks/useAuth";
+import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { cn } from "@/src/lib/utils";
+import { LoadingState } from "@/src/components/states/LoadingState";
+import {
+  useForm7GeneralFund,
+  useForm7SpecialAccount,
+  useBudgetPlansList,
+  Form7Data,
+} from "@/src/hooks/useForm7Queries";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
+import { Input } from "@/src/components/ui/input";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 
 // ─────────────────────────────────────────────────────────────────────────
 // ✏️  EDIT YOUR NUMBERS HERE — this is the only section you need to touch.
 //     (Pooling from the DB comes later; for now it's just plain variables.)
 // ─────────────────────────────────────────────────────────────────────────
 
-const PAB_YEAR_PREV = 2026;
-const PAB_YEAR_CURR = 2027;
+// Years are now derived dynamically from the active budget plan (see ComparativeSummaryPage below).
 
 interface PabRow {
     label: string;
@@ -17,14 +28,14 @@ interface PabRow {
     curr: number; // CY 2027
 }
 
-// General Funds
-const GENERAL_FUND_ROWS: PabRow[] = [
-    { label: "Personnel Services (PS)", prev: 132104560, curr: 151860452.90 },
-    { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 106097748, curr: 123829944.00 },
-    { label: "Financial Expenses (FE)", prev: 87359957, curr: 95935288.56 },
-    { label: "Capital Outlay (CO)", prev: 4765000, curr: 10588000.00 },
-    { label: "Special Programs (SPA)", prev: 89951305, curr: 103282500.00 },
-];
+// // General Funds
+// const GENERAL_FUND_ROWS: PabRow[] = [
+//     { label: "Personnel Services (PS)", prev: 132104560, curr: 151860452.90 },
+//     { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 106097748, curr: 123829944.00 },
+//     { label: "Financial Expenses (FE)", prev: 87359957, curr: 95935288.56 },
+//     { label: "Capital Outlay (CO)", prev: 4765000, curr: 10588000.00 },
+//     { label: "Special Programs (SPA)", prev: 89951305, curr: 103282500.00 },
+// ];
 
 // Estimated Income (single row, sits above General Funds table)
 const ESTIMATED_INCOME_ROW: PabRow = {
@@ -40,14 +51,14 @@ const SA_ESTIMATED_INCOME_ROW: PabRow = {
     curr: 90360000.00,   // ✏️ input grand total for CY 2027 here
 };
 
-// Special Accounts
-const SPECIAL_ACCOUNT_ROWS: PabRow[] = [
-    { label: "Personnel Services (PS)", prev: 41559972, curr: 44017540.86 },
-    { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 21517749, curr: 21991580 },
-    { label: "Capital Outlay (CO)", prev: 12073709, curr: 6600000 },
-    { label: "Financial Expenses (FE)", prev: 4507970, curr: 4518000 },
-    { label: "Special Programs (SPA)", prev: 10500000, curr: 6580000 },
-];
+// // Special Accounts
+// const SPECIAL_ACCOUNT_ROWS: PabRow[] = [
+//     { label: "Personnel Services (PS)", prev: 41559972, curr: 44017540.86 },
+//     { label: "Maintenance & Other Operating Expenses (MOOE)", prev: 21517749, curr: 21991580 },
+//     { label: "Capital Outlay (CO)", prev: 12073709, curr: 6600000 },
+//     { label: "Financial Expenses (FE)", prev: 4507970, curr: 4518000 },
+//     { label: "Special Programs (SPA)", prev: 10500000, curr: 6580000 },
+// ];
 
 // ─────────────────────────────────────────────────────────────────────────
 // End of editable section.
@@ -74,9 +85,11 @@ interface SectionProps {
     badgeText: string;
     badgeClass: string;
     rows: PabRow[];
+    prevYear: number;
+    currYear: number;
 }
 
-const ComparativeSection: React.FC<SectionProps> = ({ title, badgeText, badgeClass, rows }) => {
+const ComparativeSection: React.FC<SectionProps> = ({ title, badgeText, badgeClass, rows, prevYear, currYear }) => {
     const totals = useMemo(() => {
         const prev = rows.reduce((s, r) => s + r.prev, 0);
         const curr = rows.reduce((s, r) => s + r.curr, 0);
@@ -97,8 +110,8 @@ const ComparativeSection: React.FC<SectionProps> = ({ title, badgeText, badgeCla
                         <thead>
                             <tr>
                                 <th className={TH}>Expenditures</th>
-                            <th className={cn(TH_PREV, "border-l")}>Annual Budget {PAB_YEAR_PREV}</th>
-                            <th className={cn(TH_CURR, "border-l")}>Annual Budget {PAB_YEAR_CURR}</th>
+                            <th className={cn(TH_PREV, "border-l")}>Annual Budget {prevYear}</th>
+                            <th className={cn(TH_CURR, "border-l")}>Annual Budget {currYear}</th>
                             <th className={cn(TH, "text-right")}>Increase / Decrease</th>
                             <th className={cn(TH, "text-right")}>Percentage</th>
                         </tr>
@@ -145,10 +158,171 @@ const ComparativeSection: React.FC<SectionProps> = ({ title, badgeText, badgeCla
     );
 };
 
+// Pulls a section's total (e.g. 'PS', 'MOOE', 'FE', 'CO', 'SPA') out of a Form7Data payload.
+const getSectionTotal = (data: Form7Data | undefined, code: string): number =>
+    data?.sections.sections.find(s => s.section_code === code)?.subtotal.total ?? 0;
+
+// Sums a section's total across several Form7Data payloads (used to combine SH + OCC + PM).
+const sumSectionAcross = (datas: (Form7Data | undefined)[], code: string): number =>
+    datas.reduce((sum, d) => sum + getSectionTotal(d, code), 0);
+
+// ── Per-item comparative helpers ───────────────────────────────────────────
+
+interface ItemPabRow {
+    label:        string;
+    accountCode:  string;
+    sectionCode:  string;
+    prev:         number;
+    curr:         number;
+}
+
+const itemKey = (sectionCode: string, accountCode: string, name: string) =>
+    `${sectionCode}|${(accountCode || '').trim().toLowerCase()}|${name.trim().toLowerCase()}`;
+
+// Flattens one or more Form7Data payloads into a flat map keyed by section+account+name,
+// preserving Form 7's own order (sections in their given order, rows within each section
+// in their given order). When multiple payloads share the same key (e.g. combining
+// SH + OCC + PM special accounts), their totals are summed together.
+const flattenItemsOrdered = (datas: (Form7Data | undefined)[]): Map<string, ItemPabRow> => {
+    const map = new Map<string, ItemPabRow>();
+    datas.forEach(data => {
+        if (!data) return;
+        data.sections.sections.forEach(section => {
+            section.rows.forEach(row => {
+                const key = itemKey(section.section_code, row.account_code, row.item_name);
+                const existing = map.get(key);
+                if (existing) {
+                    existing.curr += row.total;
+                } else {
+                    map.set(key, {
+                        label:       row.item_name,
+                        accountCode: row.account_code || '',
+                        sectionCode: section.section_code,
+                        prev:        0,
+                        curr:        row.total,
+                    });
+                }
+            });
+        });
+    });
+    return map;
+};
+
+// Builds comparative rows in Form 7's natural order (section order, then row order within
+// each section — taken from the CURRENT year's layout since that's the one being reviewed;
+// any prev-year-only item is appended after). Accepts arrays so General Fund (single source)
+// and Special Accounts (SH + OCC + PM combined) can share the same logic.
+const buildItemRows = (
+    prevDatas: (Form7Data | undefined)[],
+    currDatas: (Form7Data | undefined)[]
+): ItemPabRow[] => {
+    const prevMap = flattenItemsOrdered(prevDatas);
+    const currMap = flattenItemsOrdered(currDatas);
+
+    const rows: ItemPabRow[] = [];
+    const seen = new Set<string>();
+
+    // Walk current year's order first — this is what determines on-screen ordering.
+    currMap.forEach((row, key) => {
+        rows.push({ ...row, prev: prevMap.get(key)?.curr ?? 0 });
+        seen.add(key);
+    });
+
+    // Any item that existed in the prior year but was dropped this year — append at the end.
+    prevMap.forEach((row, key) => {
+        if (seen.has(key)) return;
+        rows.push({ label: row.label, accountCode: row.accountCode, sectionCode: row.sectionCode, prev: row.curr, curr: 0 });
+    });
+
+    return rows;
+};
+
 const ComparativeSummaryPage: React.FC = () => {
     const { user, loading } = useAuth();
+    const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
-    if (loading) return null;
+    // ── Dynamic years: current = active budget plan's year, previous = year before it ──
+    const currYear = activePlan?.year ?? new Date().getFullYear();
+    const prevYear = currYear - 1;
+
+    // ── Dynamic "as of" date — today's date, e.g. "JULY 5, 2026" ──
+    const asOfLabel = new Date()
+        .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        .toUpperCase();
+
+    // ── Resolve prevYear / currYear → their budget_plan_id ────────────────────
+    const { data: budgetPlans, isLoading: plansLoading } = useBudgetPlansList();
+    const prevPlanId = useMemo(
+        () => budgetPlans?.find(p => Number(p.year) === prevYear)?.budget_plan_id,
+        [budgetPlans, prevYear]
+    );
+    const currPlanId = useMemo(
+        () => budgetPlans?.find(p => Number(p.year) === currYear)?.budget_plan_id,
+        [budgetPlans, currYear]
+    );
+
+    // ── General Fund (Form 7, filter = general-fund) ──────────────────────────
+    const { data: gfPrev, isLoading: gfPrevLoading } = useForm7GeneralFund(prevPlanId);
+    const { data: gfCurr, isLoading: gfCurrLoading } = useForm7GeneralFund(currPlanId);
+
+    // ── Special Accounts (Form 7, filter = sh / occ / pm) — summed together ──
+    const { data: shPrev, isLoading: shPrevLoading } = useForm7SpecialAccount('sh', prevPlanId);
+    const { data: shCurr, isLoading: shCurrLoading } = useForm7SpecialAccount('sh', currPlanId);
+    const { data: occPrev, isLoading: occPrevLoading } = useForm7SpecialAccount('occ', prevPlanId);
+    const { data: occCurr, isLoading: occCurrLoading } = useForm7SpecialAccount('occ', currPlanId);
+    const { data: pmPrev, isLoading: pmPrevLoading } = useForm7SpecialAccount('pm', prevPlanId);
+    const { data: pmCurr, isLoading: pmCurrLoading } = useForm7SpecialAccount('pm', currPlanId);
+
+    const form7Loading =
+        plansLoading || gfPrevLoading || gfCurrLoading ||
+        shPrevLoading || shCurrLoading || occPrevLoading || occCurrLoading ||
+        pmPrevLoading || pmCurrLoading;
+
+    const generalFundRows: PabRow[] = useMemo(() => [
+        { label: "Personnel Services (PS)", prev: getSectionTotal(gfPrev, 'PS'), curr: getSectionTotal(gfCurr, 'PS') },
+        { label: "Maintenance & Other Operating Expenses (MOOE)", prev: getSectionTotal(gfPrev, 'MOOE'), curr: getSectionTotal(gfCurr, 'MOOE') },
+        { label: "Financial Expenses (FE)", prev: getSectionTotal(gfPrev, 'FE'), curr: getSectionTotal(gfCurr, 'FE') },
+        { label: "Capital Outlay (CO)", prev: getSectionTotal(gfPrev, 'CO'), curr: getSectionTotal(gfCurr, 'CO') },
+        { label: "Special Programs (SPA)", prev: getSectionTotal(gfPrev, 'SPA'), curr: getSectionTotal(gfCurr, 'SPA') },
+    ], [gfPrev, gfCurr]);
+
+    const specialAccountRows: PabRow[] = useMemo(() => {
+        const prevDatas = [shPrev, occPrev, pmPrev];
+        const currDatas = [shCurr, occCurr, pmCurr];
+        return [
+            { label: "Personnel Services (PS)", prev: sumSectionAcross(prevDatas, 'PS'), curr: sumSectionAcross(currDatas, 'PS') },
+            { label: "Maintenance & Other Operating Expenses (MOOE)", prev: sumSectionAcross(prevDatas, 'MOOE'), curr: sumSectionAcross(currDatas, 'MOOE') },
+            { label: "Capital Outlay (CO)", prev: sumSectionAcross(prevDatas, 'CO'), curr: sumSectionAcross(currDatas, 'CO') },
+            { label: "Financial Expenses (FE)", prev: sumSectionAcross(prevDatas, 'FE'), curr: sumSectionAcross(currDatas, 'FE') },
+            { label: "Special Programs (SPA)", prev: sumSectionAcross(prevDatas, 'SPA'), curr: sumSectionAcross(currDatas, 'SPA') },
+        ];
+    }, [shPrev, shCurr, occPrev, occCurr, pmPrev, pmCurr]);
+
+    // ── Fund switcher — drives BOTH the sector tables above and the item table below ──
+    const [activeFund, setActiveFund] = useState<'general-fund' | 'special-accounts'>('general-fund');
+    const [itemSearch, setItemSearch] = useState('');
+
+    const gfItemRows: ItemPabRow[] = useMemo(
+        () => buildItemRows([gfPrev], [gfCurr]),
+        [gfPrev, gfCurr]
+    );
+
+    const saItemRows: ItemPabRow[] = useMemo(
+        () => buildItemRows([shPrev, occPrev, pmPrev], [shCurr, occCurr, pmCurr]),
+        [shPrev, shCurr, occPrev, occCurr, pmPrev, pmCurr]
+    );
+
+    const itemRows = activeFund === 'general-fund' ? gfItemRows : saItemRows;
+
+    const filteredItemRows = useMemo(() => {
+        const q = itemSearch.trim().toLowerCase();
+        if (!q) return itemRows;
+        return itemRows.filter(r =>
+            r.label.toLowerCase().includes(q) || r.accountCode.toLowerCase().includes(q)
+        );
+    }, [itemRows, itemSearch]);
+
+    if (loading || planLoading || form7Loading) return <LoadingState />;
 
     const role = (user as any)?.role;
     if (role !== "admin" && role !== "super-admin") {
@@ -168,106 +342,220 @@ const ComparativeSummaryPage: React.FC = () => {
                     Comparative Summary
                 </p>
                 <h2 className="text-[20px] font-semibold text-gray-900 mt-0.5">
-                    Proposed Annual Budget — Appropriation {PAB_YEAR_PREV} vs Proposed {PAB_YEAR_CURR}
+                    Proposed Annual Budget — Appropriation {prevYear} vs Proposed {currYear}
                 </h2>
                 <h2 className="text-[20px] font-semibold text-gray-900 mt-0.5">
-                    AS OF JULY 2, 2026
+                    AS OF {asOfLabel}
                 </h2>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2.5">
-                    <h3 className="text-[15px] font-semibold text-gray-900">General Funds</h3>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-blue-700 bg-blue-50 border-blue-200">
-                        GF
-                    </span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
-                        <colgroup>
-                            <col style={{ width: "32%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th className={TH}>Estimated Income Revenue</th>
-                                <th className={cn(TH_PREV, "border-l")}>Annual Budget {PAB_YEAR_PREV}</th>
-                                <th className={cn(TH_CURR, "border-l")}>Annual Budget {PAB_YEAR_CURR}</th>
-                                <th className={cn(TH, "text-right")}>Increase / Decrease</th>
-                                <th className={cn(TH, "text-right")}>Percentage</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="hover:bg-gray-50/60 transition-colors">
-                                <td className={cn(TD, "text-gray-800 font-medium")}>{ESTIMATED_INCOME_ROW.label}</td>
-                                <td className={cn(TD_PREV, "border-l border-blue-100")}>{fmtP(ESTIMATED_INCOME_ROW.prev)}</td>
-                                <td className={cn(TD_CURR, "border-l border-orange-100")}>{fmtP(ESTIMATED_INCOME_ROW.curr)}</td>
-                                <td className={cn(TD_M, clr(incomeDiff))}>{incomeDiff === 0 ? "–" : (incomeDiff > 0 ? "+" : "") + fmtP(incomeDiff)}</td>
-                                <td className={cn(TD_M, clr(incomeDiff))}>
-                                    {ESTIMATED_INCOME_ROW.prev === 0 && incomeDiff === 0 ? "–" : `${incomePct.toFixed(2)}%`}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <Tabs value={activeFund} onValueChange={(v) => setActiveFund(v as 'general-fund' | 'special-accounts')} className="w-full">
+                <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-5">
+                    <TabsTrigger
+                        value="general-fund"
+                        className="text-xs px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700"
+                    >
+                        General Fund
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="special-accounts"
+                        className="text-xs px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700"
+                    >
+                        Special Accounts
+                    </TabsTrigger>
+                </TabsList>
 
-            <ComparativeSection
-                title="General Funds"
-                badgeText="GF"
-                badgeClass="text-blue-700 bg-blue-50 border-blue-200"
-                rows={GENERAL_FUND_ROWS}
-            />
+                <TabsContent value="general-fund" className="mt-0 flex flex-col gap-5">
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2.5">
+                            <h3 className="text-[15px] font-semibold text-gray-900">General Funds</h3>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-blue-700 bg-blue-50 border-blue-200">
+                                GF
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
+                                <colgroup>
+                                    <col style={{ width: "32%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th className={TH}>Estimated Income Revenue</th>
+                                        <th className={cn(TH_PREV, "border-l")}>Annual Budget {prevYear}</th>
+                                        <th className={cn(TH_CURR, "border-l")}>Annual Budget {currYear}</th>
+                                        <th className={cn(TH, "text-right")}>Increase / Decrease</th>
+                                        <th className={cn(TH, "text-right")}>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="hover:bg-gray-50/60 transition-colors">
+                                        <td className={cn(TD, "text-gray-800 font-medium")}>{ESTIMATED_INCOME_ROW.label}</td>
+                                        <td className={cn(TD_PREV, "border-l border-blue-100")}>{fmtP(ESTIMATED_INCOME_ROW.prev)}</td>
+                                        <td className={cn(TD_CURR, "border-l border-orange-100")}>{fmtP(ESTIMATED_INCOME_ROW.curr)}</td>
+                                        <td className={cn(TD_M, clr(incomeDiff))}>{incomeDiff === 0 ? "–" : (incomeDiff > 0 ? "+" : "") + fmtP(incomeDiff)}</td>
+                                        <td className={cn(TD_M, clr(incomeDiff))}>
+                                            {ESTIMATED_INCOME_ROW.prev === 0 && incomeDiff === 0 ? "–" : `${incomePct.toFixed(2)}%`}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2.5">
-                    <h3 className="text-[15px] font-semibold text-gray-900">Special Accounts</h3>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-emerald-700 bg-emerald-50 border-emerald-200">
-                        SA
-                    </span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
-                        <colgroup>
-                            <col style={{ width: "32%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                            <col style={{ width: "17%" }} />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th className={TH}>Estimated Income Revenue</th>
-                                <th className={cn(TH_PREV, "border-l")}>Annual Budget {PAB_YEAR_PREV}</th>
-                                <th className={cn(TH_CURR, "border-l")}>Annual Budget {PAB_YEAR_CURR}</th>
-                                <th className={cn(TH, "text-right")}>Increase / Decrease</th>
-                                <th className={cn(TH, "text-right")}>Percentage</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="hover:bg-gray-50/60 transition-colors">
-                                <td className={cn(TD, "text-gray-800 font-medium")}>{SA_ESTIMATED_INCOME_ROW.label}</td>
-                                <td className={cn(TD_PREV, "border-l border-blue-100")}>{fmtP(SA_ESTIMATED_INCOME_ROW.prev)}</td>
-                                <td className={cn(TD_CURR, "border-l border-orange-100")}>{fmtP(SA_ESTIMATED_INCOME_ROW.curr)}</td>
-                                <td className={cn(TD_M, clr(saIncomeDiff))}>{saIncomeDiff === 0 ? "–" : (saIncomeDiff > 0 ? "+" : "") + fmtP(saIncomeDiff)}</td>
-                                <td className={cn(TD_M, clr(saIncomeDiff))}>
-                                    {SA_ESTIMATED_INCOME_ROW.prev === 0 && saIncomeDiff === 0 ? "–" : `${saIncomePct.toFixed(2)}%`}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                    <ComparativeSection
+                        title="General Funds"
+                        badgeText="GF"
+                        badgeClass="text-blue-700 bg-blue-50 border-blue-200"
+                        rows={generalFundRows}
+                        prevYear={prevYear}
+                        currYear={currYear}
+                    />
+                </TabsContent>
 
-            <ComparativeSection
-                title="Special Accounts"
-                badgeText="SA"
-                badgeClass="text-emerald-700 bg-emerald-50 border-emerald-200"
-                rows={SPECIAL_ACCOUNT_ROWS}
-            />
+                <TabsContent value="special-accounts" className="mt-0 flex flex-col gap-5">
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2.5">
+                            <h3 className="text-[15px] font-semibold text-gray-900">Special Accounts</h3>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-emerald-700 bg-emerald-50 border-emerald-200">
+                                SA
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
+                                <colgroup>
+                                    <col style={{ width: "32%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                    <col style={{ width: "17%" }} />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th className={TH}>Estimated Income Revenue</th>
+                                        <th className={cn(TH_PREV, "border-l")}>Annual Budget {prevYear}</th>
+                                        <th className={cn(TH_CURR, "border-l")}>Annual Budget {currYear}</th>
+                                        <th className={cn(TH, "text-right")}>Increase / Decrease</th>
+                                        <th className={cn(TH, "text-right")}>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="hover:bg-gray-50/60 transition-colors">
+                                        <td className={cn(TD, "text-gray-800 font-medium")}>{SA_ESTIMATED_INCOME_ROW.label}</td>
+                                        <td className={cn(TD_PREV, "border-l border-blue-100")}>{fmtP(SA_ESTIMATED_INCOME_ROW.prev)}</td>
+                                        <td className={cn(TD_CURR, "border-l border-orange-100")}>{fmtP(SA_ESTIMATED_INCOME_ROW.curr)}</td>
+                                        <td className={cn(TD_M, clr(saIncomeDiff))}>{saIncomeDiff === 0 ? "–" : (saIncomeDiff > 0 ? "+" : "") + fmtP(saIncomeDiff)}</td>
+                                        <td className={cn(TD_M, clr(saIncomeDiff))}>
+                                            {SA_ESTIMATED_INCOME_ROW.prev === 0 && saIncomeDiff === 0 ? "–" : `${saIncomePct.toFixed(2)}%`}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <ComparativeSection
+                        title="Special Accounts"
+                        badgeText="SA"
+                        badgeClass="text-emerald-700 bg-emerald-50 border-emerald-200"
+                        rows={specialAccountRows}
+                        prevYear={prevYear}
+                        currYear={currYear}
+                    />
+                </TabsContent>
+            </Tabs>
+
+            <Card className="rounded-xl border-gray-200 shadow-sm overflow-hidden">
+                <CardHeader className="px-5 py-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-[15px] font-semibold text-gray-900">
+                                    Item-by-Item Comparative
+                                </CardTitle>
+                                {activeFund === 'general-fund' ? (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-blue-700 bg-blue-50 border-blue-200">
+                                        GF
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-emerald-700 bg-emerald-50 border-emerald-200">
+                                        SA · SH + OCC + PM combined
+                                    </span>
+                                )}
+                            </div>
+                            <CardDescription className="text-xs text-gray-400 mt-0.5">
+                                {activeFund === 'general-fund'
+                                    ? `General Fund line items, ${prevYear} vs ${currYear}.`
+                                    : `Special Accounts line items (combined), ${prevYear} vs ${currYear}.`}
+                            </CardDescription>
+                        </div>
+                        <div className="relative w-full sm:w-72">
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                            <Input
+                                className="pl-9 h-9 text-sm border-gray-200"
+                                placeholder="Search item or account code…"
+                                value={itemSearch}
+                                onChange={e => setItemSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+                        <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
+                            <colgroup>
+                                <col style={{ width: "34%" }} />
+                                <col style={{ width: "16%" }} />
+                                <col style={{ width: "16%" }} />
+                                <col style={{ width: "17%" }} />
+                                <col style={{ width: "17%" }} />
+                            </colgroup>
+                            <thead className="sticky top-0 z-10">
+                                <tr>
+                                    <th className={TH}>Item</th>
+                                    <th className={cn(TH_PREV, "border-l")}>{prevYear}</th>
+                                    <th className={cn(TH_CURR, "border-l")}>{currYear}</th>
+                                    <th className={cn(TH, "text-right")}>Increase / Decrease</th>
+                                    <th className={cn(TH, "text-right")}>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredItemRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="py-10 text-center text-gray-400 text-sm">
+                                            No matching items.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredItemRows.map((row, idx) => {
+                                        const diff = row.curr - row.prev;
+                                        const pct  = pctOf(row.prev, diff);
+                                        return (
+                                            <tr key={`${row.accountCode}-${row.label}-${idx}`} className="hover:bg-gray-50/60 transition-colors border-b border-gray-50">
+                                                <td className={cn(TD, "text-gray-800 font-medium")}>
+                                                    {row.accountCode && (
+                                                        <span className="text-gray-400 font-mono text-[10px] block">{row.accountCode}</span>
+                                                    )}
+                                                    {row.label}
+                                                </td>
+                                                <td className={cn(TD_PREV, "border-l border-blue-100")}>{fmtP(row.prev)}</td>
+                                                <td className={cn(TD_CURR, "border-l border-orange-100")}>{fmtP(row.curr)}</td>
+                                                <td className={cn(TD_M, clr(diff))}>{diff === 0 ? "–" : (diff > 0 ? "+" : "") + fmtP(diff)}</td>
+                                                <td className={cn(TD_M, clr(diff))}>
+                                                    {row.prev === 0 && diff === 0 ? "–" : `${pct.toFixed(2)}%`}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

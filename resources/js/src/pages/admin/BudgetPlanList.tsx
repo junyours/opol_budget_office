@@ -1,12 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import API from "../../services/api";
 import { BudgetPlan } from "../../types/api";
 import { LoadingState } from "../../components/states/LoadingState";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+// import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Badge } from "../../components/ui/badge";
 import { Switch } from "../../components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -25,12 +32,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ExclamationCircleIcon, CalendarDaysIcon } from "@heroicons/react/24/outline";
 // import { useQueryClient } from '@tanstack/react-query';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { useAuth } from "../../hooks/useAuth";
+import { Card as ShadcnCard } from "../../components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "../../components/ui/pagination";
+
+const PER_PAGE = 10;
 
 
 // ─── Extended type ────────────────────────────────────────────────────────────
@@ -53,14 +72,44 @@ const BudgetPlanList: React.FC = () => {
 const { data: plans = [], isLoading: loading, refetch: refetchPlans } = useQuery<BudgetPlanWithOpen[]>({
   queryKey: ['budget-plans'],
   queryFn: () => API.get('/budget-plans').then(r => r.data.data as BudgetPlanWithOpen[]),
-  select: (data) => [...data].sort((a, b) => b.year - a.year),
+  select: (data) => [...data].sort((a, b) => {
+    if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+    return b.year - a.year;
+  }),
 });
 
   // ── Create dialog ──────────────────────────────────────────────────────────
+  const CURRENT_YEAR = new Date().getFullYear();
+  const MIN_YEAR = CURRENT_YEAR - 1;
+  const MAX_YEAR = CURRENT_YEAR + 10;
+
   const [createOpen, setCreateOpen]   = useState(false);
-  const [newYear, setNewYear]         = useState<number>(new Date().getFullYear() + 1);
-  const [newActive, setNewActive]     = useState(false);
+  const [newYear, setNewYear]         = useState<number | "">(CURRENT_YEAR + 1);
+  const [newActive, setNewActive]     = useState(true);
   const [creating, setCreating]       = useState(false);
+
+  // Only years in range AND not already used are selectable — removes the
+  // error class entirely instead of validating free text after the fact.
+  const usedYears = useMemo(() => new Set(plans.map(p => p.year)), [plans]);
+
+  const availableYears = useMemo(() => {
+    const years: number[] = [];
+    for (let y = MIN_YEAR; y <= MAX_YEAR; y++) {
+      if (!usedYears.has(y)) years.push(y);
+    }
+    return years;
+  }, [usedYears, MIN_YEAR, MAX_YEAR]);
+
+  const yearError = newYear === "" ? "Fiscal year is required." : null;
+
+  const openCreateDialog = () => {
+    // Default to the first available year at/after next year, falling back
+    // to the first available year at all (e.g. if next year is already used).
+    const preferred = availableYears.find(y => y >= CURRENT_YEAR + 1) ?? availableYears[0] ?? "";
+    setNewYear(preferred);
+    setNewActive(true);
+    setCreateOpen(true);
+  };
 
   // ── Edit status dialog ─────────────────────────────────────────────────────
   const [editPlan, setEditPlan]       = useState<BudgetPlanWithOpen | null>(null);
@@ -81,6 +130,21 @@ const { data: plans = [], isLoading: loading, refetch: refetchPlans } = useQuery
 
   const { user } = useAuth();
     const isViewer = user?.role === 'viewer';
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  const totalPages   = Math.max(1, Math.ceil(plans.length / PER_PAGE));
+  const paginated     = plans.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const getPageNumbers = (): (number | "ellipsis")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages: (number | "ellipsis")[] = [1];
+    if (page > 3) pages.push("ellipsis");
+    for (let p = Math.max(2, page - 1); p <= Math.min(totalPages - 1, page + 1); p++) pages.push(p);
+    if (page < totalPages - 2) pages.push("ellipsis");
+    pages.push(totalPages);
+    return pages;
+  };
 
 //   const invalidateActivePlanDependents = () => {
 //   queryClient.invalidateQueries({ queryKey: ['budget-plan-active'] });
@@ -110,7 +174,7 @@ const invalidateActivePlanDependents = () => {
   // ── Create ─────────────────────────────────────────────────────────────────
 
   const handleCreate = async () => {
-    if (!newYear) return;
+    if (newYear === "") return;
     setCreating(true);
     try {
       const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive });
@@ -123,7 +187,7 @@ const invalidateActivePlanDependents = () => {
     //   fetchPlans();
     toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);
       setCreateOpen(false);
-      setNewYear(new Date().getFullYear() + 1);
+      setNewYear(CURRENT_YEAR + 1);
       setNewActive(false);
       invalidateActivePlanDependents();
       fetchPlans();
@@ -267,8 +331,8 @@ const invalidateActivePlanDependents = () => {
         {!isViewer && (
   <Button
     size="sm"
-    onClick={() => setCreateOpen(true)}
-    className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white"
+    onClick={openCreateDialog}
+    className="gap-1.5 text-xs h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
   >
     <PlusIcon className="w-3.5 h-3.5" />
     New Budget Plan
@@ -277,13 +341,13 @@ const invalidateActivePlanDependents = () => {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+       <ShadcnCard className="rounded-lg shadow-sm overflow-hidden">
         {plans.length === 0 ? (
-          <div className="text-center py-14 text-gray-400 text-sm">
+          <div className="text-center py-14 text-muted-foreground text-sm">
             No budget plans yet.{" "}
             <button
-              onClick={() => setCreateOpen(true)}
-              className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
+              onClick={openCreateDialog}
+              className="text-foreground/70 underline underline-offset-2 font-medium hover:text-foreground"
             >
               Create the first one
             </button>
@@ -297,15 +361,15 @@ const invalidateActivePlanDependents = () => {
                 {["Year", "Status", ...(!isViewer ? ["Submissions"] : []), "Department Plans", "Created"].map((h, i) => (
                   <th
                     key={i}
-                    className="border-b border-gray-200 bg-white px-4 py-2.5 text-left text-table-header"
+                    className="border-b border-border bg-card px-4 py-2.5 text-left text-table-header"
                   >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {plans.map(plan => {
+            <tbody className="divide-y divide-border">
+              {paginated.map(plan => {
                 const deptCount = (plan as any).department_plans?.length ?? "–";
                 return (
                 //   <tr
@@ -320,7 +384,7 @@ const invalidateActivePlanDependents = () => {
   key={plan.budget_plan_id}
   onClick={() => !isViewer && openEdit(plan)}
   className={cn(
-    !isViewer && "hover:bg-gray-50/80 cursor-pointer select-none",
+    !isViewer && "hover:bg-muted/50 cursor-pointer select-none",
     plan.is_active && "bg-emerald-50/30",
     "transition-colors"
   )}
@@ -405,18 +469,64 @@ const invalidateActivePlanDependents = () => {
               })}
             </tbody>
           </table>
-          <div className="px-4 py-2.5 border-t border-gray-100">
-            {/* <p className="text-[10px] text-gray-400 italic">Click a row to edit the plan status</p> */}
-            {!isViewer && (
-  <p className="text-meta italic">Click a row to edit the plan status</p>
-)}
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
+            {!isViewer ? (
+              <p className="text-meta italic">Click a row to edit the plan status</p>
+            ) : <span />}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-3">
+                <p className="text-meta">
+                  Showing{" "}
+                  <span className="font-medium text-foreground/70">
+                    {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, plans.length)}
+                  </span>{" "}
+                  of <span className="font-medium text-foreground/70">{plans.length}</span>
+                </p>
+                <Pagination className="w-auto mx-0">
+                  <PaginationContent className="gap-0.5">
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        className={cn("h-7 px-2 text-[11px] rounded-md cursor-pointer", page === 1 && "pointer-events-none opacity-40")}
+                      />
+                    </PaginationItem>
+                    {getPageNumbers().map((p, i) =>
+                      p === "ellipsis" ? (
+                        <PaginationItem key={`ellipsis-${i}`}>
+                          <PaginationEllipsis className="h-7 w-7 text-[11px]" />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            onClick={() => setPage(p)}
+                            isActive={page === p}
+                            className={cn(
+                              "h-7 w-7 text-[11px] rounded-md cursor-pointer",
+                              page === p ? "bg-primary text-primary-foreground hover:bg-primary/90 border-primary" : "text-foreground/70 hover:bg-muted"
+                            )}
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        className={cn("h-7 px-2 text-[11px] rounded-md cursor-pointer", page === totalPages && "pointer-events-none opacity-40")}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
           </>
         )}
-      </div>
+      </ShadcnCard>
 
       {/* ── Legend ── */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-table-secondary">
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
           Only one plan can be active at a time
@@ -428,45 +538,76 @@ const invalidateActivePlanDependents = () => {
       </div>
 
       {/* ════════ CREATE DIALOG ════════ */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
-            <DialogTitle className="text-section-title">New Budget Plan</DialogTitle>
-            <DialogDescription className="text-subtitle mt-0.5">
-              Department plans for all departments will be auto-initialized.
-            </DialogDescription>
+      <Dialog open={createOpen} onOpenChange={(open) => { if (!creating) setCreateOpen(open); }}>
+        <DialogContent className="max-w-sm rounded-2xl border-border gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-muted">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <CalendarDaysIcon className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-section-title">New Budget Plan</DialogTitle>
+                <DialogDescription className="text-subtitle mt-0.5">
+                  Department plans for all departments will be auto-initialized.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
+
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label className="text-field-label">
-                Fiscal Year <span className="text-red-400">*</span>
+                Fiscal Year <span className="text-destructive">*</span>
               </Label>
-              <Input
-                type="number"
-                value={newYear}
-                onChange={e => setNewYear(parseInt(e.target.value))}
-                className="h-9 text-sm font-mono"
-              />
+              {availableYears.length === 0 ? (
+                <p className="flex items-center gap-1.5 text-xs text-destructive">
+                  <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                  No years available in the {MIN_YEAR}–{MAX_YEAR} range — all are already used.
+                </p>
+              ) : (
+                <>
+                  <Select
+                    value={newYear === "" ? undefined : String(newYear)}
+                    onValueChange={v => setNewYear(parseInt(v, 10))}
+                  >
+                    <SelectTrigger className="h-10 text-sm font-mono tabular-nums">
+                      <SelectValue placeholder="Select a year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableYears.map(y => (
+                        <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-meta">Only unused years are shown.</p>
+                </>
+              )}
             </div>
-            <div className="flex items-center justify-between py-1">
+
+            <div className="flex items-center justify-between py-1 border-t border-muted pt-4">
               <div>
                 <p className="text-field-label">Set as Active</p>
-<p className="text-meta mt-0.5">Will deactivate the current active plan</p>
+                <p className="text-meta mt-0.5">Will deactivate the current active plan</p>
               </div>
               <Switch checked={newActive} onCheckedChange={setNewActive} />
             </div>
+
             {newActive && plans.some(p => p.is_active) && (
-              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
+                <ExclamationCircleIcon className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <p className="text-table-secondary text-amber-700 font-medium">
                   Budget Plan Year {plans.find(p => p.is_active)?.year} will be deactivated.
                 </p>
               </div>
             )}
           </div>
-          <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
+
+          <DialogFooter className="px-6 py-4 border-t border-muted gap-2">
             <Button
               variant="outline" size="sm"
-              className="h-8 text-xs border-gray-200"
+              className="h-8 text-xs border-border"
               onClick={() => setCreateOpen(false)}
               disabled={creating}
             >
@@ -474,9 +615,9 @@ const invalidateActivePlanDependents = () => {
             </Button>
             <Button
               size="sm"
-              className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
+              className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
               onClick={handleCreate}
-              disabled={creating || !newYear}
+              disabled={creating || !!yearError || availableYears.length === 0}
             >
               {creating
                 ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating…</>
@@ -489,8 +630,8 @@ const invalidateActivePlanDependents = () => {
 
       {/* ════════ EDIT STATUS DIALOG ════════ */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
+        <DialogContent className="max-w-sm rounded-2xl border-border gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-muted">
             <DialogTitle className="text-section-title">Edit Budget Plan</DialogTitle>
             <DialogDescription className="text-subtitle mt-0.5">
               Budget Plan Year {editPlan?.year}
@@ -507,10 +648,10 @@ const invalidateActivePlanDependents = () => {
               <Switch checked={editActive} onCheckedChange={setEditActive} />
             </div>
           </div>
-          <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
+           <DialogFooter className="px-6 py-4 border-t border-muted gap-2">
             <Button
               variant="outline" size="sm"
-              className="h-8 text-xs border-gray-200"
+              className="h-8 text-xs border-border"
               onClick={() => setEditOpen(false)}
               disabled={saving}
             >
@@ -518,7 +659,7 @@ const invalidateActivePlanDependents = () => {
             </Button>
             <Button
               size="sm"
-              className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
+              className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
               onClick={handleSaveEdit}
               disabled={saving}
             >
@@ -532,8 +673,8 @@ const invalidateActivePlanDependents = () => {
       </Dialog>
 
       {/* ════════ ACTIVATE CONFIRM ════════ */}
-      <AlertDialog open={!!activateTarget} onOpenChange={o => { if (!o) setActivateTarget(null); }}>
-        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+       <AlertDialog open={!!activateTarget} onOpenChange={o => { if (!o) setActivateTarget(null); }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-section-title">
               Activate Budget Plan Year {activateTarget?.year}?
@@ -544,12 +685,12 @@ const invalidateActivePlanDependents = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-border">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 size="sm"
-                className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
+                className="h-8 text-xs bg-primary hover:bg-primary/90"
                 onClick={() => activateTarget && doActivate(activateTarget.budget_plan_id)}
                 disabled={saving}
               >
@@ -561,8 +702,8 @@ const invalidateActivePlanDependents = () => {
       </AlertDialog>
 
       {/* ════════ CLOSE SUBMISSIONS WARNING ════════ */}
-      <AlertDialog open={!!closeTarget} onOpenChange={o => { if (!o) { setCloseTarget(null); setDraftDepts([]); } }}>
-        <AlertDialogContent className="rounded-2xl max-w-md border-gray-200 max-h-[90vh] flex flex-col overflow-hidden">
+     <AlertDialog open={!!closeTarget} onOpenChange={o => { if (!o) { setCloseTarget(null); setDraftDepts([]); } }}>
+        <AlertDialogContent className="rounded-2xl max-w-md border-border max-h-[90vh] flex flex-col overflow-hidden">
           <AlertDialogHeader className="flex-shrink-0">
             <AlertDialogTitle className="text-section-title">
               Close submissions for FY {closeTarget?.year}?
@@ -608,12 +749,12 @@ const invalidateActivePlanDependents = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-border">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 size="sm"
-                className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
+                className="h-8 text-xs bg-primary hover:bg-primary/90"
                 onClick={confirmClose}
                 disabled={closingPlan || loadingDrafts}
               >

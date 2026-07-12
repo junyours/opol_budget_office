@@ -5,9 +5,12 @@ import { useAuth } from "../../hooks/useAuth";
 import {
   Eye, EyeOff, AlertCircle, Loader2,
   Building2, BarChart3, FileText, ShieldCheck,
-  X, UserCircle2, Settings, ChevronRight,
+  X, Settings, ChevronRight,
 } from "lucide-react";
+import { Card } from "@/src/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import API from "../../services/api";
+import LegalDialog, { type LegalTab } from "../../components/dialog/LegalDialog";
 import { Input }                   from "@/src/components/ui/input";
 import { Label }                   from "@/src/components/ui/label";
 import { Button }                  from "@/src/components/ui/button";
@@ -42,6 +45,7 @@ const FEATURES = [
   { icon: ShieldCheck, label: "Role-based access control",  iconBg: "rgba(254,226,226,0.18)", iconColor: "rgba(252,165,165,1)" },
 ];
 
+
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
 // We cache a base64 copy of the avatar in localStorage so it renders on the
 // accounts list even before the server responds (no broken-image flash).
@@ -72,10 +76,13 @@ function getCachedAvatar(userId: number): string | null {
   try { return localStorage.getItem(AVATAR_CACHE_KEY(userId)); } catch { return null; }
 }
 
+function initials(fname?: string, lname?: string) {
+  return `${fname?.[0] ?? ""}${lname?.[0] ?? ""}`.toUpperCase();
+}
+
 function AvatarImg({ acct, size = 40 }: { acct: RememberedAccount; size?: number }) {
   const cached = getCachedAvatar(acct.user_id);
-  const [src, setSrc]     = useState<string | null>(cached);
-  const [error, setError] = useState(false);
+  const [src, setSrc] = useState<string | null>(cached);
 
   useEffect(() => {
     if (!acct.avatar || cached) return;
@@ -84,25 +91,16 @@ function AvatarImg({ acct, size = 40 }: { acct: RememberedAccount; size?: number
     setSrc(url);
   }, [acct.avatar, acct.user_id]);
 
-  if (!src || error) {
-    return (
-      <div
-        className="rounded-full bg-zinc-100 flex items-center justify-center flex-shrink-0"
-        style={{ width: size, height: size }}
-      >
-        <UserCircle2 className="text-zinc-400" style={{ width: size * 0.55, height: size * 0.55 }} />
-      </div>
-    );
-  }
-
   return (
-    <img
-      src={src}
-      alt=""
-      className="rounded-full object-cover flex-shrink-0"
-      style={{ width: size, height: size }}
-      onError={() => setError(true)}
-    />
+    <Avatar style={{ width: size, height: size }} className="flex-shrink-0">
+      {src && <AvatarImage src={src} alt="" />}
+      <AvatarFallback
+        className="bg-zinc-100 text-zinc-500 font-semibold"
+        style={{ fontSize: size * 0.34 }}
+      >
+        {initials(acct.fname, acct.lname)}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -159,7 +157,10 @@ export default function Login() {
   // ── Saved accounts state ──────────────────────────────────────────────────────
   const [savedAccounts,  setSavedAccounts]  = useState<RememberedAccount[]>([]);
   const [showRemovePanel, setShowRemovePanel] = useState(false);
-  const [showManualLogin, setShowManualLogin] = useState(false);
+ const [showManualLogin, setShowManualLogin] = useState(false);
+
+  // ── Legal modal (Privacy Policy / Terms of Use) ───────────────────────────────
+  const [legalModal, setLegalModal] = useState<LegalTab | null>(null);
 
   // ── PIN panel (replaces right-panel form when an account is selected) ─────────
   const [pinAccount,   setPinAccount]   = useState<RememberedAccount | null>(null);
@@ -542,24 +543,15 @@ export default function Login() {
       </button>
 
       {/* Account card */}
-      <div style={{
-        background: '#F8F8F8',
-        border: '1px solid #EBEBEB',
-        borderRadius: 16,
-        padding: '20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginBottom: 24,
-      }}>
+      <Card className="flex flex-col items-center py-5 px-4 mb-6 bg-zinc-50 border-zinc-200 shadow-none">
         <AvatarImg acct={pinAccount} size={64} />
-        <p style={{ fontWeight: 700, fontSize: 16, color: '#18181b', margin: '12px 0 2px' }}>
+        <p className="font-bold text-base text-zinc-900 mt-3 mb-0.5">
           {pinAccount.fname} {pinAccount.lname}
         </p>
-        <p style={{ fontSize: 12, color: '#71717a', margin: 0 }}>
+        <p className="text-xs text-zinc-500">
           {pinAccount.department_name ?? ROLE_LABEL[pinAccount.role] ?? pinAccount.role}
         </p>
-      </div>
+      </Card>
 
       {pinError && (
         <Alert variant="destructive" className="mt-4">
@@ -605,6 +597,12 @@ export default function Login() {
 
       <Separator className="my-5" />
       <p className="text-xs text-zinc-400 text-center">Restricted to authorized personnel only.</p>
+      <p className="text-[11px] text-zinc-400 text-center leading-relaxed mt-2">
+        By signing in, you agree to the{" "}
+        <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
+        {" "}and{" "}
+        <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
+      </p>
     </div>
   </div>
 
@@ -679,17 +677,15 @@ export default function Login() {
             Choose your account to continue.
           </p>
         </div>
-        <button
+        <Button
+          variant="outline"
+          size="icon"
           onClick={() => setShowRemovePanel(true)}
           title="Manage saved accounts"
-          style={{
-            background: 'none', border: '1px solid #e4e4e7', borderRadius: 8,
-            padding: '6px 8px', cursor: 'pointer', color: '#71717a', display: 'flex', alignItems: 'center',
-          }}
-          className="hover:bg-zinc-50 transition-colors"
+          className="h-8 w-8 text-zinc-500"
         >
           <Settings className="w-3.5 h-3.5" />
-        </button>
+        </Button>
       </div>
 
      {/* Account cards — max 3 visible, scrollable */}
@@ -708,62 +704,47 @@ export default function Login() {
   marginBottom: -4,
 }}
       >
-        {savedAccounts.map((acct) => {
-          return (
-            <button
-              key={acct.user_id}
-              onClick={() => openPinPanel(acct)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 14px',
-                background: '#fff',
-                border: '1px solid #e4e4e7',
-                borderRadius: 14,
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'background 0.12s, transform 0.12s',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'none'; }}
-            >
-              <AvatarImg acct={acct} size={44} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: '#18181b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {acct.fname} {acct.lname}
-                </p>
-                <p style={{ fontSize: 12, color: '#71717a', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {acct.department_name
-                    ? `${acct.department_name} · ${ROLE_LABEL[acct.role] ?? acct.role}`
-                    : ROLE_LABEL[acct.role] ?? acct.role}
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: '#d4d4d8' }} />
-              {/* <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0 }} /> */}
-            </button>
-          );
-       })}
+        {savedAccounts.map((acct) => (
+          <button
+            key={acct.user_id}
+            onClick={() => openPinPanel(acct)}
+            className="group w-full flex items-center gap-3 px-3.5 py-3 bg-white border border-zinc-200 rounded-xl text-left transition-all hover:border-zinc-300 hover:shadow-sm hover:-translate-y-0.5"
+          >
+            <AvatarImg acct={acct} size={44} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-zinc-900 truncate">
+                {acct.fname} {acct.lname}
+              </p>
+              <p className="text-xs text-zinc-500 truncate mt-0.5">
+                {acct.department_name
+                  ? `${acct.department_name} · ${ROLE_LABEL[acct.role] ?? acct.role}`
+                  : ROLE_LABEL[acct.role] ?? acct.role}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 flex-shrink-0 text-zinc-300 transition-colors group-hover:text-zinc-500" />
+          </button>
+        ))}
       </div>
 
       <div className={`mt-4 ${sl("right","d3")}`}>
         <Separator className="mb-4" />
-        <button
+        <Button
+          variant="ghost"
           onClick={() => setShowManualLogin(true)}
-          style={{
-            width: '100%', background: 'none', border: 'none',
-            fontSize: 13, color: '#3b82f6', cursor: 'pointer',
-            padding: '8px 0', borderRadius: 8, fontWeight: 500,
-          }}
-          className="hover:text-blue-700 hover:bg-blue-50 transition-colors"
+          className="w-full text-sm font-medium text-blue-500 hover:text-blue-700 hover:bg-blue-50"
         >
           Use a different account
-        </button>
+        </Button>
       </div>
 
       <p className={`text-xs text-zinc-400 text-center mt-3 ${sl("right","d4")}`}>
         Restricted to authorized personnel only.
+      </p>
+      <p className={`text-[11px] text-zinc-400 text-center leading-relaxed mt-1 ${sl("right","d4")}`}>
+        By signing in, you agree to the{" "}
+        <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
+        {" "}and{" "}
+        <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
       </p>
     </div>
   </div>
@@ -845,6 +826,12 @@ export default function Login() {
                       <div className={`mt-8 ${sl("right","d6")}`}>
                         <Separator className="mb-5" />
                         <p className="text-xs text-zinc-400 text-center leading-relaxed">Restricted to authorized personnel only.</p>
+                        <p className="text-[11px] text-zinc-400 text-center leading-relaxed mt-2">
+                          By signing in, you agree to the{" "}
+                          <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
+                          {" "}and{" "}
+                          <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -859,6 +846,8 @@ export default function Login() {
           © {new Date().getFullYear()} Municipal Budget Office Management System
         </footer>
       </div>
+
+      <LegalDialog open={legalModal} onOpenChange={setLegalModal} />
     </>
   );
 }

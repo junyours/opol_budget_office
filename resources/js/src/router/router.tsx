@@ -121,10 +121,6 @@ const ComparativeSummaryPage = React.lazy(
   () => import("../pages/admin/ComparativeSummaryPage")
 );
 
-const DepartmentReportsPage = React.lazy(
-    () => import('../components/report/DepartmentReportPage')
-  );
-
 const UnifiedReportsPage = React.lazy(
     () => import('../components/report/UnifiedReportsPage')
   );
@@ -146,6 +142,10 @@ const ExpenditurePage = React.lazy(
 
    const BagOngOpol = React.lazy(
    () => import("../pages/common/BagOngOpol")
+ );
+
+   const BudgetCallMemoPage = React.lazy(
+   () => import("../pages/common/BudgetCallMemoPage")
  );
 
 const NoInternet = React.lazy(() => import("../components/states/NoInternet"));
@@ -300,6 +300,7 @@ const router = createBrowserRouter([
           },
 
 { path: "bag-ong-opol", element: Lazy(BagOngOpol) },
+          { path: "budget-call-memo", element: Lazy(BudgetCallMemoPage) },
           {
             path: "profile",
             element: Lazy(ProfilePage),
@@ -331,7 +332,7 @@ const router = createBrowserRouter([
             ],
           },
           {
-            element: <RoleRoute roles={["admin", "super-admin", "viewer"]} />,
+            element: <RoleRoute roles={["admin", "super-admin", "viewer", "admin-ldrrmo"]} />,
             children: [
               {
                 path: "admin/ldrrmf-plan",
@@ -516,7 +517,7 @@ const router = createBrowserRouter([
               },
               {
                 path: 'department/reports',
-                element: Lazy(DepartmentReportsPage),
+                element: Lazy(UnifiedReportsPage),
               },
               {
                 path: "department/settings",

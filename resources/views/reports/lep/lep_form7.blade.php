@@ -41,9 +41,8 @@ $nf = function($n): string {
     $isLast     = ($formIdx === count($forms7) - 1);
     $pageStyle  = $isLast ? '' : 'page-break-after: always;';
 
-    // Column count: special = 3 (Particulars | Account Code | Total)
-    //               general  = 7 (Particulars | Account Code | GPS | SS | ES | OS | Total)
-    $colCount = $isSpecial ? 3 : 7;
+    // Column count: always 7 — special accounts still show sector headers, with dashes in the data cells
+$colCount = 7;
 @endphp
 
 <div style="{{ $pageStyle }}">
@@ -66,7 +65,6 @@ $nf = function($n): string {
 {{-- ── Data table ── --}}
 <table class="data-table" style="width:100%; table-layout:fixed; font-size:5.5pt;">
     <colgroup>
-        @if(!$isSpecial)
         <col style="width:30%;">
         <col style="width:10%;">
         <col style="width:12%;">
@@ -74,15 +72,9 @@ $nf = function($n): string {
         <col style="width:12%;">
         <col style="width:12%;">
         <col style="width:12%;">
-        @else
-        <col style="width:58%;">
-        <col style="width:12%;">
-        <col style="width:30%;">
-        @endif
     </colgroup>
     <thead>
         {{-- ── Ghost row — forces column widths ── --}}
-        @if(!$isSpecial)
         <tr style="height:0; line-height:0; font-size:0; visibility:hidden;">
             <th style="width:30%; padding:0; border:none;"></th>
             <th style="width:10%;  padding:0; border:none;"></th>
@@ -92,42 +84,28 @@ $nf = function($n): string {
             <th style="width:12%; padding:0; border:none;"></th>
             <th style="width:12%; padding:0; border:none;"></th>
         </tr>
-        @else
-        <tr style="height:0; line-height:0; font-size:0; visibility:hidden;">
-            <th style="width:62%; padding:0; border:none;"></th>
-            <th style="width:10%; padding:0; border:none;"></th>
-            <th style="width:28%; padding:0; border:none;"></th>
-        </tr>
-        @endif
         <tr>
             <th style="text-align:left;">Particulars</th>
             <th>Account<br>Code</th>
-            @if(!$isSpecial)
             <th>General<br>Public<br>Services</th>
             <th>Social<br>Services</th>
             <th>Economic<br>Services</th>
             <th>Other<br>Services</th>
-            @endif
             <th>Total</th>
         </tr>
         <tr>
             <th style="font-weight:normal; font-size:5.5pt;">(1)</th>
             <th style="font-weight:normal; font-size:5.5pt;">(2)</th>
-            @if(!$isSpecial)
             <th style="font-weight:normal; font-size:5.5pt;">(3)</th>
             <th style="font-weight:normal; font-size:5.5pt;">(4)</th>
             <th style="font-weight:normal; font-size:5.5pt;">(5)</th>
             <th style="font-weight:normal; font-size:5.5pt;">(6)</th>
             <th style="font-weight:normal; font-size:5.5pt;">(7)</th>
-            @else
-            <th style="font-weight:normal; font-size:5.5pt;">(3)</th>
-            @endif
         </tr>
     </thead>
     <tbody>
 
     {{-- ── Ghost row — forces column widths under table-layout:fixed ── --}}
-    @if(!$isSpecial)
     <tr style="visibility:hidden; height:0; line-height:0; font-size:0;">
         <td style="width:30%; padding:0;"></td>
         <td style="width:10%; padding:0;"></td>
@@ -137,13 +115,6 @@ $nf = function($n): string {
         <td style="width:12%; padding:0;"></td>
         <td style="width:12%; padding:0;"></td>
     </tr>
-    @else
-    <tr style="visibility:hidden; height:0; line-height:0; font-size:0;">
-        <td style="width:58%; padding:0;"></td>
-        <td style="width:12%; padding:0;"></td>
-        <td style="width:30%; padding:0;"></td>
-    </tr>
-    @endif
 
     @foreach($sections as $section)
     @php
@@ -178,6 +149,10 @@ $nf = function($n): string {
         <tr>
             <td class="l" style="padding-left:8px;">{{ $row['item_name'] }}</td>
             <td class="c" style="font-size:6pt;">{{ $row['account_code'] ?? '' }}</td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
             <td class="r">{!! $rIdx === 0 ? $pa($row['total']) : $nf($row['total']) !!}</td>
         </tr>
         @endforeach
@@ -206,6 +181,10 @@ $nf = function($n): string {
     @else
     <tr style="font-weight:bold;">
         <td class="l" colspan="2" style="padding:2px 4px;">Total {{ $section['section_label'] }}</td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
+        <td class="r"> - </td>
         <td class="r">{!! $pa($subtotal['total'] ?? 0) !!}</td>
     </tr>
     @endif
@@ -229,6 +208,10 @@ $nf = function($n): string {
         @else
         <tr style="font-weight:bold; background:#fff;">
             <td class="l" colspan="2" style="padding:2px 4px;">Grand Total</td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
+            <td class="r"> - </td>
             <td class="r">{!! $pa($grandTotal['total'] ?? 0) !!}</td>
         </tr>
         @endif

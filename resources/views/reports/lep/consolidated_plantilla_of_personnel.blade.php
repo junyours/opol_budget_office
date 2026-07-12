@@ -170,11 +170,11 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
             </td>
-          <td class="r" style="{{ !$noCurrent && isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
-            @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+          <td class="r" style="{{ isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
+            @if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
                 {!! $fmt($row['increase_decrease']) !!}
             @endif
-            @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
+            @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
             </td>
@@ -312,11 +312,11 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
             </td>
-            <td class="r" style="{{ !$noCurrent && isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
-            @if(!$noCurrent && !empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
+            <td class="r" style="{{ isset($row['increase_decrease']) ? ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) : '' }}">
+            @if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
                 {!! $fmt($row['increase_decrease']) !!}
             @endif
-            @if(!$noCurrent && !empty($row['annual_increment']) && $row['annual_increment'] > 0)
+            @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
             </td>

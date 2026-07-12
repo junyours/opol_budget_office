@@ -44,6 +44,16 @@
     --cat-3: 142 71% 45%;   /* green  */
     --cat-4: 38  92% 50%;   /* amber  */
     --cat-none: 220 9% 70%; /* gray fallback */
+
+    /* ── Financial concept colors — use these SAME tokens on every page ──
+       Income/Revenue → blue · Expenditure → indigo · 20% MDF → amber
+       5% LDRRMF / 30% QRF → rose · 70% Pre-Disaster → orange       */
+    --fin-income: 217 91% 60%;       /* blue       #3b82f6 — Estimated Revenue */
+    --fin-expenditure: 258 90% 66%;  /* violet     #8b5cf6 — Expenditures */
+    --fin-mdf: 45 93% 47%;           /* gold       #eab308 — 20% MDF */
+    --fin-ldrrmf: 222 20% 42%;       /* slate      #545e70 — 5% LDRRMF umbrella (neutral container) */
+    --fin-qrf: 173 80% 40%;          /* teal       #14b8a6 — 30% QRF */
+    --fin-predisaster: 14 88% 55%;   /* red-orange #ee5a2b — 70% Pre-Disaster */
   }
 
   .dark {
@@ -303,3 +313,71 @@
 .bg-cat-2\/20 { background-color: hsl(var(--cat-2) / 0.20); }
 .bg-cat-3\/20 { background-color: hsl(var(--cat-3) / 0.20); }
 .bg-cat-4\/20 { background-color: hsl(var(--cat-4) / 0.20); }
+
+/* ── Financial concept color utilities — use everywhere for consistency ── */
+.text-fin-income      { color: hsl(var(--fin-income)); }
+.text-fin-expenditure { color: hsl(var(--fin-expenditure)); }
+.text-fin-mdf         { color: hsl(var(--fin-mdf)); }
+.text-fin-ldrrmf      { color: hsl(var(--fin-ldrrmf)); }
+.text-fin-qrf         { color: hsl(var(--fin-qrf)); }
+.text-fin-predisaster { color: hsl(var(--fin-predisaster)); }
+
+.bg-fin-income      { background-color: hsl(var(--fin-income)); }
+.bg-fin-expenditure { background-color: hsl(var(--fin-expenditure)); }
+.bg-fin-mdf         { background-color: hsl(var(--fin-mdf)); }
+.bg-fin-ldrrmf      { background-color: hsl(var(--fin-ldrrmf)); }
+.bg-fin-qrf         { background-color: hsl(var(--fin-qrf)); }
+.bg-fin-predisaster { background-color: hsl(var(--fin-predisaster)); }
+
+.bg-fin-income\/10      { background-color: hsl(var(--fin-income) / 0.10); }
+.bg-fin-expenditure\/10 { background-color: hsl(var(--fin-expenditure) / 0.10); }
+.bg-fin-mdf\/10         { background-color: hsl(var(--fin-mdf) / 0.10); }
+.bg-fin-ldrrmf\/10      { background-color: hsl(var(--fin-ldrrmf) / 0.10); }
+.bg-fin-qrf\/10         { background-color: hsl(var(--fin-qrf) / 0.10); }
+.bg-fin-predisaster\/10 { background-color: hsl(var(--fin-predisaster) / 0.10); }
+
+.border-fin-income      { border-color: hsl(var(--fin-income) / 0.35); }
+.border-fin-expenditure { border-color: hsl(var(--fin-expenditure) / 0.35); }
+.border-fin-mdf         { border-color: hsl(var(--fin-mdf) / 0.35); }
+.border-fin-ldrrmf      { border-color: hsl(var(--fin-ldrrmf) / 0.35); }
+.border-fin-qrf         { border-color: hsl(var(--fin-qrf) / 0.35); }
+.border-fin-predisaster { border-color: hsl(var(--fin-predisaster) / 0.35); }
+
+/* ── PDF Flip Book (react-pageflip) ── */
+.pf-book {
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  border-radius: 4px;
+}
+.pf-page {
+  background: #ffffff;
+  overflow: hidden;
+}
+.pf-page canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-book * { transition: none !important; animation: none !important; }
+}
+
+/* ── Staggered card entrance animation ── */
+@keyframes stagger-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-stagger-in {
+  opacity: 0;
+  animation: stagger-fade-in 0.28s ease-out forwards;
+}
+
+/* ── Goo blob pulse — behind the cloud icon on PdfGenerationLoader ── */
+@keyframes goo-blob {
+  0%, 100% { transform: scale(1) translate(0, 0); border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }
+  25%      { transform: scale(1.15) translate(2px, -2px); border-radius: 58% 42% 37% 63% / 55% 40% 60% 45%; }
+  50%      { transform: scale(0.9) translate(-2px, 1px); border-radius: 50% 50% 45% 55% / 60% 45% 55% 40%; }
+  75%      { transform: scale(1.1) translate(1px, 2px); border-radius: 37% 63% 58% 42% / 44% 59% 41% 56%; }
+}
+.animate-goo-blob {
+  animation: goo-blob 3.2s ease-in-out infinite;
+}

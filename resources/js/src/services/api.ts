@@ -63,16 +63,57 @@ API.interceptors.response.use(
           ? parseInt(retryAfterHeader, 10) * 1000
           : RETRY_DELAY_MS * config._retryCount; // exponential: 3s, 6s
 
+    //     console.warn(
+    //       `Rate limited. Retrying in ${delayMs / 1000}s... ` +
+    //       `(attempt ${config._retryCount}/${MAX_RETRIES})`
+    //     );
+
+    //     await new Promise((resolve) => setTimeout(resolve, delayMs));
+    //     return API(config); // retry the original request
+    //   }
+
+    //   // Max retries exhausted — surface a clear error to the UI
+    //   const rateLimitError = new Error(
+    //     'You are sending too many requests. Please slow down and try again in a moment.'
+    //   );
+    //   (rateLimitError as any).isRateLimit = true;
+    //   return Promise.reject(rateLimitError);
+
+    const retryInSeconds = delayMs / 1000;
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('api:rate-limited', {
+            detail: {
+              attempt: config._retryCount,
+              maxRetries: MAX_RETRIES,
+              retryInSeconds,
+              url: config.url,
+            },
+          }));
+        }
+
         console.warn(
-          `Rate limited. Retrying in ${delayMs / 1000}s... ` +
+          `Rate limited. Retrying in ${retryInSeconds}s... ` +
           `(attempt ${config._retryCount}/${MAX_RETRIES})`
         );
 
         await new Promise((resolve) => setTimeout(resolve, delayMs));
-        return API(config); // retry the original request
+
+        try {
+          const result = await API(config); // retry the original request
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('api:rate-limit-cleared'));
+          }
+          return result;
+        } catch (retryErr) {
+          return Promise.reject(retryErr);
+        }
       }
 
       // Max retries exhausted — surface a clear error to the UI
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('api:rate-limit-cleared'));
+      }
       const rateLimitError = new Error(
         'You are sending too many requests. Please slow down and try again in a moment.'
       );

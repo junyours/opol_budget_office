@@ -339,10 +339,10 @@ private function buildSummaryData(int $budgetPlanId): array
         $specialPlans[] = ['label' => $def['label'], 'total' => $total];
     }
 
-    // ── MDF & LDRRMF ──────────────────────────────────────────────────────
-    $gfFund = $this->getGfFundTotals($budgetPlanId);
-    $mdf    = $gfFund['nta']   * 0.20;
-    $ldrrmf = $gfFund['total'] * 0.05;
+    // ── MDF & LDRRMF — use ACTUAL allocated amounts (same source as Form 7 / 20% MDF report / 5% Calamity Fund report) ──
+    $mdf20Data = $this->buildMdf20Data($budgetPlanId);
+    $mdf       = (float) ($mdf20Data['grand_totals']['proposed'] ?? 0);
+    $ldrrmf    = $this->computeCalamity5Fund($budgetPlanId, 'general-fund');
 
     // ── Grand totals ──────────────────────────────────────────────────────
     $grandPS   = array_sum(array_column(array_column($categoryBlocks, 'totals'), 'ps'));
@@ -1633,6 +1633,9 @@ private function getGfFundTotals(int $budgetPlanId): array
             if (!empty($deptForms)) {
                 // All departments (general fund only — category != special accounts)
                 $generalDeptIds = Department::with('category')
+                    ->orderBy('dept_category_id')
+                    ->orderBy('sort_order')
+                    ->orderBy('dept_name')
                     ->get()
                     ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) !== 'special accounts')
                     ->pluck('dept_id');
@@ -1709,6 +1712,9 @@ private function getGfFundTotals(int $budgetPlanId): array
 
             // ── Section 2: Special Account departments ───────────────────
             $specialDepts = Department::with('category')
+                ->orderBy('dept_category_id')
+                ->orderBy('sort_order')
+                ->orderBy('dept_name')
                 ->get()
                 ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts');
 
@@ -1967,7 +1973,7 @@ return response()->stream(function () use ($zipPath) {
         $forms        = $request->forms;
 
         $departments = $request->department === 'all'
-            ? Department::orderBy('dept_name')->get()
+            ? Department::orderBy('dept_category_id')->orderBy('sort_order')->orderBy('dept_name')->get()
             : tap(Department::where('dept_id', $request->department)->get(), fn ($c) => abort_if($c->isEmpty(), 404));
 
         $currentBudgetPlan = BudgetPlan::where('year', $currentYear)->first();
@@ -2488,6 +2494,36 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
     // ── 4. Build item rows ────────────────────────────────────────────────
     $items = [];
 
+    // foreach ($allItemIds as $itemId) {
+    //     $meta = $expenseItemMeta->get($itemId);
+    //     if (! $meta) continue;
+
+    //     $proposedRow = $proposedRows->get($itemId);
+    //     $currentRow  = $currentRows->get($itemId);
+    //     $pastRow     = $pastRows->get($itemId);
+
+    //     $pastObligation = (float) ($pastRow?->obligation_amount ?? 0);
+    //     $currentSem1    = (float) ($currentRow?->sem1_amount    ?? 0);
+    //     $currentSem2    = (float) ($currentRow?->sem2_amount    ?? 0);
+    //     $currentTotal   = (float) ($currentRow?->total_amount   ?? 0);
+    //     $proposed       = (float) ($proposedRow?->total_amount  ?? 0);
+
+    //     if ($pastObligation == 0 && $currentTotal == 0 && $proposed == 0) {
+    //         continue;
+    //     }
+
+    //     $items[] = [
+    //         'classification' => $meta->classification->expense_class_name ?? 'Uncategorized',
+    //         'description'    => $meta->expense_class_item_name,
+    //         'account_code'   => $meta->expense_class_item_acc_code ?? '',
+    //         'past_total'     => $pastObligation,
+    //         'current_sem1'   => $currentSem1,
+    //         'current_sem2'   => $currentSem2,
+    //         'current_total'  => $currentTotal,
+    //         'proposed'       => $proposed,
+    //     ];
+    // }
+
     foreach ($allItemIds as $itemId) {
         $meta = $expenseItemMeta->get($itemId);
         if (! $meta) continue;
@@ -2502,12 +2538,25 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
         $currentTotal   = (float) ($currentRow?->total_amount   ?? 0);
         $proposed       = (float) ($proposedRow?->total_amount  ?? 0);
 
-        if ($pastObligation == 0 && $currentTotal == 0 && $proposed == 0) {
-            continue;
+        $classificationName = $meta->classification->expense_class_name ?? 'Uncategorized';
+        $isPersonalServices  = str_contains(strtolower(trim($classificationName)), 'personal services');
+
+        if ($isPersonalServices) {
+            // PS: keep the row as long as it has a record in ANY period,
+            // even if the amount for that period is 0.
+            if (! $proposedRow && ! $currentRow && ! $pastRow) {
+                continue;
+            }
+        } else {
+            // Everything else: keep original behavior — skip only when
+            // all three periods are zero.
+            if ($pastObligation == 0 && $currentTotal == 0 && $proposed == 0) {
+                continue;
+            }
         }
 
         $items[] = [
-            'classification' => $meta->classification->expense_class_name ?? 'Uncategorized',
+            'classification' => $classificationName,
             'description'    => $meta->expense_class_item_name,
             'account_code'   => $meta->expense_class_item_acc_code ?? '',
             'past_total'     => $pastObligation,
@@ -2594,7 +2643,8 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
 
         $proposedVersion = $this->resolveVersionFromSnapshots($proposedSnapshots)
             ?? SalaryStandardVersion::where('is_active', true)->first();
-        $currentVersion  = $this->resolveVersionFromSnapshots($currentSnapshotsRaw) ?? $proposedVersion;
+        $currentVersion  = $this->resolveVersionFromSnapshots($currentSnapshotsRaw)
+            ?? $this->resolveGlobalVersionForPlan($currentPlan?->budget_plan_id);
 
         $lbcCurrent      = $currentVersion?->lbc_reference  ?? null;
         $trancheCurrent  = $this->formatTranche($currentVersion);
@@ -2637,6 +2687,16 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             $current   = $currentSnapshots->get($positionId); // current year record (may be null)
             $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
 
+            // ── Skip stale snapshots for deactivated positions with no value ──
+            // A position can be marked inactive after its assignment row was
+            // saved. If it carries no monetary value in either year, it's a
+            // dead leftover row and shouldn't appear on the report anymore.
+            $proposedAmt = (float) ($proposed?->annual_rate ?? 0);
+            $currentAmt  = (float) ($current?->annual_rate  ?? 0);
+            if ($plantilla && !$plantilla->is_active && $proposedAmt == 0 && $currentAmt == 0) {
+                continue;
+            }
+
             // ── Incumbent name: ALWAYS from BUDGET YEAR ───────────────────────
             // If vacant or missing in budget year → "Vacant"
             // Even if Person A held it in 2026, if 2027 is vacant → show "Vacant"
@@ -2667,12 +2727,19 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             $proposedStep        = $proposed?->step         ?? null;
             $proposedAmount      = (float) ($proposed?->annual_rate ?? 0);
 
+            // // ── Increase/Decrease ─────────────────────────────────────────────
+            // // Only meaningful when current year has data.
+            // // If position is new (no current record) → 0
+            // $increaseDecrease = ($current !== null)
+            //     ? $proposedAmount - $currentAmount
+            //     : 0.0;
+
             // ── Increase/Decrease ─────────────────────────────────────────────
-            // Only meaningful when current year has data.
-            // If position is new (no current record) → 0
-            $increaseDecrease = ($current !== null)
-                ? $proposedAmount - $currentAmount
-                : 0.0;
+            // Plain subtraction: proposed − current. $currentAmount already
+            // defaults to 0 (via ?? 0) when there is no current-year record,
+            // so a brand-new position correctly shows its full proposed
+            // amount as the increase.
+            $increaseDecrease = $proposedAmount - $currentAmount;
 
             $rows[] = [
                 'old_item_number'     => $plantilla?->old_item_number ?? null,
@@ -2768,7 +2835,7 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
         $currentSem1    = $sum($currentPlanIds,  'sem1_amount');
         $currentSem2    = $sum($currentPlanIds,  'sem2_amount');
         $currentTotal   = $sum($currentPlanIds,  'total_amount');
-        $pastTotal      = $sum($pastPlanIds,      'total_amount');
+        $pastTotal      = $sum($pastPlanIds,      'obligation_amount');
 
         $allItemIds = array_unique(array_merge(array_keys($proposedByItem), array_keys($currentSem1), array_keys($pastTotal)));
         sort($allItemIds);
@@ -2894,11 +2961,11 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             $deptId  = $planToDept[$item->dept_budget_plan_id] ?? 0;
             $curGrp  = $currentItems->get($aipId, collect());
             $pastGrp = $pastItems->get($aipId, collect());
-            $rows[]  = [
+           $rows[]  = [
                 'dept_id' => $deptId,
                 'aip_reference_code'  => $item->aipProgram?->aip_reference_code ?? '',
                 'program_description' => $item->aipProgram?->program_description ?? '–',
-                'past_total'          => (float) $pastGrp->sum('total_amount'),
+                'past_total'          => (float) $pastGrp->sum('obligation_amount'),
                 'current_sem1'        => (float) $curGrp->sum('sem1_amount'),
                 'current_sem2'        => (float) $curGrp->sum('sem2_amount'),
                 'current_total'       => (float) $curGrp->sum('total_amount'),
@@ -3109,6 +3176,7 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
 
         $compute70 = fn (?int $bpId): float => $bpId
             ? (float) \DB::table('ldrrmfip_items')->where('budget_plan_id', $bpId)->where('source', $source)
+                ->whereNull('deleted_at')
                 ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')->value('grand')
             : 0.0;
 
@@ -3125,6 +3193,9 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             ['name' => '5% LDRRM Fund Prog./Proj. (net of 70%PdA)', 'account_code' => '5-02', 'kind' => 'ldrrmf',
              'past_total' => max(0, $past5 - $past70), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
              'current_total' => max(0, $curr5 - $curr70), 'proposed' => max(0, $prop5 - $prop70)],
+            ['name' => '30% Quick Response Fund (QRF)', 'account_code' => '9000-2-01-001', 'kind' => 'ldrrmf-30',
+             'past_total' => round($past5 * 0.30, 2), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+             'current_total' => round($curr5 * 0.30, 2), 'proposed' => round($prop5 * 0.30, 2)],
             ['name' => '70% Pre-Disaster Act. (JMC 2013-1, R.A. 10121)', 'account_code' => '5-02', 'kind' => 'ldrrmf-70',
              'past_total' => $past70, 'current_sem1' => 0.0, 'current_sem2' => 0.0,
              'current_total' => $curr70, 'proposed' => $prop70],
@@ -3151,6 +3222,22 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             }
         }
         return null;
+    }
+
+    private function resolveGlobalVersionForPlan(?int $budgetPlanId): ?SalaryStandardVersion
+    {
+        if (! $budgetPlanId) return null;
+
+        $deptBudgetPlanIds = DepartmentBudgetPlan::where('budget_plan_id', $budgetPlanId)
+            ->pluck('dept_budget_plan_id');
+
+        if ($deptBudgetPlanIds->isEmpty()) return null;
+
+        $snapshots = BudgetPlanForm3Assignment::whereIn('dept_budget_plan_id', $deptBudgetPlanIds)
+            ->whereNotNull('salary_grade')
+            ->get();
+
+        return $this->resolveVersionFromSnapshots($snapshots);
     }
 
     private function formatTranche(?SalaryStandardVersion $version): ?string

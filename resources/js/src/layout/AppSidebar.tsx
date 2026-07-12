@@ -27,7 +27,7 @@
         BuildingLibraryIcon as HeroPiggyIcon,
         UsersIcon, ClipboardDocumentListIcon, TableCellsIcon, CreditCardIcon, ScaleIcon,
         ShieldCheckIcon, Cog6ToothIcon, CalculatorIcon, DocumentChartBarIcon,
-        ListBulletIcon,MapIcon,
+        ListBulletIcon,MapIcon,NewspaperIcon,
         } from "@heroicons/react/24/outline";
         // ── NEW: hook for submitted plan count ────────────────────────────────────────
         import { useSubmittedPlanCount } from "@/src/hooks/useSubmittedPlanCount";
@@ -76,12 +76,12 @@
         };
 
         const roleConfig = {
-            "super-admin":     { label: "Super Admin",    avatarClass: "bg-violet-600", badge: "text-violet-700 bg-violet-50 border-violet-200" },
-            "admin":           { label: "Budget Officer", avatarClass: "bg-blue-600",   badge: "text-blue-700 bg-blue-50 border-blue-200"       },
-            "department-head": { label: "Department Head",avatarClass: "bg-emerald-600",badge: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-            "admin-hrmo":      { label: "HRMO",           avatarClass: "bg-orange-600", badge: "text-orange-700 bg-orange-50 border-orange-200" },
-            "viewer":          { label: "Viewer",          avatarClass: "bg-slate-500",  badge: "text-slate-700 bg-slate-50 border-slate-200"    },
-            "admin-ldrrmo":    { label: "LDRRMO",          avatarClass: "bg-red-600",    badge: "text-red-700 bg-red-50 border-red-200"          },
+            "super-admin":     { label: "Super Admin",     avatarClass: "bg-violet-600",  badge: "text-violet-700 bg-violet-50 border-violet-200",   dot: "bg-violet-500"  },
+            "admin":           { label: "Budget Officer",  avatarClass: "bg-blue-600",    badge: "text-blue-700 bg-blue-50 border-blue-200",         dot: "bg-blue-500"    },
+            "department-head": { label: "Department Head", avatarClass: "bg-emerald-600", badge: "text-emerald-700 bg-emerald-50 border-emerald-200",dot: "bg-emerald-500" },
+            "admin-hrmo":      { label: "HRMO",             avatarClass: "bg-orange-600",  badge: "text-orange-700 bg-orange-50 border-orange-200",   dot: "bg-orange-500"  },
+            "viewer":          { label: "Viewer",           avatarClass: "bg-slate-500",   badge: "text-slate-700 bg-slate-50 border-slate-200",      dot: "bg-slate-500"   },
+            "admin-ldrrmo":    { label: "LDRRMO",           avatarClass: "bg-red-600",      badge: "text-red-700 bg-red-50 border-red-200",            dot: "bg-red-500"     },
         } as const;
 
         interface NavItem {
@@ -102,6 +102,14 @@
   icon: MapIcon,           // import MapIcon from heroicons
   iconBg: "bg-rose-100",
   iconColor: "text-rose-600",
+  roles: ["super-admin", "admin", "department-head", "admin-hrmo", "viewer", "admin-ldrrmo"],
+},
+{
+  name: "Budget Call Memo",
+  href: "/budget-call-memo",
+  icon: NewspaperIcon,
+  iconBg: "bg-cyan-100",
+  iconColor: "text-cyan-600",
   roles: ["super-admin", "admin", "department-head", "admin-hrmo", "viewer", "admin-ldrrmo"],
 },
             ] as NavItem[],
@@ -134,10 +142,12 @@
             {
             label: "Income & Expenditures",
             items: [
-                { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin", "viewer"] },
+                // { name: "Annual Budget Year",           href: "/admin/budget-plans",                icon: DocumentTextIcon,    iconBg: "bg-blue-100",    iconColor: "text-blue-600",    roles: ["super-admin", "admin", "viewer"] },
+                // { name: "Income GF & SA",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
                 { name: "Income GF & SA",           href: "/admin/income-general-fund",         icon: BanknotesIcon,       iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
                 { name: "Consolidated Income (SA)", href: "/admin/consolidated-special-income", icon: TableCellsIcon,      iconBg: "bg-emerald-100", iconColor: "text-emerald-600", roles: ["super-admin", "admin", "viewer"] },
-                { name: "Personnel Services",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin", "viewer"] },
+                // { name: "Personnel Services",     href: "/admin/personnel-services",          icon: UserGroupIcon,       iconBg: "bg-cyan-100",    iconColor: "text-cyan-600",    roles: ["super-admin", "admin", "viewer"] },
+                // { name: "Obligations & Budget",   href: "/admin/lbp-form6",                   icon: DocumentTextIcon,    iconBg: "bg-teal-100",    iconColor: "text-teal-600",    roles: ["super-admin", "admin", "viewer"] },
                 { name: "Obligations & Budget",   href: "/admin/lbp-form6",                   icon: DocumentTextIcon,    iconBg: "bg-teal-100",    iconColor: "text-teal-600",    roles: ["super-admin", "admin", "viewer"] },
                 { name: "Allocation by Sector",   href: "/admin/lbp-form7",                   icon: TableCellsIcon,      iconBg: "bg-indigo-100",  iconColor: "text-indigo-600",  roles: ["super-admin", "admin", "viewer"] },
                 { name: "PS Computation",         href: "/admin/ps-computation",              icon: CalculatorIcon,      iconBg: "bg-sky-100",     iconColor: "text-sky-600",     roles: ["super-admin", "admin", "viewer"] },
@@ -209,7 +219,7 @@
             {
             label: "System",
             items: [
-                { name: "Settings", href: "/admin/settings", icon: Cog6ToothIcon, iconBg: "bg-gray-100", iconColor: "text-gray-600", roles: ["super-admin", "admin"] },
+                { name: "Settings", href: "/admin/settings?tab=system", icon: Cog6ToothIcon, iconBg: "bg-gray-100", iconColor: "text-gray-600", roles: ["super-admin", "admin"] },
             ] as NavItem[],
             },
             {
@@ -468,9 +478,12 @@
                     className="mt-3 flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden"
                     style={staggerStyle(1)}
                 >
-                    <Badge variant="outline" className={cn("self-start text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5", rc.badge)}>
+                    <span className={cn(
+                    "self-start rounded-md border text-[10px] font-semibold uppercase tracking-wide px-2 py-1",
+                    rc.badge,
+                    )}>
                     {rc.label}
-                    </Badge>
+                    </span>
                 </div>
 
                 </SidebarHeader>

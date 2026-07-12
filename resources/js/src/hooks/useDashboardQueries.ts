@@ -7,7 +7,8 @@ import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 // export interface FundData { total: number; nta: number; nonTaxRevenue: number }
-export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number }
+// export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number }
+export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number; previousTotal: number; previousLocalSource: number }
 // export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
 export interface DeptExpenditure { dept_id: number; abbr: string; total: number; categoryId: number }
 export interface SpecialAccountExpenditures {
@@ -19,7 +20,8 @@ export interface SpecialAccountExpenditures {
 
 const SPECIAL_CAT_ID = 4;
 // const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0 };
-const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0 }
+// const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0 }
+const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0, previousTotal: 0, previousLocalSource: 0 }
 const EMPTY_SPECIAL_EXP: SpecialAccountExpenditures = { sh: 0, occ: 0, pm: 0, combined: 0 };
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
@@ -87,24 +89,45 @@ export async function fetchFund(source: string): Promise<FundData> {
     // Tax Revenue subtree
     const taxParent = rows.find((r: any) => /^(?!.*non).*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
     let taxRevenue = 0;
+    let prevTaxRevenue = 0;
     if (taxParent) {
       const stack = [taxParent.id];
       while (stack.length) {
         const pid = stack.pop()!;
         rows.forEach((r: any) => {
           if (r.parent_id === pid) {
-            if (!parentIds.has(r.id)) taxRevenue += parseFloat(r.proposed) || 0;
+            if (!parentIds.has(r.id)) {
+              taxRevenue += parseFloat(r.proposed) || 0;
+              prevTaxRevenue += parseFloat(r.current_total) || 0;
+            } else stack.push(r.id);
+          }
+        });
+      }
+    }
+
+    let prevNonTaxRevenue = 0;
+    if (ntrParent) {
+      const stack = [ntrParent.id];
+      while (stack.length) {
+        const pid = stack.pop()!;
+        rows.forEach((r: any) => {
+          if (r.parent_id === pid) {
+            if (!parentIds.has(r.id)) prevNonTaxRevenue += parseFloat(r.current_total) || 0;
             else stack.push(r.id);
           }
         });
       }
     }
 
+    const previousTotal = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.current_total) || 0), 0);
+
     return {
       total,
       nta: parseFloat(ntaRow?.proposed) || 0,
       nonTaxRevenue,
       localSource: taxRevenue + nonTaxRevenue,
+      previousTotal,
+      previousLocalSource: prevTaxRevenue + prevNonTaxRevenue,
     };
   } catch {
     return EMPTY_FUND;
@@ -185,12 +208,18 @@ export interface AllFundsData {
 function deriveFundData(rows: any[]): FundData {
   if (!rows?.length) return EMPTY_FUND;
 
-  const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
-  const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
-  const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
-  const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
+//   const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
+//   const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
+//   const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
+//   const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
 
-  const sumSubtree = (predicate: RegExp): number => {
+const parentIds     = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
+  const leafRows      = rows.filter((r: any) => !parentIds.has(r.id));
+  const total         = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
+  const previousTotal = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.current_total) || 0), 0);
+  const ntaRow        = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
+
+  const sumSubtree = (predicate: RegExp, field: 'proposed' | 'current_total' = 'proposed'): number => {
     const parent = rows.find((r: any) => predicate.test(r.name ?? '') && parentIds.has(r.id));
     if (!parent) return 0;
     let result = 0;
@@ -199,7 +228,7 @@ function deriveFundData(rows: any[]): FundData {
       const pid = stack.pop()!;
       rows.forEach((r: any) => {
         if (r.parent_id === pid) {
-          if (!parentIds.has(r.id)) result += parseFloat(r.proposed) || 0;
+          if (!parentIds.has(r.id)) result += parseFloat(r[field]) || 0;
           else stack.push(r.id);
         }
       });
@@ -209,12 +238,16 @@ function deriveFundData(rows: any[]): FundData {
 
   const nonTaxRevenue = sumSubtree(/non[\s-]*tax[\s\S]*revenue/i);
   const taxRevenue    = sumSubtree(/^(?!.*non).*tax[\s\S]*revenue/i);
+  const prevNonTaxRevenue = sumSubtree(/non[\s-]*tax[\s\S]*revenue/i, 'current_total');
+  const prevTaxRevenue    = sumSubtree(/^(?!.*non).*tax[\s\S]*revenue/i, 'current_total');
 
   return {
     total,
     nta:         parseFloat(ntaRow?.proposed) || 0,
     nonTaxRevenue,
-    localSource: taxRevenue + nonTaxRevenue,
+    localSource:   taxRevenue + nonTaxRevenue,
+    previousTotal,
+    previousLocalSource: prevTaxRevenue + prevNonTaxRevenue,
   };
 }
 
@@ -317,18 +350,21 @@ export function useMdfFund(budgetPlanId: number | undefined) {
   });
 }
 
-// export function useLdrrmfSummary(budgetPlanId: number | undefined) {
 export function useLdrrmfSummarySource(budgetPlanId: number | undefined, source: string) {
-  return useQuery<{ reserved30: number; total70: number }>({
+  return useQuery<{ reserved30: number; total70: number; calamityFund: number }>({
     queryKey: ['ldrrmf-summary', budgetPlanId, source],
     queryFn: () =>
       API.get('/ldrrmfip/summary', { params: { budget_plan_id: budgetPlanId, source } })
         .then(r => {
           const d = r.data?.data ?? r.data;
-          return { reserved30: Number(d?.reserved_30 ?? 0), total70: Number(d?.total_70pct ?? 0) };
+          return {
+            reserved30:   Number(d?.reserved_30   ?? 0),
+            total70:      Number(d?.total_70pct   ?? 0),
+            calamityFund: Number(d?.calamity_fund ?? 0),
+          };
         })
         .catch((err: any) => {
-          if (err?.response?.status === 404) return { reserved30: 0, total70: 0 };
+          if (err?.response?.status === 404) return { reserved30: 0, total70: 0, calamityFund: 0 };
           throw err;
         }),
     enabled: !!budgetPlanId,
@@ -336,27 +372,35 @@ export function useLdrrmfSummarySource(budgetPlanId: number | undefined, source:
   });
 }
 
-export function useLdrrmfSummary(budgetPlanId: number | undefined) {
-  return useQuery<{ reserved30: number; total70: number }>({
-    queryKey: queryKeys.ldrrmfSummary(budgetPlanId!),
-    queryFn:  () =>
-      API.get('/ldrrmfip/summary', {
-        params: { budget_plan_id: budgetPlanId, source: 'general-fund' },
-      })
-      .then(r => {
-        const d = r.data?.data ?? r.data;
-        return {
-          reserved30: (d?.reserved_30 ?? 0) as number,
-          total70:    (d?.total_70pct  ?? 0) as number,
-        };
-      })
-      .catch((err: any) => {
-        if (err?.response?.status === 404) return { reserved30: 0, total70: 0 };
-        throw err;
+export interface LdrrmfPlanSpecialAccount {
+  source: string;
+  dept_name: string;
+  dept_abbreviation: string;
+  total_5pct: number;
+}
+
+export function useLdrrmfPlanSpecialAccounts() {
+  return useQuery<LdrrmfPlanSpecialAccount[]>({
+    queryKey: ['ldrrmf-plan', 'special-accounts'],
+    queryFn: () =>
+      API.get('/ldrrmf-plan').then(r => {
+        const sections: any[] = r.data?.data?.special_accounts ?? [];
+        return sections.map((s: any) => ({
+          source:            String(s.source),
+          dept_name:         String(s.dept_name),
+          dept_abbreviation: String(s.dept_abbreviation ?? ''),
+          total_5pct:        Number(s.budget_year?.total_5pct ?? 0),
+        }));
       }),
-    enabled: !!budgetPlanId,
-    retry: false,
   });
+}
+
+// Delegates to useLdrrmfSummarySource so general-fund shares the exact same
+// cache key shape ['ldrrmf-summary', planId, 'general-fund'] as every other
+// source — this is what lets LdrrmfipPage reuse data the dashboard already
+// fetched, instead of refetching under a different key.
+export function useLdrrmfSummary(budgetPlanId: number | undefined) {
+  return useLdrrmfSummarySource(budgetPlanId, 'general-fund');
 }
 
 // ─── Derived hooks — useMemo, NOT useQuery ────────────────────────────────────

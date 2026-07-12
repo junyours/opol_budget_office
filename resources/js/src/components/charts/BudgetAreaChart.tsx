@@ -1,15 +1,14 @@
-
 import React, { useState, useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from "recharts";
+import { Card as ShadcnCard } from "../ui/card";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from "../ui/select";
 import { useBudgetPlans, useDepartments, useDepartmentBudgetPlans, useAipPrograms } from "../../hooks/useDashboardQueries";
-import { useQuery } from "@tanstack/react-query";
 import { BudgetPlan, Department, DepartmentBudgetPlan } from "../../types/api";
 import { cn } from "@/src/lib/utils";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
@@ -29,28 +28,22 @@ const pesoC = (v: number): string => {
   return `₱${Math.round(v).toLocaleString("en-PH")}`;
 };
 
+// y0 = oldest year (2025) · y1 = middle year (2026) · y2 = current year (2027)
 const YEAR_COLORS: Record<string, string> = {
-  y0: "#15803D",
-  y1: "#2352D9",
-  y2: "#C34511",
-};
-
-const YEAR_BG: Record<string, string> = {
-  y0: "rgba(21,128,61,0.07)",
-  y1: "rgba(35,82,217,0.07)",
-  y2: "rgba(195,69,17,0.07)",
+  y0: "#16a34a", // green
+  y1: "#2563eb", // blue
+  y2: "#f97316", // orange
 };
 
 // ─── Pure computation (no API calls) ─────────────────────────────────────────
 
 /**
  * Compute per-dept expenditure map from already-fetched data.
- * Replaces the old `fetchDeptExpForPlan` that made raw API.get calls.
  */
 function computeDeptExpForPlan(
   plan: BudgetPlan,
-  allDeptPlans: DepartmentBudgetPlan[],   // all fetched for this budget_plan_id
-  allAipPrograms: any[],                   // all fetched for this budget_plan_id
+  allDeptPlans: DepartmentBudgetPlan[],
+  allAipPrograms: any[],
   departments: Department[],
   filter: FundFilter
 ): Record<string, number> {
@@ -93,7 +86,7 @@ const CustomTooltip = ({ active, payload, label, yearLabels }: any) => {
     return (order[a.dataKey] ?? 9) - (order[b.dataKey] ?? 9);
   });
   return (
-    <div className="bg-card border border-border rounded-xl shadow-lg px-3.5 py-3 min-w-[180px]">
+    <div className="bg-white border border-border rounded-xl shadow-lg px-3.5 py-3 min-w-[180px]">
       <p className="text-eyebrow mb-2">{label}</p>
       {sorted.map((p: any, i: number) => (
         <div key={i} className="flex items-center justify-between gap-4 py-0.5">
@@ -123,15 +116,15 @@ const FundToggle = ({
   value: FundFilter;
   onChange: (v: FundFilter) => void;
 }) => (
-  <div className="flex items-center bg-white rounded-xl p-0.5 gap-0.5 border border-border">
+  <div className="flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5 border border-border">
     {FILTER_OPTIONS.map(opt => (
       <button
         key={opt.value}
         onClick={() => onChange(opt.value)}
         className={cn(
-          "px-3 py-1.5 rounded-[10px] text-[11px] font-semibold transition-all duration-150",
+          "px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-150",
           value === opt.value
-            ? "bg-foreground text-background shadow-sm"
+            ? "bg-primary text-primary-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
@@ -166,8 +159,6 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
   const targetYears = [centerYear - 2, centerYear - 1, centerYear];
   const plansForYears = targetYears.map(y => plans.find(p => p.year === y) ?? null);
 
-  // ── Use shared query keys — React Query deduplicates these automatically ────
-  // Each year has its own budget_plan_id, so we fetch the three plan IDs.
   const planId0 = plansForYears[0]?.budget_plan_id;
   const planId1 = plansForYears[1]?.budget_plan_id;
   const planId2 = plansForYears[2]?.budget_plan_id;
@@ -179,11 +170,9 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
   const { data: aipPrograms0 = [], isLoading: aip0Loading } = useAipPrograms(planId0);
   const { data: aipPrograms1 = [], isLoading: aip1Loading } = useAipPrograms(planId1);
   const { data: aipPrograms2 = [], isLoading: aip2Loading } = useAipPrograms(planId2);
-  // ───────────────────────────────────────────────────────────────────────────
 
   const expLoading = dp0Loading || dp1Loading || dp2Loading || aip0Loading || aip1Loading || aip2Loading;
 
-  // Sort by dept_id, filtered by fund type, only depts with data
   const allDepts = useMemo(() => {
     const allDeptPlanSets = [deptPlans0, deptPlans1, deptPlans2];
     const allAipSets      = [aipPrograms0, aipPrograms1, aipPrograms2];
@@ -203,7 +192,7 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
         if (fundFilter === "special") return d.dept_category_id === SPECIAL_CAT_ID;
         return true;
       })
-      .sort((a, b) => a.dept_id - b.dept_id)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map(d => d.dept_abbreviation ?? d.dept_name.slice(0, 6))
       .filter(abbr => withData.has(abbr));
   }, [deptPlans0, deptPlans1, deptPlans2, aipPrograms0, aipPrograms1, aipPrograms2, departments, fundFilter, plansForYears]);
@@ -246,19 +235,19 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
     fundFilter === "special" ? "Special Accounts" : "All Funds";
 
   return (
-    <div
+    <ShadcnCard
       className={cn(
-        "bg-card rounded-2xl border border-border shadow-sm overflow-hidden w-full",
+        "rounded-lg shadow-sm overflow-hidden w-full",
         "animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both",
         className
       )}
     >
       {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-border">
+      <div className="px-4 pt-4 pb-3 border-b border-border">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
-              <ChartBarIcon className="w-5 h-5 text-indigo-500" />
+            <div className="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center flex-shrink-0">
+              <ChartBarIcon className="w-3.5 h-3.5 text-indigo-500" />
             </div>
             <div>
               <p className="text-eyebrow">
@@ -277,15 +266,15 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
               value={String(centerYear)}
               onValueChange={v => setSelectedYear(Number(v))}
             >
-              <SelectTrigger className="w-[112px] h-8 text-xs font-semibold bg-zinc-50 border-zinc-200 text-zinc-700 rounded-xl focus:ring-0 focus:ring-offset-0">
+             <SelectTrigger className="w-[112px] h-8 text-xs font-semibold bg-muted/50 border-border text-foreground rounded-lg focus:ring-0 focus:ring-offset-0">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
-              <SelectContent className="bg-white border-zinc-200 text-zinc-700 rounded-xl">
+              <SelectContent className="bg-white border-border text-foreground rounded-lg">
                 {selectablePlans.map(p => (
                   <SelectItem
                     key={p.budget_plan_id}
                     value={String(p.year)}
-                    className="text-xs focus:bg-zinc-50 focus:text-zinc-900"
+                    className="text-xs focus:bg-muted focus:text-foreground"
                   >
                     FY {p.year}
                   </SelectItem>
@@ -300,8 +289,7 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
           {(["y0", "y1", "y2"] as const).map((key, i) => (
             <div
               key={key}
-              className="flex items-center gap-2 rounded-xl border px-3 py-1.5"
-              style={{ borderColor: `${YEAR_COLORS[key]}30`, background: YEAR_BG[key] }}
+              className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-muted/30 border-border"
             >
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: YEAR_COLORS[key] }} />
               <span className="text-[11px] font-semibold text-foreground">{targetYears[i]}</span>
@@ -318,12 +306,12 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
         {loading ? (
           <div className="h-[260px] flex items-center justify-center">
             <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 rounded-full border-2 border-indigo-200 border-t-indigo-500 animate-spin" />
+              <div className="w-8 h-8 rounded-full border-2 border-muted border-t-indigo-500 animate-spin" />
               <p className="text-subtitle">Loading expenditure data…</p>
             </div>
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-[260px] flex flex-col items-center justify-center gap-2 text-zinc-300">
+          <div className="h-[260px] flex flex-col items-center justify-center gap-2 text-muted-foreground/40">
             <ChartBarIcon className="w-10 h-10" />
             <p className="text-subtitle">No expenditure data for selected years</p>
           </div>
@@ -345,21 +333,21 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
 
               <XAxis
                 dataKey="dept"
                 interval={0}
                 angle={-35}
                 textAnchor="end"
-                tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
                 tickLine={false}
                 axisLine={false}
                 height={44}
               />
               <YAxis
                 tickFormatter={v => pesoC(v)}
-                tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 600 }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
                 tickLine={false}
                 axisLine={false}
                 width={60}
@@ -367,7 +355,7 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
 
               <Tooltip
                 content={<CustomTooltip yearLabels={yearLabels} />}
-                cursor={{ stroke: "#f4f4f5", strokeWidth: 1 }}
+                cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
               />
 
               <Area type="monotone" dataKey="y0" stroke={YEAR_COLORS.y0} strokeWidth={1.5}
@@ -398,7 +386,7 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
           })}
         </div>
       )}
-    </div>
+    </ShadcnCard>
   );
 };
 

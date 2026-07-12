@@ -1,8 +1,10 @@
 // components/admin/LdrrmfipPage.tsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { useLdrrmfSummarySource } from "@/src/hooks/useDashboardQueries";
 import { LoadingState } from "@/src/components/states/LoadingState";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -127,7 +129,15 @@ export default function LdrrmfipPage() {
 //   const [summaryMap, setSummaryMap] = useState<Record<string, Summary>>({});
 //   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
-const [activeSource, setActiveSource] = useState<string>("general-fund");
+const [searchParams, setSearchParams] = useSearchParams();
+  const activeSource = searchParams.get("source") || "general-fund";
+  const setActiveSource = (source: string) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set("source", source);
+      return next;
+    }, { replace: true });
+  };
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -229,7 +239,8 @@ const { user } = useAuth();
   const sources    = metadata?.sources    ?? [];
   const categories = metadata?.categories ?? [];
 
-  // Default the active tab to the first available source once metadata loads
+  // Fall back to the first available source only if the URL has no valid
+  // source at all (e.g. direct visit to /admin/ldrrmfip with no query param).
   useEffect(() => {
     if (sources.length > 0 && !sources.some(s => s.id === activeSource)) {
       setActiveSource(sources[0].id);
@@ -259,29 +270,38 @@ const { user } = useAuth();
 //   useEffect(() => {
 //     if (activePlanId && activeSource) fetchSource(activeSource);
 //   }, [activePlanId, activeSource, fetchSource]);
-const fetchSourceData = useCallback(async (source: string) => {
-    const [groupsRes, summaryRes] = await Promise.all([
-      API.get("/ldrrmfip",         { params: { budget_plan_id: activePlanId, source } }),
-      API.get("/ldrrmfip/summary", { params: { budget_plan_id: activePlanId, source } }),
-    ]);
-    return {
-      groups:  (groupsRes.data.data  ?? []) as CategoryGroup[],
-      summary: (summaryRes.data.data ?? null) as Summary | null,
-    };
+// Items list is page-specific — no one else fetches it, so it keeps its own key.
+  const fetchGroups = useCallback(async (source: string) => {
+    const groupsRes = await API.get("/ldrrmfip", { params: { budget_plan_id: activePlanId, source } });
+    return (groupsRes.data.data ?? []) as CategoryGroup[];
   }, [activePlanId]);
 
-  const { data: activeSourceData, isLoading: activeSourceLoading } = useQuery<{ groups: CategoryGroup[]; summary: Summary | null }>({
-    queryKey: ['ldrrmfip-source', activePlanId, activeSource],
-    queryFn:  () => fetchSourceData(activeSource),
+  const { data: activeGroups = [], isLoading: groupsLoading } = useQuery<CategoryGroup[]>({
+    queryKey: ['ldrrmfip-items', activePlanId, activeSource],
+    queryFn:  () => fetchGroups(activeSource),
     enabled:  !!activePlanId && !!activeSource,
   });
 
-  const groupsMap  = { [activeSource]: activeSourceData?.groups  ?? [] };
-  const summaryMap = { [activeSource]: activeSourceData?.summary ?? null };
-  const loadingMap = { [activeSource]: activeSourceLoading };
+  // Summary uses the SAME hook + cache key as LdrrmoDashboard's
+  // ['ldrrmf-summary', planId, source] — if the dashboard already loaded this
+  // source, switching to this tab is instant with zero network calls.
+  const { data: activeSummaryRaw, isLoading: summaryLoading } =
+    useLdrrmfSummarySource(activePlanId ?? undefined, activeSource);
+
+  const activeSummary: Summary | null = activeSummaryRaw ? {
+    total_70pct:   activeSummaryRaw.total70,
+    reserved_30:   activeSummaryRaw.reserved30,
+    calamity_fund: activeSummaryRaw.calamityFund,
+    source:        activeSource,
+  } : null;
+
+  const groupsMap  = { [activeSource]: activeGroups };
+  const summaryMap = { [activeSource]: activeSummary };
+  const loadingMap = { [activeSource]: groupsLoading || summaryLoading };
 
   const fetchSource = useCallback((source: string) => {
-    queryClient.invalidateQueries({ queryKey: ['ldrrmfip-source', activePlanId, source] });
+    queryClient.invalidateQueries({ queryKey: ['ldrrmfip-items', activePlanId, source] });
+    queryClient.invalidateQueries({ queryKey: ['ldrrmf-summary', activePlanId, source] });
   }, [activePlanId, queryClient]);
 
   useEffect(() => {
@@ -595,8 +615,8 @@ const fetchSourceData = useCallback(async (source: string) => {
         </div>
       )}
 
-      {/* ── Summary footer ── */}
-      {summary && categoriesWithItems.length > 0 && (() => {
+      {/* ── Summary footer — always shown, even with zero items, since this is the ceiling users plan against ── */}
+      {summary && (() => {
         // const calamityFund  = summary.calamity_fund;
         // const qrf30         = calamityFund * 0.30;
         // const predis70limit = calamityFund * 0.70;
@@ -642,8 +662,14 @@ const fetchSourceData = useCallback(async (source: string) => {
                       <span className={cn("text-table-grand-total", isOverBudget ? "text-red-600" : "")}>
                         ₱ {allocated.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
-                      <span className="text-meta block">
-                        limit: ₱ {predis70limit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span
+                        className={cn(
+                          "flex items-center justify-end gap-1.5 mt-1 text-[12px] font-semibold",
+                          isOverBudget ? "text-red-500" : "text-amber-600"
+                        )}
+                      >
+                        <ShieldCheckIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                        Ceiling: ₱ {predis70limit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </td>
                   </tr>

@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
+// import {
+//   WrenchScrewdriverIcon,
+//   ClipboardDocumentListIcon,
+//   UsersIcon,
+//   Square3Stack3DIcon,
+//   BuildingOffice2Icon,
+//   BanknotesIcon,
+//   CalendarDaysIcon,
+//   TableCellsIcon,
+// } from '@heroicons/react/24/outline';
 import {
   WrenchScrewdriverIcon,
   ClipboardDocumentListIcon,
@@ -10,6 +20,7 @@ import {
   BanknotesIcon,
   CalendarDaysIcon,
   TableCellsIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 
 const TranchePage              = React.lazy(() => import('./TranchePage'));
@@ -22,6 +33,7 @@ const ExpenseItemsPage         = React.lazy(() => import('./ExpenseClassItemsPag
 const IncomeItemsPage          = React.lazy(() => import('./IncomeItemsTab'));
 const AIPProgramsPage          = React.lazy(() => import('./AipProgramsTab'));
 const SystemPage                = React.lazy(() => import('./SystemPage'));
+const PersonnelServicesPage     = React.lazy(() => import('./PersonnelServices'));
 
 // ── Tab groups ────────────────────────────────────────────────────────────────
 
@@ -45,12 +57,6 @@ const TAB_GROUPS: TabGroup[] = [
     {
     group: 'Budget Reference Data',
     tabs: [
-      {
-        key: 'tranche', label: 'Salary Tranche', short: 'Tranche',
-        description: 'Salary grade versions and active tranche',
-        icon: WrenchScrewdriverIcon, iconBg: 'bg-orange-100', iconColor: 'text-orange-600',
-        component: TranchePage,
-      },
       {
         key: 'income-items', label: 'Income Items', short: 'Income Items',
         description: 'Manage income items',
@@ -80,6 +86,12 @@ const TAB_GROUPS: TabGroup[] = [
     group: 'Position & Staffing',
     tabs: [
       {
+        key: 'tranche', label: 'Salary Tranche', short: 'Tranche',
+        description: 'Salary grade versions and active tranche',
+        icon: WrenchScrewdriverIcon, iconBg: 'bg-orange-100', iconColor: 'text-orange-600',
+        component: TranchePage,
+      },
+      {
         key: 'plantilla', label: 'Plantilla Positions', short: 'Plantilla',
         description: 'Positions per department',
         icon: ClipboardDocumentListIcon, iconBg: 'bg-teal-100', iconColor: 'text-teal-600',
@@ -96,6 +108,12 @@ const TAB_GROUPS: TabGroup[] = [
         description: 'Assign personnel to positions',
         icon: Square3Stack3DIcon, iconBg: 'bg-purple-100', iconColor: 'text-purple-600',
         component: PlantillaOfPersonnelPage,
+      },
+      {
+        key: 'personnel-services', label: 'Personnel Services', short: 'Personnel Services',
+        description: 'Manage personnel services',
+        icon: UserGroupIcon, iconBg: 'bg-cyan-100', iconColor: 'text-cyan-600',
+        component: PersonnelServicesPage,
       },
     ],
   },
@@ -116,12 +134,12 @@ const TAB_GROUPS: TabGroup[] = [
       },
     ],
   },
-  {
+ {
     group: 'System',
     tabs: [
       {
         key: 'system', label: 'System Management', short: 'System',
-        description: 'Maintenance and system tasks',
+        description: 'Maintenance tasks & public content',
         icon: WrenchScrewdriverIcon, iconBg: 'bg-red-100', iconColor: 'text-red-600',
         component: SystemPage,
       },
@@ -134,11 +152,13 @@ type TabKey = typeof ALL_TABS[number]['key'];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+const DEFAULT_TAB: TabKey = ALL_TABS[0].key;
+
 const SettingsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabKey) || 'tranche';
+  const initialTab = (searchParams.get('tab') as TabKey) || DEFAULT_TAB;
   const [activeTab, setActiveTabState] = useState<TabKey>(
-    ALL_TABS.some(t => t.key === initialTab) ? initialTab : 'tranche',
+    ALL_TABS.some(t => t.key === initialTab) ? initialTab : DEFAULT_TAB,
   );
 
   // Keep the URL in sync so tabs are shareable / deep-linkable / searchable

@@ -10,6 +10,8 @@ use App\Models\BudgetPlan;
 use App\Policies\BudgetPlanPolicy;
 use App\Models\DepartmentBudgetPlan;
 use App\Policies\DepartmentBudgetPlanPolicy;
+use App\Models\BudgetCallMemo;
+use App\Policies\BudgetCallMemoPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -28,6 +30,7 @@ class AuthServiceProvider extends ServiceProvider
         BudgetPlan::class                        => BudgetPlanPolicy::class,
         DepartmentBudgetPlan::class              => DepartmentBudgetPlanPolicy::class,
         \App\Models\LdrrmfipItem::class          => \App\Policies\LdrrmfipPolicy::class,
+        BudgetCallMemo::class                    => BudgetCallMemoPolicy::class,
     ];
 
     /**
@@ -37,5 +40,9 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
+
+        \Illuminate\Support\Facades\Gate::define('manage-database', function (\App\Models\User $user) {
+            return $user->role === 'super-admin';
+        });
     }
 }

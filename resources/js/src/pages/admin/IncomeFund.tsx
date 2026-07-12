@@ -9,7 +9,8 @@ import { IncomeFundResponse, IncomeFundRow } from "../../types/api";
 import { toast } from "sonner";
 import { useAuth } from "@/src/hooks/useAuth";
 import { cn } from "@/src/lib/utils";
-
+import { Card as ShadcnCard } from "@/src/components/ui/card";
+import { MAX_AMOUNT, sanitizeMoneyDigits } from "@/src/utils/moneyInput";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DisplayRow extends IncomeFundRow {
@@ -76,7 +77,11 @@ const fmtPct = (val: number | null | undefined): string => {
 
 const fmtInput = (val: number | null | undefined): string => {
   if (val === null || val === undefined) return "";
-  return Math.round(val).toLocaleString("en-PH");
+  const hasDecimals = val % 1 !== 0;
+  return val.toLocaleString("en-PH", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
 };
 
 // Pressing Enter blurs the field, triggering the existing onBlur save handlers.
@@ -87,15 +92,34 @@ const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
   }
 };
 
-// Strips everything except digits and a single decimal point (commas allowed as input but stripped first)
-const sanitizeNumericInput = (raw: string): string => {
-  let v = raw.replace(/,/g, "").replace(/[^0-9.]/g, "");
-  const firstDot = v.indexOf(".");
-  if (firstDot !== -1) {
-    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
-  }
-  return v;
-};
+// // Strips everything except digits and a single decimal point (commas allowed as input but stripped first)
+// const sanitizeNumericInput = (raw: string): string => {
+//   let v = raw.replace(/,/g, "").replace(/[^0-9.]/g, "");
+//   const firstDot = v.indexOf(".");
+//   if (firstDot !== -1) {
+//     v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+//   }
+//   return v;
+// };
+
+// // Hard ceiling for any peso amount field — matches the DB column's precision
+// // (e.g. DECIMAL(12,2)) so typed values can never overflow into a DB error.
+// const MAX_AMOUNT = 999999999.99;
+
+// // Clamps an already-sanitized digit string so its parsed value never exceeds
+// // MAX_AMOUNT. Returns the string unchanged if empty or still mid-typing
+// // (e.g. "12."), and formats down to the cap otherwise.
+// const clampAmountDigits = (digits: string): string => {
+//   if (digits === "" || digits === ".") return digits;
+//   const num = parseFloat(digits);
+//   if (isNaN(num)) return digits;
+//   if (num > MAX_AMOUNT) return MAX_AMOUNT.toFixed(2);
+//   return digits;
+// };
+
+// Sanitizing + clamping now lives in src/utils/money.ts so every money input
+// in the app shares the exact same MAX_AMOUNT ceiling.
+const sanitizeNumericInput = sanitizeMoneyDigits;
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 const COL_PAST    = "bg-green-50/50  border-green-100";
@@ -114,13 +138,13 @@ const COL_BUDGET_GRAND = "text-orange-300 border-orange-900/40 bg-orange-950/20"
 
 function TableSkeleton() {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+    <ShadcnCard className="rounded-xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1200px] text-[12px] border-collapse">
           <thead>
             {/* Row 1 — group headers */}
             <tr>
-              <th className="sticky left-0 z-30 border-b border-r border-gray-200 bg-white px-4 py-2.5 min-w-[260px]">
+               <th className="sticky left-0 z-30 border-b border-r border-border bg-card px-4 py-2.5 min-w-[260px]">
                 <Skeleton className="h-3 w-32 rounded" />
               </th>
               {/* Past Year (Actual) — green */}
@@ -136,16 +160,16 @@ function TableSkeleton() {
                 <Skeleton className="h-3 w-24 mx-auto rounded bg-orange-200" />
               </th>
               {/* Neutral */}
-              <th className="border-b border-r border-gray-200 bg-white px-3 py-2.5 w-28">
+              <th className="border-b border-r border-border bg-card px-3 py-2.5 w-28">
                 <Skeleton className="h-3 w-16 ml-auto rounded" />
               </th>
-              <th className="border-b border-gray-200 bg-white px-3 py-2.5 w-24">
+              <th className="border-b border-border bg-card px-3 py-2.5 w-24">
                 <Skeleton className="h-3 w-12 ml-auto rounded" />
               </th>
             </tr>
             {/* Row 2 — current year sub-headers */}
-            <tr>
-              <th className="border-b border-r border-gray-200 bg-white" />
+             <tr>
+              <th className="border-b border-r border-border bg-card" />
               <th className="border-b border-r border-green-200 bg-green-50" />
               <th className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-1.5 w-32">
                 <Skeleton className="h-2.5 w-20 ml-auto rounded bg-blue-200" />
@@ -157,30 +181,30 @@ function TableSkeleton() {
                 <Skeleton className="h-2.5 w-12 ml-auto rounded bg-blue-200" />
               </th>
               <th className="border-b border-r border-orange-200 bg-orange-50" />
-              <th className="border-b border-r border-gray-200 bg-white" />
-              <th className="border-b border-gray-200 bg-white" />
+              <th className="border-b border-r border-border bg-card" />
+              <th className="border-b border-border bg-card" />
             </tr>
             {/* Row 3 — column numbers */}
-            <tr className="border-b-2 border-gray-200">
-              <td className="border-r border-gray-200 bg-white sticky left-0" />
+            <tr className="border-b-2 border-border">
+              <td className="border-r border-border bg-card sticky left-0" />
               <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-300">(1)</td>
                 <td className="border-r border-l border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(2)</td>
                 <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(3)</td>
                 <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(4)</td>
                 <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-300">(5)</td>
-                <td className="border-r border-gray-200 bg-white px-3 py-1 text-center text-eyebrow text-gray-200">(6)</td>
-                <td className="border-gray-200 bg-white px-3 py-1 text-center text-eyebrow text-gray-200">(7)</td>
+                <td className="border-r border-border bg-card px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(6)</td>
+                <td className="border-border bg-card px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(7)</td>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {Array.from({ length: 18 }).map((_, ri) => {
               const isSubtotal = ri === 5 || ri === 11;
-              const bg = isSubtotal ? "bg-gray-50" : "";
+              const bg = isSubtotal ? "bg-muted/50" : "";
               const widths = ["w-4/5","w-full","w-3/4","w-5/6","w-2/3","w-full","w-4/5","w-3/5"];
               const nameW  = widths[ri % widths.length];
               return (
                 <tr key={ri} className={bg} style={{ animationDelay: `${ri * 40}ms` }}>
-                  <td className={cn("sticky left-0 z-10 border-r border-gray-100 px-4 py-2.5", bg || "bg-white")}>
+                  <td className={cn("sticky left-0 z-10 border-r border-border px-4 py-2.5", bg || "bg-card")}>
                     <Skeleton className={cn("h-3 rounded", nameW, isSubtotal && "bg-gray-200")} style={{ marginLeft: `${(ri % 4) * 12}px` }} />
                   </td>
                   <td className={cn("border-r border-l px-3 py-2.5", COL_PAST)}>
@@ -214,10 +238,10 @@ function TableSkeleton() {
               );
             })}
           </tbody>
-          <tfoot>
-            <tr className="bg-gray-900">
-              <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3">
-                <Skeleton className="h-3 w-48 rounded bg-gray-700" />
+         <tfoot>
+            <tr className="bg-foreground">
+              <td className="sticky left-0 z-10 bg-foreground px-4 py-3">
+                <Skeleton className="h-3 w-48 rounded bg-background/20" />
               </td>
               <td className={cn("px-3 py-3 border-l", COL_PAST_GRAND)}>
                 <Skeleton className="h-3 w-20 ml-auto rounded bg-green-900/40" />
@@ -230,17 +254,17 @@ function TableSkeleton() {
               <td className={cn("px-3 py-3 border-l", COL_BUDGET_GRAND)}>
                 <Skeleton className="h-3 w-20 ml-auto rounded bg-orange-900/40" />
               </td>
-              <td className="px-3 py-3 border-l border-gray-700">
-                <Skeleton className="h-3 w-16 ml-auto rounded bg-gray-700" />
+             <td className="px-3 py-3 border-l border-background/20">
+                <Skeleton className="h-3 w-16 ml-auto rounded bg-background/20" />
               </td>
-              <td className="px-3 py-3 border-l border-gray-700">
-                <Skeleton className="h-3 w-10 ml-auto rounded bg-gray-700" />
+              <td className="px-3 py-3 border-l border-background/20">
+                <Skeleton className="h-3 w-10 ml-auto rounded bg-background/20" />
               </td>
             </tr>
           </tfoot>
         </table>
       </div>
-    </div>
+    </ShadcnCard>
   );
 }
 
@@ -270,6 +294,36 @@ export default function IncomeFundPage() {
 // const savedValues = useRef<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>;
 const savedValues = useRef<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>;
   const seededSources = useRef<Set<string>>(new Set()) as React.MutableRefObject<Set<string>>;
+
+  // ── Draft input state (prevents cursor jump on delete/type — same pattern as Form2) ──
+  const [inputDraft, setInputDraft] = useState<Map<string, string>>(new Map());
+  const cursorRef = useRef<{ el: HTMLInputElement; pos: number } | null>(null);
+
+  useEffect(() => {
+    if (cursorRef.current) {
+      const { el, pos } = cursorRef.current;
+      el.setSelectionRange(pos, pos);
+      cursorRef.current = null;
+    }
+  });
+
+  const getDraftValue = (key: string, raw: number | null) =>
+    inputDraft.has(key) ? inputDraft.get(key)! : fmtInput(raw);
+
+  const setDraft = (key: string, digits: string, el?: HTMLInputElement, cursorPos?: number) => {
+    if (el !== undefined && cursorPos !== undefined) {
+      cursorRef.current = { el, pos: cursorPos };
+    }
+    setInputDraft((prev) => new Map(prev).set(key, digits));
+  };
+
+  const clearDraft = (key: string) => {
+    setInputDraft((prev) => {
+      const n = new Map(prev);
+      n.delete(key);
+      return n;
+    });
+  };
 
 
   const availableSources = useMemo<SourceConfig[]>(() => {
@@ -553,19 +607,30 @@ const update = (rowId: number, field: "current_sem1" | "proposed", value: number
 //     const n = raw.replace(/,/g, "");
 //     update(rowId, "sem1", n === "" ? null : Number(n));
 //   };
-const handleSem1Change = (rowId: number, raw: string) => {
+const handleSem1Change = (rowId: number, raw: string, el?: HTMLInputElement, cursorPos?: number) => {
     const n = sanitizeNumericInput(raw);
+    const cappedPos = cursorPos !== undefined ? Math.min(cursorPos, n.length) : cursorPos;
+    setDraft(`${rowId}_sem1`, n, el, cappedPos);
     update(rowId, "current_sem1", n === "" ? null : Number(n));
   };
 
-  const handleAmountChange = (rowId: number, raw: string) => {
+  const handleAmountChange = (rowId: number, raw: string, el?: HTMLInputElement, cursorPos?: number) => {
     const n = sanitizeNumericInput(raw);
+    const cappedPos = cursorPos !== undefined ? Math.min(cursorPos, n.length) : cursorPos;
+    setDraft(`${rowId}_proposed`, n, el, cappedPos);
     update(rowId, "proposed", n === "" ? null : Number(n));
   };
 
   // WITH THIS:
-const handlePastObligationChange = (rowId: number, raw: string) => {
+const handlePastObligationChange = (
+  rowId: number,
+  raw: string,
+  el?: HTMLInputElement,
+  cursorPos?: number,
+) => {
   const n = sanitizeNumericInput(raw);
+  const cappedPos = cursorPos !== undefined ? Math.min(cursorPos, n.length) : cursorPos;
+  setDraft(`${rowId}_past_obligation`, n, el, cappedPos);
   const value = n === "" ? null : Number(n);
   setRows((prev) => {
     const copy = [...prev];
@@ -754,7 +819,7 @@ const isViewer   = user?.role === "viewer";
       <table className="w-full min-w-[1200px] text-[12px] border-collapse">
         <thead>
           <tr>
-            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left align-bottom text-table-header min-w-[260px]">
+            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-border bg-card px-4 py-2.5 text-left align-bottom text-table-header min-w-[260px]">
               Object of Expenditure
             </th>
             <th rowSpan={2} className="border-b border-r border-green-200 bg-green-50 px-3 py-2.5 text-center align-bottom text-table-header text-green-700 w-40">
@@ -767,10 +832,10 @@ const isViewer   = user?.role === "viewer";
             <th rowSpan={2} className="border-b border-r border-orange-200 bg-orange-50 px-3 py-2.5 text-center align-bottom text-table-header text-orange-700 w-52">
               {meta?.year} Budget Year
             </th>
-            <th rowSpan={2} className="border-b border-r border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-table-header w-28">
+             <th rowSpan={2} className="border-b border-r border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-28">
               Increase /<br />Decrease
             </th>
-            <th rowSpan={2} className="border-b border-gray-200 bg-white px-3 py-2.5 text-right align-bottom text-table-header w-24">
+            <th rowSpan={2} className="border-b border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-24">
               % Change
             </th>
           </tr>
@@ -785,14 +850,14 @@ const isViewer   = user?.role === "viewer";
               Total
             </th>
           </tr>
-          <tr className="border-b-2 border-gray-200">
+          <tr className="border-b-2 border-border">
             <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-400">(1)</td>
             <td className="border-r border-l border-blue-200  bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(2)</td>
             <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(3)</td>
             <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(4)</td>
             <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-400">(5)</td>
-            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-eyebrow text-gray-300">(6)</td>
-            <td className="border-r         border-gray-200    bg-white     px-3 py-1 text-center text-eyebrow text-gray-300">(7)</td>
+            <td className="border-r         border-border    bg-card     px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(6)</td>
+            <td className="border-r         border-border    bg-card     px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(7)</td>
           </tr>
         </thead>
 
@@ -816,8 +881,8 @@ const isViewer   = user?.role === "viewer";
 
             if (row.isGrandTotal) {
               return (
-                <tr key={row.id} className="bg-gray-900 text-white">
-                  <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 text-table-header text-gray-300">
+                <tr key={row.id} className="bg-foreground text-background">
+                  <td className="sticky left-0 z-10 bg-foreground px-4 py-3 text-table-header text-background/70">
                     {row.name}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_PAST_GRAND)}>{fmtNum(row.past_obligation)}</td>
@@ -827,34 +892,34 @@ const isViewer   = user?.role === "viewer";
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_sem2)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_total)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono font-semibold tabular-nums border-l", COL_BUDGET_GRAND)}>{fmtNum(row.proposed)}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l border-gray-700", incColor)}>{fmtNum(increase)}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l border-gray-700", pctColor)}>{fmtPct(percent)}</td>
+                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l border-background/20", incColor)}>{fmtNum(increase)}</td>
+                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l border-background/20", pctColor)}>{fmtPct(percent)}</td>
                 </tr>
               );
             }
 
             if (row.isSubtotal) {
   return (
-    <tr key={row.id} className="bg-gray-50">
-      <td className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 text-table-grand-total text-gray-800 border-r border-gray-200" style={{ paddingLeft: indent + 16 }}>
+    <tr key={row.id} className="bg-muted/50">
+      <td className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-table-grand-total text-foreground border-r border-border" style={{ paddingLeft: indent + 16 }}>
         {row.name}
       </td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
                   {/* <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem1)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem2)}</td> */}
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem1)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem2)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_total)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_BUDGET_SUB)}>{fmtNum(row.proposed)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-gray-200", incColor)}>{fmtNum(increase)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-gray-200", pctColor)}>{fmtPct(percent)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem1)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem2)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_total)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_BUDGET_SUB)}>{fmtNum(row.proposed)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-border", incColor)}>{fmtNum(increase)}</td>
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-border", pctColor)}>{fmtPct(percent)}</td>
                 </tr>
               );
             }
 
             return (
-              <tr key={row.id} className="bg-white hover:bg-gray-50/60 transition-colors">
-                <td className="sticky left-0 z-10 bg-white border-r border-gray-100 px-4 py-2.5 text-gray-800 max-w-[260px]" style={{ paddingLeft: indent + 16 }}>
+              <tr key={row.id} className="bg-card hover:bg-muted/40 transition-colors">
+                <td className="sticky left-0 z-10 bg-card border-r border-border px-4 py-2.5 text-foreground/90 max-w-[260px]" style={{ paddingLeft: indent + 16 }}>
                   <span className="line-clamp-2">{row.name}</span>
                 </td>
                 <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-r border-green-200", "bg-green-50")}>
@@ -879,30 +944,35 @@ const isViewer   = user?.role === "viewer";
     type="text"
     inputMode="decimal"
     className="w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300 tabular-nums placeholder:text-gray-300"
-    value={fmtInput(row.past_obligation)}
-    onChange={(e) => handlePastObligationChange(row.id, e.target.value)}
-    onBlur={(e) => {
-      const n = e.target.value.replace(/,/g, "");
-      savePastObligation(row.id, n === "" ? null : Number(n));
+    value={getDraftValue(`${row.id}_past_obligation`, row.past_obligation)}
+    onChange={(e) => {
+      const pos = e.target.selectionStart ?? e.target.value.length;
+      handlePastObligationChange(row.id, e.target.value, e.target, pos);
+    }}
+    onBlur={() => {
+      clearDraft(`${row.id}_past_obligation`);
+      savePastObligation(row.id, row.past_obligation);
     }}
     onKeyDown={blurOnEnter}
     tabIndex={1000 + rowIdx}
     placeholder="0"
   />
 ) : (
-  <div className="text-right font-mono text-gray-700 tabular-nums px-2">{fmtNum(row.past_obligation)}</div>
+  <div className="text-right font-mono text-foreground/70 tabular-nums px-2">{fmtNum(row.past_obligation)}</div>
 )}
                 </td>
                 <td className={cn("border-r border-l px-2 py-2", COL_CURR)}>
                   {editable && canEditPastAndSem1 ? (
   <input type="text" inputMode="decimal"
-    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
-      "border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300",
-      "placeholder:text-gray-300 tabular-nums", isSaving && "opacity-50 pointer-events-none")}
-    // value={fmtInput(row.sem1)}
-    value={fmtInput(row.current_sem1)}
-    onChange={(e) => handleSem1Change(row.id, e.target.value)}
-    onBlur={() => saveRow(row.id)}
+    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-card",
+      "border-border focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300",
+      "placeholder:text-muted-foreground/50 tabular-nums", isSaving && "opacity-50 pointer-events-none")}    // value={fmtInput(row.sem1)}
+    value={getDraftValue(`${row.id}_sem1`, row.current_sem1)}
+    onChange={(e) => {
+      const pos = e.target.selectionStart ?? e.target.value.length;
+      handleSem1Change(row.id, e.target.value, e.target, pos);
+    }}
+    onBlur={() => { clearDraft(`${row.id}_sem1`); saveRow(row.id); }}
     onKeyDown={blurOnEnter}
     tabIndex={2000 + rowIdx}
     disabled={isSaving}
@@ -914,20 +984,23 @@ const isViewer   = user?.role === "viewer";
 //                 </td>
 //                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.sem2)}</td>
 ) : (
-  <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.current_sem1)}</div>
+  <div className="text-right font-mono text-muted-foreground tabular-nums px-2">{fmtNum(row.current_sem1)}</div>
 )}
                 </td>
-                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.current_sem2)}</td>
-                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-600 tabular-nums", COL_CURR)}>{fmtNum(row.current_total)}</td>
+                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-muted-foreground tabular-nums", COL_CURR)}>{fmtNum(row.current_sem2)}</td>
+                <td className={cn("border-r px-3 py-2.5 text-right font-mono text-foreground/70 tabular-nums", COL_CURR)}>{fmtNum(row.current_total)}</td>
                 <td className={cn("border-r border-l px-2 py-1.5", COL_BUDGET)}>
                   {editable && canEditBudgetYear ? (
   <input type="text" inputMode="decimal"
-    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-white",
-      "border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300",
-      "tabular-nums placeholder:text-gray-300", isSaving && "opacity-50 pointer-events-none")}
-    value={fmtInput(row.proposed)}
-    onChange={(e) => handleAmountChange(row.id, e.target.value)}
-    onBlur={() => saveRow(row.id)}
+    className={cn("w-full text-right text-table-secondary font-mono h-7 px-2 rounded border bg-card",
+      "border-border focus:outline-none focus:ring-2 focus:ring-orange-300",
+      "tabular-nums placeholder:text-muted-foreground/50", isSaving && "opacity-50 pointer-events-none")}
+    value={getDraftValue(`${row.id}_proposed`, row.proposed)}
+    onChange={(e) => {
+      const pos = e.target.selectionStart ?? e.target.value.length;
+      handleAmountChange(row.id, e.target.value, e.target, pos);
+    }}
+    onBlur={() => { clearDraft(`${row.id}_proposed`); saveRow(row.id); }}
     onKeyDown={blurOnEnter}
     tabIndex={3000 + rowIdx}
     disabled={isSaving}
@@ -935,10 +1008,10 @@ const isViewer   = user?.role === "viewer";
     autoComplete="off"
   />
 ) : (
-  <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.proposed)}</div>
+  <div className="text-right font-mono text-muted-foreground tabular-nums px-2">{fmtNum(row.proposed)}</div>
 )}
                 </td>
-                <td className={cn("border-r border-gray-100 px-3 py-2.5 text-right font-mono tabular-nums", incColor)}>{fmtNum(increase)}</td>
+                <td className={cn("border-r border-border px-3 py-2.5 text-right font-mono tabular-nums", incColor)}>{fmtNum(increase)}</td>
                 <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", pctColor)}>{fmtPct(percent)}</td>
               </tr>
             );
@@ -963,7 +1036,7 @@ const isViewer   = user?.role === "viewer";
         <span className="text-orange-600 font-semibold">Orange</span> = Budget year · enter amount directly
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="w-2.5 h-2.5 rounded-sm bg-gray-100 border border-gray-300 inline-block" />
+        <span className="w-2.5 h-2.5 rounded-sm bg-muted border border-border inline-block" />
         Subtotals and grand total are computed automatically
       </span>
     </div>
@@ -971,15 +1044,14 @@ const isViewer   = user?.role === "viewer";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const renderContent = () => (
+ const renderContent = () => (
     <>
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <ShadcnCard className="rounded-xl overflow-hidden shadow-sm">
         {loading ? <TableSkeleton /> : renderTable()}
-      </div>
+      </ShadcnCard>
       {!loading && renderLegend()}
     </>
   );
-
   if (availableSources.length > 1) {
     return (
       <div className="p-6">
@@ -990,10 +1062,10 @@ const isViewer   = user?.role === "viewer";
           <h1 className="text-page-title">Income Fund</h1>
         </div>
         <Tabs value={currentSource} onValueChange={handleSourceChange} className="w-full">
-          <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-5">
+           <TabsList className="h-9 bg-muted border border-border rounded-lg p-1 mb-5">
             {availableSources.map((s) => (
               <TabsTrigger key={s.id} value={s.id}
-                className="text-subtitle px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+                className="text-subtitle px-4 rounded-md data-[state=active]:bg-primary data-[state=active]:shadow-sm data-[state=active]:text-primary-foreground text-muted-foreground hover:text-foreground">
                 {s.name}
               </TabsTrigger>
             ))}
@@ -1013,9 +1085,9 @@ const isViewer   = user?.role === "viewer";
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-eyebrow">Receipts Program</span>
-          <span className="text-eyebrow text-gray-300">·</span>
+          <span className="text-eyebrow text-muted-foreground/50">·</span>
           <span className="text-meta">{/* remove font-medium since text-meta has font-weight */}FY {meta?.past_year} – {meta?.year}</span>
-          <span className="text-eyebrow text-gray-300">·</span>
+          <span className="text-eyebrow text-muted-foreground/50">·</span>
           <span className="text-meta">{meta?.source ? sourceName(meta.source) : sourceName(currentSource)}</span>
         </div>
         <h1 className="text-page-title">Income Fund</h1>

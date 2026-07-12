@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { MoreHorizontalIcon } from "lucide-react";
 import { PlusIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { MAX_AMOUNT, parseMoney, formatMoneyOnBlur } from "@/src/utils/moneyInput";
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 // Previous Payments Made → green
@@ -78,35 +79,62 @@ const EMPTY_FORM: ObligationForm = {
 
 const fmt = (v: number | null | undefined): string => {
   if (v === null || v === undefined || v === 0) return "–";
-  return new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(v));
+  return new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 };
 
 const fmtAlways = (v: number): string =>
-  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(v));
+  new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-const parseFormatted = (s: string): number => {
-  const n = parseFloat(s.replace(/,/g, "").trim());
-  return isNaN(n) ? 0 : n;
-};
+// const parseFormatted = (s: string): number => {
+//   const n = parseFloat(s.replace(/,/g, "").trim());
+//   return isNaN(n) ? 0 : n;
+// };
 
-const formatWhileTyping = (raw: string): string => {
+// // No comma formatting while typing — this is the actual fix for the caret bug.
+// // We just strip invalid chars and cap to one decimal point / 2 decimal places.
+// // Commas only get added back in on blur (formatOnBlur), so the browser never
+// // has to reflow the string mid-edit and reset your cursor to the end.
+// const cleanTypingInput = (raw: string): string => {
+//   let cleaned = raw.replace(/[^\d.]/g, "");
+//   const dotIdx = cleaned.indexOf(".");
+//   if (dotIdx !== -1) {
+//     cleaned = cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, "");
+//     const [intPart, decPart] = cleaned.split(".");
+//     cleaned = decPart !== undefined ? `${intPart}.${decPart.slice(0, 2)}` : cleaned;
+//   }
+//   return cleaned;
+// };
+
+// const formatOnBlur = (raw: string): string => {
+//   const n = parseFormatted(raw);
+//   if (n === 0) return "";
+//   return new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+// };
+const parseFormatted = parseMoney;
+
+// No comma formatting while typing — this is the actual fix for the caret bug.
+// We just strip invalid chars, cap to one decimal point / 2 decimal places,
+// and clamp to MAX_AMOUNT so a huge paste can't overflow the DB column.
+// Commas only get added back in on blur (formatOnBlur), so the browser never
+// has to reflow the string mid-edit and reset your cursor to the end.
+const cleanTypingInput = (raw: string): string => {
   let cleaned = raw.replace(/[^\d.]/g, "");
   const dotIdx = cleaned.indexOf(".");
-  if (dotIdx !== -1) cleaned = cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, "");
-  if (cleaned === "" || cleaned === ".") return cleaned;
-  const [intPart, decPart] = cleaned.split(".");
-  const formattedInt = intPart ? parseInt(intPart, 10).toLocaleString("en-PH") : "0";
-  return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
+  if (dotIdx !== -1) {
+    cleaned = cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, "");
+    const [intPart, decPart] = cleaned.split(".");
+    cleaned = decPart !== undefined ? `${intPart}.${decPart.slice(0, 2)}` : cleaned;
+  }
+  if (cleaned !== "" && cleaned !== "." && parseFloat(cleaned) > MAX_AMOUNT) {
+    return MAX_AMOUNT.toFixed(2);
+  }
+  return cleaned;
 };
 
-const formatOnBlur = (raw: string): string => {
-  const n = parseFormatted(raw);
-  if (n === 0) return "";
-  return new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n));
-};
+const formatOnBlur = formatMoneyOnBlur;
 
 const seedDisplay = (v: number): string =>
-  v === 0 ? "" : new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(v));
+  v === 0 ? "" : new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
 // ─── Table Skeleton ───────────────────────────────────────────────────────────
 // Mirrors the 14-column layout of the real table:
@@ -257,8 +285,20 @@ function AmountCell({ obligationId, field, value, onChange, onBlurSave }: Amount
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(value);
   const valueAtFocus = useRef<number>(0);
+  const cursorRef = useRef<{ el: HTMLInputElement; pos: number } | null>(null);
 
   useEffect(() => { if (!focused) setDraft(value); }, [value, focused]);
+
+  // Runs after every render — restores the caret to where the user actually
+  // left it, since React/the browser would otherwise push it to the end
+  // whenever the input's value gets replaced programmatically.
+  useEffect(() => {
+    if (cursorRef.current) {
+      const { el, pos } = cursorRef.current;
+      el.setSelectionRange(pos, pos);
+      cursorRef.current = null;
+    }
+  });
 
   return (
     <input
@@ -271,9 +311,12 @@ function AmountCell({ obligationId, field, value, onChange, onBlurSave }: Amount
         setDraft(value.replace(/,/g, ""));
       }}
       onChange={(e) => {
-        const formatted = formatWhileTyping(e.target.value);
-        setDraft(formatted);
-        onChange(formatted);
+        const raw = e.target.value;
+        const cursorPos = e.target.selectionStart ?? raw.length;
+        const cleaned = cleanTypingInput(raw);
+        cursorRef.current = { el: e.target, pos: Math.min(cursorPos, cleaned.length) };
+        setDraft(cleaned);
+        onChange(cleaned);
       }}
       onBlur={() => {
         setFocused(false);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button }   from '@/src/components/ui/button';
 import { Input }    from '@/src/components/ui/input';
@@ -12,16 +12,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/ta
 import {
   Download, Eye, FileText, Loader2, RefreshCw, Package,
   ChevronDown, ChevronRight, BookOpen, ClipboardList,
-  Settings2, Save, RotateCcw,
+  Settings2, Save, RotateCcw, Check,
 } from 'lucide-react';
+import { cn } from '@/src/lib/utils';
 import API from '@/src/services/api';
 import { useAuth } from '@/src/hooks/useAuth';
+import { PdfGenerationLoader } from '@/src/components/report/PdfGenerationLoader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface BudgetPlan  { budget_plan_id: number; year: number; is_active: boolean; }
-interface Department  { dept_id: number; dept_name: string; dept_abbreviation: string; }
-interface FilterOption { value: string; label: string; }
+export interface BudgetPlan  { budget_plan_id: number; year: number; is_active: boolean; }
+export interface Department  { dept_id: number; dept_name: string; dept_abbreviation: string; }
+export interface FilterOption { value: string; label: string; }
 
 // ─── ABP Form definitions ─────────────────────────────────────────────────────
 
@@ -306,18 +308,24 @@ const LepHeaderEditor: React.FC<{
 // ABP PANEL
 // ═════════════════════════════════════════════════════════════════════════════
 
-const AbpPanel: React.FC<{
+export const AbpPanel: React.FC<{
   budgetPlans: BudgetPlan[];
   departments: Department[];
   filterOptions: FilterOption[];
   loadingInit: boolean;
   restrictToCalamity?: boolean;
-}> = ({ budgetPlans, departments, filterOptions, loadingInit, restrictToCalamity = false }) => {
+  /** Department-head mode: only forms 2/3/4, no ZIP, dept locked to lockedDeptId */
+  restrictToDeptForms?: boolean;
+  lockedDeptId?: number | null;
+}> = ({
+  budgetPlans, departments, filterOptions, loadingInit,
+  restrictToCalamity = false, restrictToDeptForms = false, lockedDeptId = null,
+}) => {
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [selectedDept,   setSelectedDept]   = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
-  const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set(['form1']));
+const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set());
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingDl,      setLoadingDl]      = useState(false);
   const [loadingAll,     setLoadingAll]     = useState(false);
@@ -329,11 +337,21 @@ const AbpPanel: React.FC<{
     if (active) setSelectedPlanId(String(active.budget_plan_id));
   }, [budgetPlans]);
 
+  // Department-head mode: lock the department selection to their own dept
+  // so requests and preview/ZIP stages don't fan out to every department.
+  useEffect(() => {
+    if (restrictToDeptForms && lockedDeptId) {
+      setSelectedDept(String(lockedDeptId));
+    }
+  }, [restrictToDeptForms, lockedDeptId]);
+
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
-  const visibleForms = restrictToCalamity
-    ? FORM_DEFS.filter(f => f.id === 'calamity5')
-    : FORM_DEFS;
+  const visibleForms = restrictToDeptForms
+    ? FORM_DEFS.filter(f => ['form2', 'form2a', 'form3', 'form4'].includes(f.id))
+    : restrictToCalamity
+      ? FORM_DEFS.filter(f => ['calamity5', 'consolidated_sa_income'].includes(f.id))
+      : FORM_DEFS;
   const allFormIds  = visibleForms.map(f => f.id) as FormId[];
   const allSelected = allFormIds.every(id => selectedForms.has(id));
   const someSelected= allFormIds.some(id  => selectedForms.has(id)) && !allSelected;
@@ -345,7 +363,7 @@ const AbpPanel: React.FC<{
   const toggleForm = (id: FormId) => {
     setSelectedForms(prev => {
       const next = new Set(prev);
-      if (next.has(id)) { if (next.size === 1) return prev; next.delete(id); } else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
     setPreviewUrl(null);
@@ -400,13 +418,28 @@ const AbpPanel: React.FC<{
     return response.data as Blob;
   }, [forms, buildParams]);
 
+ const [previewReady, setPreviewReady] = useState(false);
+  const pendingBlobRef = useRef<Blob | null>(null);
+
   const handlePreview = async () => {
     if (!canPreview || loadingPreview) return;
     setLoadingPreview(true);
+    setPreviewReady(false);
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
-    try { setPreviewUrl(URL.createObjectURL(await fetchPdf(false))); }
-    catch (err: any) { toast.error(err.message ?? 'Failed to generate preview'); }
-    finally { setLoadingPreview(false); }
+    try {
+      pendingBlobRef.current = await fetchPdf(false);
+      setPreviewReady(true); // triggers the loader's finish animation
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to generate preview');
+      setLoadingPreview(false);
+    }
+  };
+
+  const handlePreviewLoaderFinished = () => {
+    if (pendingBlobRef.current) setPreviewUrl(URL.createObjectURL(pendingBlobRef.current));
+    pendingBlobRef.current = null;
+    setLoadingPreview(false);
+    setPreviewReady(false);
   };
 
   const handleDownload = async () => {
@@ -424,9 +457,13 @@ const AbpPanel: React.FC<{
     finally { setLoadingDl(false); }
   };
 
+  const [zipReady, setZipReady] = useState(false);
+  const pendingZipRef = useRef<{ blob: Blob; plan?: BudgetPlan } | null>(null);
+
   const handleGenerateAll = async () => {
     if (!isReady || loadingAll) return;
     setLoadingAll(true);
+    setZipReady(false);
     try {
       const plan = budgetPlans.find(p => String(p.budget_plan_id) === selectedPlanId);
       const response = await API.post('/reports/unified/generate-all', null, {
@@ -435,13 +472,26 @@ const AbpPanel: React.FC<{
         headers: { Accept: 'application/zip', 'X-Requested-With': 'XMLHttpRequest' },
       });
       if ((response.data as Blob).size === 0) throw new Error('Empty ZIP received');
-      const url = URL.createObjectURL(response.data as Blob);
-      const a   = Object.assign(document.createElement('a'), { href: url, download: `LBP_AllForms_FY${plan?.year ?? ''}.zip` });
+      pendingZipRef.current = { blob: response.data as Blob, plan };
+      setZipReady(true); // triggers the loader's finish animation
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to generate ZIP');
+      setLoadingAll(false);
+    }
+  };
+
+  const handleZipLoaderFinished = () => {
+    const pending = pendingZipRef.current;
+    if (pending) {
+      const url = URL.createObjectURL(pending.blob);
+      const a   = Object.assign(document.createElement('a'), { href: url, download: `LBP_AllForms_FY${pending.plan?.year ?? ''}.zip` });
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success('ZIP downloaded — check your downloads folder');
-    } catch (err: any) { toast.error(err.message ?? 'Failed to generate ZIP'); }
-    finally { setLoadingAll(false); }
+    }
+    pendingZipRef.current = null;
+    setLoadingAll(false);
+    setZipReady(false);
   };
 
   const selectedPlan     = budgetPlans.find(p => String(p.budget_plan_id) === selectedPlanId);
@@ -449,6 +499,27 @@ const AbpPanel: React.FC<{
     ? 'All Departments'
     : departments.find(d => String(d.dept_id) === selectedDept)?.dept_name ?? '—';
   const isBusy = loadingPreview || loadingDl || loadingAll;
+
+  const selectedFormDefs = visibleForms.filter(f => selectedForms.has(f.id));
+  // Real extra work when "All Departments" is picked for dept-scoped forms —
+  // reflect it as one compiling stage per department instead of pretending
+  // it's the same amount of work as a single department.
+  const deptStageLabels = hasDeptForms && selectedDept === 'all'
+    ? departments.map(d => `Compiling for ${d.dept_abbreviation || d.dept_name}`)
+    : [];
+  const previewStages = [
+    'Sending request',
+    ...selectedFormDefs.map(f => `Compiling ${f.label}`),
+    ...deptStageLabels,
+    'Rendering layout',
+    'Loading preview',
+  ];
+  const zipStages = [
+    'Preparing files',
+    ...selectedFormDefs.map(f => `Compiling ${f.label}`),
+    ...deptStageLabels,
+    'Packaging ZIP',
+  ];
 
   const zipContents = () => {
     const lines: string[] = ['📁 01_GeneralFund/'];
@@ -476,18 +547,25 @@ const AbpPanel: React.FC<{
     <div className="absolute inset-0 flex overflow-hidden">
 
       {/* ── Left sidebar — FIX: full height column, inner content scrolls ── */}
-      <div className="w-60 flex-shrink-0 flex flex-col border-r border-zinc-200 bg-zinc-50 overflow-hidden">
+      <div className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/30 overflow-hidden">
         {/* Scrollable region */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
           <div>
-            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Budget Plan</p>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Budget Plan
+            </Label>
             <Select value={selectedPlanId} onValueChange={v => { setSelectedPlanId(v); setPreviewUrl(null); }} disabled={loadingInit}>
-              <SelectTrigger className="w-full h-7 text-xs bg-white"><SelectValue placeholder={loadingInit ? 'Loading…' : 'Select plan'} /></SelectTrigger>
+              <SelectTrigger className="w-full h-8 text-xs">
+                <SelectValue placeholder={loadingInit ? 'Loading…' : 'Select plan'} />
+              </SelectTrigger>
               <SelectContent>
                 {budgetPlans.map(p => (
                   <SelectItem key={p.budget_plan_id} value={String(p.budget_plan_id)}>
-                    <span className="flex items-center gap-1.5">FY {p.year}{p.is_active && <Badge variant="secondary" className="text-[9px] px-1 h-3.5">Active</Badge>}</span>
+                    <span className="flex items-center gap-1.5">
+                      FY {p.year}
+                      {p.is_active && <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Active</Badge>}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -495,84 +573,164 @@ const AbpPanel: React.FC<{
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Forms to Include</p>
-            <label htmlFor="chk-select-all" className="flex items-center gap-2 cursor-pointer group mb-2 pb-2 border-b border-zinc-200">
-              <Checkbox id="chk-select-all" checked={allSelected} className={`mt-0 flex-shrink-0 ${someSelected ? 'opacity-70' : ''}`} onCheckedChange={toggleSelectAll} />
-              <span className="text-xs font-bold text-zinc-700 group-hover:text-zinc-900">{allSelected ? 'Deselect All' : 'Select All'}</span>
-            </label>
-            <div className="space-y-2">
-              {visibleForms.map(form => (
-                <label key={form.id} htmlFor={`chk-${form.id}`} className="flex items-start gap-2 cursor-pointer group">
-                  <Checkbox id={`chk-${form.id}`} checked={selectedForms.has(form.id)} onCheckedChange={() => toggleForm(form.id)} className="mt-0.5 flex-shrink-0" />
-                  <div>
-                    <div className="text-xs font-semibold text-zinc-800 leading-tight group-hover:text-zinc-900">
-                      {form.label}
-                      {form.orientation === 'landscape' && <span className="ml-1 text-[9px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">landscape</span>}
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Forms to Include
+              </Label>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-[11px] font-medium text-primary hover:underline"
+              >
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {visibleForms.map((form, idx) => {
+                const checked = selectedForms.has(form.id);
+                return (
+                  <button
+                    key={form.id}
+                    type="button"
+                    onClick={() => toggleForm(form.id)}
+                    style={{ animationDelay: `${idx * 40}ms` }}
+                    className={cn(
+                      'w-full text-left rounded-lg border p-2.5 transition-colors animate-stagger-in',
+                      checked
+                        ? 'border-zinc-900 bg-zinc-900 text-white'
+                        : 'border-border bg-card hover:bg-accent text-foreground',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5 pr-4">
+                        <div className="flex items-center gap-1.5 text-xs font-medium leading-none">
+                          {form.label}
+                          {form.orientation === 'landscape' && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'h-4 px-1 text-[9px] font-normal',
+                                checked
+                                  ? 'text-amber-300 border-amber-300/40 bg-transparent'
+                                  : 'text-amber-600 border-amber-200 bg-amber-50',
+                              )}
+                            >
+                              landscape
+                            </Badge>
+                          )}
+                        </div>
+                        <p className={cn('text-[11px] leading-snug', checked ? 'text-zinc-300' : 'text-muted-foreground')}>
+                          {form.desc}
+                        </p>
+                      </div>
+                      <div className={cn(
+                        'flex-shrink-0 h-4 w-4 rounded-full border flex items-center justify-center mt-0.5',
+                        checked ? 'border-white bg-white' : 'border-zinc-300 bg-transparent',
+                      )}>
+                        {checked && <Check className="h-3 w-3 text-zinc-900" strokeWidth={3} />}
+                      </div>
                     </div>
-                    <div className="text-[9px] text-zinc-400 leading-tight mt-0.5">{form.desc}</div>
-                  </div>
-                </label>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {hasScopeForm && (
             <div>
-              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">{scopeLabel}</p>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                {scopeLabel}
+              </Label>
               <Select value={selectedFilter} onValueChange={v => { setSelectedFilter(v); setPreviewUrl(null); }} disabled={loadingInit}>
-                <SelectTrigger className="w-full h-7 text-xs bg-white"><SelectValue /></SelectTrigger>
-                <SelectContent>{filterOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-full h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {filterOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           )}
 
-          {hasDeptForms && (
+          {hasDeptForms && restrictToDeptForms && lockedDeptId && (() => {
+            const lockedDept = departments.find(d => d.dept_id === lockedDeptId);
+            return (
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                  Department
+                </Label>
+                <div className="rounded-lg border border-border bg-card px-2.5 py-2">
+                  <p className="text-xs font-semibold text-foreground leading-snug">
+                    {lockedDept?.dept_name ?? 'Your Department'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lockedDept?.dept_abbreviation ?? ''}
+                  </p>
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-1">
+                  Reports are generated for your department only.
+                </p>
+              </div>
+            );
+          })()}
+
+          {hasDeptForms && !restrictToDeptForms && (
             <div>
-              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Department</p>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Department
+              </Label>
               <Select value={selectedDept} onValueChange={v => { setSelectedDept(v); setPreviewUrl(null); }} disabled={loadingInit}>
-                <SelectTrigger className="w-full h-7 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map(d => <SelectItem key={d.dept_id} value={String(d.dept_id)}>{d.dept_abbreviation ? `${d.dept_abbreviation} — ${d.dept_name}` : d.dept_name}</SelectItem>)}
+                  {departments.map(d => (
+                    <SelectItem key={d.dept_id} value={String(d.dept_id)}>
+                      {d.dept_abbreviation ? `${d.dept_abbreviation} — ${d.dept_name}` : d.dept_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
           {selectedPlan && (
-            <div className="rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-[10px] text-zinc-500 space-y-0.5">
-              <p className="font-semibold text-zinc-700">FY {selectedPlan.year}</p>
-              {hasScopeForm && <p>{scopeLabel}: {filterOptions.find(f => f.value === selectedFilter)?.label ?? selectedFilter}</p>}
-              {hasDeptForms && <p>Depts: {selectedDeptName}</p>}
-              <p>Forms: {forms.map(f => f.toUpperCase()).join(', ')}</p>
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-[11px] text-muted-foreground space-y-1">
+              <p className="text-xs font-semibold text-foreground">FY {selectedPlan.year}</p>
+              {hasScopeForm && (
+                <p>{scopeLabel}: <span className="text-foreground/80">{filterOptions.find(f => f.value === selectedFilter)?.label ?? selectedFilter}</span></p>
+              )}
+              {hasDeptForms && <p>Depts: <span className="text-foreground/80">{selectedDeptName}</span></p>}
+              <p>Forms: <span className="text-foreground/80">{forms.map(f => f.toUpperCase()).join(', ')}</span></p>
             </div>
           )}
 
           <Separator />
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             {canPreview ? (
-              <Button onClick={handlePreview} disabled={!isReady || isBusy} variant="outline" size="sm" className="w-full h-7 text-xs">
-                {loadingPreview ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Generating…</> : <><Eye className="mr-1 h-3 w-3" />Preview PDF</>}
+              <Button onClick={handlePreview} disabled={!isReady || isBusy} variant="outline" size="sm" className="w-full h-8 text-xs">
+                {loadingPreview ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Generating…</> : <><Eye className="mr-1.5 h-3.5 w-3.5" />Preview PDF</>}
               </Button>
             ) : (
-              <div className="rounded-lg bg-zinc-100 px-2 py-1.5 text-[10px] text-zinc-400 text-center leading-tight">Mixed forms — use<br />"Generate All ZIP" below</div>
+              <div className="rounded-lg border border-dashed border-border bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground text-center leading-snug">
+                Mixed forms — use<br />"Generate All ZIP" below
+              </div>
             )}
             {canPreview && (
-              <Button onClick={handleDownload} disabled={!isReady || isBusy} size="sm" className="w-full h-7 text-xs">
-                {loadingDl ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Downloading…</> : <><Download className="mr-1 h-3 w-3" />Download PDF</>}
+              <Button onClick={handleDownload} disabled={!isReady || isBusy} size="sm" className="w-full h-8 text-xs">
+                {loadingDl ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Downloading…</> : <><Download className="mr-1.5 h-3.5 w-3.5" />Download PDF</>}
               </Button>
             )}
-            <div className="mt-1">
-              <div className="flex items-center gap-1 mb-1 cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-600" onClick={() => setShowInfo(v => !v)}>
-                {showInfo ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}ZIP structure
+            {!restrictToDeptForms && (
+              <div className="mt-1">
+                <div className="flex items-center gap-1 mb-1 cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-600" onClick={() => setShowInfo(v => !v)}>
+                  {showInfo ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}ZIP structure
+                </div>
+                {showInfo && <pre className="rounded bg-zinc-100 p-1.5 text-[9px] text-zinc-500 whitespace-pre-wrap leading-relaxed mb-1.5">{zipContents()}</pre>}
+                <Button onClick={handleGenerateAll} disabled={!isReady || isBusy} size="sm" className="w-full h-8 text-xs bg-zinc-900 hover:bg-zinc-700 text-white">
+                  {loadingAll ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Building ZIP…</> : <><Package className="mr-1.5 h-3.5 w-3.5" />Generate All — Download ZIP</>}
+                </Button>
+                <p className="text-[9px] text-zinc-400 mt-1 text-center leading-tight">General Fund first, then each Special Account dept</p>
               </div>
-              {showInfo && <pre className="rounded bg-zinc-100 p-1.5 text-[9px] text-zinc-500 whitespace-pre-wrap leading-relaxed mb-1.5">{zipContents()}</pre>}
-              <Button onClick={handleGenerateAll} disabled={!isReady || isBusy} size="sm" className="w-full h-8 text-xs bg-zinc-900 hover:bg-zinc-700 text-white">
-                {loadingAll ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Building ZIP…</> : <><Package className="mr-1.5 h-3.5 w-3.5" />Generate All — Download ZIP</>}
-              </Button>
-              <p className="text-[9px] text-zinc-400 mt-1 text-center leading-tight">General Fund first, then each Special Account dept</p>
-            </div>
+            )}
           </div>
 
           {/* Bottom padding so last item isn't clipped */}
@@ -594,16 +752,27 @@ const AbpPanel: React.FC<{
           // FIX: min-h-0 + flex-1 ensures the iframe expands to fill all remaining vertical space
           <iframe
             key={previewUrl}
-            src={`${previewUrl}#toolbar=1&navpanes=0`}
+            src={`${previewUrl}#toolbar=0&navpanes=0`}
             className="flex-1 min-h-0 w-full border-0 block"
             title="PDF Preview"
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
             {loadingPreview ? (
-              <><Loader2 className="w-10 h-10 text-zinc-300 animate-spin" /><p className="text-sm text-zinc-400">Generating PDF…</p></>
+              <PdfGenerationLoader
+                active
+                ready={previewReady}
+                stages={previewStages}
+                onFinished={handlePreviewLoaderFinished}
+              />
             ) : loadingAll ? (
-              <><Package className="w-10 h-10 text-zinc-300" /><p className="text-sm text-zinc-400">Building ZIP — this may take a moment…</p></>
+              <PdfGenerationLoader
+                active
+                ready={zipReady}
+                stages={zipStages}
+                title="Building ZIP…"
+                onFinished={handleZipLoaderFinished}
+              />
             ) : (
               <>
                 <FileText className="w-14 h-14 text-zinc-200" />
@@ -612,7 +781,7 @@ const AbpPanel: React.FC<{
                   <p className="text-xs text-zinc-400 mt-0.5">{canPreview ? 'Select options and click Preview PDF' : 'Select forms and click Generate All to download ZIP'}</p>
                 </div>
                 {canPreview && isReady && <Button size="sm" variant="outline" className="mt-1 text-xs h-7" onClick={handlePreview} disabled={isBusy}><Eye className="mr-1.5 h-3 w-3" />Preview PDF</Button>}
-                {isReady && !canPreview && <Button size="sm" className="mt-1 text-xs h-7 bg-zinc-900 hover:bg-zinc-700 text-white" onClick={handleGenerateAll} disabled={isBusy}><Package className="mr-1.5 h-3 w-3" />Generate All — Download ZIP</Button>}
+                {isReady && !canPreview && !restrictToDeptForms && <Button size="sm" className="mt-1 text-xs h-7 bg-zinc-900 hover:bg-zinc-700 text-white" onClick={handleGenerateAll} disabled={isBusy}><Package className="mr-1.5 h-3 w-3" />Generate All — Download ZIP</Button>}
               </>
             )}
           </div>
@@ -634,7 +803,7 @@ const LepPanel: React.FC<{
 }> = ({ budgetPlans, departments, filterOptions, loadingInit }) => {
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
-  const [selectedForms,  setSelectedForms]  = useState<Set<LepFormId>>(new Set(['consolidated_plantilla']));
+  const [selectedForms,  setSelectedForms]  = useState<Set<LepFormId>>(new Set());
   const [selectedDept,   setSelectedDept]   = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -652,7 +821,7 @@ const LepPanel: React.FC<{
   const toggleForm = (id: LepFormId) => {
     setSelectedForms(prev => {
       const next = new Set(prev);
-      if (next.has(id)) { if (next.size === 1) return prev; next.delete(id); } else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
     setPreviewUrl(null);
@@ -692,13 +861,28 @@ const LepPanel: React.FC<{
     return response.data as Blob;
   }, [currentEndpoint, selectedPlanId, needsDept, selectedDept, needsFilter, selectedFilter]);
 
+  const [previewReady, setPreviewReady] = useState(false);
+  const pendingBlobRef = useRef<Blob | null>(null);
+
   const handlePreview = async () => {
     if (!canPreview || loadingPreview) return;
     setLoadingPreview(true);
+    setPreviewReady(false);
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
-    try { setPreviewUrl(URL.createObjectURL(await fetchLepPdf(false))); }
-    catch (err: any) { toast.error(err.message ?? 'Failed to generate preview'); }
-    finally { setLoadingPreview(false); }
+    try {
+      pendingBlobRef.current = await fetchLepPdf(false);
+      setPreviewReady(true);
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to generate preview');
+      setLoadingPreview(false);
+    }
+  };
+
+  const handlePreviewLoaderFinished = () => {
+    if (pendingBlobRef.current) setPreviewUrl(URL.createObjectURL(pendingBlobRef.current));
+    pendingBlobRef.current = null;
+    setLoadingPreview(false);
+    setPreviewReady(false);
   };
 
   const handleDownload = async () => {
@@ -725,19 +909,33 @@ const LepPanel: React.FC<{
     ? 'All Offices'
     : departments.find(d => String(d.dept_id) === selectedDept)?.dept_name ?? '—';
 
+  const selectedLepDefs = LEP_FORM_DEFS.filter(f => selectedForms.has(f.id));
+  const deptStageLabels = needsDept && selectedDept === 'all'
+    ? departments.map(d => `Compiling for ${d.dept_abbreviation || d.dept_name}`)
+    : [];
+  const previewStages = [
+    'Sending request',
+    ...selectedLepDefs.map(f => `Compiling ${f.label}`),
+    ...deptStageLabels,
+    'Rendering layout',
+    'Loading preview',
+  ];
+
   return (
     // FIX: same absolute inset pattern as AbpPanel
     <div className="absolute inset-0 flex overflow-hidden">
 
       {/* ── Left sidebar ── */}
-      <div className="w-60 flex-shrink-0 flex flex-col border-r border-zinc-200 bg-zinc-50 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/30 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
           {/* Budget plan */}
           <div>
-            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Budget Plan</p>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Budget Plan
+            </Label>
             <Select value={selectedPlanId} onValueChange={v => { setSelectedPlanId(v); setPreviewUrl(null); }} disabled={loadingInit}>
-              <SelectTrigger className="w-full h-7 text-xs bg-white">
+              <SelectTrigger className="w-full h-8 text-xs">
                 <SelectValue placeholder={loadingInit ? 'Loading…' : 'Select plan'} />
               </SelectTrigger>
               <SelectContent>
@@ -745,7 +943,7 @@ const LepPanel: React.FC<{
                   <SelectItem key={p.budget_plan_id} value={String(p.budget_plan_id)}>
                     <span className="flex items-center gap-1.5">
                       Budget Year {p.year}
-                      {p.is_active && <Badge variant="secondary" className="text-[9px] px-1 h-3.5">Active</Badge>}
+                      {p.is_active && <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Active</Badge>}
                     </span>
                   </SelectItem>
                 ))}
@@ -754,11 +952,18 @@ const LepPanel: React.FC<{
           </div>
 
           {/* Generate / Header toggle */}
-          <div className="flex rounded-md border border-zinc-200 overflow-hidden bg-white">
+          <div className="flex rounded-md border border-border overflow-hidden bg-card p-0.5 gap-0.5">
             {(['generate', 'settings'] as const).map(tab => (
-              <button key={tab} onClick={() => setInnerTab(tab)}
-                className={`flex-1 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors
-                  ${innerTab === tab ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'}`}>
+              <button
+                key={tab}
+                onClick={() => setInnerTab(tab)}
+                className={cn(
+                  'flex-1 py-1.5 rounded-[5px] text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors',
+                  innerTab === tab
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                )}
+              >
                 {tab === 'generate'
                   ? <><ClipboardList className="h-3 w-3" />Generate</>
                   : <><Settings2 className="h-3 w-3" />Header</>}
@@ -770,35 +975,67 @@ const LepPanel: React.FC<{
           {innerTab === 'generate' && (
             <>
               <div>
-                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">LEP Documents</p>
-                <div className="space-y-2">
-                  {LEP_FORM_DEFS.map(form => (
-                    <label key={form.id} htmlFor={`lep-chk-${form.id}`} className="flex items-start gap-2 cursor-pointer group">
-                      <Checkbox
-                        id={`lep-chk-${form.id}`}
-                        checked={selectedForms.has(form.id)}
-                        onCheckedChange={() => toggleForm(form.id)}
-                        className="mt-0.5 flex-shrink-0"
-                      />
-                      <div>
-                        <div className="text-xs font-semibold text-zinc-800 leading-tight group-hover:text-zinc-900">
-                          {form.label}
-                          {form.orientation === 'landscape' && (
-                            <span className="ml-1 text-[9px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">landscape</span>
-                          )}
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                  LEP Documents
+                </Label>
+                <div className="space-y-1.5">
+                  {LEP_FORM_DEFS.map((form, idx) => {
+                    const checked = selectedForms.has(form.id);
+                    return (
+                      <button
+                        key={form.id}
+                        type="button"
+                        onClick={() => toggleForm(form.id)}
+                        style={{ animationDelay: `${idx * 40}ms` }}
+                        className={cn(
+                          'w-full text-left rounded-lg border p-2.5 transition-colors animate-stagger-in',
+                          checked
+                            ? 'border-zinc-900 bg-zinc-900 text-white'
+                            : 'border-border bg-card hover:bg-accent text-foreground',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5 pr-4">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold leading-tight">
+                              {form.label}
+                              {form.orientation === 'landscape' && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'h-4 px-1 text-[9px] font-normal',
+                                    checked
+                                      ? 'text-amber-300 border-amber-300/40 bg-transparent'
+                                      : 'text-amber-600 border-amber-200 bg-amber-50',
+                                  )}
+                                >
+                                  landscape
+                                </Badge>
+                              )}
+                            </div>
+                            <p className={cn('text-[11px] leading-snug', checked ? 'text-zinc-300' : 'text-muted-foreground')}>
+                              {form.desc}
+                            </p>
+                          </div>
+                          <div className={cn(
+                            'flex-shrink-0 h-4 w-4 rounded-full border flex items-center justify-center mt-0.5',
+                            checked ? 'border-white bg-white' : 'border-zinc-300 bg-transparent',
+                          )}>
+                            {checked && <Check className="h-3 w-3 text-zinc-900" strokeWidth={3} />}
+                          </div>
                         </div>
-                        <div className="text-[9px] text-zinc-400 leading-tight mt-0.5">{form.desc}</div>
-                      </div>
-                    </label>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {needsDept && (
                 <div>
-                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Office / Department</p>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                    Office / Department
+                  </Label>
                   <Select value={selectedDept} onValueChange={v => { setSelectedDept(v); setPreviewUrl(null); }} disabled={loadingInit}>
-                    <SelectTrigger className="w-full h-7 text-xs bg-white"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Offices</SelectItem>
                       {departments.map(d => (
@@ -813,9 +1050,11 @@ const LepPanel: React.FC<{
 
               {needsFilter && (
                 <div>
-                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Fund Scope</p>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                    Fund Scope
+                  </Label>
                   <Select value={selectedFilter} onValueChange={v => { setSelectedFilter(v); setPreviewUrl(null); }} disabled={loadingInit}>
-                    <SelectTrigger className="w-full h-7 text-xs bg-white"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {filterOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
@@ -826,33 +1065,33 @@ const LepPanel: React.FC<{
               )}
 
               {selectedPlan && (
-                <div className="rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-[10px] text-zinc-500 space-y-0.5">
-                  <p className="font-semibold text-zinc-700">Budget Year {selectedPlan.year}</p>
-                  {needsDept   && <p>Office: {selectedDeptName}</p>}
-                  {needsFilter && <p>Scope: {filterOptions.find(f => f.value === selectedFilter)?.label ?? selectedFilter}</p>}
-                  <p>Docs: {Array.from(selectedForms).join(', ')}</p>
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-[11px] text-muted-foreground space-y-1">
+                  <p className="text-xs font-semibold text-foreground">Budget Year {selectedPlan.year}</p>
+                  {needsDept   && <p>Office: <span className="text-foreground/80">{selectedDeptName}</span></p>}
+                  {needsFilter && <p>Scope: <span className="text-foreground/80">{filterOptions.find(f => f.value === selectedFilter)?.label ?? selectedFilter}</span></p>}
+                  <p>Docs: <span className="text-foreground/80">{Array.from(selectedForms).join(', ')}</span></p>
                 </div>
               )}
 
               <Separator />
 
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {canPreview ? (
-                  <Button onClick={handlePreview} disabled={!isReady || isBusy} variant="outline" size="sm" className="w-full h-7 text-xs">
+                  <Button onClick={handlePreview} disabled={!isReady || isBusy} variant="outline" size="sm" className="w-full h-8 text-xs">
                     {loadingPreview
-                      ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Generating…</>
-                      : <><Eye className="mr-1 h-3 w-3" />Preview PDF</>}
+                      ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Generating…</>
+                      : <><Eye className="mr-1.5 h-3.5 w-3.5" />Preview PDF</>}
                   </Button>
                 ) : (
-                  <div className="rounded-lg bg-zinc-100 px-2 py-1.5 text-[10px] text-zinc-400 text-center leading-tight">
+                  <div className="rounded-lg border border-dashed border-border bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground text-center leading-snug">
                     Select a single document to preview
                   </div>
                 )}
                 {canPreview && (
-                  <Button onClick={handleDownload} disabled={!isReady || isBusy} size="sm" className="w-full h-7 text-xs">
+                  <Button onClick={handleDownload} disabled={!isReady || isBusy} size="sm" className="w-full h-8 text-xs">
                     {loadingDl
-                      ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Downloading…</>
-                      : <><Download className="mr-1 h-3 w-3" />Download PDF</>}
+                      ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Downloading…</>
+                      : <><Download className="mr-1.5 h-3.5 w-3.5" />Download PDF</>}
                   </Button>
                 )}
               </div>
@@ -861,7 +1100,7 @@ const LepPanel: React.FC<{
 
           {/* Settings sub-panel hint */}
           {innerTab === 'settings' && (
-            <div className="rounded-lg bg-zinc-100 px-2.5 py-2 text-[10px] text-zinc-400 leading-relaxed">
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
               Edit the ordinance letterhead, session text, and ordinance number/title that appear on the first page of the LEP report.
               {!selectedPlanId && <p className="mt-1.5 font-semibold text-amber-600">Select a budget plan above first.</p>}
             </div>
@@ -892,14 +1131,19 @@ const LepPanel: React.FC<{
               // FIX: min-h-0 + flex-1 so iframe fills remaining vertical space
               <iframe
                 key={previewUrl}
-                src={`${previewUrl}#toolbar=1&navpanes=0`}
+                src={`${previewUrl}#toolbar=0&navpanes=0`}
                 className="flex-1 min-h-0 w-full border-0 block"
                 title="LEP PDF Preview"
               />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
                 {loadingPreview
-                  ? <><Loader2 className="w-10 h-10 text-zinc-300 animate-spin" /><p className="text-sm text-zinc-400">Generating PDF…</p></>
+                  ? <PdfGenerationLoader
+                      active
+                      ready={previewReady}
+                      stages={previewStages}
+                      onFinished={handlePreviewLoaderFinished}
+                    />
                   : <>
                       <ClipboardList className="w-14 h-14 text-zinc-200" />
                       <div>
@@ -945,7 +1189,10 @@ const LepPanel: React.FC<{
 
 const UnifiedReportsPage: React.FC = () => {
   const { user } = useAuth();
-  const restrictToCalamity = user?.role === 'admin-ldrrmo';
+  const restrictToCalamity  = user?.role === 'admin-ldrrmo';
+  const restrictToDeptForms = user?.role === 'department-head';
+  const lockedDeptId        = (user as any)?.dept_id ?? null;
+  const canSeeLep = user?.role === 'admin' || user?.role === 'super-admin';
 
   const [budgetPlans,   setBudgetPlans]   = useState<BudgetPlan[]>([]);
   const [departments,   setDepartments]   = useState<Department[]>([]);
@@ -955,6 +1202,13 @@ const UnifiedReportsPage: React.FC = () => {
   ]);
   const [loadingInit, setLoadingInit] = useState(true);
   const [activeTab,   setActiveTab]   = useState<'abp' | 'lep'>('abp');
+
+  // Belt-and-suspenders: if role info arrives after mount and this user
+  // isn't allowed on LEP, bounce back to ABP rather than leaving them
+  // stranded on a tab whose trigger no longer renders.
+  useEffect(() => {
+    if (!canSeeLep && activeTab === 'lep') setActiveTab('abp');
+  }, [canSeeLep, activeTab]);
 
   useEffect(() => {
     (async () => {
@@ -995,26 +1249,28 @@ const UnifiedReportsPage: React.FC = () => {
         className="flex-1 min-h-0 flex flex-col overflow-hidden"
       >
         {/* Tab strip */}
-        <div className="flex-shrink-0 border-b border-zinc-200 px-4 bg-white">
-          <TabsList className="h-9 bg-transparent border-0 p-0 gap-0 rounded-none">
+        <div className="flex-shrink-0 px-5 py-3 bg-white border-b border-zinc-100">
+          <TabsList className="h-10 bg-zinc-100 border-0 p-1 gap-1 rounded-lg inline-flex">
             <TabsTrigger
               value="abp"
-              className="h-9 px-4 text-xs font-semibold rounded-none border-b-2 border-transparent
-                         data-[state=active]:border-zinc-900 data-[state=active]:bg-transparent
-                         data-[state=active]:shadow-none data-[state=active]:text-zinc-900
-                         text-zinc-500 hover:text-zinc-700 gap-1.5"
+              className="h-8 px-4 text-xs font-semibold rounded-md border-0
+                         data-[state=active]:bg-zinc-900 data-[state=active]:text-white
+                         data-[state=active]:shadow-sm
+                         text-zinc-500 hover:text-zinc-700 gap-1.5 transition-colors"
             >
               <BookOpen className="h-3.5 w-3.5" />Annual Budget Proposal
             </TabsTrigger>
-            <TabsTrigger
-              value="lep"
-              className="h-9 px-4 text-xs font-semibold rounded-none border-b-2 border-transparent
-                         data-[state=active]:border-zinc-900 data-[state=active]:bg-transparent
-                         data-[state=active]:shadow-none data-[state=active]:text-zinc-900
-                         text-zinc-500 hover:text-zinc-700 gap-1.5"
-            >
-              <ClipboardList className="h-3.5 w-3.5" />Local Expenditure Program
-            </TabsTrigger>
+            {canSeeLep && (
+              <TabsTrigger
+                value="lep"
+                className="h-8 px-4 text-xs font-semibold rounded-md border-0
+                           data-[state=active]:bg-zinc-900 data-[state=active]:text-white
+                           data-[state=active]:shadow-sm
+                           text-zinc-500 hover:text-zinc-700 gap-1.5 transition-colors"
+              >
+                <ClipboardList className="h-3.5 w-3.5" />Local Expenditure Program
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -1034,20 +1290,24 @@ const UnifiedReportsPage: React.FC = () => {
             filterOptions={filterOptions}
             loadingInit={loadingInit}
             restrictToCalamity={restrictToCalamity}
+            restrictToDeptForms={restrictToDeptForms}
+            lockedDeptId={lockedDeptId}
           />
         </TabsContent>
 
-        <TabsContent
-          value="lep"
-          className="relative flex-1 min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden"
-        >
-          <LepPanel
-            budgetPlans={budgetPlans}
-            departments={departments}
-            filterOptions={filterOptions}
-            loadingInit={loadingInit}
-          />
-        </TabsContent>
+        {canSeeLep && (
+          <TabsContent
+            value="lep"
+            className="relative flex-1 min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden"
+          >
+            <LepPanel
+              budgetPlans={budgetPlans}
+              departments={departments}
+              filterOptions={filterOptions}
+              loadingInit={loadingInit}
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

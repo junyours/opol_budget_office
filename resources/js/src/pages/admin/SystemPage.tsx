@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import API from '@/src/services/api';
 import { toast } from 'sonner';
+import { useAuth } from '../../hooks/useAuth';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -26,6 +27,10 @@ import {
   ArrowPathIcon,
   ServerStackIcon,
 } from '@heroicons/react/24/outline';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/tabs';
+import BudgetCallMemoAdminPage from './BudgetCallMemoAdminPage';
+
+const BudgetPlanList = React.lazy(() => import('./BudgetPlanList'));
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -254,6 +259,8 @@ const PasswordDialog: React.FC<PasswordDialogProps> = ({ mode, onClose, onConfir
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SystemPage: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super-admin';
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const [clearing,    setClearing]    = useState(false);
@@ -344,16 +351,49 @@ const SystemPage: React.FC = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="p-6">
 
       {/* Page header */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400 mb-0.5">System</p>
       <h1 className="text-[18px] font-semibold text-gray-900 mb-1">System Management</h1>
-      <p className="text-[13px] text-gray-500 mb-6">Manage system-level data and maintenance tasks.</p>
+      <p className="text-[13px] text-gray-500 mb-6">Manage system-level data, maintenance tasks, and public content.</p>
+
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-6">
+          <TabsTrigger value="general"
+            className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+            General
+          </TabsTrigger>
+          <TabsTrigger value="budget-call-memo"
+            className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+            Budget Call Memo
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="mt-0">
+
+      {/* ── ANNUAL BUDGET YEAR ───────────────────────────────────────────── */}
+      <div className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Budget</p>
+
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">
+              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+              Loading…
+            </div>
+          }>
+            <BudgetPlanList />
+          </React.Suspense>
+        </div>
+      </div>
 
       <Separator className="mb-6" />
 
+      <div className="max-w-3xl">
+
       {/* ── DATABASE ─────────────────────────────────────────────────────── */}
+      {isSuperAdmin && (
       <div className="mb-6">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Database</p>
 
@@ -445,8 +485,9 @@ const SystemPage: React.FC = () => {
           Admin password required for backup and restore.
         </p>
       </div>
+      )}
 
-      <Separator className="mb-6" />
+      {isSuperAdmin && <Separator className="mb-6" />}
 
       {/* ── NOTIFICATIONS ─────────────────────────────────────────────────── */}
       <div className="mb-6">
@@ -479,6 +520,13 @@ const SystemPage: React.FC = () => {
           </Button>
         </div>
       </div>
+      </div>
+        </TabsContent>
+
+        <TabsContent value="budget-call-memo" className="mt-0">
+          <BudgetCallMemoAdminPage />
+        </TabsContent>
+      </Tabs>
 
       {/* ── Confirm clear-read dialog ─────────────────────────────────────── */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

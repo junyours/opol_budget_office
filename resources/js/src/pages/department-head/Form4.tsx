@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
+import { MAX_AMOUNT, sanitizeMoneyDigits, useCaretRestore } from "@/src/utils/moneyInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,10 @@ const fmtAmount = (v: number) => {
   if (!v || v === 0) return '–';
   return `₱${Math.round(v).toLocaleString('en-PH')}`;
 };
+
+// Hard ceiling for any peso amount field — matches the DB column's precision
+// so typed values can never overflow into a DB error.
+// const MAX_AMOUNT = 999999999.99;
 
 const TH_R = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-right whitespace-nowrap';
 const TH   = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap';
@@ -127,6 +132,9 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [selectedProgram, setSelectedProgram] = useState<AIPProgram | null>(null);
   const [formData, setFormData]               = useState({ ...EMPTY_FORM });
   const [saving, setSaving]                   = useState(false);
+
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+const cursorRef = useCaretRestore();
 
   // ── Context menu ────────────────────────────────────────────────────────────
 //   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
@@ -432,15 +440,22 @@ useEffect(() => {
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const raw = value.replace(/,/g, '').replace(/[^\d]/g, '');
-    setFormData(prev => ({ ...prev, [name]: raw === '' ? 0 : parseInt(raw, 10) }));
-  };
+  const { name, value } = e.target;
+  const pos = e.target.selectionStart ?? value.length;
+  const sanitized = sanitizeMoneyDigits(value);
+  cursorRef.current = { el: e.target, pos: Math.min(pos, sanitized.length) };
+  setAmountDrafts(prev => ({ ...prev, [name]: sanitized }));
+  const num = sanitized === '' ? 0 : parseFloat(sanitized);
+  setFormData(prev => ({ ...prev, [name]: num }));
+};
 
-  const formatAmountDisplay = (val: number): string => {
-    if (val === 0) return '';
-    return Math.round(val).toLocaleString('en-PH');
-  };
+// Shows the raw digit draft while editing (no commas), falls back to a
+// comma-formatted display once the field isn't actively being typed into.
+const getAmountDisplay = (field: string, val: number): string => {
+  if (amountDrafts[field] !== undefined) return amountDrafts[field];
+  if (val === 0) return '';
+  return Math.round(val).toLocaleString('en-PH');
+};
 
   // ── Save / Delete ────────────────────────────────────────────────────────────
 
@@ -951,7 +966,7 @@ const handleDeleteRequest = async (itemId: number) => {
                       </Label>
                       <Input
                         name={field} type="text" inputMode="numeric"
-                        value={formatAmountDisplay((formData as any)[field])}
+                        value={getAmountDisplay(field, (formData as any)[field])}
                         onChange={handleAmountChange} placeholder="0"
                         className="h-9 text-sm text-right font-mono border-gray-200"
                       />

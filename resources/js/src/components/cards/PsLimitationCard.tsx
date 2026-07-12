@@ -63,7 +63,7 @@ function Row({
   bold?: boolean; indent?: boolean;
 }) {
   const colors: Record<string, string> = {
-    default: "text-zinc-700",
+    default: "text-foreground",
     blue:    "text-blue-600",
     green:   "text-emerald-600",
     red:     "text-red-600",
@@ -72,10 +72,10 @@ function Row({
   return (
     <div className={cn("flex items-center justify-between py-2", indent && "pl-4")}>
       <div className="flex-1 min-w-0">
-        <p className={cn("text-[11.5px] leading-snug", bold ? "font-semibold text-zinc-900" : "text-zinc-500")}>
+        <p className={cn("text-[11.5px] leading-snug", bold ? "font-semibold text-foreground" : "text-muted-foreground")}>
           {label}
         </p>
-        {sub && <p className="text-[10px] text-zinc-400 mt-0.5">{sub}</p>}
+        {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
       </div>
       <p className={cn("font-mono tabular-nums text-[12px] ml-3 flex-shrink-0", bold ? "font-bold" : "font-medium", colors[accent])}>
         {value < 0 ? `-${peso(value)}` : peso(value)}
@@ -119,9 +119,9 @@ export function PsLimitationCard({
   // ── Loading ───────────────────────────────────────────────────────────────
   if (isLoading || !planId) {
     return (
-      <div style={style} className="bg-card rounded-2xl border border-border shadow-sm p-5 space-y-4 animate-in fade-in duration-500">
+      <div style={style} className="bg-card rounded-lg border border-border shadow-sm p-4 space-y-4 animate-in fade-in duration-500">
         <div className="flex items-center gap-3">
-          <Shimmer className="w-9 h-9 rounded-xl" />
+          <Shimmer className="w-7 h-7 rounded-md" />
           <div className="space-y-1.5">
             <Shimmer className="h-2.5 w-32" />
             <Shimmer className="h-4 w-44" />
@@ -143,68 +143,68 @@ export function PsLimitationCard({
   return (
     <div
       style={style}
-      className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both"
+      className="bg-card rounded-lg border border-border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both"
     >
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center flex-shrink-0">
-            <UserGroupIcon className="w-5 h-5 text-cyan-600" />
+      <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-md bg-cyan-50 flex items-center justify-center flex-shrink-0">
+            <UserGroupIcon className="w-3.5 h-3.5 text-cyan-600" />
           </div>
           <div>
-            <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-zinc-400 leading-none">
+            <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-muted-foreground leading-none">
               Personnel Services
             </p>
-            <p className="text-[14px] font-semibold text-zinc-900 mt-0.5 leading-none">
+            <p className="text-[14px] font-semibold text-foreground mt-0.5 leading-none">
               PS Limitation
             </p>
           </div>
         </div>
         <button
           onClick={() => navigate("/admin/ps-computation")}
-          className="flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-800 transition-colors font-medium"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
         >
           View <ChevronRightIcon className="w-3 h-3" />
         </button>
       </div>
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 space-y-3">
 
         {/* ── Amount Allowable hero ───────────────────────────────────── */}
         <div className={cn(
-          "rounded-2xl border-2 px-4 py-3.5 flex items-center justify-between",
+          "rounded-lg border px-3.5 py-3 flex items-center justify-between",
           isOver
             ? "bg-red-50   border-red-200"
             : "bg-emerald-50 border-emerald-200"
         )}>
           <div>
             <p className={cn(
-              "text-[10px] font-bold uppercase tracking-widest mb-1",
+              "text-[10px] font-medium mb-1",
               isOver ? "text-red-500" : "text-emerald-600"
             )}>
-              Amount Allowable
+              Amount allowable
             </p>
             <p className={cn(
-              "font-mono font-bold tabular-nums text-xl leading-none",
+              "font-mono font-semibold tabular-nums text-lg leading-none",
               isOver ? "text-red-700" : "text-emerald-700"
             )}>
               {isOver ? `-${peso(allowable)}` : peso(allowable)}
             </p>
             <p className={cn("text-[10px] mt-1", isOver ? "text-red-400" : "text-emerald-500")}>
-              PS Limit − Net PS Budget
+              PS limit − net PS budget
             </p>
           </div>
           <div className={cn(
-            "rounded-xl border px-3 py-2 text-center flex-shrink-0",
+            "rounded-md border px-2.5 py-1.5 text-center flex-shrink-0",
             isOver ? "bg-red-100 border-red-200" : "bg-emerald-100 border-emerald-200"
           )}>
             <p className={cn(
-              "text-xl font-bold font-mono tabular-nums leading-none",
+              "text-lg font-semibold font-mono tabular-nums leading-none",
               isOver ? "text-red-700" : "text-emerald-700"
             )}>
               {Math.round(utilisationPct)}%
             </p>
-            <p className={cn("text-[9px] font-semibold uppercase tracking-widest mt-0.5", isOver ? "text-red-500" : "text-emerald-600")}>
+            <p className={cn("text-[9px] font-medium mt-0.5", isOver ? "text-red-500" : "text-emerald-600")}>
               utilized
             </p>
           </div>
@@ -212,7 +212,7 @@ export function PsLimitationCard({
 
         {/* ── Progress bar ────────────────────────────────────────────── */}
         <div className="space-y-1.5">
-          <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-700",
@@ -223,16 +223,15 @@ export function PsLimitationCard({
               style={{ width: `${utilisationPct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+          <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
             <span>{pesoC(netPs)} net PS</span>
             <span>of {pesoC(limitation)} limit</span>
           </div>
         </div>
 
-        {/* ── Breakdown rows ──────────────────────────────────────────── */}
-       {/* PS Limitation — standalone */}
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3">
-          <Row
+       {/* ── Breakdown rows ──────────────────────────────────────────── */}
+        {/* PS Limitation — standalone */}
+        <div className="rounded-lg border bg-muted/30 px-3">          <Row
             label="PS Limitation (45%)"
             sub={incYear ? `Based on ${incYear} realized income` : undefined}
             value={limitation}
@@ -241,7 +240,7 @@ export function PsLimitationCard({
         </div>
 
         {/* Net PS calculation block */}
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 divide-y divide-zinc-100 overflow-hidden">
+        <div className="rounded-lg border bg-muted/30 divide-y overflow-hidden">
 
           <div className="px-3">
             <Row
@@ -264,11 +263,11 @@ export function PsLimitationCard({
           <div className={cn("px-3", isOver ? "bg-red-50" : "bg-cyan-50")}>
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-1.5">
-                <p className="text-[11.5px] font-bold text-zinc-900">Net Annual Total PS</p>
+                <p className="text-[11.5px] font-bold text-foreground">Net Annual Total PS</p>
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="text-zinc-300 hover:text-zinc-500 transition-colors">
+                      <button className="text-muted-foreground/60 hover:text-muted-foreground transition-colors">
                         <InformationCircleIcon className="w-3.5 h-3.5" />
                       </button>
                     </TooltipTrigger>

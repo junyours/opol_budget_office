@@ -1,14 +1,12 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import API from '../../services/api';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
 import { useGetIncomeFundTotals } from '../../hooks/useGetTotalAmount';
 import { LoadingState } from '../../components/states/LoadingState';
-import { Button } from '@/src/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/tabs';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +67,6 @@ const Form6: React.FC = () => {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
   const [activeSource, setActiveSource] = useState<string>('general-fund');
-  const queryClient = useQueryClient();
 
   const { data: tabs = [{ id: 'general-fund', label: 'General Fund', type: 'general' as const }], isLoading: tabsLoading } = useQuery<TabSource[]>({
     queryKey: ['form6-special-sources'],
@@ -96,59 +93,51 @@ const Form6: React.FC = () => {
     enabled:      !!activePlan,
   });
 
-// ── Fetch rows for one source ──────────────────────────────────────────────
+// ── Fetch + sync rows for one source ────────────────────────────────────────
+  // Sync (from PS / other sources) now lives inside the query itself, so it
+  // runs automatically the first time a given source's query actually
+  // executes — on initial mount, on switching to a not-yet-cached tab, or
+  // after an explicit refetch / page reload. React Query's cache (staleTime +
+  // refetchOnMount: false, set globally in App.tsx) is what prevents it from
+  // re-running on every subsequent mount/tab-revisit within that window.
 
   const fetchForm6Rows = useCallback(async (source: string, planId: number): Promise<Form6Row[]> => {
     const endpoint = source === 'general-fund' ? '/form6' : '/form6-special';
-    const res          = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
-    const data         = toRows(res.data?.data);
-    const recordsExist = res.data?.records_exist ?? data.length > 0;
+
+    // Ensure template rows exist (one-time init on first-ever access).
+    const initial      = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
+    const recordsExist = initial.data?.records_exist ?? toRows(initial.data?.data).length > 0;
 
     if (!recordsExist) {
       await API.post(`${endpoint}/init`, { budget_plan_id: planId, source });
-      const res2 = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
-      return toRows(res2.data?.data);
     }
-    return data;
+
+    // Sync from PS / other sources, then read back the final rows.
+    await API.post(`${endpoint}/sync-from-ps`, { budget_plan_id: planId, source });
+    const otherRes = await API.post(`${endpoint}/sync-from-other`, { budget_plan_id: planId, source });
+    (otherRes.data?.warnings ?? []).forEach((w: string) => toast.warning(w));
+
+    const final = await API.get(endpoint, { params: { budget_plan_id: planId, source } });
+    return toRows(final.data?.data);
   }, []);
 
   const {
     data: activeRows = [],
     isLoading: activeRowsLoading,
+    dataUpdatedAt: activeRowsUpdatedAt,
   } = useQuery<Form6Row[]>({
     queryKey: ['form6-rows', activeSource, activePlan?.budget_plan_id],
     queryFn:  () => fetchForm6Rows(activeSource, activePlan!.budget_plan_id),
     enabled:  !!activePlan && !!activeSource,
   });
 
-  // ── Sync All ───────────────────────────────────────────────────────────────
-
-  const [syncing, setSyncing] = useState(false);
-
-  const handleSync = useCallback(async (source: string) => {
-    if (!activePlan) return;
-
-    const endpoint = source === 'general-fund' ? '/form6' : '/form6-special';
-
-    setSyncing(true);
-    try {
-      await API.post(`${endpoint}/sync-from-ps`,    { budget_plan_id: activePlan.budget_plan_id, source });
-      const otherRes = await API.post(`${endpoint}/sync-from-other`, { budget_plan_id: activePlan.budget_plan_id, source });
-
-      (otherRes.data?.warnings ?? []).forEach((w: string) => toast.warning(w));
-
-      await queryClient.invalidateQueries({ queryKey: ['form6-rows', source, activePlan.budget_plan_id] });
-
-      if (source === 'general-fund') refetchDerived();
-
-      toast.success('Form 6 synced and saved.');
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(`Sync failed: ${e?.response?.data?.message ?? e?.message}`);
-    } finally {
-      setSyncing(false);
+  // Whenever the general-fund rows are (re)synced, refresh the income-fund-derived totals too.
+  useEffect(() => {
+    if (activeSource === 'general-fund' && activeRowsUpdatedAt) {
+      refetchDerived();
     }
-  }, [activePlan, refetchDerived, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRowsUpdatedAt, activeSource]);
 
  // ── Guards ─────────────────────────────────────────────────────────────────
 
@@ -189,14 +178,7 @@ const Form6: React.FC = () => {
           <p className="text-[12px] text-gray-500 mt-0.5">LGU : OPOL, MISAMIS ORIENTAL</p>
         </div>
 
-        {/* Sync button in header only when there's a single tab (no tab bar) */}
-        {!isMultiTab && (
-          <SyncButton
-            syncing={syncing}
-            onSync={() => handleSync('general-fund')}
-          />
-        )}
-      </div>
+        </div>
 
       {/* ── Single-tab (no special accounts) ── */}
       {!isMultiTab ? (
@@ -204,12 +186,9 @@ const Form6: React.FC = () => {
           source="general-fund"
           rows={activeRows}
           loading={activeRowsLoading}
-          syncing={false}               // button already in header
           budgetYear={budgetYear}
           derivedData={derivedData}
           derivedLoading={derivedLoading}
-          onSync={() => handleSync('general-fund')}
-          showSyncButton={false}
         />
       ) : (
         /* ── Multi-tab ── */
@@ -233,12 +212,10 @@ const Form6: React.FC = () => {
                 sourceLabel={tab.type === 'special' ? tab.label : undefined}
                 rows={tab.id === activeSource ? activeRows : []}
                 loading={tab.id === activeSource ? activeRowsLoading : true}
-                syncing={tab.id === activeSource ? syncing : false}
                 budgetYear={budgetYear}
                 derivedData={tab.id === 'general-fund' ? derivedData : null}
                 derivedLoading={tab.id === 'general-fund' ? derivedLoading : false}
-                onSync={() => handleSync(tab.id)}
-                showSyncButton
+                isMultiTab
               />
             </TabsContent>
           ))}
@@ -247,29 +224,6 @@ const Form6: React.FC = () => {
     </div>
   );
 };
-
-// ─── SyncButton ───────────────────────────────────────────────────────────────
-
-const SyncButton: React.FC<{ syncing: boolean; onSync: () => void }> = ({ syncing, onSync }) => (
-  <div className="flex items-center gap-2.5">
-    {syncing && (
-      <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
-        <span className="w-3 h-3 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin inline-block" />
-        Syncing
-      </span>
-    )}
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={onSync}
-      disabled={syncing}
-      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900"
-    >
-      <ArrowPathIcon className={cn('w-3.5 h-3.5', syncing && 'animate-spin')} />
-      {syncing ? 'Syncing…' : 'Sync All'}
-    </Button>
-  </div>
-);
 
 // ─── Form6Panel ───────────────────────────────────────────────────────────────
 
@@ -288,17 +242,16 @@ interface Form6PanelProps {
   sourceLabel?:   string;
   rows:           Form6Row[];
   loading:        boolean;
-  syncing:        boolean;
   budgetYear:     number;
   derivedData:    IncomeFundDerivedData | null;
   derivedLoading: boolean;
-  onSync:         () => void;
-  showSyncButton: boolean;
+  /** True when rendered inside the multi-tab (special accounts) layout — controls whether the period sub-header shows. */
+  isMultiTab?:    boolean;
 }
 
 const Form6Panel: React.FC<Form6PanelProps> = ({
-  source, sourceLabel, rows, loading, syncing,
-  budgetYear, derivedData, derivedLoading, onSync, showSyncButton,
+  source, sourceLabel, rows, loading,
+  budgetYear, derivedData, derivedLoading, isMultiTab = false,
 }) => {
 
 //   const getDerivedAmount = useCallback(
@@ -382,20 +335,17 @@ const grandTotal = useMemo(() => {
 
   return (
     <div>
-      {/* Sub-header for special accounts + per-tab sync button */}
-      {(sourceLabel || showSyncButton) && (
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            {sourceLabel && (
-              <p className="text-[11px] font-bold uppercase tracking-widest text-red-500">
-                Special Account — {sourceLabel.toUpperCase()}
-              </p>
-            )}
-            <p className="text-[11px] text-gray-400">
-              January to December {budgetYear} · Municipality of Opol, Misamis Oriental
+      {/* Sub-header — shown for special accounts, or whenever there's a tab bar */}
+      {(sourceLabel || isMultiTab) && (
+        <div className="mb-4">
+          {sourceLabel && (
+            <p className="text-[11px] font-bold uppercase tracking-widest text-red-500">
+              Special Account — {sourceLabel.toUpperCase()}
             </p>
-          </div>
-          {showSyncButton && <SyncButton syncing={syncing} onSync={onSync} />}
+          )}
+          <p className="text-[11px] text-gray-400">
+            January to December {budgetYear} · Municipality of Opol, Misamis Oriental
+          </p>
         </div>
       )}
 

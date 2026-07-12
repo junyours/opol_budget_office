@@ -1,31 +1,5 @@
 <?php
 
-// namespace App\Providers;
-
-// use Illuminate\Support\ServiceProvider;
-// use Illuminate\Support\Facades\URL;
-// class AppServiceProvider extends ServiceProvider
-// {
-//     /**
-//      * Register any application services.
-//      */
-//     public function register(): void
-//     {
-//         //
-//     }
-
-//     /**
-//      * Bootstrap any application services.
-//      */
-//     public function boot()
-//     {
-//         // uncomment for test tunnel
-//         // if (app()->environment('local')) {
-//         //     URL::forceScheme('https');
-//         // }
-//     }
-// }
-
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -82,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
         // ── 4. File uploads — bandwidth protection ─────────────────────────────
         // Avatar uploads, obligation file uploads: 5 per minute per user
         RateLimiter::for('uploads', function (Request $request) {
-            return Limit::perMinute(5)
+            return Limit::perMinute(10)
                 ->by(optional($request->user())->id ?: $request->ip());
         });
 

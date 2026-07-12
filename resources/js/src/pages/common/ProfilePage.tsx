@@ -88,6 +88,7 @@ function updateLoginAvatarCache(userId: number, src: string) {
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth();
+  const isViewer = user?.role === "viewer";
 
   // ── profile form ────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState<ProfileForm>({
@@ -363,9 +364,9 @@ export default function ProfilePage() {
               </div>
               <button
                 onClick={() => fileRef.current?.click()}
-                disabled={avatarLoading}
+                disabled={avatarLoading || isViewer}
                 className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-zinc-900 border-2 border-white flex items-center justify-center hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Change photo"
+                title={isViewer ? "Viewers cannot edit profile" : "Change photo"}
               >
                 <Camera className="w-3.5 h-3.5 text-white" />
               </button>
@@ -375,6 +376,7 @@ export default function ProfilePage() {
                 accept="image/jpeg,image/png,image/jpg,image/webp"
                 className="hidden"
                 onChange={handleAvatarChange}
+                disabled={isViewer}
               />
             </div>
 
@@ -434,8 +436,13 @@ export default function ProfilePage() {
               <Input
                 id="fname"
                 value={profile.fname}
-                onChange={e => setProfile(p => ({ ...p, fname: e.target.value }))}
-                className={cn("h-9 text-sm", profileErrors.fname && "border-red-400 focus-visible:ring-red-300")}
+                onChange={e => !isViewer && setProfile(p => ({ ...p, fname: e.target.value }))}
+                readOnly={isViewer}
+                className={cn(
+                  "h-9 text-sm",
+                  profileErrors.fname && "border-red-400 focus-visible:ring-red-300",
+                  isViewer && "bg-zinc-50 text-zinc-400 cursor-not-allowed select-none",
+                )}
               />
               {profileErrors.fname && <p className="text-[11px] text-red-500">{profileErrors.fname}</p>}
             </div>
@@ -445,7 +452,8 @@ export default function ProfilePage() {
                 id="mname"
                 value={profile.mname}
                 onChange={e => setProfile(p => ({ ...p, mname: e.target.value }))}
-                className="h-9 text-sm"
+                disabled={isViewer}
+                className={cn("h-9 text-sm", isViewer && "bg-zinc-50 text-zinc-400 cursor-not-allowed select-none")}
               />
             </div>
             <div className="space-y-1.5">
@@ -456,7 +464,12 @@ export default function ProfilePage() {
                 id="lname"
                 value={profile.lname}
                 onChange={e => setProfile(p => ({ ...p, lname: e.target.value }))}
-                className={cn("h-9 text-sm", profileErrors.lname && "border-red-400 focus-visible:ring-red-300")}
+                disabled={isViewer}
+                className={cn(
+                  "h-9 text-sm",
+                  profileErrors.lname && "border-red-400 focus-visible:ring-red-300",
+                  isViewer && "bg-zinc-50 text-zinc-400 cursor-not-allowed select-none",
+                )}
               />
               {profileErrors.lname && <p className="text-[11px] text-red-500">{profileErrors.lname}</p>}
             </div>
@@ -471,7 +484,12 @@ export default function ProfilePage() {
                 id="username"
                 value={profile.username}
                 onChange={e => setProfile(p => ({ ...p, username: e.target.value }))}
-                className={cn("h-9 text-sm font-mono", profileErrors.username && "border-red-400 focus-visible:ring-red-300")}
+                disabled={isViewer}
+                className={cn(
+                  "h-9 text-sm font-mono",
+                  profileErrors.username && "border-red-400 focus-visible:ring-red-300",
+                  isViewer && "bg-zinc-50 text-zinc-400 cursor-not-allowed select-none",
+                )}
               />
               {profileErrors.username && <p className="text-[11px] text-red-500">{profileErrors.username}</p>}
             </div>
@@ -499,7 +517,7 @@ export default function ProfilePage() {
           )}
 
           <div className="flex items-center justify-end gap-3 pt-2">
-            {hasUnsavedChanges && !profileLoading && (
+            {!isViewer && hasUnsavedChanges && !profileLoading && (
               <Badge
                 variant="outline"
                 className="text-[11px] font-medium text-amber-700 bg-amber-50 border-amber-300 px-2.5 py-1 animate-pulse"
@@ -512,25 +530,28 @@ export default function ProfilePage() {
                 <CheckCircle className="w-4 h-4" /> Profile updated successfully
               </span>
             )}
-            <Button
-              onClick={handleProfileSave}
-              disabled={profileLoading || !hasUnsavedChanges}
-              size="sm"
-              className={cn(
-                "rounded-lg h-8 px-4 text-xs font-semibold transition-colors",
-                hasUnsavedChanges
-                  ? "bg-zinc-900 hover:bg-zinc-800 text-white"
-                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-              )}
-            >
-              {profileLoading ? "Saving…" : "Save Changes"}
-            </Button>
+            {!isViewer && (
+              <Button
+                onClick={handleProfileSave}
+                disabled={profileLoading || !hasUnsavedChanges}
+                size="sm"
+                className={cn(
+                  "rounded-lg h-8 px-4 text-xs font-semibold transition-colors",
+                  hasUnsavedChanges
+                    ? "bg-zinc-900 hover:bg-zinc-800 text-white"
+                    : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+                )}
+              >
+                {profileLoading ? "Saving…" : "Save Changes"}
+              </Button>
+            )}
           </div>
 
         </CardContent>
       </Card>
 
       {/* ── Change password ──────────────────────────────────────────────────── */}
+      {!isViewer && (
       <Card className="border-zinc-200 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
@@ -708,6 +729,7 @@ export default function ProfilePage() {
 
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

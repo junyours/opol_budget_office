@@ -40,6 +40,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
+import { MAX_AMOUNT, clampMoneyDigits as clampAmountDigits } from "@/src/utils/moneyInput";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PS_CLASS_ID = 1;
@@ -114,21 +115,21 @@ const comma = (n: number) =>
 const normRec = (v: string | null | undefined): string | null =>
     v === "" ? null : (v ?? null);
 
-// Hard ceiling for any peso amount field (proposed, sem1, obligation, etc.) —
-// prevents huge typed values from overflowing into Infinity% once divided.
-const MAX_AMOUNT = 999999999.99;
+// // Hard ceiling for any peso amount field (proposed, sem1, obligation, etc.) —
+// // prevents huge typed values from overflowing into Infinity% once divided.
+// const MAX_AMOUNT = 999999999.99;
 
-// Clamps a raw digit string (already stripped of non-numeric chars) so its
-// parsed value never exceeds MAX_AMOUNT. Returns the digits unchanged if
-// they're empty, not yet a valid number (e.g. mid-typing "12."), or already
-// within range.
-const clampAmountDigits = (digits: string): string => {
-    if (digits === "") return digits;
-    const num = parseFloat(digits);
-    if (isNaN(num)) return digits;
-    if (num > MAX_AMOUNT) return MAX_AMOUNT.toFixed(2);
-    return digits;
-};
+// // Clamps a raw digit string (already stripped of non-numeric chars) so its
+// // parsed value never exceeds MAX_AMOUNT. Returns the digits unchanged if
+// // they're empty, not yet a valid number (e.g. mid-typing "12."), or already
+// // within range.
+// const clampAmountDigits = (digits: string): string => {
+//     if (digits === "") return digits;
+//     const num = parseFloat(digits);
+//     if (isNaN(num)) return digits;
+//     if (num > MAX_AMOUNT) return MAX_AMOUNT.toFixed(2);
+//     return digits;
+// };
 
 // Pressing Enter in any of these amount/recommendation inputs blurs the field,
 // which triggers the existing onBlur save handlers (same as clicking away / tabbing out).
@@ -2608,7 +2609,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
 
                                                         <td
                                                             className={cn(
-                                                                TD_APP,
+                                                                TD_CUR,
                                                                 "text-gray-500",
                                                             )}
                                                         >
@@ -3224,16 +3225,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                     {row.note}
                                                 </span>
                                             </td>
-                                            {isAdmin && (
-                                                <td
-                                                    className={cn(
-                                                        TD_CUR,
-                                                        "border-l border-blue-100 text-blue-200",
-                                                    )}
-                                                >
-                                                    –
-                                                </td>
-                                            )}
+                                            {isAdmin && (<td className={cn(TD_CUR, "border-l border-blue-100 text-blue-200",)}>–</td> )}
                                             <td
                                                 className={cn(
                                                     TD_CUR,

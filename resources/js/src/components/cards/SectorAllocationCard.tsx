@@ -6,6 +6,7 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip,
 } from "recharts";
+import { Card as ShadcnCard } from "@/src/components/ui/card";
 import { ChartContainer, ChartConfig } from "@/src/components/ui/chart";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
 
@@ -46,18 +47,17 @@ const pesoC = (v: number): string => {
 
 function Shimmer({ className }: { className?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-2xl bg-muted animate-pulse", className)} />
+    <div className={cn("relative overflow-hidden rounded-lg bg-muted animate-pulse", className)} />
   );
 }
 
-// ─── Sector colours (matches Form7 page column colours) ───────────────────────
+// ─── Sector colours — matches the hsl(var(--cat-*)) tokens used across the dashboard ──
 
-// Mirrors the cat-1/2/3/4 CSS variables used in the department sidebar
 const SECTOR_COLORS = {
-  general_public_services: "var(--color-cat-1, #3b82f6)",
-  social_services:         "var(--color-cat-2, #f43f5e)",
-  economic_services:       "var(--color-cat-3, #22c55e )",
-  other_services:          "var(--color-cat-4, #f59e0b)",
+  general_public_services: "hsl(var(--cat-1))",
+  social_services:         "hsl(var(--cat-2))",
+  economic_services:       "hsl(var(--cat-3))",
+  other_services:          "hsl(var(--cat-4))",
 } as const;
 
 const SECTOR_LABELS = {
@@ -68,33 +68,38 @@ const SECTOR_LABELS = {
 } as const;
 
 // ─── Section display config ───────────────────────────────────────────────────
+// PS/MOOE/FE/CO/SPA aren't part of the shared cat-*/fin-* token set, so these
+// keep their own distinct hues — matching the accent colors already used for
+// similarly "extra" categories (violet, blue, rose, amber, emerald) elsewhere
+// in the app (e.g. BreakdownCard's PS/MOOE/CO rows).
 
-const SECTION_DISPLAY: Record<string, { label: string; shortLabel: string; color: string; dot: string; bg: string; border: string }> = {
-  PS:   { label: "Personal Services",                  shortLabel: "PS",   color: "text-violet-700",  dot: "#7c3aed", bg: "bg-violet-50",  border: "border-violet-200" },
-  MOOE: { label: "Maint. & Other Operating Expenses",  shortLabel: "MOOE", color: "text-blue-700",    dot: "#2563eb", bg: "bg-blue-50",    border: "border-blue-200"   },
-  FE:   { label: "Financial Expenses",                 shortLabel: "FE",   color: "text-rose-700",    dot: "#e11d48", bg: "bg-rose-50",    border: "border-rose-200"   },
-  CO:   { label: "Capital Outlay",                     shortLabel: "CO",   color: "text-amber-700",   dot: "#d97706", bg: "bg-amber-50",   border: "border-amber-200"  },
-  SPA:  { label: "Special Purpose Appropriations",     shortLabel: "SPA",  color: "text-emerald-700", dot: "#059669", bg: "bg-emerald-50", border: "border-emerald-200"},
+const SECTION_DISPLAY: Record<string, { label: string; shortLabel: string; dot: string }> = {
+  PS:   { label: "Personal Services",                 shortLabel: "PS",   dot: "#7c3aed" },
+  MOOE: { label: "Maint. & Other Operating Expenses",  shortLabel: "MOOE", dot: "#2563eb" },
+  FE:   { label: "Financial Expenses",                 shortLabel: "FE",   dot: "#e11d48" },
+  CO:   { label: "Capital Outlay",                     shortLabel: "CO",   dot: "#d97706" },
+  SPA:  { label: "Special Purpose Appropriations",     shortLabel: "SPA",  dot: "#059669" },
 };
+
 // ─── Custom tooltip ───────────────────────────────────────────────────────────
 
 const SectorBarTip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl shadow-lg px-3 py-2.5 min-w-[160px] space-y-1">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1.5">{label}</p>
+    <div className="bg-white border border-border rounded-xl shadow-lg px-3 py-2.5 min-w-[160px] space-y-1">
+      <p className="text-[10px] font-medium text-muted-foreground mb-1.5">{label}</p>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
-            <span className="text-[10px] text-zinc-500">{p.name}</span>
+            <span className="text-[10px] text-muted-foreground">{p.name}</span>
           </div>
-          <span className="text-[10px] font-semibold font-mono text-zinc-800">{pesoC(p.value)}</span>
+          <span className="text-[10px] font-semibold font-mono text-foreground">{pesoC(p.value)}</span>
         </div>
       ))}
-      <div className="border-t border-zinc-100 pt-1 mt-1 flex justify-between">
-        <span className="text-[10px] text-zinc-400">Total</span>
-        <span className="text-[10px] font-bold font-mono text-zinc-900">
+      <div className="border-t border-border pt-1 mt-1 flex justify-between">
+        <span className="text-[10px] text-muted-foreground">Total</span>
+        <span className="text-[10px] font-semibold font-mono text-foreground">
           {pesoC(payload.reduce((s: number, p: any) => s + (p.value || 0), 0))}
         </span>
       </div>
@@ -115,13 +120,13 @@ const SectorTotalsRow: React.FC<{ grandTotal: SectionSubtotal }> = ({ grandTotal
   return (
     <div className="grid grid-cols-4 gap-2 mt-3">
       {sectors.map(s => (
-        <div key={s.key} className="rounded-xl bg-zinc-50 p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-zinc-500 leading-tight">{s.label}</p>
+        <div key={s.key} className="rounded-lg border border-border p-2.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+            <p className="text-[9px] font-medium text-muted-foreground leading-tight">{s.label}</p>
           </div>
-          <p className="text-sm font-bold text-zinc-800 tabular-nums leading-none">{pesoC(grandTotal[s.key])}</p>
-          <p className="text-[9px] font-mono text-zinc-400 mt-1">{peso(grandTotal[s.key])}</p>
+          <p className="text-sm font-semibold text-foreground tabular-nums leading-none">{pesoC(grandTotal[s.key])}</p>
+          <p className="text-[9px] font-mono text-muted-foreground mt-1">{peso(grandTotal[s.key])}</p>
         </div>
       ))}
     </div>
@@ -136,10 +141,10 @@ const SectionChips: React.FC<{ sections: Form7Section[] }> = ({ sections }) => (
       const cfg = SECTION_DISPLAY[sec.section_code];
       if (!cfg) return null;
       return (
-        <div key={sec.section_code} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 flex items-center gap-2">
+        <div key={sec.section_code} className="rounded-full border border-border px-2.5 py-1 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
-          <span className={cn("text-[10px] font-semibold uppercase tracking-widest", cfg.color)}>{cfg.shortLabel}</span>
-          <span className="text-[11px] font-medium font-mono tabular-nums text-zinc-700">{pesoC(sec.subtotal.total)}</span>
+          <span className="text-[10px] font-medium text-muted-foreground">{cfg.shortLabel}</span>
+          <span className="text-[11px] font-medium font-mono tabular-nums text-foreground">{pesoC(sec.subtotal.total)}</span>
         </div>
       );
     })}
@@ -210,14 +215,14 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">{eyebrow}</p>
+         <p className="text-[10px] font-medium text-muted-foreground">{eyebrow}</p>
           <p className={cn("text-sm font-bold mt-0.5", accentClass)}>{title}</p>
         </div>
         {grandTotal && (
           <div className="text-right">
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-zinc-400">Grand Total</p>
-            <p className="text-base font-bold tabular-nums text-zinc-900">{pesoC(grandTotal.total)}</p>
-            <p className="text-[9px] font-mono text-zinc-400">{peso(grandTotal.total)}</p>
+            <p className="text-[9px] font-medium text-muted-foreground">Grand Total</p>
+            <p className="text-base font-semibold tabular-nums text-foreground">{pesoC(grandTotal.total)}</p>
+            <p className="text-[9px] font-mono text-muted-foreground">{peso(grandTotal.total)}</p>
           </div>
         )}
       </div>
@@ -225,19 +230,19 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
       {/* Section chips */}
       {isLoading ? (
         <div className="flex gap-2">
-          {[0,1,2,3].map(i => <Shimmer key={i} className="h-9 w-20 rounded-xl" />)}
+          {[0,1,2,3].map(i => <Shimmer key={i} className="h-9 w-20 rounded-full" />)}
         </div>
       ) : isError ? (
-        <p className="text-xs text-red-400">Failed to load data.</p>
+        <p className="text-xs text-red-500">Failed to load data.</p>
       ) : sections.length === 0 ? (
-        <p className="text-xs text-zinc-300">No data yet.</p>
+        <p className="text-xs text-muted-foreground/60">No data yet.</p>
       ) : (
         <SectionChips sections={sections} />
       )}
 
       {/* Grouped bar chart */}
       {isLoading ? (
-        <Shimmer className="h-36 w-full rounded-2xl" />
+        <Shimmer className="h-36 w-full" />
       ) : hasData ? (
         isSA ? (
           <ChartContainer config={chartConfig} className="h-[148px] w-full">
@@ -247,29 +252,29 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
               barCategoryGap="30%"
               margin={{ top: 2, right: 48, left: 0, bottom: 2 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
               <XAxis
                 type="number"
                 tickFormatter={v => pesoC(v)}
-                tick={{ fontSize: 9, fill: "#a1a1aa" }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 type="category"
                 dataKey="section"
-                tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
                 tickLine={false}
                 axisLine={false}
                 width={36}
               />
-              <RechartsTooltip content={<SectorBarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
+              <RechartsTooltip content={<SectorBarTip />} cursor={{ fill: "hsl(var(--muted))", radius: 4 }} />
               <Bar
                 dataKey="saTotal"
                 name="Total"
                 radius={[0, 3, 3, 0]}
                 maxBarSize={20}
-                label={{ position: "right", formatter: (v: number) => pesoC(v), fontSize: 9, fill: "#71717a" }}
+                label={{ position: "right", formatter: (v: number) => pesoC(v), fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
               >
                 {chartData.map((entry) => (
                   <Cell
@@ -285,21 +290,21 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
         ) : (
           <ChartContainer config={chartConfig} className="h-[148px] w-full">
             <BarChart data={chartData} barCategoryGap="28%" barGap={2} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis
                 dataKey="section"
-                tick={{ fontSize: 9, fill: "#a1a1aa", fontWeight: 700 }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 tickFormatter={v => pesoC(v)}
-                tick={{ fontSize: 9, fill: "#a1a1aa" }}
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                 tickLine={false}
                 axisLine={false}
                 width={52}
               />
-              <RechartsTooltip content={<SectorBarTip />} cursor={{ fill: "#f9f9f9", radius: 4 }} />
+              <RechartsTooltip content={<SectorBarTip />} cursor={{ fill: "hsl(var(--muted))", radius: 4 }} />
               {(["general_public_services","social_services","economic_services","other_services"] as const).map(key => (
                 <Bar key={key} dataKey={key} name={SECTOR_LABELS[key]} fill={SECTOR_COLORS[key]} radius={[3,3,0,0]} maxBarSize={18} />
               ))}
@@ -307,7 +312,7 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
           </ChartContainer>
         )
       ) : (
-        <div className="h-36 flex flex-col items-center justify-center gap-2 text-zinc-200">
+        <div className="h-36 flex flex-col items-center justify-center gap-2 text-muted-foreground/40">
           <ChartBarIcon className="w-8 h-8" />
           <p className="text-[10px]">No expenditure data</p>
         </div>
@@ -364,7 +369,7 @@ function useSaForm7Summary(planId: number | undefined) {
 
         const rawAbbr = String(item.expense_item?.classification?.abbreviation ?? "").toUpperCase();
         const code = ["PS","MOOE","FE","CO"].includes(rawAbbr) ? rawAbbr : "MOOE";
-        
+
         if (!sectionMap.has(code)) sectionMap.set(code, { ...ZERO_SUB });
         sectionMap.get(code)!.total += amt;
       });
@@ -414,37 +419,37 @@ export const SectorAllocationCard: React.FC<Props> = ({ planId, style }) => {
   const { data: saData, isLoading: saLoading, isError: saError } = useSaForm7Summary(planId);
 
   return (
-    <div
+    <ShadcnCard
       style={style}
       className={cn(
-        "bg-card rounded-2xl border border-border shadow-sm overflow-hidden",
+        "rounded-lg shadow-sm overflow-hidden",
         "animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both",
       )}
     >
       {/* Card header */}
-      <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center flex-shrink-0">
-          <ChartBarIcon className="w-5 h-5 text-indigo-500" />
+      <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
+        <div className="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center flex-shrink-0">
+          <ChartBarIcon className="w-3.5 h-3.5 text-indigo-500" />
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">LBP Form 7</p>
-          <p className="text-sm font-bold text-zinc-900">Fund Allocation by Sector</p>
+          <p className="text-[10px] font-medium text-muted-foreground">LBP Form 7</p>
+          <p className="text-sm font-semibold text-foreground">Fund Allocation by Sector</p>
         </div>
       </div>
 
-      <div className="p-5 space-y-6">
+      <div className="p-4 space-y-5">
 
         {/* TOP — General Fund */}
         <AllocationPanel
           eyebrow="General Fund"
           title="PS · MOOE · CO · SPA by Sector"
-          accentClass="text-zinc-800"
+          accentClass="text-foreground"
           data={gfData}
           isLoading={gfLoading}
           isError={gfError}
         />
 
-        <div className="border-t border-zinc-100" />
+        <div className="border-t border-border" />
 
         {/* BOTTOM — Special Accounts */}
         <AllocationPanel
@@ -458,6 +463,8 @@ export const SectorAllocationCard: React.FC<Props> = ({ planId, style }) => {
         />
 
       </div>
-    </div>
+    </ShadcnCard>
   );
 };
+
+export default SectorAllocationCard;

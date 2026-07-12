@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\{
     NotificationController,
     DatabaseBackupController,
     PsSettingController,
+    BudgetCallMemoController,
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
@@ -96,6 +97,14 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::apiResource('budget-plans', BudgetPlanController::class);
     Route::post('budget-plans/{budget_plan}/activate', [BudgetPlanController::class, 'activate']);
     Route::post('budget-plans/{budget_plan}/close',    [BudgetPlanController::class, 'close']);
+
+    // ── Budget Call Memorandum (public viewer, admin-only writes) ─────────────
+    Route::get   ('budget-call-memos',            [BudgetCallMemoController::class, 'index']);
+    Route::get   ('budget-call-memos/current',    [BudgetCallMemoController::class, 'current']);
+    Route::get   ('budget-call-memos/{budget_call_memo}/download', [BudgetCallMemoController::class, 'download']);
+    Route::put   ('budget-call-memos/{budget_call_memo}', [BudgetCallMemoController::class, 'update']);
+    Route::post  ('budget-call-memos/reorder',    [BudgetCallMemoController::class, 'reorder']);
+    Route::delete('budget-call-memos/{budget_call_memo}', [BudgetCallMemoController::class, 'destroy']);
 
     // ── Department Budget Plans ────────────────────────────────────────────────
     Route::get('/department-budget-plans/years',                      [DepartmentBudgetPlanController::class, 'years']);
@@ -177,8 +186,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // but these override the outer 'throttle:api' for their specific routes.
     // ════════════════════════════════════════════════════════════════════════════
 
-
-    Route::get('/database/info', [DatabaseBackupController::class, 'info']);
+    Route::middleware('can:manage-database')->group(function () {
+        Route::get('/database/info', [DatabaseBackupController::class, 'info']);
+    });
     // ── File Uploads (5/min) ───────────────────────────────────────────────────
     Route::middleware('throttle:uploads')->group(function () {
         Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
@@ -186,8 +196,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
             'department-budget-plans/{department_budget_plan}/upload-obligations',
             [DepartmentBudgetPlanController::class, 'uploadObligations']
         );
-        Route::post('/database/backup',  [DatabaseBackupController::class, 'backup']);
-        Route::post('/database/restore', [DatabaseBackupController::class, 'restore']);
+        Route::middleware('can:manage-database')->group(function () {
+            Route::post('/database/backup',  [DatabaseBackupController::class, 'backup']);
+            Route::post('/database/restore', [DatabaseBackupController::class, 'restore']);
+        });
+        Route::post('budget-call-memos', [BudgetCallMemoController::class, 'store']);
     });
 
     // ── Bulk Writes (20/min) ───────────────────────────────────────────────────
@@ -278,8 +291,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     }
 
     Route::get   ('/notifications',              [NotificationController::class, 'index']);
-Route::post  ('/notifications/read-all',     [NotificationController::class, 'markAllRead']);
-Route::post  ('/notifications/{id}/read',    [NotificationController::class, 'markRead']);
-Route::delete('/notifications/clear-read',   [NotificationController::class, 'clearRead']);
+    Route::post  ('/notifications/read-all',     [NotificationController::class, 'markAllRead']);
+    Route::post  ('/notifications/{id}/read',    [NotificationController::class, 'markRead']);
+    Route::delete('/notifications/clear-read',   [NotificationController::class, 'clearRead']);
 
 });

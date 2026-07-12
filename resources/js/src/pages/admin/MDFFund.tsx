@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { MAX_AMOUNT, parseMoney, sanitizeMoneyDigits, useCaretRestore } from "@/src/utils/moneyInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,29 +115,50 @@ const C_BUDG_GT  = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 
 // ─── Number helpers ───────────────────────────────────────────────────────────
 
+// const enPH = (v: number) =>
+//   new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+// const fmt      = (v: number | null | undefined) => (!v ? "–" : enPH(v));
+// const fmtPeso  = (v: number) => (v === 0 ? "–" : `₱ ${enPH(v)}`);
+// const parseNum = (s: string) => { const n = parseFloat(s.replace(/,/g, "").trim()); return isNaN(n) ? 0 : n; };
+// const toStr    = (v: number) => (v === 0 ? "" : enPH(v));
+
+// // Hard ceiling for any peso amount field — matches the DB column's precision
+// // so typed values can never overflow into a DB error.
+// const MAX_AMOUNT = 999999999.99;
+
+// const commaFmt = (raw: string) => {
+//   // Keep digits and at most one decimal point
+//   let cleaned = raw.replace(/[^0-9.]/g, "");
+//   const firstDot = cleaned.indexOf(".");
+//   if (firstDot !== -1) {
+//     cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+//   }
+//   if (!cleaned) return "";
+
+//   const [intPartRaw, decPart] = cleaned.split(".");
+//   // Clamp the integer part so the number can never exceed MAX_AMOUNT, even
+//   // while the user is still mid-typing (e.g. pasting a huge value).
+//   let intNum = intPartRaw ? parseInt(intPartRaw, 10) : 0;
+//   if (intNum > Math.floor(MAX_AMOUNT)) intNum = Math.floor(MAX_AMOUNT);
+//   const intFormatted = intNum.toLocaleString("en-PH");
+
+//   if (decPart === undefined) return intFormatted;
+//   // Limit to 2 decimal places while typing, but allow "0." / "0.5" mid-entry
+//   return `${intFormatted}.${decPart.slice(0, 2)}`;
+// };
+
 const enPH = (v: number) =>
   new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
 const fmt      = (v: number | null | undefined) => (!v ? "–" : enPH(v));
 const fmtPeso  = (v: number) => (v === 0 ? "–" : `₱ ${enPH(v)}`);
-const parseNum = (s: string) => { const n = parseFloat(s.replace(/,/g, "").trim()); return isNaN(n) ? 0 : n; };
+const parseNum = parseMoney;
 const toStr    = (v: number) => (v === 0 ? "" : enPH(v));
-const commaFmt = (raw: string) => {
-  // Keep digits and at most one decimal point
-  let cleaned = raw.replace(/[^0-9.]/g, "");
-  const firstDot = cleaned.indexOf(".");
-  if (firstDot !== -1) {
-    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
-  }
-  if (!cleaned) return "";
 
-  const [intPartRaw, decPart] = cleaned.split(".");
-  const intFormatted = intPartRaw ? parseInt(intPartRaw, 10).toLocaleString("en-PH") : "0";
-
-  if (decPart === undefined) return intFormatted;
-  // Limit to 2 decimal places while typing, but allow "0." / "0.5" mid-entry
-  return `${intFormatted}.${decPart.slice(0, 2)}`;
-};
+// commaFmt removed — AmountInput no longer comma-formats while typing (that
+// was the cause of the caret jumping to the end on delete). See AmountInput
+// below, which now follows Form2's pattern via useCaretRestore.
 
 // ─── AmountInput ──────────────────────────────────────────────────────────────
 
@@ -158,6 +180,9 @@ function AmountInput({
   const [focused, setFocused] = useState(false);
   const [draft,   setDraft]   = useState(value);
   const atFocus               = useRef<number>(0);
+  // Same caret-preservation pattern as Form2 — required because we
+  // programmatically overwrite the input's value on every keystroke.
+  const cursorRef = useCaretRestore();
 
   useEffect(() => { if (!focused) setDraft(value); }, [value, focused]);
 
@@ -175,7 +200,15 @@ function AmountInput({
       value={focused ? draft : value}
       placeholder={placeholder}
       onFocus={() => { setFocused(true); atFocus.current = parseNum(value); setDraft(value.replace(/,/g, "")); }}
-      onChange={(e) => { const f = commaFmt(e.target.value); setDraft(f); onChange(f); }}
+      onChange={(e) => {
+        // Show raw digits while typing (no commas) — inserting commas mid-edit
+        // is what shifted the caret to the end. Commas only reappear on blur.
+        const pos = e.target.selectionStart ?? e.target.value.length;
+        const sanitized = sanitizeMoneyDigits(e.target.value);
+        cursorRef.current = { el: e.target, pos: Math.min(pos, sanitized.length) };
+        setDraft(sanitized);
+        onChange(sanitized);
+      }}
       onBlur={() => {
         setFocused(false);
         const n = parseNum(draft);
@@ -643,7 +676,7 @@ const isViewer = user?.role === "viewer";
   const handleProposedBlur = useCallback((itemId: number) => {
     const y = yearsRef.current;
     if (!y) return;
-    const cur  = parseNum(proposedRef.current[itemId] ?? "");
+    const cur  = Math.min(parseNum(proposedRef.current[itemId] ?? ""), MAX_AMOUNT);
     const last = savedProposed.current.get(itemId);
     if (last === cur) return;
     // Debt rows: proposed is read-only (driven by debt_payments.principal/interest_due)
@@ -743,7 +776,7 @@ const isViewer = user?.role === "viewer";
       return;
     }
 
-    const cur  = parseNum(obligationRef.current[item.item_id] ?? "");
+    const cur  = Math.min(parseNum(obligationRef.current[item.item_id] ?? ""), MAX_AMOUNT);
     const last = savedObligation.current.get(item.item_id);
     if (last === cur) return;
 

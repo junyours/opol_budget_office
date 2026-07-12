@@ -72,7 +72,7 @@ class LEPReportController extends Controller
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
-        $allDepartments = Department::with('category')->orderBy('dept_id')->get();
+        $allDepartments = Department::with('category')->orderBy('dept_category_id')->orderBy('sort_order')->get();
         $generalDepts   = $allDepartments->filter(fn ($d) => $d->dept_category_id !== $specialCategoryId);
         $specialDepts   = $allDepartments->filter(fn ($d) => $d->dept_category_id === $specialCategoryId);
 
@@ -150,7 +150,7 @@ class LEPReportController extends Controller
         bool  $groupByDept
     ): array {
         $groups = [];
-        $deptCollection = Department::whereIn('dept_id', $deptIds)->orderBy('dept_id')->get();
+        $deptCollection = Department::whereIn('dept_id', $deptIds)->orderBy('dept_category_id')->orderBy('sort_order')->get();
 
         foreach ($deptCollection as $dept) {
             $proposedPlan = DepartmentBudgetPlan::where('dept_id', $dept->dept_id)
@@ -224,9 +224,11 @@ class LEPReportController extends Controller
                 $proposedStep   = $proposed?->step       ?? null;
                 $proposedAmount = (float) ($proposed?->annual_rate ?? 0);
 
-                $increaseDecrease = ($current !== null)
-                    ? $proposedAmount - $currentAmount
-                    : 0.0;
+                // $increaseDecrease = ($current !== null)
+                //     ? $proposedAmount - $currentAmount
+                //     : 0.0;
+
+                $increaseDecrease = $proposedAmount - $currentAmount;
 
                 $rows[] = [
                     'old_item_number'     => $plantilla?->old_item_number ?? null,
@@ -378,23 +380,21 @@ class LEPReportController extends Controller
         $currentYear = $proposedYear - 1;
         $currentPlan = BudgetPlan::where('year', $currentYear)->first();
 
-        $anyProposed = BudgetPlanForm3Assignment::whereHas('budgetPlan', function ($q) use ($budgetPlanId) {
-            $q->where('budget_plan_id', $budgetPlanId);
-        })->first();
+        $proposedDeptPlanIds = DepartmentBudgetPlan::where('budget_plan_id', $budgetPlanId)
+            ->pluck('dept_budget_plan_id');
+        $currentDeptPlanIds  = $currentPlan
+            ? DepartmentBudgetPlan::where('budget_plan_id', $currentPlan->budget_plan_id)
+                ->pluck('dept_budget_plan_id')
+            : collect();
 
-        $anyCurrent = $currentPlan
-            ? BudgetPlanForm3Assignment::whereHas('budgetPlan', function ($q) use ($currentPlan) {
-                $q->where('budget_plan_id', $currentPlan->budget_plan_id);
-            })->first()
-            : null;
+        $proposedSnapshots = BudgetPlanForm3Assignment::whereIn('dept_budget_plan_id', $proposedDeptPlanIds)->get();
+        $currentSnapshots  = $currentDeptPlanIds->isNotEmpty()
+            ? BudgetPlanForm3Assignment::whereIn('dept_budget_plan_id', $currentDeptPlanIds)->get()
+            : collect();
 
-        $proposedVersion = $anyProposed?->salary_standard_version_id
-            ? SalaryStandardVersion::find($anyProposed->salary_standard_version_id)
-            : SalaryStandardVersion::where('is_active', true)->first();
-
-        $currentVersion = $anyCurrent?->salary_standard_version_id
-            ? SalaryStandardVersion::find($anyCurrent->salary_standard_version_id)
-            : $proposedVersion;
+        $proposedVersion = $this->resolveVersionFromSnapshots($proposedSnapshots)
+            ?? SalaryStandardVersion::where('is_active', true)->first();
+        $currentVersion  = $this->resolveVersionFromSnapshots($currentSnapshots) ?? $proposedVersion;
 
         return [
             'lbc_current'      => $currentVersion?->lbc_reference  ?? null,
@@ -480,7 +480,7 @@ class LEPReportController extends Controller
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
-        $allDepartments = Department::with('category')->orderBy('dept_id')->get();
+        $allDepartments = Department::with('category')->orderBy('dept_category_id')->orderBy('sort_order')->get();
         $specialDepts   = $allDepartments->filter(fn ($d) => $d->dept_category_id === $specialCategoryId);
 
         $forms = [];
@@ -698,7 +698,7 @@ class LEPReportController extends Controller
             "LOWER(dept_category_name) LIKE '%special account%'"
         )->value('dept_category_id');
 
-        $allDepts     = Department::with('category')->orderBy('dept_id')->get();
+        $allDepts     = Department::with('category')->orderBy('dept_category_id')->orderBy('sort_order')->get();
         $gfDepts      = $allDepts->filter(fn ($d) => $d->dept_category_id !== $specialCategoryId);
         $specialDepts = $allDepts->filter(fn ($d) => $d->dept_category_id === $specialCategoryId);
 

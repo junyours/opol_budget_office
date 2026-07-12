@@ -407,8 +407,17 @@ class DatabaseBackupController extends Controller
     // PASSWORD GATE
     // ═══════════════════════════════════════════════════════════════════════════
 
+    private function verifySuperAdmin(): void
+    {
+        if (Auth::user()?->role !== 'super-admin') {
+            abort(403, 'Only super-admin can perform this action.');
+        }
+    }
+
     private function verifyAdminPassword(Request $request): void
     {
+        $this->verifySuperAdmin();
+
         $request->validate(['password' => ['required', 'string']]);
 
         if (! Hash::check($request->input('password'), Auth::user()->password)) {
@@ -499,6 +508,8 @@ class DatabaseBackupController extends Controller
 
     public function info(): \Illuminate\Http\JsonResponse
     {
+        $this->verifySuperAdmin();
+
         $execOk       = $this->execAvailable();
         $mysqldumpBin = $execOk ? $this->findBinary('mysqldump', 'MYSQLDUMP_PATH') : null;
         $mysqlBin     = $execOk ? $this->findBinary('mysql',     'MYSQL_BIN_PATH')  : null;

@@ -21,8 +21,7 @@ class BudgetPlanForm2ItemController extends BaseApiController
     {
         // Admins can add items to any plan regardless of status.
         // Non-admins are restricted to their own draft plans via policy.
-        // $isAdmin = $request->user()->hasRole('admin');
-        $isAdmin = $request->user()->role === 'admin';
+        $isAdmin = in_array($request->user()->role, ['admin', 'super-admin']);
 
         if (!$isAdmin) {
             $this->authorize('update', $department_budget_plan);
@@ -78,8 +77,7 @@ class BudgetPlanForm2ItemController extends BaseApiController
         BudgetPlanForm2Item $item
     ) {
         // Admins can update items on any plan regardless of status.
-        // $isAdmin = $request->user()->hasRole('admin');
-        $isAdmin = $request->user()->role === 'admin';
+        $isAdmin = in_array($request->user()->role, ['admin', 'super-admin']);
         if (!$isAdmin) {
             $this->authorize('update', $item);
 

@@ -331,7 +331,12 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
             // ── 1. Return saved snapshots if they exist ────────────────────
             $snapshots = BudgetPlanForm3Assignment::with(['plantillaPosition', 'personnel'])
                 ->where('dept_budget_plan_id', $plan->dept_budget_plan_id)
-                ->get();
+                ->get()
+                ->reject(fn ($item) =>
+                    $item->plantillaPosition
+                    && !$item->plantillaPosition->is_active
+                    && (float) $item->annual_rate == 0
+                );
 
             if ($snapshots->isNotEmpty()) {
                 $result = $snapshots->map(fn ($item) => [

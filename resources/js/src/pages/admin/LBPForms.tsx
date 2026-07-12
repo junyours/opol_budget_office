@@ -905,7 +905,7 @@ const LBPForms: React.FC = () => {
   const location = useLocation();
   const notifications = useNotificationStore(s => s.notifications);
   const markRead      = useNotificationStore(s => s.markRead);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super-admin';
   const isViewer = user?.role === 'viewer';
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
@@ -1439,24 +1439,43 @@ const handleAcknowledge = async () => {
     </KbdGroup>
     <button
       onClick={() => setCardView(v => !v)}
+      style={{ width: '52px', height: '20px', overflow: 'hidden', flexShrink: 0 }}
       className={cn(
-        'relative inline-flex h-5 w-9 items-center rounded-full border transition-colors focus:outline-none',
+        'relative inline-flex items-center rounded-full border transition-colors focus:outline-none',
         cardView ? 'bg-gray-900 border-gray-900' : 'bg-gray-200 border-gray-300',
       )}
       role="switch"
       aria-checked={cardView}
     >
-      <span className={cn(
-        'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
-        cardView ? 'translate-x-[18px]' : 'translate-x-[2px]',
-      )} />
+      <span
+        style={{ position: 'absolute', left: '30px', fontSize: '7px', whiteSpace: 'nowrap' }}
+        className={cn(
+          'font-bold tracking-wider text-gray-500 transition-opacity',
+          cardView ? 'opacity-0' : 'opacity-100',
+        )}
+      >
+        OFF
+      </span>
+      <span
+        style={{ position: 'absolute', right: '30px', fontSize: '7px', whiteSpace: 'nowrap' }}
+        className={cn(
+          'font-bold tracking-wider text-white transition-opacity',
+          cardView ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        ON
+      </span>
+      <span
+        style={{ transform: cardView ? 'translateX(34px)' : 'translateX(2px)' }}
+        className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
+      />
     </button>
   </div>
  {!isViewer && selectedPlan.status === 'submitted' && (
     <>
       <Button size="sm" variant="outline"
         onClick={() => setRejectTarget(selectedPlan)}
-        className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+        className="gap-1.5 text-xs h-8 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700">
         <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
         Return to Draft
       </Button>
@@ -1473,7 +1492,7 @@ const handleAcknowledge = async () => {
     <>
       <Button size="sm" variant="outline"
         onClick={() => setRejectTarget(selectedPlan)}
-        className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600 hover:text-gray-900">
+        className="gap-1.5 text-xs h-8 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700">
         <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
         Return to Draft
       </Button>
@@ -1488,7 +1507,7 @@ const handleAcknowledge = async () => {
   {!isViewer && selectedPlan.status === 'approved' && (
     <Button size="sm" variant="outline"
       onClick={() => setRejectTarget(selectedPlan)}
-      className="gap-1.5 text-xs h-8 border-gray-200 text-gray-600">
+      className="gap-1.5 text-xs h-8 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700">
       <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
       Return to Draft
     </Button>

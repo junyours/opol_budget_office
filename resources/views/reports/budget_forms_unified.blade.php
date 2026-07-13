@@ -1492,8 +1492,8 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
   <tr>
     <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
       Prepared by:
-      <span class="sig-name">{{ $signatories['hrmo']['name'] }}</span>
-      <span class="sig-title">{{ $signatories['hrmo']['title'] }}</span>
+      <span class="sig-name">JOSEPH A. ACTUB</span>
+      <span class="sig-title">HRMO - Designate</span>
     </td>
     <td style="border-left:none solid #000;border-right:none solid #000;text-align:center;vertical-align:top;width:34%;padding:8px 6px 18px;">
       Reviewed by:

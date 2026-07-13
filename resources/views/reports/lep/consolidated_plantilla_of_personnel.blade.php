@@ -195,7 +195,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
       <td style="width:50%;text-align:center;vertical-align:top;padding:6px 4px 24px;">
         Prepared by:
         <span class="sig-name">JOSEPH A. ACTUB</span>
-        <span class="sig-title">HRMO Designate</span>
+        <span class="sig-title">HRMO - Designate</span>
       </td>
       <td style="width:50%;text-align:center;vertical-align:top;padding:6px 4px 24px;">
         &nbsp;
@@ -358,7 +358,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
       <td style="width:50%;text-align:center;vertical-align:top;padding:6px 4px 24px;">
         Prepared by:
         <span class="sig-name">JOSEPH A. ACTUB</span>
-        <span class="sig-title">HRMO Designate</span>
+        <span class="sig-title">HRMO - Designate</span>
       </td>
       <td style="width:50%;text-align:center;vertical-align:top;padding:6px 4px 24px;">
         &nbsp;

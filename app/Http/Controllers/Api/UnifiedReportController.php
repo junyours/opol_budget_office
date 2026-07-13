@@ -3407,7 +3407,7 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             ],
             'hrmo' => [
                 'name'  => 'JOSEPH A. ACTUB',
-                'title' => 'HRMO Designate',
+                'title' => 'HRMO - Designate',
             ],
         ];
     }

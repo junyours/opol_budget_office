@@ -19,6 +19,15 @@ class Department extends Model
     //     'special_provisions',
     //     'logo',
     // ];
+    // protected $fillable   = [
+    //     'dept_name',
+    //     'dept_abbreviation',
+    //     'dept_category_id',
+    //     'mandate',
+    //     'special_provisions',
+    //     'logo',
+    //     'sort_order',
+    // ];
     protected $fillable   = [
         'dept_name',
         'dept_abbreviation',
@@ -27,6 +36,8 @@ class Department extends Model
         'special_provisions',
         'logo',
         'sort_order',
+        'signatory_name',
+        'signatory_title',
     ];
 
     public function category()

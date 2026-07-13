@@ -62,7 +62,22 @@ class DepartmentController extends BaseMasterCrudController
             $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
-        $validated = $request->validate($rules);
+    //     $validated = $request->validate($rules);
+
+    //     if ($request->hasFile('logo')) {
+    //         $validated['logo'] = $request->file('logo')->store('departments', 'public');
+    //     }
+
+    //     $department = $this->modelClass::create($validated);
+
+    //     return $this->success($department, 201);
+    // }
+
+    $validated = $request->validate($rules);
+
+        // Empty strings mean "no signatory set" — normalize to null, not "".
+        $validated['signatory_name']  = $validated['signatory_name']  ?: null;
+        $validated['signatory_title'] = $validated['signatory_title'] ?: null;
 
         if ($request->hasFile('logo')) {
             $validated['logo'] = $request->file('logo')->store('departments', 'public');
@@ -86,7 +101,25 @@ class DepartmentController extends BaseMasterCrudController
             $rules['logo'] = 'image|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
-        $validated = $request->validate($rules);
+    //     $validated = $request->validate($rules);
+
+    //     if ($request->hasFile('logo')) {
+    //         if ($model->logo) {
+    //             Storage::disk('public')->delete($model->logo);
+    //         }
+    //         $validated['logo'] = $request->file('logo')->store('departments', 'public');
+    //     }
+
+    //     $model->update($validated);
+
+    //     return $this->success($model);
+    // }
+
+    $validated = $request->validate($rules);
+
+        // Empty strings mean "no signatory set" — normalize to null, not "".
+        $validated['signatory_name']  = $validated['signatory_name']  ?: null;
+        $validated['signatory_title'] = $validated['signatory_title'] ?: null;
 
         if ($request->hasFile('logo')) {
             if ($model->logo) {
@@ -123,12 +156,22 @@ class DepartmentController extends BaseMasterCrudController
      */
     protected function rules($id = null): array
     {
+        // $rules = [
+        //     'dept_name'          => 'required|string|max:255',
+        //     'dept_category_id'   => 'required|exists:department_categories,dept_category_id',
+        //     'dept_abbreviation'  => 'nullable|string|max:50',
+        //     'mandate'            => 'nullable|string',
+        //     'special_provisions' => 'nullable|string',
+        // ];
+
         $rules = [
             'dept_name'          => 'required|string|max:255',
             'dept_category_id'   => 'required|exists:department_categories,dept_category_id',
             'dept_abbreviation'  => 'nullable|string|max:50',
             'mandate'            => 'nullable|string',
             'special_provisions' => 'nullable|string',
+            'signatory_name'     => 'nullable|string|max:255',
+            'signatory_title'    => 'nullable|string|max:255',
         ];
 
         if ($id) {

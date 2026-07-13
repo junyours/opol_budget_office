@@ -397,6 +397,7 @@ useEffect(() => {
     setFormData({ ...EMPTY_FORM });
     setSelectedProgram(null);
     setProgramSearch('');
+    setAmountDrafts({});
     const hasAvailable = existingPrograms.some(p => !usedProgramIds.has(p.aip_program_id));
     setModalMode(hasAvailable ? 'choose' : 'new');
     setModalOpen(true);
@@ -407,6 +408,7 @@ useEffect(() => {
     setEditingItem(item);
     setModalMode('new');
     setSelectedProgram(null);
+    setAmountDrafts({});
     setFormData({
       aip_reference_code:    item.aip_reference_code    || '',
       program_description:   item.program_description   || '',

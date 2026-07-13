@@ -311,8 +311,27 @@ private function buildSummaryData(int $budgetPlanId): array
             if ($def['source'] === 'gad') {
     $total = (float) \DB::table('gad_entries')
         ->where('budget_plan_id', $budgetPlanId)
+        ->whereNull('deleted_at')
         ->sum('mooe');
             } else {
+    // $planType = str_replace('-', '_', str_replace('-plan', '', $def['slug']));
+    // $sectorPlans = ['mpoc', 'drugs', 'arts', 'aids', 'sc_ppa'];
+    // if (in_array($planType, $sectorPlans)) {
+    //     // Sector plans store amount in aip_amount
+    //     $total = (float) \DB::table('unified_plan_items')
+    //         ->where('budget_plan_id', $budgetPlanId)
+    //         ->where('plan_type', $planType)
+    //         ->where('is_subtotal_row', false)
+    //         ->sum('aip_amount');
+    // } else {
+    //     // Fund plans (lcpc, lydp, sc) and nutrition use PS+MOOE+CO
+    //     $total = (float) \DB::table('unified_plan_items')
+    //         ->where('budget_plan_id', $budgetPlanId)
+    //         ->where('plan_type', $planType)
+    //         ->where('is_subtotal_row', false)
+    //         ->selectRaw('COALESCE(SUM(ps_amount + mooe_amount + co_amount), 0) as total')
+    //         ->value('total');
+    // }
     $planType = str_replace('-', '_', str_replace('-plan', '', $def['slug']));
     $sectorPlans = ['mpoc', 'drugs', 'arts', 'aids', 'sc_ppa'];
     if (in_array($planType, $sectorPlans)) {
@@ -321,6 +340,7 @@ private function buildSummaryData(int $budgetPlanId): array
             ->where('budget_plan_id', $budgetPlanId)
             ->where('plan_type', $planType)
             ->where('is_subtotal_row', false)
+            ->whereNull('deleted_at')
             ->sum('aip_amount');
     } else {
         // Fund plans (lcpc, lydp, sc) and nutrition use PS+MOOE+CO
@@ -328,6 +348,7 @@ private function buildSummaryData(int $budgetPlanId): array
             ->where('budget_plan_id', $budgetPlanId)
             ->where('plan_type', $planType)
             ->where('is_subtotal_row', false)
+            ->whereNull('deleted_at')
             ->selectRaw('COALESCE(SUM(ps_amount + mooe_amount + co_amount), 0) as total')
             ->value('total');
     }
@@ -1997,12 +2018,21 @@ return response()->stream(function () use ($zipPath) {
                     ->where('budget_plan_id', $pastBudgetPlan->budget_plan_id)->first()
                 : null;
 
+            // $report = [
+            //     'department'    => $dept,
+            //     'proposed_year' => $proposedYear,
+            //     'current_year'  => $currentYear,
+            //     'past_year'     => $pastYear,
+            //     'dept_head'     => $this->getDeptHead($dept->dept_id),
+            // ];
             $report = [
-                'department'    => $dept,
-                'proposed_year' => $proposedYear,
-                'current_year'  => $currentYear,
-                'past_year'     => $pastYear,
-                'dept_head'     => $this->getDeptHead($dept->dept_id),
+                'department'       => $dept,
+                'proposed_year'    => $proposedYear,
+                'current_year'     => $currentYear,
+                'past_year'        => $pastYear,
+                'dept_head'        => $this->getDeptHead($dept->dept_id),
+                'signatory_name'   => $dept->signatory_name,
+                'signatory_title'  => $dept->signatory_title,
             ];
             // if (in_array('form2', $forms)) $report['form2'] = $this->buildForm2($proposedPlan, $currentPlan, $pastPlan);
             // if (in_array('form3', $forms)) $report['form3'] = $this->buildForm3($proposedPlan, $currentPlan, $currentYear, $proposedYear);
@@ -2687,13 +2717,11 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             $current   = $currentSnapshots->get($positionId); // current year record (may be null)
             $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
 
-            // ── Skip stale snapshots for deactivated positions with no value ──
-            // A position can be marked inactive after its assignment row was
-            // saved. If it carries no monetary value in either year, it's a
-            // dead leftover row and shouldn't appear on the report anymore.
-            $proposedAmt = (float) ($proposed?->annual_rate ?? 0);
-            $currentAmt  = (float) ($current?->annual_rate  ?? 0);
-            if ($plantilla && !$plantilla->is_active && $proposedAmt == 0 && $currentAmt == 0) {
+            // ── Skip deactivated positions entirely ─────────────────────────
+            // A deactivated plantilla position should never appear on Form 3
+            // (or any downstream report), regardless of whether it still
+            // carries a monetary value from a prior year's snapshot.
+            if ($plantilla && !$plantilla->is_active) {
                 continue;
             }
 

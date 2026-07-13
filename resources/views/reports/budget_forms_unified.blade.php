@@ -1156,10 +1156,11 @@ $showForm2A = in_array('form2a', $forms);
 {{-- Signature block --}}
 <table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;border:1px solid #000;">
   <tr>
+
     <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 18px;">
       Prepared by:
-      <span class="sig-name">{{ $dr['dept_head']['name'] }}</span>
-      <span class="sig-title">{{ $dr['dept_head']['title'] }}</span>
+      <span class="sig-name">{{ $dr['signatory_name'] ?? '' }}</span>
+      <span class="sig-title">{{ $dr['signatory_title'] ?? '' }}</span>
     </td>
     <td style="border-left:none;border-right:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 18px;">
       Reviewed by:
@@ -1677,8 +1678,8 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
         </tr>
         <tr>
           <td style="border:none;text-align:center;vertical-align:top;padding:0 6px 6px;">
-            <span class="sig-name">{{ $dr['dept_head']['name'] }}</span>
-            <span class="sig-title">{{ $dr['dept_head']['title'] }}</span>
+            <span class="sig-name">{{ $dr['signatory_name'] ?? '' }}</span>
+            <span class="sig-title">{{ $dr['signatory_title'] ?? '' }}</span>
           </td>
           <td style="border:none;text-align:center;vertical-align:top;padding:0 6px 6px;">
             <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>

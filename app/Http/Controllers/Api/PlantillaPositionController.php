@@ -10,6 +10,20 @@ class PlantillaPositionController extends BaseMasterCrudController
 {
     protected string $modelClass = PlantillaPosition::class;
 
+    // protected function rules($id = null): array
+    // {
+    //     return [
+    //         'old_item_number'          => ['nullable', 'string', 'max:100'],
+    //         'new_item_number'          => ['nullable', 'string', 'max:100'],
+    //         'position_title'           => [$id ? 'sometimes' : 'required', 'string', 'max:255'],
+    //         'salary_grade'             => [$id ? 'sometimes' : 'required', 'integer', 'min:1'],
+    //         'dept_id'                  => [$id ? 'sometimes' : 'required', 'exists:departments,dept_id'],
+    //         'extension_department_id'  => ['nullable', 'integer', 'min:1'],
+    //         'is_active'                => ['sometimes', 'boolean'],
+    //     ];
+    // }
+
+    // public function index()
     protected function rules($id = null): array
     {
         return [
@@ -21,6 +35,39 @@ class PlantillaPositionController extends BaseMasterCrudController
             'extension_department_id'  => ['nullable', 'integer', 'min:1'],
             'is_active'                => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * Search distinct plantilla position titles for the department
+     * "signatory title" picker. Always scoped to one department — a
+     * signatory title is meant to reflect a real position within the
+     * department whose form is being edited.
+     *
+     * GET /api/plantilla-positions/search-title?dept_id=&q=
+     */
+    public function searchTitle(Request $request)
+    {
+        $this->authorize('viewAny', PlantillaPosition::class);
+
+        $request->validate([
+            'dept_id' => ['required', 'exists:departments,dept_id'],
+        ]);
+
+        $query = PlantillaPosition::query()
+            ->where('dept_id', $request->input('dept_id'))
+            ->where('is_active', true);
+
+        if ($request->filled('q')) {
+            $query->where('position_title', 'like', '%' . trim($request->input('q')) . '%');
+        }
+
+        $titles = $query->select('position_title')
+            ->distinct()
+            ->orderBy('position_title')
+            ->limit(50)
+            ->get();
+
+        return $this->success($titles);
     }
 
     public function index()

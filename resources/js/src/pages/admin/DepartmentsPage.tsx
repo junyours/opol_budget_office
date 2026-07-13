@@ -62,7 +62,9 @@ import {
   ArrowsUpDownIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/src/lib/utils";
+// import ReorderDepartmentsDialog from "@/src/components/dialog/ReorderDepartmentsDialog";
 import ReorderDepartmentsDialog from "@/src/components/dialog/ReorderDepartmentsDialog";
+import { SignatoryNameField, SignatoryTitleField } from "@/src/components/dialog/SignatoryFields";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -123,9 +125,14 @@ const DepartmentsPage: React.FC = () => {
   // ── Create / Edit dialog ──────────────────────────────────────────────────
   const [modalOpen, setModalOpen]     = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
-  const [form, setForm] = useState({
+//   const [form, setForm] = useState({
+//     dept_name: "", dept_abbreviation: "", dept_category_id: "",
+//     mandate: "", special_provisions: "",
+//   });
+const [form, setForm] = useState({
     dept_name: "", dept_abbreviation: "", dept_category_id: "",
     mandate: "", special_provisions: "",
+    signatory_name: "", signatory_title: "",
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef                   = useRef<File | null>(null);
@@ -234,9 +241,21 @@ const DepartmentsPage: React.FC = () => {
 
   // ── Open modals ───────────────────────────────────────────────────────────
 
-  const openCreate = () => {
+//   const openCreate = () => {
+//     setEditingDept(null);
+//     setForm({ dept_name: "", dept_abbreviation: "", dept_category_id: "", mandate: "", special_provisions: "" });
+//     logoFileRef.current = null;
+//     setLogoPreview(null);
+//     setModalOpen(true);
+//   };
+
+const openCreate = () => {
     setEditingDept(null);
-    setForm({ dept_name: "", dept_abbreviation: "", dept_category_id: "", mandate: "", special_provisions: "" });
+    setForm({
+      dept_name: "", dept_abbreviation: "", dept_category_id: "",
+      mandate: "", special_provisions: "",
+      signatory_name: "", signatory_title: "",
+    });
     logoFileRef.current = null;
     setLogoPreview(null);
     setModalOpen(true);
@@ -245,12 +264,21 @@ const DepartmentsPage: React.FC = () => {
   const openEdit = (dept: Department) => {
     setCtxMenu(null);
     setEditingDept(dept);
+    // setForm({
+    //   dept_name:          dept.dept_name,
+    //   dept_abbreviation:  dept.dept_abbreviation ?? "",
+    //   dept_category_id:   dept.dept_category_id?.toString() ?? "",
+    //   mandate:            dept.mandate ?? "",
+    //   special_provisions: dept.special_provisions ?? "",
+    // });
     setForm({
       dept_name:          dept.dept_name,
       dept_abbreviation:  dept.dept_abbreviation ?? "",
       dept_category_id:   dept.dept_category_id?.toString() ?? "",
       mandate:            dept.mandate ?? "",
       special_provisions: dept.special_provisions ?? "",
+      signatory_name:     dept.signatory_name ?? "",
+      signatory_title:    dept.signatory_title ?? "",
     });
     logoFileRef.current = null;
     setLogoPreview(dept.logo ? `/storage/${dept.logo}` : null);
@@ -286,9 +314,17 @@ const DepartmentsPage: React.FC = () => {
       const fd = new FormData();
       fd.append("dept_name",        form.dept_name);
       fd.append("dept_category_id", form.dept_category_id);
-      if (form.dept_abbreviation)  fd.append("dept_abbreviation",  form.dept_abbreviation);
+    //   if (form.dept_abbreviation)  fd.append("dept_abbreviation",  form.dept_abbreviation);
+    //   if (form.mandate)            fd.append("mandate",            form.mandate);
+    //   if (form.special_provisions) fd.append("special_provisions", form.special_provisions);
+    //   if (logoFileRef.current)     fd.append("logo",               logoFileRef.current);
+    if (form.dept_abbreviation)  fd.append("dept_abbreviation",  form.dept_abbreviation);
       if (form.mandate)            fd.append("mandate",            form.mandate);
       if (form.special_provisions) fd.append("special_provisions", form.special_provisions);
+      // Always append these two (even blank) so clearing a previously-set
+      // signatory actually clears it, rather than leaving the old value.
+      fd.append("signatory_name",  form.signatory_name);
+      fd.append("signatory_title", form.signatory_title);
       if (logoFileRef.current)     fd.append("logo",               logoFileRef.current);
 
     //   const token = localStorage.getItem("token");
@@ -706,7 +742,7 @@ const DepartmentsPage: React.FC = () => {
                   className="text-sm resize-none"
                 />
               </div>
-              <div className="space-y-1.5">
+              {/* <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-gray-600">Special Provisions</Label>
                 <Textarea
                   value={form.special_provisions}
@@ -717,6 +753,34 @@ const DepartmentsPage: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2"> */}
+          <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-gray-600">Special Provisions</Label>
+                <Textarea
+                  value={form.special_provisions}
+                  onChange={(e) => setForm((p) => ({ ...p, special_provisions: e.target.value }))}
+                  placeholder="Enter any special provisions for this department…"
+                  rows={4}
+                  className="text-sm resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-5 pt-1 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <SignatoryNameField
+              value={form.signatory_name}
+              onChange={(v) => setForm((p) => ({ ...p, signatory_name: v }))}
+              departments={departments}
+              defaultDeptId={editingDept ? editingDept.dept_id.toString() : null}
+            />
+            <SignatoryTitleField
+              value={form.signatory_title}
+              onChange={(v) => setForm((p) => ({ ...p, signatory_title: v }))}
+              deptId={editingDept ? editingDept.dept_id.toString() : null}
+            />
           </div>
 
           <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">

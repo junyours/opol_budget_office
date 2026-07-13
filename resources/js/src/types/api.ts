@@ -137,6 +137,8 @@ export interface Department {
   special_provisions: string | null;
   logo: string | null;
   category?: DepartmentCategory | null;
+  signatory_name: string | null;
+    signatory_title: string | null;
 }
 
 ///////////////////////////////////////////////

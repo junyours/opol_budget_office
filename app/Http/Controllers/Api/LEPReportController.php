@@ -201,6 +201,11 @@ class LEPReportController extends Controller
                 $current   = $currentSnapshots->get($positionId);
                 $plantilla = $proposed?->plantillaPosition ?? $current?->plantillaPosition;
 
+                // ── Skip deactivated positions entirely ─────────────────────────
+                if ($plantilla && !$plantilla->is_active) {
+                    continue;
+                }
+
                 // ── Name: always from budget year ─────────────────────────────
                 $budgetYearPersonnel = $proposed?->personnel;
                 $incumbentName = 'Vacant';

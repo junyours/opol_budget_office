@@ -90,9 +90,11 @@ class UnifiedPlanItemController extends Controller
 
     // ── PUT /api/{slug}-plan/{id} ─────────────────────────────────────────────
 
-    public function update(Request $request, string $planType, UnifiedPlanItem $upItem): JsonResponse
+    public function update(Request $request, $upItem): JsonResponse
     {
+        $planType = $request->route('planType');
         $this->guard($planType);
+        $upItem = UnifiedPlanItem::findOrFail($upItem);
 
         $data = $request->validate(array_merge(
             $this->sharedRules('sometimes'),
@@ -116,10 +118,12 @@ class UnifiedPlanItemController extends Controller
 
     // ── DELETE /api/{slug}-plan/{id} ──────────────────────────────────────────
 
-    public function destroy(string $planType, UnifiedPlanItem $upItem): JsonResponse
+    public function destroy($upItem): JsonResponse
     {
+        $planType = request()->route('planType');
         $this->guard($planType);
-        $upItem->delete();
+        $item = UnifiedPlanItem::findOrFail($upItem);
+        $item->delete();
         return response()->json(['message' => 'Deleted successfully']);
     }
 

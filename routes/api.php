@@ -71,6 +71,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('departments/{department}/upload',  [DepartmentController::class, 'update']);
     Route::post('departments/reorder',               [DepartmentController::class, 'reorder']);
 
+    Route::get('personnels/search-signatory', [PersonnelController::class, 'searchSignatory']);
+    Route::get('plantilla-positions/search-title', [PlantillaPositionController::class, 'searchTitle']);
+
     Route::apiResource('expense-classifications',   ExpenseClassificationController::class);
     Route::apiResource('expense-class-items',       ExpenseClassItemController::class);
 

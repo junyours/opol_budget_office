@@ -2081,7 +2081,59 @@ function parseExcel(
   });
 }
 
-// ─── Micro components ─────────────────────────────────────────────────────────
+// ── Countdown number for the delete-undo toast ────────────────────────────
+const CountdownRing: React.FC<{ durationMs: number }> = ({ durationMs }) => {
+  const totalSeconds = Math.ceil(durationMs / 1000);
+  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const pausedRef = useRef(false);
+  const elapsedRef = useRef(0);
+  const lastTickRef = useRef(Date.now());
+
+  useEffect(() => {
+    const toastEl = spanRef.current?.closest('[data-sonner-toast]');
+    const onEnter = () => { pausedRef.current = true; };
+    const onLeave = () => { pausedRef.current = false; lastTickRef.current = Date.now(); };
+    toastEl?.addEventListener('mouseenter', onEnter);
+    toastEl?.addEventListener('mouseleave', onLeave);
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const delta = now - lastTickRef.current;
+      lastTickRef.current = now;
+      if (!pausedRef.current) {
+        elapsedRef.current += delta;
+        setSecondsLeft(Math.max(0, totalSeconds - Math.floor(elapsedRef.current / 1000)));
+      }
+    }, 200);
+
+    return () => {
+      clearInterval(interval);
+      toastEl?.removeEventListener('mouseenter', onEnter);
+      toastEl?.removeEventListener('mouseleave', onLeave);
+    };
+  }, [totalSeconds]);
+
+  return (
+    <span ref={spanRef} className="flex-shrink-0 w-5 text-center text-lg font-bold tabular-nums leading-none text-red-700">
+      {secondsLeft}
+    </span>
+  );
+};
+
+if (typeof document !== 'undefined' && !document.getElementById('delete-toast-shine-style')) {
+  const styleTag = document.createElement('style');
+  styleTag.id = 'delete-toast-shine-style';
+  styleTag.textContent = `
+    .delete-toast-red {
+      background: #fef2f2 !important;
+      border: 1px solid #fecaca !important;
+    }
+  `;
+  document.head.appendChild(styleTag);
+}
+
+// ─── Micro components ─────────────────────────────────────────────────────
 
 function StatCard({ label, value, icon: Icon, iconBg, iconColor, emphasize = false }: {
   label:string; value:number;
@@ -2622,7 +2674,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
   const [dialogForm, setDialogForm]     = useState<ItemForm>(EMPTY_FORM);
   const [editTarget, setEditTarget]     = useState<UpItem | null>(null);
   const [submitting, setSubmitting]     = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<UpItem | null>(null);
+  const undoneDeletesRef = useRef<Set<number>>(new Set());
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRows, setPreviewRows] = useState<ParsedRow[]>([]);
@@ -2645,16 +2697,61 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
     setLoading(true);
     try {
       const r: { data: UpResponse } = await API.get(`${apiBase}?budget_plan_id=${planId}`);
-      setItems(r.data.data);
-      setTotals({
+      let fetchedItems = r.data.data;
+      let fetchedTotals = {
         aip: r.data.total_aip, ab: r.data.total_ab,
         ps: r.data.total_ps, mooe: r.data.total_mooe, co: r.data.total_co,
         total: r.data.grand_total,
         ccAdapt: r.data.total_cc_adapt, ccMitig: r.data.total_cc_mitig,
-      });
+      };
+
+      // Reconcile deletes that were still in their undo window when the
+      // page last unloaded — otherwise a refresh mid-countdown brings
+      // the item back since it was never actually deleted server-side yet.
+      const prefix = `pending_delete_${meta.apiSlug}_`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+
+        let parsed: { item: UpItem; deleteAt: number } | null = null;
+        try { parsed = JSON.parse(raw); } catch { localStorage.removeItem(key); continue; }
+        if (!parsed) continue;
+
+        const { item, deleteAt } = parsed;
+        if (!fetchedItems.some(i2 => i2.up_item_id === item.up_item_id)) {
+          localStorage.removeItem(key); // already deleted server-side
+          continue;
+        }
+
+        fetchedItems = fetchedItems.filter(i2 => i2.up_item_id !== item.up_item_id);
+        if (!item.is_subtotal_row) {
+          fetchedTotals = {
+            aip: fetchedTotals.aip - item.aip_amount,
+            ab: fetchedTotals.ab - item.ab_amount,
+            ps: fetchedTotals.ps - item.ps_amount,
+            mooe: fetchedTotals.mooe - item.mooe_amount,
+            co: fetchedTotals.co - item.co_amount,
+            total: fetchedTotals.total - item.total_amount,
+            ccAdapt: fetchedTotals.ccAdapt - item.cc_adaptation,
+            ccMitig: fetchedTotals.ccMitig - item.cc_mitigation,
+          };
+        }
+
+        const remaining = deleteAt - Date.now();
+        if (remaining <= 0) {
+          finalizeDelete(item); // grace period elapsed while the page was closed
+        } else {
+          showDeleteToast(item, remaining); // resume the same countdown
+        }
+      }
+
+      setItems(fetchedItems);
+      setTotals(fetchedTotals);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [apiBase]);
+  }, [apiBase, meta.apiSlug]);
 
   useEffect(() => {
     if (activePlan?.budget_plan_id) fetchData(activePlan.budget_plan_id);
@@ -2749,14 +2846,88 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
     } finally { setSubmitting(false); }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await API.delete(`${apiBase}/${deleteTarget.up_item_id}`);
-      toast.success("Item deleted");
-      setDeleteTarget(null);
-      if (activePlan?.budget_plan_id) await fetchData(activePlan.budget_plan_id);
-    } catch (e) { console.error(e); }
+  const adjustTotals = (item: UpItem, sign: 1 | -1) => {
+    if (item.is_subtotal_row) return;
+    setTotals(prev => ({
+      aip:     prev.aip     + sign * item.aip_amount,
+      ab:      prev.ab      + sign * item.ab_amount,
+      ps:      prev.ps      + sign * item.ps_amount,
+      mooe:    prev.mooe    + sign * item.mooe_amount,
+      co:      prev.co      + sign * item.co_amount,
+      total:   prev.total   + sign * item.total_amount,
+      ccAdapt: prev.ccAdapt + sign * item.cc_adaptation,
+      ccMitig: prev.ccMitig + sign * item.cc_mitigation,
+    }));
+  };
+
+  const restoreItem = (item: UpItem) => {
+    setItems(prev =>
+      prev.some(i => i.up_item_id === item.up_item_id)
+        ? prev
+        : [...prev, item].sort((a, b) => a.sort_order - b.sort_order)
+    );
+    adjustTotals(item, 1);
+  };
+
+  // ── Pending-delete persistence ──────────────────────────────────────────
+  // Survives a page refresh mid-countdown by tracking the pending delete
+  // (and its exact expiry time) in localStorage.
+  const DELETE_GRACE_MS = 8000;
+  const pendingDeleteKey = (id: number) => `pending_delete_${meta.apiSlug}_${id}`;
+
+  const finalizeDelete = (item: UpItem) => {
+    const key = pendingDeleteKey(item.up_item_id);
+    API.delete(`${apiBase}/${item.up_item_id}`)
+      .catch(() => {
+        toast.error("Failed to delete item — restoring it.");
+        restoreItem(item);
+      })
+      .finally(() => localStorage.removeItem(key));
+  };
+
+  const showDeleteToast = (item: UpItem, durationMs: number) => {
+    const id = item.up_item_id;
+    undoneDeletesRef.current.delete(id);
+
+    toast(`"${item.program_description || item.row_label || "Item"}" deleted`, {
+      id: `delete-${id}`,
+      description: "Cannot be undone",
+      duration: durationMs,
+      icon: <CountdownRing durationMs={durationMs} />,
+      className: "delete-toast-red",
+      classNames: {
+        title: "!text-red-900",
+        description: "!text-red-500",
+        actionButton: "!bg-red-600 hover:!bg-red-700 !text-white",
+      },
+      action: {
+        label: "Undo",
+        onClick: () => {
+          undoneDeletesRef.current.add(id);
+          localStorage.removeItem(pendingDeleteKey(id));
+          restoreItem(item);
+        },
+      },
+      onAutoClose: () => {
+        if (undoneDeletesRef.current.has(id)) return;
+        finalizeDelete(item);
+      },
+    });
+  };
+
+  const requestDelete = (item: UpItem) => {
+    const id = item.up_item_id;
+    const deleteAt = Date.now() + DELETE_GRACE_MS;
+
+    // Persist BEFORE touching state, so a refresh during the undo window
+    // can pick this back up instead of losing track of it.
+    localStorage.setItem(pendingDeleteKey(id), JSON.stringify({ item, deleteAt }));
+
+    // optimistic removal — gone from the table immediately, no refetch
+    setItems(prev => prev.filter(i => i.up_item_id !== id));
+    adjustTotals(item, -1);
+
+    showDeleteToast(item, DELETE_GRACE_MS);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3143,7 +3314,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
     <DropdownMenuItem className="text-xs" onClick={() => openEdit(item)}>Edit</DropdownMenuItem>
   )}
   {!isViewer && (
-    <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => setDeleteTarget(item)}>Delete</DropdownMenuItem>
+    <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 text-xs" onClick={() => requestDelete(item)}>Delete</DropdownMenuItem>
   )}
   {isViewer && (
     <DropdownMenuItem disabled className="text-muted-foreground/60 text-xs">View only</DropdownMenuItem>
@@ -3218,7 +3389,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
         editMode={!!editTarget} meta={meta}
       />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
+      {/* <AlertDialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[15px] font-semibold">Delete item?</AlertDialogTitle>
@@ -3231,7 +3402,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
             <AlertDialogAction asChild><Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700" onClick={handleDelete}>Delete</Button></AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog> */}
     </div>
   );
 }

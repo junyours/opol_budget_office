@@ -970,7 +970,11 @@ const LBPForms: React.FC = () => {
   const loading = deptPlansLoading;
 
   const [selectedPlanId,  setSelectedPlanId]  = useState<number | null>(null);
-  const [activeFormTab,   setActiveFormTab]   = useState('2');
+//   const [activeFormTab,   setActiveFormTab]   = useState('2');
+const [activeFormTab,   setActiveFormTab]   = useState('2');
+  useEffect(() => {
+    if (isViewer && activeFormTab === '3') setActiveFormTab('2');
+  }, [isViewer, activeFormTab]);
   const [search,          setSearch]         = useState('');
   const [panelKey,        setPanelKey]       = useState(0);
 //   const [approveTarget,   setApproveTarget]  = useState<DeptPlanWithName | null>(null);
@@ -1554,9 +1558,14 @@ const handleAcknowledge = async () => {
                     <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
                       Form 2 — Expenditures
                     </TabsTrigger>
-                    <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+                    {/* <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
                       Form 3 — Personnel
-                    </TabsTrigger>
+                    </TabsTrigger> */}
+                    {!isViewer && (
+                      <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+                        Form 3 — Personnel
+                      </TabsTrigger>
+                    )}
                     <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
                       Form 4 — AIP Programs
                     </TabsTrigger>
@@ -1575,7 +1584,7 @@ const handleAcknowledge = async () => {
                       cardView={cardView}
                     />
                   </TabsContent>
-                  <TabsContent value="3">
+                  {/* <TabsContent value="3">
                     <Form3
                       plan={selectedPlan}
                       pastYearPlan={pastYearPlan}
@@ -1583,7 +1592,18 @@ const handleAcknowledge = async () => {
                       isEditable={isAdmin}
                       isAdmin={isAdmin}
                     />
-                  </TabsContent>
+                  </TabsContent> */}
+                  {!isViewer && (
+                    <TabsContent value="3">
+                      <Form3
+                        plan={selectedPlan}
+                        pastYearPlan={pastYearPlan}
+                        departmentId={selectedPlan.dept_id}
+                        isEditable={isAdmin}
+                        isAdmin={isAdmin}
+                      />
+                    </TabsContent>
+                  )}
                   <TabsContent value="4">
                     <Form4 plan={selectedPlan} isEditable={isAdmin} />
                   </TabsContent>

@@ -203,7 +203,7 @@ const SubHeader: React.FC<SubHeaderProps> = ({
             <th className={cn(TH, "border-t-2 border-gray-300 sticky left-0 z-20 bg-white")} rowSpan={2}>
                 Acct Code
             </th>
-            <th className={cn(TH, "border-t-2 border-gray-300 sticky left-[100px] z-20 bg-white border-r border-gray-200")} rowSpan={2}>
+            <th className={cn(TH, "border-t-2 border-gray-300 sticky left-[100px] z-20 bg-white border-r ")} rowSpan={2}>
                 Object of Expenditure
             </th>
             {isAdmin && (

@@ -44,6 +44,7 @@ class PsSettingController extends Controller
         'productivity_annual'   => 2000,
         'cash_gift_annual'      => 5000,
         'other_benefits_days'   => 5,
+        'other_benefits_flat'   => 7000,
         'ra' => [
             ['from' => 27, 'to' => 40, 'monthly' => 9000],
             ['from' => 25, 'to' => 26, 'monthly' => 8550],
@@ -89,6 +90,7 @@ class PsSettingController extends Controller
             'productivity_annual'   => 'sometimes|numeric|min:0',
             'cash_gift_annual'      => 'sometimes|numeric|min:0',
             'other_benefits_days'   => 'sometimes|numeric|min:0',
+            'other_benefits_flat'   => 'sometimes|numeric|min:0',
             'ra'                    => 'sometimes|array',
         ]);
 

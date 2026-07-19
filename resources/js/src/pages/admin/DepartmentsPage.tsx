@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import API from "../../services/api";
 import { Department, DepartmentCategory } from "../../types/api";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useIsMobile } from "../../hooks/use-mobile";
 import { LoadingState } from "../../components/states/LoadingState";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -104,6 +105,7 @@ const getInitials = (dept: Department): string => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const DepartmentsPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [categories, setCategories]   = useState<DepartmentCategory[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -237,6 +239,11 @@ const [form, setForm] = useState({
     const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
     const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
     setCtxMenu({ x, y, dept });
+  };
+
+  // Mobile card tap → open bottom action sheet (x/y unused there)
+  const openMobileActions = (dept: Department) => {
+    setCtxMenu({ x: 0, y: 0, dept });
   };
 
   // ── Open modals ───────────────────────────────────────────────────────────
@@ -384,18 +391,18 @@ const openCreate = () => {
   if (loading && departments.length === 0) return <LoadingState />;
 
   return (
-    <div className="p-6 relative">
+    <div className="p-4 sm:p-6 relative">
 
       {/* ── Page Header ── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Administration
           </span>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
             Departments
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1 hidden sm:block">
             Manage department records and organizational structure.
           </p>
         </div>
@@ -404,7 +411,7 @@ const openCreate = () => {
             size="sm"
             variant="outline"
             onClick={() => setReorderOpen(true)}
-            className="gap-1.5 text-xs h-8 border-gray-200"
+            className="gap-1.5 text-xs h-9 sm:h-8 border-gray-200 flex-1 sm:flex-none"
           >
             <ArrowsUpDownIcon className="w-3.5 h-3.5" />
             Reorder
@@ -412,7 +419,7 @@ const openCreate = () => {
           <Button
             size="sm"
             onClick={openCreate}
-            className="gap-1.5 text-xs h-8 bg-gray-900 hover:bg-gray-800 text-white"
+            className="gap-1.5 text-xs h-9 sm:h-8 bg-gray-900 hover:bg-gray-800 text-white flex-1 sm:flex-none"
           >
             <PlusIcon className="w-3.5 h-3.5" />
             Add Department
@@ -421,14 +428,14 @@ const openCreate = () => {
       </div>
 
       {/* ── Filter + Search bar ── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
             value={searchRaw}
             onChange={handleSearchChange}
             placeholder="Search departments…"
-            className="pl-8 h-8 text-xs border-gray-200 bg-white"
+            className="pl-8 h-9 sm:h-8 text-xs border-gray-200 bg-white w-full"
           />
           {isSearching && (
             <button
@@ -440,47 +447,60 @@ const openCreate = () => {
           )}
         </div>
 
-        <FunnelIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+        <div className="flex items-center gap-2">
+          <FunnelIcon className="hidden sm:block w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
 
-        <Select value={filterCategory} onValueChange={handleFilterChange}>
-          <SelectTrigger className={cn("h-8 text-xs w-44 border-gray-200", isFiltered && "border-gray-400 bg-gray-50")}>
-            <SelectValue placeholder="All categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_CATEGORIES} className="text-xs">All categories</SelectItem>
-            {categories.map((cat) => (
-              <SelectItem key={cat.dept_category_id} value={cat.dept_category_id.toString()} className="text-xs">
-                {cat.dept_category_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={filterCategory} onValueChange={handleFilterChange}>
+            <SelectTrigger className={cn("h-9 sm:h-8 text-xs flex-1 sm:flex-none sm:w-44 border-gray-200", isFiltered && "border-gray-400 bg-gray-50")}>
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CATEGORIES} className="text-xs">All categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.dept_category_id} value={cat.dept_category_id.toString()} className="text-xs">
+                  {cat.dept_category_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {isFiltered && (
-          <span className="flex items-center gap-1 text-[11px] text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1">
-            {activeCategory?.dept_category_name}
+          {isFiltered && (
+            <span className="hidden sm:flex items-center gap-1 text-[11px] text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 flex-shrink-0">
+              {activeCategory?.dept_category_name}
+              <button
+                onClick={clearFilter}
+                className="text-gray-400 hover:text-gray-700 transition-colors ml-0.5"
+              >
+                <XMarkIcon className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end sm:ml-auto gap-2">
+          {isFiltered && (
             <button
               onClick={clearFilter}
-              className="text-gray-400 hover:text-gray-700 transition-colors ml-0.5"
+              className="sm:hidden flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 flex-shrink-0"
             >
+              {activeCategory?.dept_category_name}
               <XMarkIcon className="w-3 h-3" />
             </button>
-          </span>
-        )}
-
-        <span className="text-[11px] text-gray-400 ml-auto">
-          {isFiltered || isSearching ? (
-            <>
-              <span className="font-medium text-gray-600">{filtered.length}</span> of{" "}
-              <span className="font-medium text-gray-600">{departments.length}</span> departments
-            </>
-          ) : (
-            <>
-              <span className="font-medium text-gray-600">{departments.length}</span>{" "}
-              department{departments.length !== 1 ? "s" : ""}
-            </>
           )}
-        </span>
+          <span className="text-[11px] text-gray-400 flex-shrink-0">
+            {isFiltered || isSearching ? (
+              <>
+                <span className="font-medium text-gray-600">{filtered.length}</span> of{" "}
+                <span className="font-medium text-gray-600">{departments.length}</span> departments
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-gray-600">{departments.length}</span>{" "}
+                department{departments.length !== 1 ? "s" : ""}
+              </>
+            )}
+          </span>
+        </div>
       </div>
 
       {/* ── Hint ── */}
@@ -521,6 +541,7 @@ const openCreate = () => {
           </div>
         ) : (
           <>
+            <div className="hidden md:block">
             <table className="w-full text-[12px] border-collapse">
               <thead>
                 <tr>
@@ -570,6 +591,43 @@ const openCreate = () => {
                 ))}
               </tbody>
             </table>
+            </div>
+
+            {/* ── Mobile card list ── */}
+            <div className="md:hidden flex flex-col gap-2.5 p-3">
+              {paginated.map((dept) => (
+                <button
+                  key={dept.dept_id}
+                  onClick={() => openMobileActions(dept)}
+                  className="w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 flex items-center gap-3 transition-colors active:bg-gray-50"
+                >
+                  <Avatar className="h-10 w-10 rounded-lg border border-gray-100 flex-shrink-0">
+                    <AvatarImage src={dept.logo ? `/storage/${dept.logo}?t=${logoVersion}` : undefined} alt={dept.dept_name} />
+                    <AvatarFallback className="rounded-lg bg-gray-100 text-gray-600 text-[11px] font-semibold">
+                      {getInitials(dept)}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-gray-900 truncate">
+                      {isSearching ? highlightMatch(dept.dept_name, debouncedSearch) : dept.dept_name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {dept.dept_abbreviation && (
+                        <span className="text-[11px] text-gray-400 font-mono">
+                          {isSearching ? highlightMatch(dept.dept_abbreviation, debouncedSearch) : dept.dept_abbreviation}
+                        </span>
+                      )}
+                      {dept.category?.dept_category_name && (
+                        <span className="text-[10px] text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
+                          {dept.category.dept_category_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
@@ -623,8 +681,52 @@ const openCreate = () => {
         )}
       </div>
 
-      {/* ── Context Menu ── */}
-      {ctxMenu && (
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2.5">
+              <Avatar className="h-8 w-8 rounded-lg border border-gray-100 flex-shrink-0">
+                <AvatarImage src={ctxMenu.dept.logo ? `/storage/${ctxMenu.dept.logo}?t=${logoVersion}` : undefined} alt={ctxMenu.dept.dept_name} />
+                <AvatarFallback className="rounded-lg bg-gray-100 text-gray-600 text-[10px] font-semibold">
+                  {getInitials(ctxMenu.dept)}
+                </AvatarFallback>
+              </Avatar>
+              <p className="text-[13px] font-semibold text-gray-900 truncate">
+                {ctxMenu.dept.dept_name}
+              </p>
+            </div>
+
+            <button
+              onClick={() => openEdit(ctxMenu.dept)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit Department
+            </button>
+
+            <button
+              onClick={() => openDelete(ctxMenu.dept)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-red-600 active:bg-red-50 transition-colors border-t border-gray-100"
+            >
+              <TrashIcon className="w-4 h-4 text-red-400 shrink-0" />
+              Delete
+            </button>
+
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <div
           ref={ctxRef}
           style={{ position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
@@ -653,12 +755,12 @@ const openCreate = () => {
             Delete
           </button>
         </div>
-      )}
+      ))}
 
       {/* ════════ Create / Edit Dialog ════════ */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-3xl rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
+        <DialogContent className="max-w-3xl w-[calc(100%-2rem)] sm:w-full rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-4 sm:px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
             <DialogTitle className="text-[15px] font-semibold text-gray-900">
               {editingDept ? "Edit Department" : "Add Department"}
             </DialogTitle>
@@ -667,7 +769,7 @@ const openCreate = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="px-4 sm:px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5 overflow-y-auto flex-1">
             {/* Left column */}
             <div className="space-y-4">
               <div className="space-y-1.5">
@@ -769,7 +871,7 @@ const openCreate = () => {
             </div>
           </div>
 
-          <div className="px-6 pb-5 pt-1 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="px-4 sm:px-6 pb-5 pt-1 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-5 flex-shrink-0">
             <SignatoryNameField
               value={form.signatory_name}
               onChange={(v) => setForm((p) => ({ ...p, signatory_name: v }))}
@@ -783,7 +885,7 @@ const openCreate = () => {
             />
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
+          <DialogFooter className="px-4 sm:px-6 py-4 border-t border-gray-100 gap-2 flex-shrink-0">
             <Button
               variant="outline" size="sm"
               className="h-8 text-xs border-gray-200"

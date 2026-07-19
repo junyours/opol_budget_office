@@ -40,6 +40,16 @@ class AuthController extends Controller
             ]);
         }
 
+        // Maintenance mode: block everyone except super-admin from logging in.
+        $maintenance = \App\Models\SystemSetting::current();
+        if ($maintenance->maintenance_mode && $user->role !== 'super-admin') {
+            return response()->json([
+                'maintenance_mode'    => true,
+                'maintenance_message' => $maintenance->maintenance_message
+                    ?? 'The system is temporarily down for maintenance. Please check back shortly.',
+            ], 503);
+        }
+
         // Clean up only THIS user's expired tokens on login
     //     $user->tokens()->where('expires_at', '<', now())->delete();
 
@@ -90,6 +100,16 @@ class AuthController extends Controller
             return response()->json(['message' => 'Incorrect password.'], 422);
         }
 
+        // Maintenance mode: block everyone except super-admin from logging in.
+        $maintenance = \App\Models\SystemSetting::current();
+        if ($maintenance->maintenance_mode && $user->role !== 'super-admin') {
+            return response()->json([
+                'maintenance_mode'    => true,
+                'maintenance_message' => $maintenance->maintenance_message
+                    ?? 'The system is temporarily down for maintenance. Please check back shortly.',
+            ], 503);
+        }
+
     //     $user->tokens()->where('expires_at', '<', now())->delete();
 
     //     return response()->json([
@@ -115,5 +135,51 @@ class AuthController extends Controller
     {
         $request->user()->tokens()->where('id', $request->user()->currentAccessToken()->id)->delete();
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    public function changeForcedPassword(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password'         => 'required|string|min:8|max:16|confirmed',
+        ]);
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Current password is incorrect.'],
+            ]);
+        }
+
+        $pwd = $validated['password'];
+        $rules = [
+            'an uppercase letter (A–Z)' => (bool) preg_match('/[A-Z]/', $pwd),
+            'a lowercase letter (a–z)'  => (bool) preg_match('/[a-z]/', $pwd),
+            'a number (0–9)'            => (bool) preg_match('/[0-9]/', $pwd),
+            'a symbol (!@#$%^&*…)'      => (bool) preg_match('/[@$!%*?&#^()\-_=+\[\]{};:\'",.\/<>?\\\\|`~]/', $pwd),
+        ];
+        $failed = array_keys(array_filter($rules, fn ($ok) => !$ok));
+
+        if (!empty($failed)) {
+            throw ValidationException::withMessages([
+                'password' => ['Password must include ' . implode(', ', $failed) . '.'],
+            ]);
+        }
+
+        if (Hash::check($pwd, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['New password must be different from your current password.'],
+            ]);
+        }
+
+        $user->password         = Hash::make($pwd);
+        $user->must_change_pass = false;
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password changed successfully.',
+            'user'    => $user->fresh('department'),
+        ]);
     }
 }

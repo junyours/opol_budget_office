@@ -28,13 +28,15 @@ class User extends Authenticatable
         'dept_id',
         'is_online',
         'is_active',
+        'must_change_pass',
     ];
 
     protected $hidden = ['password', 'pin', 'remember_token'];
 
     protected $casts = [
-        'is_online' => 'boolean',
-        'is_active' => 'boolean',
+        'is_online'        => 'boolean',
+        'is_active'        => 'boolean',
+        'must_change_pass' => 'boolean',
     ];
 
     public function department()

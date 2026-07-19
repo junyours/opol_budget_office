@@ -36,6 +36,8 @@
         import { useNotificationPoller } from '@/src/hooks/useNotificationPoller';
         import { SidebarNotifications } from '@/src/components/sidebar/SidebarNotifications';
         import { useReviewModeStore } from '@/src/store/useReviewModeStore';
+        import { usePwaInstall } from '@/src/hooks/usePwaInstall';
+        import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
         export interface User {
         user_id: number; username: string; fname: string; mname?: string; lname: string;
         role: string; dept_id?: number; department?: Department;
@@ -290,6 +292,15 @@
         const location  = useLocation();
         const { state, setOpen } = useSidebar();
         const reviewMode = useReviewModeStore(s => s.reviewMode);
+        const { canInstall, isInstalled, isIOS, promptInstall } = usePwaInstall();
+
+        const handleInstallClick = async () => {
+            if (isIOS) {
+                alert('To install: tap the Share button in Safari, then "Add to Home Screen".');
+                return;
+            }
+            await promptInstall();
+        };
         const [showLogout, setShowLogout] = useState(false);
         const [animKey,    setAnimKey]    = useState(0);
         const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -475,7 +486,7 @@
                 {/* Role badges — slot 1 */}
                 <div
                     key={`tags-${animKey}`}
-                    className="mt-3 flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden"
+                    className="mt-13 flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden"
                     style={staggerStyle(1)}
                 >
                     <span className={cn(
@@ -611,7 +622,27 @@
                 </SidebarContent>
 
                 {/* ══ FOOTER ══════════════════════════════════════ */}
-                <SidebarFooter className="p-2 border-t border-zinc-100 dark:border-zinc-800">
+               <SidebarFooter className="p-2 border-t border-zinc-100 dark:border-zinc-800">
+                    {/* ══ INSTALL APP ══ */}
+                    {(canInstall || isIOS) && !isInstalled && (
+                        <button
+                            onClick={handleInstallClick}
+                            className="flex items-center gap-2.5 w-full rounded-lg border border-zinc-200 bg-blue-50/40 px-2.5 py-2 hover:bg-blue-50 hover:border-blue-200 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                            title="Install App"
+                        >
+                            <span className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <ArrowDownTrayIcon className="w-3.5 h-3.5 text-blue-600" />
+                            </span>
+                            <div className="flex flex-col items-start min-w-0 group-data-[collapsible=icon]:hidden">
+                                <span className="text-[12px] font-semibold text-zinc-700 truncate leading-tight">
+                                    Install App
+                                </span>
+                                <span className="text-[10px] text-zinc-400 truncate leading-tight">
+                                    Add to desktop
+                                </span>
+                            </div>
+                        </button>
+                    )}
                      {/* ══ NOTIFICATIONS ══ */}
                 {notifications.length > 0 && (
                 <div className="group-data-[collapsible=icon]:hidden">
@@ -661,6 +692,11 @@
                         <DropdownMenuItem onClick={() => navigate("/profile")} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-zinc-600 cursor-pointer">
                             <UserIcon className="w-4 h-4 text-zinc-400" />View Profile
                         </DropdownMenuItem>
+                        {(canInstall || isIOS) && !isInstalled && (
+                            <DropdownMenuItem onClick={handleInstallClick} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-zinc-600 cursor-pointer">
+                                <ArrowDownTrayIcon className="w-4 h-4 text-zinc-400" />Install App
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator className="bg-zinc-100 my-1" />
                         <DropdownMenuItem onClick={() => setShowLogout(true)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50">
                             <Logout01Icon className="w-4 h-4" />Sign out

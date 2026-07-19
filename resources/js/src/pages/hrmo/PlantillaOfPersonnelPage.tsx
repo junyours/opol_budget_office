@@ -451,7 +451,8 @@ const PlantillaOfPersonnelPage: React.FC = () => {
           {positionsForActiveDept.length === 0 ? (
             <div className="text-center py-14 text-gray-400 text-sm">No active positions in this department.</div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-[12px] border-collapse min-w-[700px]">
                 <thead>
                   <tr>
@@ -500,6 +501,33 @@ const PlantillaOfPersonnelPage: React.FC = () => {
                 </tfoot>
               </table>
             </div>
+
+            {/* Mobile card list */}
+            <div className="md:hidden flex flex-col gap-2.5 p-3">
+              {positionsForActiveDept.map(pos => {
+                const assignment = getAssignment(pos.plantilla_position_id)
+                return (
+                  <div key={pos.plantilla_position_id}
+                    className="bg-white border border-gray-200 rounded-2xl px-4 py-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13px] font-semibold text-gray-900 truncate">{pos.position_title}</p>
+                      <span className="text-[10px] text-gray-500 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0">
+                        SG {pos.salary_grade}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 font-mono">
+                      New # {pos.new_item_number || '–'} <span className="text-gray-300">(old: {pos.old_item_number || '–'})</span>
+                    </p>
+                    <PersonnelCombobox positionId={pos.plantilla_position_id}
+                      selectedId={assignment?.personnelId || null}
+                      onChange={id => updateAssignment(pos.plantilla_position_id, { personnelId: id, assignmentDate: id ? new Date() : null })} />
+                    <DatePicker date={assignment?.assignmentDate || null}
+                      onChange={date => updateAssignment(pos.plantilla_position_id, { assignmentDate: date })} />
+                  </div>
+                )
+              })}
+            </div>
+            </>
           )}
         </div>
       )}

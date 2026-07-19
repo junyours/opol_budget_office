@@ -18,23 +18,31 @@ import {
   Pagination, PaginationContent, PaginationEllipsis, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "@/src/components/ui/pagination";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/src/components/ui/command";
 // import { MoreHorizontalIcon } from "lucide-react";
 // import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
-import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, NoSymbolIcon, CheckCircleIcon, TrashIcon, ChevronUpDownIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { ExcelUploadModal } from './ExcelUploadModal';
 import { LoadingState } from '../../components/states/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useIsMobile } from '../../hooks/use-mobile';
 import API from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { Department } from '../../types/api';
 import { cn } from '@/src/lib/utils';
+// import { DeptDots } from '@/src/components/ui/DeptDots';
 import { DeptDots } from '@/src/components/ui/DeptDots';
+import { getSuggestedPositions, SuggestedPlantillaPosition } from '../../data/plantillaSuggestions';
 
 const ITEMS_PER_PAGE = 10;
 
 const PlantillaPage: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super-admin';
+  const isMobile = useIsMobile();
 
   const [positions, setPositions]           = useState<any[]>([]);
   const [departments, setDepartments]       = useState<Department[]>([]);
@@ -49,8 +57,14 @@ const PlantillaPage: React.FC = () => {
   const [sortColumn, setSortColumn]       = useState('position_title');
   const [currentPage, setCurrentPage]     = useState(1);
 
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+//   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+//   const [createForm, setCreateForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
+const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
+  // Position-title selector for the Create dialog — options are scoped to
+  // whichever department is currently selected, from the static per-dept
+  // list in src/data/plantillaSuggestions.ts.
+  const [positionComboOpen, setPositionComboOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen]     = useState(false);
   const [editingPosition, setEditingPosition]   = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: 0, extension_department_id: '' });
@@ -68,7 +82,13 @@ const PlantillaPage: React.FC = () => {
   const [assignmentsForRenumber, setAssignmentsForRenumber] = useState<any[]>([]);
 
   useEffect(() => { if (selectedDeptId) setCreateForm(p => ({ ...p, dept_id: selectedDeptId })); }, [selectedDeptId]);
-  useEffect(() => { if (createDialogOpen) setCreateForm(p => ({ ...p, new_item_number: getNextNewNumber() })); }, [createDialogOpen]);
+//   useEffect(() => { if (createDialogOpen) setCreateForm(p => ({ ...p, new_item_number: getNextNewNumber() })); }, [createDialogOpen]);
+useEffect(() => {
+    if (createDialogOpen) {
+      setCreateForm(p => ({ ...p, new_item_number: getNextNewNumber(), position_title: '', salary_grade: 1 }));
+      setPositionComboOpen(false);
+    }
+  }, [createDialogOpen]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -202,6 +222,27 @@ const PlantillaPage: React.FC = () => {
     });
   }, [filteredPositions, sortColumn, sortOrder]);
 
+//   const totalPages = Math.max(1, Math.ceil(sortedPositions.length / ITEMS_PER_PAGE));
+  const getDeptAbbr = (id: number) => departments.find(d => d.dept_id === id)?.dept_abbreviation || `Dept ${id}`;
+
+  // Suggestions are scoped to the department currently selected in the Create
+  // dialog (not the page's selectedDeptId tab) so they stay correct if the
+  // form's dept_id is ever changed independently of the active tab.
+  const createDeptAbbr = getDeptAbbr(createForm.dept_id);
+  const positionSuggestionPool = useMemo(
+    () => getSuggestedPositions(createDeptAbbr),
+    [createDeptAbbr],
+  );
+  // Count of each position title already on file in the dept chosen in the
+  // Create dialog, used to flag titles that are already at max headcount.
+  const createDeptPositionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    positions
+      .filter(p => p.dept_id === createForm.dept_id)
+      .forEach(p => { counts[p.position_title] = (counts[p.position_title] || 0) + 1; });
+    return counts;
+  }, [positions, createForm.dept_id]);
+
   const totalPages = Math.max(1, Math.ceil(sortedPositions.length / ITEMS_PER_PAGE));
   const paginated  = useMemo(() => sortedPositions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE), [sortedPositions, currentPage]);
 
@@ -212,8 +253,6 @@ const PlantillaPage: React.FC = () => {
   };
 
   const sortIcon = (col: string) => sortColumn === col ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : '';
-
-  const getDeptAbbr = (id: number) => departments.find(d => d.dept_id === id)?.dept_abbreviation || `Dept ${id}`;
 
   const handleCreateClick = () => {
     if (!createForm.position_title || !createForm.new_item_number) { toast.error('Title and item number required.'); return; }
@@ -457,6 +496,7 @@ const confirmToggleActive = async () => {
           </div>
         ) : (
           <>
+            {!isMobile && (
             <table className="w-full text-[12px] border-collapse">
               <thead>
                 <tr>
@@ -503,6 +543,37 @@ const confirmToggleActive = async () => {
                 ))}
               </tbody>
             </table>
+            )}
+
+            {/* Mobile card list */}
+            {isMobile && (
+              <div className="flex flex-col gap-2.5 p-3">
+                {paginated.map(pos => (
+                  <button
+                    key={pos.plantilla_position_id}
+                    onClick={(e) => handleRowClick(e, pos)}
+                    className="w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 space-y-2 active:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13px] font-semibold text-gray-900 truncate">{pos.position_title}</p>
+                      <span className={cn(
+                        "inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0",
+                        pos.is_active
+                          ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                          : "text-red-600 bg-red-50 border-red-200"
+                      )}>
+                        {pos.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-gray-400 font-mono">
+                      <span>New # {pos.new_item_number}</span>
+                      <span className="text-gray-300">Old # {pos.old_item_number || '–'}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">SG {pos.salary_grade}</p>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -533,59 +604,100 @@ const confirmToggleActive = async () => {
         )}
       </div>
 
-      {/* ── Context Menu ── */}
-{ctxMenu && (
-  <div
-    ref={ctxRef}
-    style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
-    className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[175px] overflow-hidden"
-  >
-    <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
-    <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[155px]">
-        {ctxMenu.pos.new_item_number} — {ctxMenu.pos.position_title.slice(0, 22)}
-      </p>
-    </div>
-    <button
-      onClick={() => { setCtxMenu(null); handleEdit(ctxMenu.pos); }}
-      className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
-    >
-      <PencilSquareIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-      Edit Position
-    </button>
-    <button
-      onClick={() => { setCtxMenu(null); setTogglePosition(ctxMenu.pos); setToggleActiveOpen(true); }}
-      className={cn(
-        'flex items-center gap-2.5 w-full px-3 py-2 text-[12px] transition-colors',
-        ctxMenu.pos.is_active
-          ? 'text-amber-700 hover:bg-amber-50'
-          : 'text-emerald-700 hover:bg-emerald-50'
-      )}
-    >
-      {/* {ctxMenu.pos.is_active
-        ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
-        : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
-      }
-    </button>
-  </div>
-)} */}
-
-{ctxMenu.pos.is_active
-        ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
-        : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
-      }
-    </button>
-    {!ctxMenu.pos.is_active && isSuperAdmin && (
-      <button
-        onClick={() => { setCtxMenu(null); setDeletePosition(ctxMenu.pos); setDeleteOpen(true); }}
-        className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-700 hover:bg-red-50 transition-colors"
-      >
-        <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
-        Delete Position
-      </button>
-    )}
-  </div>
-)}
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[13px] font-semibold text-gray-900 truncate">
+                {ctxMenu.pos.new_item_number} — {ctxMenu.pos.position_title}
+              </p>
+            </div>
+            <button
+              onClick={() => { setCtxMenu(null); handleEdit(ctxMenu.pos); }}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit Position
+            </button>
+            <button
+              onClick={() => { setCtxMenu(null); setTogglePosition(ctxMenu.pos); setToggleActiveOpen(true); }}
+              className={cn(
+                'flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100',
+                ctxMenu.pos.is_active ? 'text-amber-700 active:bg-amber-50' : 'text-emerald-700 active:bg-emerald-50'
+              )}
+            >
+              {ctxMenu.pos.is_active
+                ? <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
+                : <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
+              }
+            </button>
+            {!ctxMenu.pos.is_active && isSuperAdmin && (
+              <button
+                onClick={() => { setCtxMenu(null); setDeletePosition(ctxMenu.pos); setDeleteOpen(true); }}
+                className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-red-600 active:bg-red-50 transition-colors border-t border-gray-100"
+              >
+                <TrashIcon className="w-4 h-4 text-red-400 shrink-0" />
+                Delete Position
+              </button>
+            )}
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={ctxRef}
+          style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
+          className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[175px] overflow-hidden"
+        >
+          <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
+          <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[155px]">
+              {ctxMenu.pos.new_item_number} — {ctxMenu.pos.position_title.slice(0, 22)}
+            </p>
+          </div>
+          <button
+            onClick={() => { setCtxMenu(null); handleEdit(ctxMenu.pos); }}
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <PencilSquareIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            Edit Position
+          </button>
+          <button
+            onClick={() => { setCtxMenu(null); setTogglePosition(ctxMenu.pos); setToggleActiveOpen(true); }}
+            className={cn(
+              'flex items-center gap-2.5 w-full px-3 py-2 text-[12px] transition-colors',
+              ctxMenu.pos.is_active
+                ? 'text-amber-700 hover:bg-amber-50'
+                : 'text-emerald-700 hover:bg-emerald-50'
+            )}
+          >
+            {ctxMenu.pos.is_active
+              ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
+              : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
+            }
+          </button>
+          {!ctxMenu.pos.is_active && isSuperAdmin && (
+            <button
+              onClick={() => { setCtxMenu(null); setDeletePosition(ctxMenu.pos); setDeleteOpen(true); }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-700 hover:bg-red-50 transition-colors"
+            >
+              <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              Delete Position
+            </button>
+          )}
+        </div>
+      ))}
 
       {/* ── Dialogs ── */}
 
@@ -597,19 +709,89 @@ const confirmToggleActive = async () => {
             <DialogDescription className="text-xs text-gray-400 mt-0.5">Fill in the details for the new position.</DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
-            {[
-              { id: 'old_item', label: 'Old Item #', key: 'old_item_number', placeholder: 'Optional' },
-              { id: 'new_item', label: 'New Item #', key: 'new_item_number', placeholder: 'Required' },
-              { id: 'pos_title', label: 'Position Title', key: 'position_title', placeholder: 'e.g. Administrative Aide I' },
-            ].map(f => (
-              <div key={f.id} className="space-y-1.5">
-                <Label className="text-xs font-semibold text-gray-600">{f.label}</Label>
-                <Input value={(createForm as any)[f.key]} onChange={e => setCreateForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} className="h-9 text-sm" />
-              </div>
-            ))}
-           <div className="space-y-1.5">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-600">Position Title</Label>
+              <Popover open={positionComboOpen} onOpenChange={setPositionComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={positionComboOpen}
+                    className="w-full h-9 text-sm font-normal justify-between border-gray-200 text-gray-900 hover:bg-white"
+                  >
+                    <span className={cn('truncate', !createForm.position_title && 'text-gray-400')}>
+                      {createForm.position_title || 'Select a position…'}
+                    </span>
+                    <ChevronUpDownIcon className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0"
+                  align="start"
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  <Command>
+                    <CommandInput placeholder="Search positions…" className="text-sm" />
+                    <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
+                      <CommandEmpty className="px-3 py-4 text-xs text-gray-400 text-center">
+                        {positionSuggestionPool.length === 0
+                          ? 'No suggested positions on file for this department yet.'
+                          : 'No matching position.'}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {positionSuggestionPool.map((s: SuggestedPlantillaPosition, i: number) => {
+                          const maxAllowed = s.max ?? 1;
+                          const currentCount = createDeptPositionCounts[s.title] || 0;
+                          const isFull = currentCount >= maxAllowed;
+                          return (
+                            <CommandItem
+                              key={`${s.title}-${i}`}
+                              value={s.title}
+                              disabled={isFull}
+                              onSelect={() => {
+                                if (isFull) return;
+                                setCreateForm(p => ({ ...p, position_title: s.title, salary_grade: s.salaryGrade }));
+                                setPositionComboOpen(false);
+                              }}
+                              className={cn(
+                                'text-sm flex items-center justify-between gap-2',
+                                isFull && 'opacity-60 cursor-not-allowed text-red-600 bg-red-50 aria-selected:bg-red-50 aria-selected:text-red-600',
+                              )}
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <CheckIcon
+                                  className={cn(
+                                    'w-3.5 h-3.5 shrink-0',
+                                    createForm.position_title === s.title ? 'opacity-100' : 'opacity-0',
+                                  )}
+                                />
+                                <span className="truncate">{s.title}</span>
+                              </span>
+                              <span className={cn(
+                                'text-[10px] font-mono shrink-0',
+                                isFull ? 'text-red-500 font-semibold' : 'text-gray-400',
+                              )}>
+                                {currentCount}/{maxAllowed} · SG {s.salaryGrade}
+                              </span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Salary Grade</Label>
-              <Input type="number" min={1} max={40} value={createForm.salary_grade} onChange={e => setCreateForm(p => ({ ...p, salary_grade: parseInt(e.target.value) || 1 }))} className="h-9 text-sm" />
+              <Input
+                type="number"
+                value={createForm.salary_grade}
+                disabled
+                className="h-9 text-sm bg-gray-50 text-gray-500"
+              />
+              <p className="text-[11px] text-gray-400">Auto-filled when you select a suggested position above.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Extension Group <span className="text-gray-400 font-normal">(optional)</span></Label>

@@ -160,19 +160,19 @@ const Form6: React.FC = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
 
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
               LBP Form No. 6
             </span>
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] font-medium text-gray-400">FY {budgetYear}</span>
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
+          <h1 className="text-lg sm:text-2xl font-semibold text-zinc-900 tracking-tight leading-snug">
             Statement of Statutory and Contractual Obligations and Budgetary Requirements
           </h1>
           <p className="text-[12px] text-gray-500 mt-0.5">LGU : OPOL, MISAMIS ORIENTAL</p>
@@ -193,7 +193,7 @@ const Form6: React.FC = () => {
       ) : (
         /* ── Multi-tab ── */
         <Tabs value={activeSource} onValueChange={setActiveSource}>
-          <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-5">
+          <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-5 w-full overflow-x-auto flex-nowrap justify-start">
             {tabs.map(tab => (
               <TabsTrigger
                 key={tab.id}
@@ -354,11 +354,11 @@ const grandTotal = useMemo(() => {
         <table className="w-full text-[12px] border-collapse">
           <thead>
             <tr>
-              <th className="border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-8">#</th>
-              <th className="border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Object of Expenditures</th>
-              <th className="border-b border-gray-200 bg-white px-4 py-2.5 text-right font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-44">Amount</th>
+              <th className="hidden sm:table-cell border-b border-r border-gray-200 bg-white px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-8">#</th>
+              <th className="border-b border-r border-gray-200 bg-white px-3 sm:px-4 py-2.5 text-left font-semibold text-gray-600 text-[11px] uppercase tracking-wide">Object of Expenditures</th>
+              <th className="border-b border-gray-200 bg-white px-3 sm:px-4 py-2.5 text-right font-semibold text-gray-600 text-[11px] uppercase tracking-wide w-28 sm:w-44">Amount</th>
             </tr>
-            <tr className="border-b-2 border-gray-200">
+            <tr className="border-b-2 border-gray-200 hidden sm:table-row">
               <td className="border-r border-gray-200 px-4 py-1 text-center text-[10px] text-gray-300 bg-white" />
               <td className="border-r border-gray-200 px-4 py-1 text-center text-[10px] text-gray-300 bg-white">(1)</td>
               <td className="px-4 py-1 text-center text-[10px] text-gray-300 bg-white">(2)</td>
@@ -375,9 +375,9 @@ const grandTotal = useMemo(() => {
               const showShimmer = INCOME_DERIVED_CODES.has(row.code) && derivedLoading && source === 'general-fund';
               const showPeso    = row.show_peso_sign || FORCE_PESO_SIGN.has(row.code);
               const paddingLeft =
-                row.level === 0 ? 'pl-4' :
-                row.level === 1 ? 'pl-8' :
-                                  'pl-14';
+                row.level === 0 ? 'pl-3 sm:pl-4' :
+                row.level === 1 ? 'pl-6 sm:pl-8' :
+                                  'pl-9 sm:pl-14';
 
               return (
                 <tr
@@ -389,20 +389,20 @@ const grandTotal = useMemo(() => {
                     : 'hover:bg-gray-50/60',
                   )}
                 >
-                  <td className="border-r border-gray-100 px-3 py-3 text-center text-[10px] text-gray-400 font-mono align-middle w-12">
+                  <td className="hidden sm:table-cell border-r border-gray-100 px-3 py-3 text-center text-[10px] text-gray-400 font-mono align-middle w-12">
                     {!isSection && row.code}
                   </td>
-                  <td className={cn('py-3 pr-4 border-r border-gray-100 align-middle', paddingLeft)}>
+                  <td className={cn('py-2.5 sm:py-3 pr-2 sm:pr-4 border-r border-gray-100 align-middle', paddingLeft)}>
                     <span className={cn(
-                      'leading-snug',
-                      isSection   && 'font-semibold text-gray-900 text-[11px] uppercase tracking-wide',
+                      'leading-snug text-[11px] sm:text-[12px]',
+                      isSection   && 'font-semibold text-gray-900 text-[10px] sm:text-[11px] uppercase tracking-wide',
                       isTopParent && 'font-semibold text-gray-900',
                       !isSection && !isTopParent && 'text-gray-800',
                     )}>
-                      {row.label}
+                      {isSection ? row.label : <><span className="sm:hidden text-gray-400 font-mono mr-1">{row.code}</span>{row.label}</>}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right align-middle">
+                  <td className="py-2.5 sm:py-3 px-2 sm:px-4 text-right align-middle">
                     {isSection ? null : showShimmer ? (
                       <span className="inline-block w-24 h-3.5 rounded bg-gray-100 animate-pulse" />
                     ) : (
@@ -428,9 +428,9 @@ const grandTotal = useMemo(() => {
 
           <tfoot>
             <tr className="bg-gray-900 text-white">
-              <td className="px-3 py-3 border-r border-gray-700" />
-              <td className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-gray-500 border-r border-gray-700">Total</td>
-              <td className="px-4 py-3 text-right font-mono font-bold tabular-nums">₱ {fmt(grandTotal)}</td>
+              <td className="hidden sm:table-cell px-3 py-3 border-r border-gray-700" />
+              <td className="px-3 sm:px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-gray-500 border-r border-gray-700">Total</td>
+              <td className="px-3 sm:px-4 py-3 text-right font-mono font-bold tabular-nums whitespace-nowrap">₱ {fmt(grandTotal)}</td>
             </tr>
           </tfoot>
         </table>

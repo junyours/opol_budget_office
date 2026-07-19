@@ -21,6 +21,7 @@ import {
 import { ExcelUploadModal } from './ExcelUploadModal';
 import { LoadingState } from '../../components/states/LoadingState';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useIsMobile } from '../../hooks/use-mobile';
 import API from '../../services/api';
 import { cn } from '@/src/lib/utils';
 
@@ -118,6 +119,7 @@ const SortIcon = ({ dir }: { dir: 'asc' | 'desc' }) => (
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const PersonnelPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const [personnels, setPersonnels]       = useState<Personnel[]>([]);
   const [departments, setDepartments]     = useState<Department[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -514,6 +516,7 @@ const PersonnelPage: React.FC = () => {
           </div>
         ) : (
           <>
+            {!isMobile && (
             <div className="overflow-x-auto">
               <table className="w-full text-[12px] border-collapse min-w-[640px]">
                 <thead>
@@ -596,6 +599,51 @@ const PersonnelPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* ── Mobile card list ── */}
+            {isMobile && (
+              <div className="flex flex-col gap-2.5 p-3">
+                {paginated.map(p => {
+                  const dept     = p.assignment?.plantilla_position?.department;
+                  const position = p.assignment?.plantilla_position;
+                  const assigned = p.assignment != null;
+
+                  return (
+                    <button
+                      key={p.personnel_id}
+                      onClick={() => setCtxMenu({ x: 0, y: 0, personnel: p })}
+                      className="w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 space-y-2 active:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[13px] font-semibold text-gray-900 truncate">
+                          {p.last_name}, {p.first_name} {p.middle_name || ''}
+                        </p>
+                        {assigned ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 flex-shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                            Assigned
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 flex-shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-amber-400" />
+                            Unassigned
+                          </span>
+                        )}
+                      </div>
+                      {dept ? (
+                        <DeptLogo dept={dept} />
+                      ) : (
+                        <span className="text-gray-300 text-[11px]">No department</span>
+                      )}
+                      {position && (
+                        <p className="text-[11px] text-gray-500">{position.position_title}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
@@ -649,8 +697,36 @@ const PersonnelPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── Context Menu ── */}
-      {ctxMenu && (
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[13px] font-semibold text-gray-900 truncate">
+                {ctxMenu.personnel.last_name}, {ctxMenu.personnel.first_name}
+              </p>
+            </div>
+            <button
+              onClick={() => openEdit(ctxMenu.personnel)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit Personnel
+            </button>
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <div
           ref={ctxRef}
           style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
@@ -670,7 +746,7 @@ const PersonnelPage: React.FC = () => {
             Edit Personnel
           </button>
         </div>
-      )}
+      ))}
 
       {/* ════════ New Personnel Dialog ════════ */}
       <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>

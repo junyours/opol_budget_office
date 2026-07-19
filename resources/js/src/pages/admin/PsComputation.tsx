@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { LoadingState } from "@/src/components/states/LoadingState";
 import { Skeleton }     from "@/src/components/ui/skeleton";
+import { useIsMobile }  from "@/src/hooks/use-mobile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ function InlineInput({ value, onSave }: { value: number; onSave: (v: number) => 
       }}
       className="text-right font-mono tabular-nums bg-transparent border-b-2 border-dashed
         border-gray-300 focus:outline-none focus:border-blue-400 transition-colors
-        w-36 px-1 py-0.5 text-[12.5px] placeholder:text-gray-300"
+        w-full max-w-36 px-1 py-0.5 text-[11px] sm:text-[12.5px] placeholder:text-gray-300"
     />
   );
 }
@@ -150,9 +151,9 @@ function SummaryCard({
 // ─── PS Computation Skeleton ──────────────────────────────────────────────────
 // Mirrors the 2-column layout: big computation table LEFT + sidebar cards RIGHT
 
-function PsSkeleton() {
+function PsSkeleton({ isMobile }: { isMobile: boolean }) {
   return (
-    <div className="flex gap-5 items-start">
+    <div className={cn("flex gap-5 items-start", isMobile && "flex-col")}>
 
       {/* ── Computation table ─────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
@@ -242,7 +243,7 @@ function PsSkeleton() {
       </div>
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
-      <div className="w-64 flex-none sticky top-5 space-y-3">
+      <div className={cn("flex-none space-y-3", isMobile ? "w-full" : "w-64 sticky top-5")}>
         {/* Hero allowable card */}
         <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-5 py-4">
           <Skeleton className="h-2.5 w-32 rounded mb-2 bg-emerald-200" />
@@ -282,6 +283,7 @@ function PsSkeleton() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function PsComputation() {
+  const isMobile = useIsMobile();
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
   const [totalIncome,  setTotalIncome]  = useState(0);
@@ -369,13 +371,15 @@ const liveAllowable   = liveLimitation - liveNetPs;
 
   // ── Table row helpers ─────────────────────────────────────────────────────
 
+  const indentStep = isMobile ? 9 : 14;
+
   const DerivedRow = ({ label, value, indent = 0, peso = false }: {
     label: React.ReactNode; value: number; indent?: number; peso?: boolean;
   }) => (
     <tr className="border-b border-gray-100 hover:bg-gray-50/40 transition-colors">
-      <td className="py-[7px] pr-3 text-[12.5px] text-gray-700 leading-snug"
-          style={{ paddingLeft: `${(indent + 1) * 14}px` }}>{label}</td>
-      <td className="py-[7px] px-3 text-right font-mono tabular-nums text-[12.5px] w-40">
+      <td className="py-[7px] pr-2 sm:pr-3 text-[11px] sm:text-[12.5px] text-gray-700 leading-snug"
+          style={{ paddingLeft: `${(indent + 1) * indentStep}px` }}>{label}</td>
+      <td className="py-[7px] px-2 sm:px-3 text-right font-mono tabular-nums text-[11px] sm:text-[12.5px]">
         <span className={value < 0 ? "text-red-500" : "text-blue-600"}>
           {peso ? fmtSignedPeso(value) : fmtSigned(value)}
         </span>
@@ -387,9 +391,9 @@ const liveAllowable   = liveLimitation - liveNetPs;
     label: React.ReactNode; value: number; indent?: number; bold?: boolean; peso?: boolean;
   }) => (
     <tr className={cn("border-b border-gray-100", bold && "bg-gray-50")}>
-      <td className={cn("py-[7px] pr-3 text-[12.5px] leading-snug", bold ? "font-semibold text-gray-900" : "text-gray-700")}
-          style={{ paddingLeft: `${(indent + 1) * 14}px` }}>{label}</td>
-      <td className="py-[7px] px-3 text-right font-mono tabular-nums text-[12.5px] w-40">
+      <td className={cn("py-[7px] pr-2 sm:pr-3 text-[11px] sm:text-[12.5px] leading-snug", bold ? "font-semibold text-gray-900" : "text-gray-700")}
+          style={{ paddingLeft: `${(indent + 1) * indentStep}px` }}>{label}</td>
+      <td className="py-[7px] px-2 sm:px-3 text-right font-mono tabular-nums text-[11px] sm:text-[12.5px]">
         <span className={cn(value < 0 ? "text-red-500" : bold ? "font-semibold text-gray-900" : "text-gray-600")}>
           {peso ? fmtSignedPeso(value) : fmtSigned(value)}
         </span>
@@ -399,8 +403,8 @@ const liveAllowable   = liveLimitation - liveNetPs;
 
   const LabelRow = ({ label, indent = 0 }: { label: React.ReactNode; indent?: number }) => (
     <tr className="border-b border-gray-100">
-      <td className="py-1.5 text-[12.5px] text-gray-500 italic"
-          style={{ paddingLeft: `${(indent + 1) * 14}px` }}>{label}</td>
+      <td className="py-1.5 text-[11px] sm:text-[12.5px] text-gray-500 italic"
+          style={{ paddingLeft: `${(indent + 1) * indentStep}px` }}>{label}</td>
       <td />
     </tr>
   );
@@ -423,17 +427,19 @@ const liveAllowable   = liveLimitation - liveNetPs;
     label: React.ReactNode; value: number; onSave: (v: number) => void; indent?: number;
   }) => (
     <tr className="border-b border-gray-100 group hover:bg-blue-50/20 transition-colors">
-      <td className="py-1 pr-3 text-[12.5px] text-gray-700 leading-snug"
-          style={{ paddingLeft: `${(indent + 1) * 14}px` }}>
+      <td className="py-1 pr-2 sm:pr-3 text-[11px] sm:text-[12.5px] text-gray-700 leading-snug"
+          style={{ paddingLeft: `${(indent + 1) * indentStep}px` }}>
         <span className="flex items-center gap-1.5">
           {label}
-          <span className="text-[9px] text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity
-            bg-blue-50 border border-blue-200 rounded px-1 py-0.5 whitespace-nowrap">
-            click to edit
-          </span>
+          {!isMobile && (
+            <span className="text-[9px] text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity
+              bg-blue-50 border border-blue-200 rounded px-1 py-0.5 whitespace-nowrap">
+              click to edit
+            </span>
+          )}
         </span>
       </td>
-      <td className="py-1 px-3 text-right w-40">
+      <td className="py-1 px-2 sm:px-3 text-right">
         <InlineInput value={value} onSave={onSave} />
       </td>
     </tr>
@@ -463,25 +469,25 @@ const liveAllowable   = liveLimitation - liveNetPs;
 
   return (
     /* Full-width landscape container — no max-width cap */
-    <div className="p-5 h-full">
+    <div className="p-3 sm:p-5 h-full">
 
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-end justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-gray-400">
               Personnel Services
             </span>
             <span className="text-gray-300 text-[10px]">·</span>
             <span className="text-[10px] font-medium text-gray-400">Budget Year {year}</span>
-            <span className="text-gray-300 text-[10px]">·</span>
-            <span className="text-[10px] text-gray-400">Municipality of Opol, Misamis Oriental</span>
+            <span className="hidden sm:inline text-gray-300 text-[10px]">·</span>
+            <span className="hidden sm:inline text-[10px] text-gray-400">Municipality of Opol, Misamis Oriental</span>
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">PS Computation</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-zinc-900 tracking-tight">PS Computation</h1>
         </div>
 
         {/* Inline legend */}
-        <div className="flex items-center gap-4 text-[10.5px] text-gray-400 pb-0.5">
+        <div className="flex items-center gap-3 sm:gap-4 text-[10.5px] text-gray-400 pb-0.5 flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-sm bg-white border-b-2 border-dashed border-blue-300 inline-block" />
             Editable
@@ -502,10 +508,10 @@ const liveAllowable   = liveLimitation - liveNetPs;
       </div>
 
       {loading ? (
-         <PsSkeleton />
+         <PsSkeleton isMobile={isMobile} />
       ) : (
-        /* ── Landscape: table LEFT, sidebar RIGHT ───────────────────────── */
-        <div className="flex gap-5 items-start h-full">
+        /* ── Landscape: table LEFT, sidebar RIGHT (stacks on mobile) ────── */
+        <div className={cn("flex gap-5 items-start h-full", isMobile && "flex-col")}>
 
           {/* ── Computation table ─────────────────────────────────────── */}
           <div className="flex-1 min-w-0">
@@ -513,7 +519,7 @@ const liveAllowable   = liveLimitation - liveNetPs;
               <table className="w-full border-collapse">
                 <colgroup>
                   <col />
-                  <col style={{ width: "160px" }} />
+                  <col style={{ width: isMobile ? "108px" : "160px" }} />
                 </colgroup>
                 <tbody>
 
@@ -602,8 +608,8 @@ const liveAllowable   = liveLimitation - liveNetPs;
             </div>
           </div>
 
-          {/* ── Sticky sidebar ────────────────────────────────────────── */}
-          <div className="w-64 flex-none sticky top-5 space-y-3">
+          {/* ── Sidebar (sticky on desktop, stacked below table on mobile) ── */}
+          <div className={cn("flex-none space-y-3", isMobile ? "w-full order-first" : "w-64 sticky top-5")}>
 
             {/* Amount Allowable — hero */}
             <div className={cn(

@@ -11,9 +11,14 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+// import { Settings } from 'lucide-react';
+// import { Badge } from '@/src/components/ui/badge';
+// import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Settings } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { cn } from '@/src/lib/utils';
+import { useIsMobile } from '@/src/hooks/use-mobile';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,6 +59,7 @@ export interface PsSettings {
   productivity_annual: number;
   cash_gift_annual: number;
   other_benefits_days: number;
+  other_benefits_flat: number;
   ra: RaRow[];
 }
 
@@ -81,6 +87,7 @@ export const DEFAULT_SETTINGS: PsSettings = {
   productivity_annual:   PS_CONFIG.productivity.annual,
   cash_gift_annual:      PS_CONFIG.cashGift.annual,
   other_benefits_days:   PS_CONFIG.otherBenefits.days,
+  other_benefits_flat:   PS_CONFIG.otherBenefits.flat,
   ra:                    PS_CONFIG.ra.map(r => ({ ...r })),
 };
 
@@ -163,7 +170,7 @@ const DeptEligibilityEditor: React.FC<{
           </Badge>
         ))}
       </div>
-      <div className="flex gap-2 items-end">
+      {/* <div className="flex gap-2 items-end">
         <div className="space-y-1 w-24">
           <Label className="text-[10px] text-muted-foreground">Dept ID</Label>
           <Input
@@ -188,6 +195,32 @@ const DeptEligibilityEditor: React.FC<{
         <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={handleAdd} disabled={!newId}>
           + Add
         </Button>
+      </div> */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+        <div className="space-y-1 w-full sm:w-24">
+          <Label className="text-[10px] text-muted-foreground">Dept ID</Label>
+          <Input
+            type="number"
+            min={1}
+            placeholder="e.g. 21"
+            value={newId}
+            onChange={e => setNewId(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </div>
+        <div className="space-y-1 flex-1">
+          <Label className="text-[10px] text-muted-foreground">Label (optional)</Label>
+          <Input
+            placeholder="e.g. (MHO)"
+            value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}
+            className="h-7 text-xs"
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          />
+        </div>
+        <Button type="button" variant="outline" size="sm" className="h-7 text-xs w-full sm:w-auto" onClick={handleAdd} disabled={!newId}>
+          + Add
+        </Button>
       </div>
     </div>
   );
@@ -200,7 +233,11 @@ interface Props {
   onChange: (s: PsSettings) => void;
 }
 
+// export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange }) => {
+//   const [open,  setOpen]  = useState(false);
+//   const [local, setLocal] = useState<PsSettings>(() => deepClone(settings));
 export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange }) => {
+  const isMobile = useIsMobile();
   const [open,  setOpen]  = useState(false);
   const [local, setLocal] = useState<PsSettings>(() => deepClone(settings));
 
@@ -248,22 +285,32 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      {/* <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto"> */}
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto overflow-x-hidden min-w-0">
         <DialogHeader>
           <DialogTitle>Personnel services — calculation settings</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="contributions">
+        {/* <Tabs defaultValue="contributions">
           <TabsList className="w-full">
             <TabsTrigger value="contributions" className="flex-1">Contributions</TabsTrigger>
             <TabsTrigger value="allowances"    className="flex-1">Allowances</TabsTrigger>
             <TabsTrigger value="magna_carta"   className="flex-1">Magna Carta</TabsTrigger>
             <TabsTrigger value="ra"            className="flex-1">RA / TA</TabsTrigger>
+          </TabsList> */}
+          <Tabs defaultValue="contributions" className="min-w-0">
+          <TabsList className={cn("w-full", isMobile && "grid grid-cols-4 gap-0.5")}>
+            <TabsTrigger value="contributions" className={cn(isMobile ? "px-1 text-[11px]" : "flex-1")}>{isMobile ? 'Contrib.' : 'Contributions'}</TabsTrigger>
+            <TabsTrigger value="allowances"    className={cn(isMobile ? "px-1 text-[11px]" : "flex-1")}>{isMobile ? 'Allow.' : 'Allowances'}</TabsTrigger>
+            <TabsTrigger value="magna_carta"   className={cn(isMobile ? "px-1 text-[11px]" : "flex-1")}>{isMobile ? 'MC' : 'Magna Carta'}</TabsTrigger>
+            <TabsTrigger value="ra"            className={cn(isMobile ? "px-1 text-[11px]" : "flex-1")}>RA/TA</TabsTrigger>
           </TabsList>
 
           {/* ── Contributions ────────────────────────────────────────────── */}
-          <TabsContent value="contributions" className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
+          {/* <TabsContent value="contributions" className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-4"> */}
+            <TabsContent value="contributions" className="space-y-4 pt-4">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
               <NumField label="PERA monthly (₱)"           hint="Annual = monthly × 12"   value={local.pera_monthly}       step={100}  onChange={v => set('pera_monthly', v)} />
               <NumField label="Retirement insurance (%)"   hint="% of annual salary"       value={local.retirement_rate}    step={0.5}  onChange={v => set('retirement_rate', v)} />
               <NumField label="Pag-IBIG rate (%)"          hint="% of monthly × 12"        value={local.pagibig_rate}       step={0.5}  onChange={v => set('pagibig_rate', v)} />
@@ -275,18 +322,27 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
           </TabsContent>
 
           {/* ── Allowances ───────────────────────────────────────────────── */}
-          <TabsContent value="allowances" className="space-y-5 pt-4">
-            <div className="grid grid-cols-2 gap-4">
+          {/* <TabsContent value="allowances" className="space-y-5 pt-4">
+            <div className="grid grid-cols-2 gap-4"> */}
+            <TabsContent value="allowances" className="space-y-5 pt-4">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
               <NumField label="Min annual for Clothing / Productivity / Cash Gift (₱)" value={local.annual_threshold}    step={1000} onChange={v => set('annual_threshold', v)} />
               <NumField label="Clothing allowance annual (₱)"                          value={local.clothing_annual}     step={500}  onChange={v => set('clothing_annual', v)} />
               <NumField label="Productivity incentive annual (₱)"                      value={local.productivity_annual} step={500}  onChange={v => set('productivity_annual', v)} />
               <NumField label="Cash gift annual (₱)"                                   value={local.cash_gift_annual}    step={500}  onChange={v => set('cash_gift_annual', v)} />
               <NumField label="Other benefits (days)" hint="(monthly / 22) × days"    value={local.other_benefits_days} step={1}    onChange={v => set('other_benefits_days', v)} />
+              <NumField
+                label="Other Benefits — flat per position (₱)"
+                hint="Added once per active position in the office, filled or vacant."
+                value={local.other_benefits_flat}
+                step={500}
+                onChange={v => set('other_benefits_flat', v)}
+                />
             </div>
 
             <div className="border rounded-lg p-4 space-y-4">
               <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Subsistence Allowance</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
                 <NumField label="Min annual salary to qualify (₱)" value={local.subsistence_threshold} step={1000} onChange={v => set('subsistence_threshold', v)} />
                 <NumField label="Monthly amount (₱)" hint="Annual = monthly × 12"                     value={local.subsistence_monthly}  step={50}   onChange={v => set('subsistence_monthly', v)} />
               </div>
@@ -300,7 +356,7 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
 
             <div className="border rounded-lg p-4 space-y-4">
               <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Laundry Allowance</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
                 <NumField label="Min annual salary to qualify (₱)" value={local.laundry_threshold} step={1000} onChange={v => set('laundry_threshold', v)} />
                 <NumField label="Monthly amount (₱)" hint="Annual = monthly × 12"                  value={local.laundry_monthly}  step={50}   onChange={v => set('laundry_monthly', v)} />
               </div>
@@ -320,7 +376,7 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
               Their combined total is saved to the <span className="font-medium">Hazard Pay</span> expense item.
             </p>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
               <NumField
                 label="Magna Carta rate (%)"
                 hint="% of annual salary — applied to both columns"
@@ -373,7 +429,7 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
               TA always equals RA. Rows are matched highest grade first.
             </p>
             <div className="space-y-2">
-              <div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground px-1">
+              {/* <div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground px-1">
                 <span>Grade from</span><span>Grade to</span><span>RA monthly (₱)</span><span />
               </div>
               {local.ra.map((row, i) => (
@@ -382,6 +438,17 @@ export const PersonnelServicesSettings: React.FC<Props> = ({ settings, onChange 
                   <Input type="number" min={1} max={40} value={row.to}      onChange={e => setRa(i, 'to',      parseInt(e.target.value)  || 1)} className="h-8 text-sm" />
                   <Input type="number" step={500}        value={row.monthly} onChange={e => setRa(i, 'monthly', parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
                   <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive" onClick={() => removeRaRow(i)}>✕</Button>
+                </div>
+              ))} */}
+              <div className={cn("grid gap-2 text-xs font-medium text-muted-foreground px-1", isMobile ? "grid-cols-[1fr_1fr_1.4fr_28px]" : "grid-cols-4")}>
+                <span>{isMobile ? "From" : "Grade from"}</span><span>{isMobile ? "To" : "Grade to"}</span><span>{isMobile ? "RA (₱)" : "RA monthly (₱)"}</span><span />
+              </div>
+              {local.ra.map((row, i) => (
+                <div key={i} className={cn("grid gap-2 items-center", isMobile ? "grid-cols-[1fr_1fr_1.4fr_28px]" : "grid-cols-4")}>
+                  <Input type="number" min={1} max={40} value={row.from}    onChange={e => setRa(i, 'from',    parseInt(e.target.value)  || 1)} className="h-8 text-sm px-2" />
+                  <Input type="number" min={1} max={40} value={row.to}      onChange={e => setRa(i, 'to',      parseInt(e.target.value)  || 1)} className="h-8 text-sm px-2" />
+                  <Input type="number" step={500}        value={row.monthly} onChange={e => setRa(i, 'monthly', parseFloat(e.target.value) || 0)} className="h-8 text-sm px-2" />
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" onClick={() => removeRaRow(i)}>✕</Button>
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={addRaRow} className="mt-1">+ Add row</Button>

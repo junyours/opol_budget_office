@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import API from '../../services/api';
 import { Department } from '../../types/api';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useIsMobile } from '../../hooks/use-mobile';
 import { LoadingState } from '../../components/states/LoadingState';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -185,6 +186,7 @@ const emptyPwForm = () => ({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UserAccountPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const [users,       setUsers]       = useState<UserRecord[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -324,6 +326,11 @@ const UserAccountPage: React.FC = () => {
     const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
     const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
     setCtxMenu({ x, y, user });
+  };
+
+  // Mobile card tap → open the bottom action sheet (x/y unused there)
+  const openMobileActions = (user: UserRecord) => {
+    setCtxMenu({ x: 0, y: 0, user });
   };
 
   // ── Open modals ───────────────────────────────────────────────────────────
@@ -500,7 +507,7 @@ const UserAccountPage: React.FC = () => {
   if (loading && users.length === 0) return <LoadingState />;
 
   return (
-    <div className="p-6 relative">
+    <div className="p-4 sm:p-6 relative">
 
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between mb-6">
@@ -508,10 +515,10 @@ const UserAccountPage: React.FC = () => {
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Administration
           </span>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
             User Accounts
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1 hidden sm:block">
             Manage system users, roles, and access.
           </p>
         </div>
@@ -543,16 +550,16 @@ const UserAccountPage: React.FC = () => {
       </div>
 
       {/* ── Search + Filter bar ── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
             value={searchRaw}
             onChange={e => setSearchRaw(e.target.value)}
             placeholder="Search by name or username…"
-            className="pl-8 h-8 text-xs border-gray-200 bg-white"
+            className="pl-8 h-9 sm:h-8 text-xs border-gray-200 bg-white w-full"
           />
           {isSearching && (
             <button onClick={() => setSearchRaw('')}
@@ -562,53 +569,57 @@ const UserAccountPage: React.FC = () => {
           )}
         </div>
 
-        <FunnelIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <FunnelIcon className="hidden sm:block w-3.5 h-3.5 text-gray-400 shrink-0" />
 
-        {/* Status filter */}
-        <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className={cn('h-8 text-xs w-36 border-gray-200', statusFilter !== 'all' && 'border-gray-400 bg-gray-50')}>
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all"      className="text-xs">All statuses</SelectItem>
-            <SelectItem value="active"   className="text-xs">Active</SelectItem>
-            <SelectItem value="inactive" className="text-xs">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+          {/* Status filter */}
+          <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className={cn('h-9 sm:h-8 text-xs flex-1 sm:flex-none sm:w-36 border-gray-200', statusFilter !== 'all' && 'border-gray-400 bg-gray-50')}>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all"      className="text-xs">All statuses</SelectItem>
+              <SelectItem value="active"   className="text-xs">Active</SelectItem>
+              <SelectItem value="inactive" className="text-xs">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Role filter */}
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className={cn('h-8 text-xs w-40 border-gray-200', roleFilter !== 'all' && 'border-gray-400 bg-gray-50')}>
-            <SelectValue placeholder="All roles" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-xs">All roles</SelectItem>
-            {ROLE_OPTIONS.map(r => (
-              <SelectItem key={r.value} value={r.value} className="text-xs">{r.label}</SelectItem>
-            ))}
-            <SelectItem value="super-admin" className="text-xs">Super Admin</SelectItem>
-          </SelectContent>
-        </Select>
+          {/* Role filter */}
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className={cn('h-9 sm:h-8 text-xs flex-1 sm:flex-none sm:w-40 border-gray-200', roleFilter !== 'all' && 'border-gray-400 bg-gray-50')}>
+              <SelectValue placeholder="All roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All roles</SelectItem>
+              {ROLE_OPTIONS.map(r => (
+                <SelectItem key={r.value} value={r.value} className="text-xs">{r.label}</SelectItem>
+              ))}
+              <SelectItem value="super-admin" className="text-xs">Super Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        {/* Clear filters */}
-        {isFiltered && (
-          <button
-            onClick={() => { setStatusFilter('all'); setRoleFilter('all'); }}
-            className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <XMarkIcon className="w-3 h-3" />
-            Clear filters
-          </button>
-        )}
-
-        {/* Result count */}
-        <span className="text-[11px] text-gray-400 ml-auto">
-          {isFiltered || isSearching ? (
-            <><span className="font-medium text-gray-600">{processed.length}</span> of <span className="font-medium text-gray-600">{users.length}</span> users</>
-          ) : (
-            <><span className="font-medium text-gray-600">{users.length}</span> user{users.length !== 1 ? 's' : ''}</>
+        <div className="flex items-center justify-between sm:justify-end sm:ml-auto gap-2">
+          {/* Clear filters */}
+          {isFiltered && (
+            <button
+              onClick={() => { setStatusFilter('all'); setRoleFilter('all'); }}
+              className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+            >
+              <XMarkIcon className="w-3 h-3" />
+              Clear filters
+            </button>
           )}
-        </span>
+
+          {/* Result count */}
+          <span className="text-[11px] text-gray-400 flex-shrink-0">
+            {isFiltered || isSearching ? (
+              <><span className="font-medium text-gray-600">{processed.length}</span> of <span className="font-medium text-gray-600">{users.length}</span> users</>
+            ) : (
+              <><span className="font-medium text-gray-600">{users.length}</span> user{users.length !== 1 ? 's' : ''}</>
+            )}
+          </span>
+        </div>
       </div>
 
       {/* ── Hint ── */}
@@ -638,6 +649,7 @@ const UserAccountPage: React.FC = () => {
           </div>
         ) : (
           <>
+            <div className="hidden md:block">
             <table className="w-full text-[12px] border-collapse">
               <thead>
                 <tr>
@@ -735,6 +747,60 @@ const UserAccountPage: React.FC = () => {
                 })}
               </tbody>
             </table>
+            </div>
+
+            {/* ── Mobile card list ── */}
+            <div className="md:hidden flex flex-col gap-2.5 p-3">
+              {paginated.map(u => {
+                const fullName = [u.fname, u.mname, u.lname].filter(Boolean).join(' ');
+                return (
+                  <button
+                    key={u.user_id}
+                    onClick={() => openMobileActions(u)}
+                    className={cn(
+                      'w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 flex items-center gap-3 transition-colors active:bg-gray-50',
+                      !u.is_active && 'opacity-60',
+                    )}
+                  >
+                    <Avatar className="h-10 w-10 rounded-full border border-gray-100 flex-shrink-0">
+                      <AvatarImage src={u.avatar ? `/storage/${u.avatar}` : undefined} alt={fullName} />
+                      <AvatarFallback className="rounded-full bg-gray-100 text-gray-600 text-[12px] font-semibold">
+                        {getInitials(u)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[13px] font-semibold text-gray-900 truncate">{fullName}</p>
+                        <span className={cn(
+                          'inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-full border flex-shrink-0',
+                          u.is_active
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                            : 'text-red-600 bg-red-50 border-red-100'
+                        )}>
+                          <span className={cn('w-1 h-1 rounded-full', u.is_active ? 'bg-emerald-400' : 'bg-red-400')} />
+                          {u.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 font-mono truncate mt-0.5">{u.username}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className={cn('text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0 leading-4', ROLE_BADGE[u.role] ?? '')}
+                        >
+                          {ROLE_LABEL[u.role] ?? u.role}
+                        </Badge>
+                        {u.department && (
+                          <span className="text-[10px] text-gray-400 truncate">
+                            {u.department.dept_abbreviation || u.department.dept_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
@@ -786,8 +852,60 @@ const UserAccountPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── Context Menu ── */}
-      {ctxMenu && (
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[13px] font-semibold text-gray-900 truncate">
+                {ctxMenu.user.fname} {ctxMenu.user.lname}
+              </p>
+              <p className="text-[11px] text-gray-400 font-mono truncate">{ctxMenu.user.username}</p>
+            </div>
+
+            <button
+              onClick={() => openEdit(ctxMenu.user)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit User
+            </button>
+
+            <button
+              onClick={() => openPasswordModal(ctxMenu.user)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors border-t border-gray-100"
+            >
+              <KeyIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Change Password
+            </button>
+
+            <button
+              onClick={() => openToggle(ctxMenu.user)}
+              className={cn(
+                'flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100',
+                ctxMenu.user.is_active ? 'text-amber-700 active:bg-amber-50' : 'text-emerald-700 active:bg-emerald-50'
+              )}
+            >
+              {ctxMenu.user.is_active
+                ? <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
+                : <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
+              }
+            </button>
+
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <div
           ref={ctxRef}
           style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
@@ -801,7 +919,6 @@ const UserAccountPage: React.FC = () => {
             <p className="text-[10px] text-gray-300 font-mono truncate">{ctxMenu.user.username}</p>
           </div>
 
-          {/* Edit */}
           <button
             onClick={() => openEdit(ctxMenu.user)}
             className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
@@ -810,7 +927,6 @@ const UserAccountPage: React.FC = () => {
             Edit User
           </button>
 
-          {/* Change Password */}
           <button
             onClick={() => openPasswordModal(ctxMenu.user)}
             className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
@@ -819,7 +935,6 @@ const UserAccountPage: React.FC = () => {
             Change Password
           </button>
 
-          {/* Toggle Active */}
           <button
             onClick={() => openToggle(ctxMenu.user)}
             className={cn(
@@ -834,19 +949,8 @@ const UserAccountPage: React.FC = () => {
               : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
             }
           </button>
-
-          {/* Divider + Delete */}
-          {/* <div className="border-t border-gray-100 mt-1 pt-1">
-            <button
-              onClick={() => openDelete(ctxMenu.user)}
-              className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              Delete User
-            </button>
-          </div> */}
         </div>
-      )}
+      ))}
 
       {/* ════════ Create / Edit User Dialog ════════ */}
       <Dialog open={modalOpen} onOpenChange={open => { if (!open) setModalOpen(false); }}>

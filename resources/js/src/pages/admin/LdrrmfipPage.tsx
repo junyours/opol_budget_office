@@ -114,10 +114,12 @@ function sourceFundLabel(source: FundSource): string {
 }
 
 import { LdrrmfipTableSkeleton } from "@/src/components/skeleton-loader/LdrrmfipTableSkeleton";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LdrrmfipPage() {
+  const isMobile = useIsMobile();
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
 //   const [sources,     setSources]     = useState<FundSource[]>([]);
@@ -151,7 +153,19 @@ const [searchParams, setSearchParams] = useSearchParams();
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
 
-  const activePlanId = activePlan?.budget_plan_id ?? null;
+const activePlanId = activePlan?.budget_plan_id ?? null;
+
+  // ── Tab scroll affordance (fade + dots) ────────────────────────────────────
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft,  setCanScrollLeft]  = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
 
   // ── Load sources + categories once ────────────────────────────────────────
 
@@ -247,6 +261,13 @@ const { user } = useAuth();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sources]);
+
+  // Recompute fade edges once tabs render/resize
+  useEffect(() => {
+    updateScrollState();
+    window.addEventListener("resize", updateScrollState);
+    return () => window.removeEventListener("resize", updateScrollState);
+  }, [sources, updateScrollState]);
 
   // ── Load data for the active source whenever it or the plan changes ────────
 
@@ -516,74 +537,114 @@ const { user } = useAuth();
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px] border-collapse">
-              <thead>
-                <tr>
-                  {[
-                    { label: "Program/Project/Activity Description", cls: "text-left w-[28%]" },
-                    { label: "Implementing Office",                   cls: "text-left w-[9%]" },
-                    { label: "Starting Date",                         cls: "text-center w-[8%]" },
-                    { label: "Completion Date",                       cls: "text-center w-[8%]" },
-                    { label: "Expected Output",                       cls: "text-left w-[12%]" },
-                    { label: "Funding Source",                        cls: "text-center w-[7%]" },
-                    { label: "MOOE",                                  cls: "text-right w-[9%]" },
-                    { label: "CO",                                    cls: "text-right w-[9%]" },
-                    { label: "Total",                                 cls: "text-right w-[9%]" },
-                  ].map(({ label, cls }) => (
-                    <th
-                      key={label}
-                      className={cn("text-table-header border-b  px-3 py-2.5 border-t border-t-gray-100", cls)}
-                    >
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-100">
-                {group.items.map((item, idx) => (
-                  <tr
-                    key={item.ldrrmfip_item_id}
-                    onClick={(e) => !isViewer && handleRowClick(e, item)}
-                    onContextMenu={(e) => !isViewer && handleRowClick(e, item)}
-                    className={cn(
-                      "transition-colors",
-                      idx % 2 === 1 && "bg-gray-50/40",
-                      !isViewer && "hover:bg-gray-50/80 cursor-pointer select-none"
-                    )}
-                  >
-                    <td className="px-3 py-2.5">
-                      <span className="text-table-primary">{item.description}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.implementing_office}</span></td>
-                    <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.starting_date ?? "–"}</span></td>
-                    <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.completion_date ?? "–"}</span></td>
-                    <td className="px-3 py-2.5"><span className="text-table-secondary">{item.expected_output ?? "–"}</span></td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="text-badge bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5">
-                        {item.funding_source}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right"><span className="text-table-number">{enPH(item.mooe)}</span></td>
-                    <td className="px-3 py-2.5 text-right"><span className="text-table-number">{enPH(item.co)}</span></td>
-                    <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(item.total)}</span></td>
+          {isMobile ? (
+            <div className="p-3 space-y-2">
+              {group.items.map((item) => (
+                <div
+                  key={item.ldrrmfip_item_id}
+                  onClick={(e) => !isViewer && handleRowClick(e, item)}
+                  className={cn(
+                    "rounded-lg border border-gray-100 bg-white px-3 py-2.5",
+                    !isViewer && "active:bg-gray-50 cursor-pointer select-none"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <span className="text-table-primary flex-1">{item.description}</span>
+                    <span className="text-badge bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5 flex-shrink-0">
+                      {item.funding_source}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
+                    <span>{item.implementing_office}</span>
+                    <span>{item.starting_date ?? "–"} – {item.completion_date ?? "–"}</span>
+                  </div>
+                  {item.expected_output && (
+                    <p className="text-table-secondary mb-2">{item.expected_output}</p>
+                  )}
+                  <div className="flex items-center justify-between border-t border-gray-100 pt-1.5">
+                    <div className="flex gap-3 text-[11px] text-gray-400">
+                      <span>MOOE <span className="text-gray-700 font-mono">{enPH(item.mooe)}</span></span>
+                      <span>CO <span className="text-gray-700 font-mono">{enPH(item.co)}</span></span>
+                    </div>
+                    <span className="text-table-total">{enPH(item.total)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-lg bg-gray-50/80 border border-gray-200 px-3 py-2 mt-1">
+                <span className="text-table-total">Total {group.name}</span>
+                <span className="text-table-grand-total">{enPH(group.subtotal_total)}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px] border-collapse">
+                <thead>
+                  <tr>
+                    {[
+                      { label: "Program/Project/Activity Description", cls: "text-left w-[28%]" },
+                      { label: "Implementing Office",                   cls: "text-left w-[9%]" },
+                      { label: "Starting Date",                         cls: "text-center w-[8%]" },
+                      { label: "Completion Date",                       cls: "text-center w-[8%]" },
+                      { label: "Expected Output",                       cls: "text-left w-[12%]" },
+                      { label: "Funding Source",                        cls: "text-center w-[7%]" },
+                      { label: "MOOE",                                  cls: "text-right w-[9%]" },
+                      { label: "CO",                                    cls: "text-right w-[9%]" },
+                      { label: "Total",                                 cls: "text-right w-[9%]" },
+                    ].map(({ label, cls }) => (
+                      <th
+                        key={label}
+                        className={cn("text-table-header border-b  px-3 py-2.5 border-t border-t-gray-100", cls)}
+                      >
+                        {label}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
+                </thead>
 
-              <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-gray-50/80">
-                  <td colSpan={6} className="px-3 py-2.5 text-right">
-                    <span className="text-table-total">Total {group.name}</span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(group.subtotal_mooe)}</span></td>
-                  <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(group.subtotal_co)}</span></td>
-                  <td className="px-3 py-2.5 text-right"><span className="text-table-grand-total">{enPH(group.subtotal_total)}</span></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                <tbody className="divide-y divide-gray-100">
+                  {group.items.map((item, idx) => (
+                    <tr
+                      key={item.ldrrmfip_item_id}
+                      onClick={(e) => !isViewer && handleRowClick(e, item)}
+                      onContextMenu={(e) => !isViewer && handleRowClick(e, item)}
+                      className={cn(
+                        "transition-colors",
+                        idx % 2 === 1 && "bg-gray-50/40",
+                        !isViewer && "hover:bg-gray-50/80 cursor-pointer select-none"
+                      )}
+                    >
+                      <td className="px-3 py-2.5">
+                        <span className="text-table-primary">{item.description}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.implementing_office}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.starting_date ?? "–"}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-table-secondary">{item.completion_date ?? "–"}</span></td>
+                      <td className="px-3 py-2.5"><span className="text-table-secondary">{item.expected_output ?? "–"}</span></td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="text-badge bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5">
+                          {item.funding_source}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right"><span className="text-table-number">{enPH(item.mooe)}</span></td>
+                      <td className="px-3 py-2.5 text-right"><span className="text-table-number">{enPH(item.co)}</span></td>
+                      <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(item.total)}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-gray-50/80">
+                    <td colSpan={6} className="px-3 py-2.5 text-right">
+                      <span className="text-table-total">Total {group.name}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(group.subtotal_mooe)}</span></td>
+                    <td className="px-3 py-2.5 text-right"><span className="text-table-total">{enPH(group.subtotal_co)}</span></td>
+                    <td className="px-3 py-2.5 text-right"><span className="text-table-grand-total">{enPH(group.subtotal_total)}</span></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </div>
       ))}
 
@@ -757,17 +818,51 @@ const { user } = useAuth();
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       {sources.length > 0 ? (
         <Tabs value={activeSource} onValueChange={setActiveSource} className="w-full">
-          <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1">
-            {sources.map(src => (
-              <TabsTrigger
-                key={src.id}
-                value={src.id}
-                className="text-xs px-4 rounded-md data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:font-medium data-[state=active]:shadow-sm text-gray-500"
-              >
-                {src.type === "general" ? "General Fund" : src.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="relative w-full sm:w-auto">
+            <TabsList
+              id="fund-source-tabs"
+              ref={tabsScrollRef}
+              onScroll={updateScrollState}
+              className="h-9 bg-white border border-gray-200 rounded-lg p-1 w-full sm:w-auto flex items-center justify-start overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {sources.map(src => (
+                <TabsTrigger
+                  key={src.id}
+                  value={src.id}
+                  className="text-xs px-4 rounded-md data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:font-medium data-[state=active]:shadow-sm text-gray-500 flex-shrink-0 whitespace-nowrap"
+                >
+                  {src.type === "general" ? "General Fund" : src.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {/* Edge fades — hint that more tabs exist off-screen */}
+            {canScrollLeft && (
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 rounded-l-lg bg-gradient-to-r from-white to-transparent" />
+            )}
+            {canScrollRight && (
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 rounded-r-lg bg-gradient-to-l from-white to-transparent" />
+            )}
+          </div>
+
+          {/* Dot indicators — shows total source count + which is active,
+              independent of scroll position. Tapping a dot jumps to that tab. */}
+          {sources.length > 1 && (
+            <div className="flex items-center justify-center gap-1.5 pt-2 sm:hidden">
+              {sources.map(src => (
+                <button
+                  key={src.id}
+                  onClick={() => setActiveSource(src.id)}
+                  aria-label={src.type === "general" ? "General Fund" : src.label}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    src.id === activeSource ? "w-4 bg-zinc-900" : "w-1.5 bg-gray-300"
+                  )}
+                />
+              ))}
+            </div>
+          )}
 
           {sources.map(src => (
             <TabsContent key={src.id} value={src.id} className="mt-4">

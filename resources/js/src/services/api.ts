@@ -45,6 +45,14 @@ API.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ── 503: system in maintenance mode — redirect to maintenance screen ───────
+    if (error.response?.status === 503 && (error.response?.data as any)?.maintenance_mode) {
+      if (window.location.pathname !== '/maintenance') {
+        window.location.href = '/maintenance';
+      }
+      return Promise.reject(error);
+    }
+
     // ── 429: rate limited — auto-retry with backoff ────────────────────────────
     if (error.response?.status === 429) {
   // Don't retry login — let the component handle it immediately

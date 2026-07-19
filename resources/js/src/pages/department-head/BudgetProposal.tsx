@@ -17,6 +17,7 @@ import {
 import { PlusIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ const RowSkeleton = ({ delay = 0 }: { delay?: number }) => (
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const BudgetProposal: React.FC = () => {
+  const isMobile     = useIsMobile();
   const { user }     = useAuth();
   const navigate     = useNavigate();
 
@@ -228,6 +230,77 @@ const BudgetProposal: React.FC = () => {
                 </Button>
               )}
             </div>
+          ) : isMobile ? (
+            <>
+              <div className="p-3 flex flex-col gap-2.5">
+                {plans.map((plan, i) => {
+                  const cfg      = getStatusCfg(plan.status);
+                  const isActive = plan.budget_plan_id === activePlan?.budget_plan_id;
+
+                  return (
+                    <div
+                      key={plan.dept_budget_plan_id}
+                      onClick={() => handleRowClick(plan)}
+                      className={cn(
+                        "bg-white border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-colors",
+                        isActive ? "border-emerald-200 bg-emerald-50/30" : "border-gray-200 hover:bg-gray-50/80",
+                      )}
+                      style={{
+                        opacity: 0,
+                        animation: "rowReveal .35s ease forwards",
+                        animationDelay: `${i * 50}ms`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900 tabular-nums text-[15px]">
+                            {plan.budget_plan?.year ?? "N/A"}
+                          </span>
+                          {isActive && (
+                            <span className="text-[9px] font-semibold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", cfg.dot)} />
+                          <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", cfg.badge)}>
+                            {cfg.label}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-gray-100">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Created</span>
+                          <span className="text-[11px] text-gray-500">
+                            {plan.created_at
+                              ? new Date(plan.created_at).toLocaleDateString("en-PH", {
+                                  year: "numeric", month: "short", day: "numeric",
+                                })
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Last Updated</span>
+                          <span className="text-[11px] text-gray-500">
+                            {plan.updated_at
+                              ? new Date(plan.updated_at).toLocaleDateString("en-PH", {
+                                  year: "numeric", month: "short", day: "numeric",
+                                })
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* hint */}
+              <div className="px-4 py-2.5 border-t border-gray-100">
+                <p className="text-[10px] text-gray-400 italic">Tap a proposal to view or edit it</p>
+              </div>
+            </>
           ) : (
             <>
               <table className="w-full text-[12px] border-collapse">

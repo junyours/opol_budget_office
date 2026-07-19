@@ -118,15 +118,15 @@ const SectorTotalsRow: React.FC<{ grandTotal: SectionSubtotal }> = ({ grandTotal
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2 mt-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
       {sectors.map(s => (
-        <div key={s.key} className="rounded-lg border border-border p-2.5">
+        <div key={s.key} className="rounded-lg border border-border p-2.5 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-            <p className="text-[9px] font-medium text-muted-foreground leading-tight">{s.label}</p>
+            <p className="text-[9px] font-medium text-muted-foreground leading-tight truncate">{s.label}</p>
           </div>
-          <p className="text-sm font-semibold text-foreground tabular-nums leading-none">{pesoC(grandTotal[s.key])}</p>
-          <p className="text-[9px] font-mono text-muted-foreground mt-1">{peso(grandTotal[s.key])}</p>
+          <p className="text-sm font-semibold text-foreground tabular-nums leading-none truncate">{pesoC(grandTotal[s.key])}</p>
+          <p className="text-[9px] font-mono text-muted-foreground mt-1 truncate">{peso(grandTotal[s.key])}</p>
         </div>
       ))}
     </div>

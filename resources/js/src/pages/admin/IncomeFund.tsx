@@ -11,6 +11,7 @@ import { useAuth } from "@/src/hooks/useAuth";
 import { cn } from "@/src/lib/utils";
 import { Card as ShadcnCard } from "@/src/components/ui/card";
 import { MAX_AMOUNT, sanitizeMoneyDigits } from "@/src/utils/moneyInput";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DisplayRow extends IncomeFundRow {
@@ -285,6 +286,7 @@ function TableSkeleton() {
 
 export default function IncomeFundPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [rows, setRows]             = useState<IncomeFundRow[]>([]);
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
@@ -446,7 +448,7 @@ useEffect(() => {
     if (queryData.past_plan_missing) {
       toast.warning(
         `Budget plan for ${queryData.past_year} does not exist. Create it first to enable past year obligation amount entries.`,
-        { duration: 8000 }
+        { duration: 5000 }
       );
     }
 
@@ -1021,6 +1023,136 @@ const isViewer   = user?.role === "viewer";
     </div>
   );
 
+  // ── Mobile card renderer (stacked layout — no horizontal table scroll) ─────
+  const renderMobileList = () => (
+    <div className="space-y-2">
+      {displayRows.map((row, rowIdx) => {
+        const total    = row.current_total ?? 0;
+        const proposed = row.proposed ?? 0;
+        const increase = proposed - total;
+        const percent  = total === 0
+          ? (proposed === 0 ? null : 100)
+          : (increase / total) * 100;
+
+        const editable  = isEditable(row);
+        const isSaving  = savingRows.has(row.id);
+        const indent    = row.level * 10;
+        const incColor  = increase > 0 ? "text-green-600" : increase < 0 ? "text-red-500" : "text-gray-500";
+        const pctColor  = percent !== null
+          ? percent > 0 ? "text-green-600" : percent < 0 ? "text-red-500" : "text-gray-500"
+          : "";
+
+        const cardBase = row.isGrandTotal
+          ? "bg-foreground text-background"
+          : row.isSubtotal
+          ? "bg-muted/50"
+          : "bg-card";
+
+        return (
+          <div key={row.id} className={cn("rounded-lg border border-border p-3", cardBase)}>
+            <p
+              className={cn(
+                "text-[13px] font-semibold mb-2",
+                row.isGrandTotal ? "text-background" : "text-foreground",
+              )}
+              style={{ paddingLeft: row.isSubtotal || (!row.isGrandTotal && !row.isSubtotal) ? indent : 0 }}
+            >
+              {row.name}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              {/* Past Year (Actual) — green */}
+              <div className={cn("rounded-md border px-2 py-1.5", row.isGrandTotal ? COL_PAST_GRAND : row.isSubtotal ? COL_PAST_SUB : COL_PAST)}>
+                <p className={cn("mb-0.5", row.isGrandTotal ? "text-green-300/70" : "text-green-700/70")}>Past Year (Actual)</p>
+                {isPastEditable(row) && canEditPastAndSem1 ? (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="w-full text-right font-mono h-7 px-2 rounded border bg-white border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300 tabular-nums"
+                    value={getDraftValue(`${row.id}_past_obligation`, row.past_obligation)}
+                    onChange={(e) => {
+                      const pos = e.target.selectionStart ?? e.target.value.length;
+                      handlePastObligationChange(row.id, e.target.value, e.target, pos);
+                    }}
+                    onBlur={() => { clearDraft(`${row.id}_past_obligation`); savePastObligation(row.id, row.past_obligation); }}
+                    onKeyDown={blurOnEnter}
+                    placeholder="0"
+                  />
+                ) : (
+                  <p className={cn("font-mono text-right", row.isGrandTotal ? "text-green-300" : "text-green-900")}>{fmtNum(row.past_obligation)}</p>
+                )}
+              </div>
+
+              {/* Budget Year — orange */}
+              <div className={cn("rounded-md border px-2 py-1.5", row.isGrandTotal ? COL_BUDGET_GRAND : row.isSubtotal ? COL_BUDGET_SUB : COL_BUDGET)}>
+                <p className={cn("mb-0.5", row.isGrandTotal ? "text-orange-300/70" : "text-orange-700/70")}>Budget Year {meta?.year}</p>
+                {editable && canEditBudgetYear ? (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={cn("w-full text-right font-mono h-7 px-2 rounded border bg-white border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-300 tabular-nums", isSaving && "opacity-50 pointer-events-none")}
+                    value={getDraftValue(`${row.id}_proposed`, row.proposed)}
+                    onChange={(e) => {
+                      const pos = e.target.selectionStart ?? e.target.value.length;
+                      handleAmountChange(row.id, e.target.value, e.target, pos);
+                    }}
+                    onBlur={() => { clearDraft(`${row.id}_proposed`); saveRow(row.id); }}
+                    onKeyDown={blurOnEnter}
+                    disabled={isSaving}
+                    placeholder="0"
+                  />
+                ) : (
+                  <p className={cn("font-mono text-right font-semibold", row.isGrandTotal ? "text-orange-300" : "text-orange-900")}>{fmtNum(row.proposed)}</p>
+                )}
+              </div>
+
+              {/* 1st Semester — blue */}
+              <div className={cn("rounded-md border px-2 py-1.5", row.isGrandTotal ? COL_CURR_GRAND : row.isSubtotal ? COL_CURR_SUB : COL_CURR)}>
+                <p className={cn("mb-0.5", row.isGrandTotal ? "text-blue-300/70" : "text-blue-700/70")}>1st Sem {meta?.current_year}</p>
+                {editable && canEditPastAndSem1 ? (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={cn("w-full text-right font-mono h-7 px-2 rounded border bg-white border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300 tabular-nums", isSaving && "opacity-50 pointer-events-none")}
+                    value={getDraftValue(`${row.id}_sem1`, row.current_sem1)}
+                    onChange={(e) => {
+                      const pos = e.target.selectionStart ?? e.target.value.length;
+                      handleSem1Change(row.id, e.target.value, e.target, pos);
+                    }}
+                    onBlur={() => { clearDraft(`${row.id}_sem1`); saveRow(row.id); }}
+                    onKeyDown={blurOnEnter}
+                    disabled={isSaving}
+                    placeholder="0"
+                  />
+                ) : (
+                  <p className={cn("font-mono text-right", row.isGrandTotal ? "text-blue-300" : "text-blue-900")}>{fmtNum(row.current_sem1)}</p>
+                )}
+              </div>
+
+              {/* 2nd Semester — blue (auto, read-only) */}
+              <div className={cn("rounded-md border px-2 py-1.5", row.isGrandTotal ? COL_CURR_GRAND : row.isSubtotal ? COL_CURR_SUB : COL_CURR)}>
+                <p className={cn("mb-0.5", row.isGrandTotal ? "text-blue-300/70" : "text-blue-700/70")}>2nd Sem (auto)</p>
+                <p className={cn("font-mono text-right", row.isGrandTotal ? "text-blue-300" : "text-blue-900")}>{fmtNum(row.current_sem2)}</p>
+              </div>
+
+              {/* Increase / Decrease — neutral, full width */}
+              <div className="rounded-md border border-border bg-card px-2 py-1.5">
+                <p className="text-muted-foreground/60 mb-0.5">Increase / Decrease</p>
+                <p className={cn("font-mono text-right", incColor)}>{fmtNum(increase)}</p>
+              </div>
+
+              {/* % Change — neutral, full width */}
+              <div className="rounded-md border border-border bg-card px-2 py-1.5">
+                <p className="text-muted-foreground/60 mb-0.5">% Change</p>
+                <p className={cn("font-mono text-right", pctColor)}>{fmtPct(percent)}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const renderLegend = () => (
     <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-table-secondary">
       <span className="flex items-center gap-1.5">
@@ -1046,9 +1178,19 @@ const isViewer   = user?.role === "viewer";
 
  const renderContent = () => (
     <>
-      <ShadcnCard className="rounded-xl overflow-hidden shadow-sm">
-        {loading ? <TableSkeleton /> : renderTable()}
-      </ShadcnCard>
+      {isMobile ? (
+        loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : renderMobileList()
+      ) : (
+        <ShadcnCard className="rounded-xl overflow-hidden shadow-sm">
+          {loading ? <TableSkeleton /> : renderTable()}
+        </ShadcnCard>
+      )}
       {!loading && renderLegend()}
     </>
   );
@@ -1062,7 +1204,7 @@ const isViewer   = user?.role === "viewer";
           <h1 className="text-page-title">Income Fund</h1>
         </div>
         <Tabs value={currentSource} onValueChange={handleSourceChange} className="w-full">
-           <TabsList className="h-9 bg-muted border border-border rounded-lg p-1 mb-5">
+           <TabsList className="h-9 bg-muted border border-border rounded-lg p-1 mb-5 w-full overflow-x-auto flex-nowrap justify-start">
             {availableSources.map((s) => (
               <TabsTrigger key={s.id} value={s.id}
                 className="text-subtitle px-4 rounded-md data-[state=active]:bg-primary data-[state=active]:shadow-sm data-[state=active]:text-primary-foreground text-muted-foreground hover:text-foreground">

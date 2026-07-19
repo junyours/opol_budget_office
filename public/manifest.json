@@ -1,0 +1,21 @@
+{
+  "name": "Municipal Budget Office Management System",
+  "short_name": "MBO System",
+  "description": "Annual Budget Plan and Local Expenditure Program Preparation",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/images/opol.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/opol.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

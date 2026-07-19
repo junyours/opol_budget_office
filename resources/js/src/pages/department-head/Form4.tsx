@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan, DepartmentBudgetPlanForm4Item } from '../../types/api';
+import { useIsMobile } from '../../hooks/use-mobile';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/src/components/ui/button';
 import {
@@ -77,15 +78,15 @@ const fmtAmount = (v: number) => {
 // Hard ceiling for any peso amount field — matches the DB column's precision
 // so typed values can never overflow into a DB error.
 // const MAX_AMOUNT = 999999999.99;
-
-const TH_R = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-right whitespace-nowrap';
-const TH   = 'border-b border-gray-200 bg-white px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap';
+const TH_R = 'border-b border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground text-right whitespace-nowrap';
+const TH   = 'border-b border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground text-left whitespace-nowrap';
 const TD      = 'px-4 py-3 text-[12px] text-gray-700';
 const TD_MONO = 'px-4 py-3 text-[12px] font-mono tabular-nums text-right text-gray-700';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const planId = plan.dept_budget_plan_id;
   const deptId = plan.dept_id;
@@ -676,7 +677,9 @@ const handleDeleteRequest = async (itemId: number) => {
         <div className="flex items-center gap-3">
           {isEditable && (
             <>
-              <span className="text-[10px] text-gray-400 italic hidden sm:block">Click a row to edit or delete</span>
+              {!isMobile && (
+                <span className="text-[10px] text-gray-400 italic hidden sm:block">Click a row to edit or delete</span>
+              )}
               <Button
                 size="sm"
                 onClick={openAddModal}
@@ -690,7 +693,117 @@ const handleDeleteRequest = async (itemId: number) => {
         </div>
       </div>
 
-      {/* Main table */}
+      {/* Main table / mobile cards */}
+      {isMobile ? (
+        <div className="p-3 flex flex-col gap-2.5">
+          {items.length === 0 ? (
+            <p className="py-10 text-center text-gray-400 text-sm">
+              No items.{' '}
+              {isEditable && (
+                <button
+                  onClick={openAddModal}
+                  className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900"
+                >
+                  Add the first one
+                </button>
+              )}
+            </p>
+          ) : (
+            items.map(item => (
+              <div
+                key={item.dept_bp_form4_item_id}
+                className="bg-white border border-gray-200 rounded-xl px-3.5 py-3"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-800 leading-snug">
+                      {item.program_description || '–'}
+                    </p>
+                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                      {item.aip_reference_code || '–'}
+                    </p>
+                  </div>
+                  {isEditable && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => openEditModal(item)}
+                        className="text-gray-300 hover:text-gray-700 transition-colors p-1"
+                        aria-label="Edit"
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRequest(item.dept_bp_form4_item_id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                        aria-label="Delete"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {(item.major_final_output || item.performance_indicator || item.target) && (
+                  <div className="flex flex-col gap-1 mb-2.5 text-[11px] text-gray-500">
+                    {item.major_final_output && (
+                      <p><span className="font-semibold text-gray-400">MFO:</span> {item.major_final_output}</p>
+                    )}
+                    {item.performance_indicator && (
+                      <p><span className="font-semibold text-gray-400">Indicator:</span> {item.performance_indicator}</p>
+                    )}
+                    {item.target && (
+                      <p><span className="font-semibold text-gray-400">Target:</span> {item.target}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 pt-2.5 border-t border-gray-100">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">PS</span>
+                    <span className="text-[12px] font-mono font-semibold text-gray-700">{fmtAmount(item.ps_amount)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">MOOE</span>
+                    <span className="text-[12px] font-mono font-semibold text-gray-700">{fmtAmount(item.mooe_amount)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">CO</span>
+                    <span className="text-[12px] font-mono font-semibold text-gray-700">{fmtAmount(item.co_amount)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Total</span>
+                  <span className="text-[14px] font-mono font-bold text-gray-900">{fmtAmount(item.total_amount)}</span>
+                </div>
+              </div>
+            ))
+          )}
+
+          {items.length > 0 && (
+            <div className="bg-gray-900 text-white rounded-xl px-4 py-4 mt-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Total Appropriations</p>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-wide text-gray-500">PS</span>
+                  <span className="text-[13px] font-mono font-semibold">{fmtCurrency(totals.ps)}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-wide text-gray-500">MOOE</span>
+                  <span className="text-[13px] font-mono font-semibold">{fmtCurrency(totals.mooe)}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-wide text-gray-500">CO</span>
+                  <span className="text-[13px] font-mono font-semibold">{fmtCurrency(totals.co)}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">Grand Total</span>
+                <span className="text-[18px] font-mono font-bold text-orange-300">{fmtCurrency(totals.total)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-[12px] border-collapse" style={{ minWidth: 1100 }}>
           <thead>
@@ -770,6 +883,7 @@ const handleDeleteRequest = async (itemId: number) => {
           </tfoot>
         </table>
       </div>
+      )}
 
       {/* ── Context Menu — portaled to <body> so it isn't affected by
              transformed/overflow ancestors (e.g. the panel entrance animation) ── */}

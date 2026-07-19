@@ -4,6 +4,7 @@ import API from '../../services/api';
 import { LoadingState } from '../../components/states/LoadingState';
 import { DepartmentBudgetPlan } from '../../types/api';
 import { cn } from '@/src/lib/utils';
+import { useIsMobile } from '../../hooks/use-mobile';
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 
@@ -74,8 +75,8 @@ const parseRow = (item: any): SnapshotRow => ({
 
 // ─── Shared cell classes ──────────────────────────────────────────────────────
 
-const TH_BASE = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wide border-b border-gray-200';
-const TH_GRAY = cn(TH_BASE, 'bg-white text-gray-500 text-center');
+const TH_BASE = 'px-3 py-2 text-sm font-medium text-muted-foreground border-b border-gray-200';
+const TH_GRAY = cn(TH_BASE, 'bg-white text-center');
 const TH_PREV = cn(TH_BASE, 'text-center border-b', C_PREV_TH);
 const TH_CURR = cn(TH_BASE, 'text-center border-b', C_CURR_TH);
 
@@ -109,9 +110,32 @@ type MergedRow = {
   extensionDeptId: number | null;
 };
 
+// ─── Private data badges ──────────────────────────────────────────────────────
+
+const PrivateBadge: React.FC = () => (
+  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+    <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 12 12">
+      <rect x="2.5" y="5.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M4 5.5V3.8a2 2 0 0 1 4 0v1.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+    Private Data
+  </span>
+);
+
+const PrivateBadgeDark: React.FC = () => (
+  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-300 bg-amber-950/40 border border-amber-800/40 rounded px-1.5 py-0.5">
+    <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 12 12">
+      <rect x="2.5" y="5.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M4 5.5V3.8a2 2 0 0 1 4 0v1.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+    Private
+  </span>
+);
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Form3: React.FC<Form3Props> = ({ plan, pastYearPlan, isEditable, isAdmin }) => {
+  const isMobile = useIsMobile();
   const currentYear  = plan.budget_plan?.year          ?? plan.budget_plan_id;
   const previousYear = pastYearPlan?.budget_plan?.year ?? pastYearPlan?.budget_plan_id ?? 'Previous';
 
@@ -291,6 +315,119 @@ const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
           </h3>
         </div>
 
+        {isMobile ? (
+          <div className="p-3 flex flex-col gap-2.5">
+            {rows.length === 0 ? (
+              <p className="py-10 text-center text-gray-400 text-sm">
+                No plantilla assignments for this department.
+              </p>
+            ) : (() => {
+              let lastExtId: number | null | undefined = undefined;
+              return rows.map((row, idx) => {
+                const extId = row.extensionDeptId;
+                const showHeader = extId !== null && extId !== lastExtId;
+                lastExtId = extId;
+                return (
+                  <React.Fragment key={idx}>
+                    {showHeader && (
+                      <div className="px-1 pt-2 pb-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                          {EXTENSION_DEPT_NAMES[extId!] ?? `Extension Group ${extId}`}
+                        </span>
+                      </div>
+                    )}
+                    <div className="bg-white border border-gray-200 rounded-xl px-3.5 py-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-gray-800 leading-snug">
+                            {row.positionTitle}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                            Old {row.oldItem} · New {row.newItem}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mb-2.5">
+                        <span className={cn(
+                          'text-[12px]',
+                          row.incumbentName === 'Vacant' ? 'text-gray-400 italic' : 'text-gray-700 font-medium',
+                        )}>
+                          {row.incumbentName}
+                        </span>
+                        {row.currStepUpDate && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-fit mt-1 ml-2">
+                            Effective {fmtDate(row.currStepUpDate)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex flex-col rounded-lg bg-blue-50/40 border border-blue-100 px-2.5 py-2">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-blue-400">
+                            {previousYear} · G{row.pastGrade ?? '–'} / S{row.pastStep ?? '–'}
+                          </span>
+                          {isAdmin ? (
+                            <span className="text-[13px] font-mono font-bold text-blue-700 mt-0.5">
+                              {row.pastAnnual === 0 ? '–' : fmtCurrency(row.pastAnnual)}
+                            </span>
+                          ) : (
+                            <div className="mt-1"><PrivateBadge /></div>
+                          )}
+                        </div>
+                        <div className="flex flex-col rounded-lg bg-orange-50/40 border border-orange-100 px-2.5 py-2">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-orange-400">
+                            {currentYear} · G{row.currGrade ?? '–'} / S{row.currStep ?? '–'}
+                          </span>
+                          {isAdmin ? (
+                            <span className="text-[13px] font-mono font-bold text-orange-700 mt-0.5">
+                              {fmtCurrency(row.currAnnual)}
+                            </span>
+                          ) : (
+                            <div className="mt-1"><PrivateBadge /></div>
+                          )}
+                        </div>
+                      </div>
+
+                      {isAdmin && (
+                        <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                            Inc / Dec
+                          </span>
+                          <span className={cn(
+                            'text-[13px] font-mono font-bold',
+                            row.diff >= 0 ? 'text-emerald-600' : 'text-red-500',
+                          )}>
+                            {fmtCurrency(row.diff)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </React.Fragment>
+                );
+              });
+            })()}
+
+            {rows.length > 0 && (
+              <div className="bg-gray-900 text-white rounded-xl px-4 py-4 mt-1 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-300">Total</p>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-gray-400">
+                    {previousYear}: {isAdmin ? fmtCurrency(totalPastAnnual) : '—'}
+                  </span>
+                  <span className="text-[18px] font-mono font-bold text-orange-300">
+                    {isAdmin ? fmtCurrency(totalCurrAnnual) : '—'}
+                  </span>
+                  {isAdmin && (
+                    <span className={cn('text-[11px] font-mono font-semibold', totalDiff >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {totalDiff >= 0 ? '+' : ''}{fmtCurrency(totalDiff)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[12px] border-collapse" style={{ minWidth: 900 }}>
             <thead>
@@ -310,11 +447,11 @@ const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
                 <th className={cn(TH_GRAY, 'border-r border-gray-200')}>Old</th>
                 <th className={cn(TH_GRAY, 'border-r border-gray-200')}>New</th>
                 <th className={cn(TH_PREV, 'border-l border-blue-200')}>Grade / Step</th>
-                <th className={TH_PREV}>Rate / Month</th>
-                <th className={cn(TH_PREV, 'border-r border-blue-200')}>Rate / Annum</th>
+                <th className={TH_PREV}>{isAdmin ? 'Rate / Month' : 'Private'}</th>
+                <th className={cn(TH_PREV, 'border-r border-blue-200')}>{isAdmin ? 'Rate / Annum' : 'Data'}</th>
                 <th className={cn(TH_CURR, 'border-l border-orange-200')}>Grade / Step</th>
-                <th className={TH_CURR}>Rate / Month</th>
-                <th className={cn(TH_CURR, 'border-r border-orange-200')}>Rate / Annum</th>
+                <th className={TH_CURR}>{isAdmin ? 'Rate / Month' : 'Private'}</th>
+                <th className={cn(TH_CURR, 'border-r border-orange-200')}>{isAdmin ? 'Rate / Annum' : 'Data'}</th>
               </tr>
             </thead>
 
@@ -372,8 +509,16 @@ const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
                         </div>
                       ) : '–'}
                     </td>
-                    <td className={TD_PREV_NUM}>{row.pastMonthly === 0 ? '–' : fmtCurrency(row.pastMonthly)}</td>
-                    <td className={cn(TD_PREV_NUM, 'border-r border-blue-100')}>{row.pastAnnual === 0 ? '–' : fmtCurrency(row.pastAnnual)}</td>
+                    <td className={TD_PREV_NUM}>
+                      {isAdmin
+                        ? (row.pastMonthly === 0 ? '–' : fmtCurrency(row.pastMonthly))
+                        : <PrivateBadge />}
+                    </td>
+                    <td className={cn(TD_PREV_NUM, 'border-r border-blue-100')}>
+                      {isAdmin
+                        ? (row.pastAnnual === 0 ? '–' : fmtCurrency(row.pastAnnual))
+                        : <PrivateBadge />}
+                    </td>
 
                     {/* Current — orange */}
                     <td className={cn(TD_CURR_CTR, 'border-l')}>
@@ -384,24 +529,32 @@ const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
                         </div>
                       ) : '–'}
                     </td>
-                    <td className={TD_CURR_NUM}>{row.currMonthly === 0 ? '–' : fmtCurrency(row.currMonthly)}</td>
-
-                    <td className={cn(TD_CURR_NUM, 'border-r border-orange-100')}>
-                      <div className="flex flex-col gap-0.5 items-end">
-                        <span>{fmtCurrency(row.currAnnual)}</span>
-                        {row.annualIncrement !== null && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold leading-none">
-                            <svg className="w-2 h-2 shrink-0" fill="none" viewBox="0 0 10 10">
-                              <path d="M5 1.5v7M2 4l3-2.5L8 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            {fmtCurrency(row.annualIncrement)}
-                          </span>
-                        )}
-                      </div>
+                    <td className={TD_CURR_NUM}>
+                      {isAdmin
+                        ? (row.currMonthly === 0 ? '–' : fmtCurrency(row.currMonthly))
+                        : <PrivateBadge />}
                     </td>
 
-                    <td className={cn(TD_BASE, 'font-mono tabular-nums text-right font-semibold', row.diff >= 0 ? 'text-emerald-600' : 'text-red-500')}>
-                      {fmtCurrency(row.diff)}
+                    <td className={cn(TD_CURR_NUM, 'border-r border-orange-100')}>
+                      {isAdmin ? (
+                        <div className="flex flex-col gap-0.5 items-end">
+                          <span>{fmtCurrency(row.currAnnual)}</span>
+                          {row.annualIncrement !== null && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold leading-none">
+                              <svg className="w-2 h-2 shrink-0" fill="none" viewBox="0 0 10 10">
+                                <path d="M5 1.5v7M2 4l3-2.5L8 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              {fmtCurrency(row.annualIncrement)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <PrivateBadge />
+                      )}
+                    </td>
+
+                    <td className={cn(TD_BASE, 'font-mono tabular-nums text-right font-semibold', isAdmin && (row.diff >= 0 ? 'text-emerald-600' : 'text-red-500'))}>
+                      {isAdmin ? fmtCurrency(row.diff) : <PrivateBadge />}
                     </td>
                       </tr>
                     </React.Fragment>
@@ -429,6 +582,7 @@ const proposedMap = new Map(currentRows.map(r => [r.plantilla_position_id, r]));
             </tfoot>
           </table>
         </div>
+        )}
 
         {/* Legend */}
         <div className="px-5 py-3 border-t border-gray-100 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">

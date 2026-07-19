@@ -191,37 +191,71 @@ class MdfItemController extends Controller
     }
 
     // PUT /api/mdf-items/{mdfItem}
-    public function update(Request $request, MdfItem $mdfItem): JsonResponse
-    {
-        if ($mdfItem->obligation_id) {
-            return response()->json(['message' => 'Debt rows are managed automatically.'], 422);
+    // public function update(Request $request, MdfItem $mdfItem): JsonResponse
+    // {
+    //     if ($mdfItem->obligation_id) {
+    //         return response()->json(['message' => 'Debt rows are managed automatically.'], 422);
+    //     }
+
+    //     $mdfItem->update($request->validate([
+    //         'name'         => 'sometimes|required|string|max:255',
+    //         'account_code' => 'nullable|string|max:50',
+    //         'sort_order'   => 'sometimes|integer',
+    //     ]));
+
+    //     return response()->json(['data' => $mdfItem]);
+    // }
+
+    // PUT /api/mdf-items/{mdfItem}
+public function update(Request $request, MdfItem $mdfItem): JsonResponse
+{
+    if ($mdfItem->obligation_id) {
+        return response()->json(['message' => 'Debt rows are managed automatically.'], 422);
+    }
+
+    $validated = $request->validate([
+        'name'         => 'sometimes|required|string|max:255',
+        'account_code' => 'nullable|string|max:50',
+        'sort_order'   => 'sometimes|integer',
+    ]);
+
+    // Guard: if the name is changing, make sure it doesn't collide with
+    // another item (case-insensitive, matches the DB's unique constraint).
+    if (isset($validated['name'])) {
+        $trimmed = trim($validated['name']);
+        $exists = MdfItem::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($trimmed)])
+            ->where('item_id', '!=', $mdfItem->item_id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'message' => "An item named \"{$trimmed}\" already exists. Please choose a different name.",
+            ], 422);
         }
 
-        $mdfItem->update($request->validate([
-            'name'         => 'sometimes|required|string|max:255',
-            'account_code' => 'nullable|string|max:50',
-            'sort_order'   => 'sometimes|integer',
-        ]));
-
-        return response()->json(['data' => $mdfItem]);
+        $validated['name'] = $trimmed;
     }
+
+    $mdfItem->update($validated);
+
+    return response()->json(['data' => $mdfItem]);
+}
 
     // DELETE /api/mdf-items/{mdfItem} — NOT USED for UI removal anymore
     // Kept only for true admin hard-delete if ever needed
     public function destroy(MdfItem $mdfItem): JsonResponse
-    {
-        if ($mdfItem->obligation_id) {
-            return response()->json(['message' => 'Debt rows cannot be deleted here.'], 422);
-        }
-
-        // Safety: only allow if no snapshots exist at all
-        if ($mdfItem->snapshots()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete an item that has snapshot data across budget plans. Remove it from each plan individually.',
-            ], 422);
-        }
-
-        $mdfItem->delete();
-        return response()->json(['message' => 'Item deleted.']);
+{
+    if ($mdfItem->obligation_id) {
+        return response()->json(['message' => 'Debt rows cannot be deleted here.'], 422);
     }
+
+    if ($mdfItem->snapshots()->exists()) {
+        return response()->json([
+            'message' => 'Cannot delete an item that has snapshot data across budget plans. Remove it from each plan individually.',
+        ], 422);
+    }
+
+    $mdfItem->delete(); // now a real DELETE, not soft
+    return response()->json(['message' => 'Item deleted.']);
+}
 }

@@ -21,6 +21,15 @@ export interface BudgetCallMemoFile {
 
 const buildUrl = (path: string) => (path.startsWith('http') ? path : `/storage/${path}`);
 
+// 1x1 transparent pixel. Pages inside HTMLFlipBook must ALWAYS render the
+// same <img> element — react-pageflip physically relocates each page's DOM
+// node for its flip animation, and swapping element types on a page it
+// already owns causes "removeChild: not a child of this node" crashes. So
+// the src just points here until the real rasterized image is ready; the
+// loading spinner is a separate overlay sibling, not a structural swap.
+const TRANSPARENT_PIXEL =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7';
+
 interface FlatPage { fileIndex: number; pageNumber: number; key: string; }
 interface Dims { width: number; height: number; }
 
@@ -139,7 +148,14 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
     return rasterFileCacheRef.current.get(fileId)!;
   };
 
-  const filesReady = files.length > 0 && Object.keys(numPagesByFile).length === files.length;
+  // Only the FIRST file needs to have finished loading (numPages known) before
+  // we start rasterizing/showing page 1 — waiting on EVERY file's hidden
+  // Document to finish parsing (the old behavior) was what made mobile — much
+  // slower per-file PDF.js parsing than desktop — take dramatically longer to
+  // show anything, even though only file 0 / page 1 is needed for first paint.
+  // Other files' pages simply appear in flatPages (and get rasterized) as
+  // their own numPages resolves, in the background.
+  const filesReady = files.length > 0 && numPagesByFile[0] !== undefined;
 
   const flatPages: FlatPage[] = useMemo(() => {
     const out: FlatPage[] = [];
@@ -152,7 +168,14 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
     return out;
   }, [files, numPagesByFile]);
 
-  const ready = filesReady && flatPages.length > 0 && flatPages.every(p => pageImages[p.key]);
+  // Two separate gates:
+  //  - `ready`: enough to show the book (just page 1) — keeps first paint fast,
+  //    especially on mobile where waiting for high-DPI rasterization of EVERY
+  //    page up front was the actual cause of the long "Loading pages…" wait.
+  //  - `allRasterized`: everything is done — controls when we stop mounting the
+  //    hidden rasterizer <Document> instances.
+  const allRasterized = flatPages.length > 0 && flatPages.every(p => pageImages[p.key]);
+  const ready = filesReady && flatPages.length > 0 && !!pageImages[flatPages[0]?.key];
 
   const handlePageRenderSuccess = useCallback((key: string) => () => {
     const canvas = canvasRefs.current[key];
@@ -180,44 +203,69 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
     if (!el) return;
 
     let raf = 0;
-    const recompute = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const containerW = rect.width;
-        let containerH = rect.height;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-        // On phones, always trust the visual viewport over the measured
-        // rect. Flex-chain layouts under mobile Safari's dynamic toolbar
-        // frequently under-report height, which is why the book was
-        // rendering small with empty space below it.
-        if (isMobile) {
-          const vh = window.visualViewport?.height ?? window.innerHeight;
-          containerH = Math.max(containerH, vh - rect.top - 16);
-        }
+    // Mobile Safari's address bar collapsing/expanding while the page settles
+    // fires visualViewport 'resize' repeatedly. Each firing used to recompute
+    // dims immediately, and because <HTMLFlipBook> below is force-remounted
+    // whenever dims changes (it's keyed by `${dims.width}x${dims.height}`
+    // since the library doesn't react to width/height prop changes on its
+    // own), that meant remounting it several times in a row during load.
+    // react-pageflip physically relocates page DOM nodes for its flip
+    // animation, so yanking it out mid-relocation is what threw "removeChild:
+    // not a child of this node" — which then triggered React's error-boundary
+    // retry loop ("Maximum update depth exceeded") right behind it.
+    // Debouncing lets the viewport settle to ONE final value before we ever
+    // touch dims / remount the book.
+    const doRecompute = () => {
+      const rect = el.getBoundingClientRect();
+      const containerW = rect.width;
+      let containerH = rect.height;
 
-        if (containerW < 10 || containerH < 10) return;
+      if (isMobile) {
+        const vh = window.visualViewport?.height ?? window.innerHeight;
+        containerH = Math.max(containerH, vh - rect.top - 16);
+      }
 
-        const numVisible = containerW < 640 ? 1 : 2;
-        const perPageW = containerW / numVisible;
-        const next = fitContain(perPageW, containerH, pageAspect);
+      if (containerW < 10 || containerH < 10) return;
 
-        setDims(prev => {
-          if (Math.abs(prev.width - next.width) < 8 && Math.abs(prev.height - next.height) < 8) return prev;
-          return next;
-        });
+      const numVisible = containerW < 640 ? 1 : 2;
+      const perPageW = containerW / numVisible;
+      const next = fitContain(perPageW, containerH, pageAspect);
+
+      // Wider snap tolerance on mobile absorbs the small back-and-forth
+      // jitter from the address bar, so it doesn't read as a "real" size
+      // change and force another remount.
+      const threshold = isMobile ? 24 : 8;
+      setDims(prev => {
+        if (Math.abs(prev.width - next.width) < threshold && Math.abs(prev.height - next.height) < threshold) return prev;
+        return next;
       });
     };
 
-    recompute();
-    window.addEventListener('resize', recompute);
-    window.addEventListener('orientationchange', recompute);
-    window.visualViewport?.addEventListener('resize', recompute);
+    const recompute = (immediate = false) => {
+      cancelAnimationFrame(raf);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (immediate) {
+        raf = requestAnimationFrame(doRecompute);
+      } else {
+        debounceTimer = setTimeout(() => {
+          raf = requestAnimationFrame(doRecompute);
+        }, 150);
+      }
+    };
+
+    recompute(true);
+    const onResize = () => recompute(false);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener('resize', recompute);
-      window.removeEventListener('orientationchange', recompute);
-      window.visualViewport?.removeEventListener('resize', recompute);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
     };
   }, [pageAspect, isMobile]);
 
@@ -254,7 +302,14 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
     );
   }
 
-  const rasterWidth = Math.round(dims.width * rasterScale);
+  // Cap the raster width outright. Without this, mobile — which shows a
+  // single full-width page (vs desktop's half-width two-page spread) at a
+  // typically higher devicePixelRatio (2-3 vs desktop's often-clamped 1.5) —
+  // was rasterizing page 1 at several times the pixel count of desktop,
+  // directly slowing the canvas render + toDataURL() that gates first paint.
+  // 1600px is comfortably sharp on any phone or laptop screen at this UI's
+  // page sizes; there's no visible quality loss from capping it here.
+  const rasterWidth = Math.min(Math.round(dims.width * rasterScale), 1600);
 
   const bookNode = (
     <div className="relative w-full h-full flex flex-col items-center">
@@ -285,7 +340,7 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
       </div>
 
       {/* Hidden rasterizers: render every page once off-screen at high-DPI, capture to <img> */}
-      {filesReady && !ready && dims.width > 0 && (
+      {filesReady && !allRasterized && dims.width > 0 && (
         <div className="hidden">
           {files.map((f, fileIndex) => {
             const buf = pdfBuffers[fileIndex];
@@ -352,13 +407,14 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
                   key={p.key}
                   className="pf-page bg-white"
                   style={{
+                    position: 'relative',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     WebkitBackfaceVisibility: 'hidden',
                     backfaceVisibility: 'hidden',
                   }}
                 >
                   <img
-                    src={pageImages[p.key]}
+                    src={pageImages[p.key] || TRANSPARENT_PIXEL}
                     alt={`Page ${idx + 1}`}
                     style={{
                       width: '100%',
@@ -370,6 +426,14 @@ export const PdfFlipViewer: React.FC<PdfFlipViewerProps> = ({ files, expanded = 
                     }}
                     draggable={false}
                   />
+                  {!pageImages[p.key] && (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center bg-gray-50"
+                      style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
+                    >
+                      <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                    </div>
+                  )}
                 </div>
               ))}
             </HTMLFlipBook>

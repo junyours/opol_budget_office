@@ -26,7 +26,7 @@ interface MemoFile {
 
 const ItemTypes = { ROW: 'memo_row' };
 
-const DELETE_GRACE_MS = 8000;
+const DELETE_GRACE_MS = 5000;
 const PENDING_DELETE_PREFIX = 'pending_delete_budget_call_memo_';
 const pendingDeleteKey = (id: number) => `${PENDING_DELETE_PREFIX}${id}`;
 
@@ -78,7 +78,7 @@ const CountdownRing: React.FC<{ durationMs: number }> = ({ durationMs }) => {
   }, [totalSeconds]);
 
   return (
-    <span ref={spanRef} className="flex-shrink-0 w-5 text-center text-lg font-bold tabular-nums leading-none text-red-700">
+    <span ref={spanRef} className="flex-shrink-0 w-5 text-center text-lg font-bold tabular-nums leading-none text-gray-700">
       {secondsLeft}
     </span>
   );
@@ -89,10 +89,6 @@ if (typeof document !== 'undefined' && !document.getElementById('delete-toast-sh
   const styleTag = document.createElement('style');
   styleTag.id = 'delete-toast-shine-style';
   styleTag.textContent = `
-    .delete-toast-red {
-      background: #fef2f2 !important;
-      border: 1px solid #fecaca !important;
-    }
     @keyframes stagedFileAbsorb {
       0%   { transform: scale(1); opacity: 1; max-height: 80px; margin-bottom: 8px; }
       60%  { transform: scale(0.85); opacity: 0.4; }
@@ -456,6 +452,30 @@ const BudgetCallMemoAdminPage: React.FC = () => {
     [files]
   );
 
+  // Flags any staged file whose name already exists in the target year —
+  // either already uploaded, or duplicated among the currently staged files.
+  const duplicateStagedIds = useMemo(() => {
+    const dup = new Set<string>();
+    if (!selectedYear) return dup;
+    const yearNum = Number(selectedYear);
+    const existingNames = new Set(
+      files.filter(f => f.year === yearNum).map(f => f.original_filename.toLowerCase())
+    );
+    const seenNames = new Set<string>();
+    // Only pending files are still "choices" the user can act on — a file
+    // that's uploading/done/removing has already been submitted, so it
+    // shouldn't be re-flagged as a duplicate of the very row it just became
+    // once the list refetches mid-fade-out.
+    stagedFiles.filter(sf => sf.status === 'pending').forEach(sf => {
+      const name = sf.file.name.toLowerCase();
+      if (existingNames.has(name) || seenNames.has(name)) {
+        dup.add(sf.id);
+      }
+      seenNames.add(name);
+    });
+    return dup;
+  }, [stagedFiles, files, selectedYear]);
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['budget-call-memos-all'] });
     qc.invalidateQueries({ queryKey: ['budget-call-memos-current'] });
@@ -586,11 +606,9 @@ const BudgetCallMemoAdminPage: React.FC = () => {
       description: `FY ${file.year} · Cannot be undone`,
       duration: durationMs,
       icon: <CountdownRing durationMs={durationMs} />,
-      className: 'delete-toast-red',
       classNames: {
         title: '!text-red-900',
-        description: '!text-red-500',
-        actionButton: '!bg-red-600 hover:!bg-red-700 !text-white',
+        description: '!text-red-600',
       },
       action: {
         label: 'Undo',
@@ -740,11 +758,14 @@ const BudgetCallMemoAdminPage: React.FC = () => {
               <div className="mt-3">
                 <RateLimitBanner />
                 <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 -mr-1">
-                {stagedFiles.map(sf => (
+                {stagedFiles.map(sf => {
+                  const isDuplicate = duplicateStagedIds.has(sf.id);
+                  return (
                   <div
                     key={sf.id}
                     className={cn(
-                      'rounded-lg border border-gray-200 bg-gray-50/60 px-3 py-2.5',
+                      'rounded-lg border px-3 py-2.5',
+                      isDuplicate ? 'border-amber-300 bg-amber-50/60' : 'border-gray-200 bg-gray-50/60',
                       sf.removing && 'staged-file-absorb'
                     )}
                   >
@@ -755,6 +776,11 @@ const BudgetCallMemoAdminPage: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <p className="text-[12px] font-medium text-gray-800 truncate">{sf.file.name}</p>
                         <p className="text-[10.5px] text-gray-400">{formatBytes(sf.file.size)}</p>
+                        {isDuplicate && (
+                          <p className="text-[10.5px] text-amber-600 font-medium mt-0.5">
+                            Duplicate — already exists in FY {selectedYear}
+                          </p>
+                        )}
                       </div>
                       {sf.status === 'done' ? (
                         <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -781,7 +807,8 @@ const BudgetCallMemoAdminPage: React.FC = () => {
                       <p className="text-[10.5px] text-red-500 mt-1.5">{sf.error}</p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">

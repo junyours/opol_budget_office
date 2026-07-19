@@ -194,6 +194,18 @@ const MainLayout: React.FC = () => {
       .catch(() => setDepartment(null));
   }, [user?.dept_id]);
 
+  // ── Maintenance mode indicator ──────────────────────────────────────────────
+  // Reaching any authenticated page while maintenance is on almost always means
+  // the viewer is a super-admin (everyone else gets bounced at login), so this
+  // is a persistent reminder in the header rather than a gate.
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  useEffect(() => {
+    API.get('/maintenance/status')
+      .then(({ data }) => setMaintenanceMode(!!data?.maintenance_mode))
+      .catch(() => {});
+  }, []);
+
   // Initials for avatar fallback
   const deptInitials = department?.name
     ? department.name.slice(0, 2).toUpperCase()
@@ -203,10 +215,10 @@ const MainLayout: React.FC = () => {
     <SidebarProvider>
       <AppSidebar />
 
-      <SidebarInset className="min-w-0 overflow-x-hidden">
+      <SidebarInset className="min-w-0 h-[100dvh] max-h-[100dvh] overflow-x-hidden overflow-y-hidden flex flex-col">
 
         {/* ── Top Header Bar ──────────────────────────────────────────── */}
-        <header className="sticky top-0 z-20 grid grid-cols-[1fr_auto_1fr] items-center gap-3 h-12 border-b border-zinc-200 bg-white px-4">
+        <header className="sticky top-0 z-20 shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-3 h-12 border-b border-zinc-200 bg-white px-4">
 
           {/* LEFT: sidebar toggle + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
@@ -224,6 +236,15 @@ const MainLayout: React.FC = () => {
 
           {/* RIGHT: department pill + notifications */}
           <div className="flex items-center justify-end gap-2.5">
+            {maintenanceMode && (
+              <div className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 flex-shrink-0">
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                </span>
+                <span className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">System Maintenance Mode</span>
+              </div>
+            )}
             {department && (
               <div className="flex items-center gap-2 flex-shrink-0 pr-2.5 mr-0.5 border-r border-zinc-200 h-6">
                 {department.logo ? (
@@ -249,7 +270,7 @@ const MainLayout: React.FC = () => {
         </header>
 
         {/* ── Page Content ────────────────────────────────────────────── */}
-        <main className="relative flex-1 min-w-0 overflow-x-auto bg-gray-50">
+        <main className="relative flex-1 min-w-0 min-h-0 overflow-hidden bg-gray-50 flex flex-col" style={{ overscrollBehavior: "contain" }}>
 
           {/* Watermark logo — behind content */}
           {/* <div
@@ -264,7 +285,7 @@ const MainLayout: React.FC = () => {
           </div> */}
 
           {/* Routed page */}
-          <div className="relative z-10">
+          <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
             <Outlet />
           </div>
 

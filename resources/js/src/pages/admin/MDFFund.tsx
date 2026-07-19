@@ -7,21 +7,22 @@ import { Input } from "@/src/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/src/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/src/components/ui/alert-dialog";
+// import {
+//   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+//   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+// } from "@/src/components/ui/alert-dialog";
 import { Badge } from "@/src/components/ui/badge";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import {
-  PlusIcon, TrashIcon, MagnifyingGlassIcon,
+  PlusIcon, TrashIcon, MagnifyingGlassIcon, PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { MAX_AMOUNT, parseMoney, sanitizeMoneyDigits, useCaretRestore } from "@/src/utils/moneyInput";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,52 @@ const C_BUDG_TD  = "bg-orange-50/30 border-orange-100";
 const C_BUDG_SUB = "bg-orange-50 border-orange-200";
 const C_BUDG_GT  = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 
+// ─── Optimistic delete (undo window) — mirrors Form2's pattern ────────────────
+const DELETE_GRACE_MS = 5000;
+const MDF_PENDING_DELETE_PREFIX = "pending_delete_mdf_item_";
+const mdfPendingDeleteKey = (planId: number, itemId: number) =>
+  `${MDF_PENDING_DELETE_PREFIX}${planId}_${itemId}`;
+
+// ─── Countdown number for the delete-undo toast ────────────────────────────
+const CountdownRing: React.FC<{ durationMs: number }> = ({ durationMs }) => {
+  const totalSeconds = Math.ceil(durationMs / 1000);
+  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const pausedRef = useRef(false);
+  const elapsedRef = useRef(0);
+  const lastTickRef = useRef(Date.now());
+
+  useEffect(() => {
+    const toastEl = spanRef.current?.closest('[data-sonner-toast]');
+    const onEnter = () => { pausedRef.current = true; };
+    const onLeave = () => { pausedRef.current = false; lastTickRef.current = Date.now(); };
+    toastEl?.addEventListener('mouseenter', onEnter);
+    toastEl?.addEventListener('mouseleave', onLeave);
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const delta = now - lastTickRef.current;
+      lastTickRef.current = now;
+      if (!pausedRef.current) {
+        elapsedRef.current += delta;
+        setSecondsLeft(Math.max(0, totalSeconds - Math.floor(elapsedRef.current / 1000)));
+      }
+    }, 200);
+
+    return () => {
+      clearInterval(interval);
+      toastEl?.removeEventListener('mouseenter', onEnter);
+      toastEl?.removeEventListener('mouseleave', onLeave);
+    };
+  }, [totalSeconds]);
+
+  return (
+    <span ref={spanRef} className="flex-shrink-0 w-5 text-center text-lg font-bold tabular-nums leading-none text-gray-700">
+      {secondsLeft}
+    </span>
+  );
+};
+
 // ─── Number helpers ───────────────────────────────────────────────────────────
 
 // const enPH = (v: number) =>
@@ -170,12 +217,14 @@ interface AmountInputProps {
   onBlur: () => void;
   colorClass?: string;
   placeholder?: string;
+  inputRef?: (el: HTMLInputElement | null) => void;
 }
 
 function AmountInput({
   value, disabled, readOnly, onChange, onBlur,
   colorClass = "focus:ring-gray-400 focus:border-gray-400",
   placeholder = "0",
+  inputRef,
 }: AmountInputProps) {
   const [focused, setFocused] = useState(false);
   const [draft,   setDraft]   = useState(value);
@@ -197,6 +246,7 @@ function AmountInput({
 
   return (
     <input type="text" inputMode="numeric"
+      ref={inputRef}
       value={focused ? draft : value}
       placeholder={placeholder}
       onFocus={() => { setFocused(true); atFocus.current = parseNum(value); setDraft(value.replace(/,/g, "")); }}
@@ -222,6 +272,142 @@ function AmountInput({
         "placeholder:text-gray-300 transition-colors"
       )}
     />
+  );
+}
+
+// ─── Mobile item card ─────────────────────────────────────────────────────────
+
+interface MobileItemCardProps {
+  item: MdfItem;
+  years: MdfYears | null;
+  pastPlanMissing: boolean;
+  isViewer: boolean;
+  isNew: boolean;
+  oblStr: string; sem1Str: string; propStr: string;
+  liveSem2: number;
+  onObligationChange: (v: string) => void;
+  onObligationBlur: () => void;
+  onSem1Change: (v: string) => void;
+  onSem1Blur: () => void;
+  onProposedChange: (v: string) => void;
+  onProposedBlur: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  proposedInputRef?: (el: HTMLInputElement | null) => void;
+}
+
+function MobileItemCard({
+  item, years, pastPlanMissing, isViewer, isNew,
+  oblStr, sem1Str, propStr, liveSem2,
+  onObligationChange, onObligationBlur,
+  onSem1Change, onSem1Blur,
+  onProposedChange, onProposedBlur,
+  onEdit, onDelete, proposedInputRef,
+}: MobileItemCardProps) {
+  const isDebt = item.is_debt_row;
+  const oblEditable = !pastPlanMissing && !isViewer;
+  const sem1Editable = (isDebt ? !!years?.current_plan_id : item.has_prior_data) && !isViewer;
+  const rowEditable = !item.obligation_id && !isViewer;
+
+  const label = item.obligation_id
+    ? item.debt_type === "principal"
+      ? `${item.name.replace(" - Principal", "")} – Principal`
+      : "– Interest"
+    : item.name;
+
+  return (
+    <div className={cn(
+      "rounded-lg border px-3 py-2.5",
+      isNew ? "bg-emerald-50 border-emerald-300" : "bg-white border-gray-100",
+    )}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className={cn(
+            "text-[12px] leading-snug",
+            item.debt_type === "interest" ? "text-gray-400 italic" : "font-medium text-gray-800",
+          )}>
+            {label}
+          </p>
+          {item.account_code && <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.account_code}</p>}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isNew && (
+            <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">New</span>
+          )}
+          {item.obligation_id && (
+            <Badge variant="outline" className="text-[9px] border-blue-200 text-blue-600 bg-blue-50 px-1 py-0">auto</Badge>
+          )}
+          {rowEditable && (
+            <button onClick={onEdit} className="p-1 text-gray-300 hover:text-gray-600">
+              <PencilSquareIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {rowEditable && (
+            <button onClick={onDelete} className="p-1 text-gray-300 hover:text-red-500">
+              <TrashIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {/* Past obligation */}
+        <div className={cn("rounded-md border px-2 py-1.5", C_PAST_TD)}>
+          <p className="text-[9px] text-green-700/70 mb-1">Past Obligation ({years?.past ?? "–"})</p>
+          {oblEditable ? (
+            <AmountInput value={oblStr} colorClass="focus:ring-green-300 focus:border-green-300" onChange={onObligationChange} onBlur={onObligationBlur} />
+          ) : (
+            <span className={cn("block text-right text-[12px] font-mono px-2 py-1.5 tabular-nums", pastPlanMissing ? "text-gray-300" : "text-gray-500")}>
+              {oblStr ? enPH(parseNum(oblStr)) : "–"}
+            </span>
+          )}
+        </div>
+
+        {/* Proposed */}
+        <div className={cn("rounded-md border px-2 py-1.5", C_BUDG_TD)}>
+          <p className="text-[9px] text-orange-700/70 mb-1">Budget Yr ({years?.proposed ?? "–"})</p>
+          {isDebt || isViewer ? (
+            <span className="block text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">{fmt(item.proposed)}</span>
+          ) : (
+            <AmountInput
+              value={propStr}
+              colorClass="focus:ring-orange-300 focus:border-orange-300"
+              onChange={onProposedChange}
+              onBlur={onProposedBlur}
+              inputRef={proposedInputRef}
+            />
+          )}
+        </div>
+
+        {/* Sem 1 */}
+        <div className={cn("rounded-md border px-2 py-1.5", C_CURR_TD)}>
+          <p className="text-[9px] text-blue-700/70 mb-1">1st Sem</p>
+          {sem1Editable ? (
+            <AmountInput value={sem1Str} colorClass="focus:ring-blue-300 focus:border-blue-300" onChange={onSem1Change} onBlur={onSem1Blur} />
+          ) : (
+            <span className="block text-right text-[12px] font-mono px-2 py-1.5 text-gray-400 tabular-nums">
+              {sem1Str ? enPH(parseNum(sem1Str)) : "–"}
+            </span>
+          )}
+        </div>
+
+        {/* Sem 2 (computed) */}
+        <div className={cn("rounded-md border px-2 py-1.5", C_CURR_TD)}>
+          <p className="text-[9px] text-blue-700/70 mb-1">2nd Sem (auto)</p>
+          <span className="block text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">
+            {!item.has_prior_data && !isDebt ? "–" : fmt(liveSem2)}
+          </span>
+        </div>
+
+        {/* Current total — spans full width */}
+        <div className="col-span-2 flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+          <span className="text-[9px] text-gray-500">Current Total ({years?.current ?? "–"})</span>
+          <span className="text-[12px] font-mono text-gray-600 tabular-nums">
+            {!item.has_prior_data && !isDebt ? "–" : fmt(item.cur_total)}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -272,6 +458,32 @@ function MdfTableSkeleton() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function MobileSubtotalCard({ totals }: { totals: MdfCategoryTotals }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2.5">
+      <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Subtotal</p>
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div className={cn("rounded-md border px-2 py-1", C_PAST_SUB)}>
+          <p className="text-[9px] text-green-700/70">Past Obligation</p>
+          <p className="font-mono font-semibold text-right text-gray-700">{fmt(totals.past_obligation)}</p>
+        </div>
+        <div className={cn("rounded-md border px-2 py-1", C_BUDG_SUB)}>
+          <p className="text-[9px] text-orange-700/70">Budget Year</p>
+          <p className="font-mono font-semibold text-right text-gray-700">{fmt(totals.proposed)}</p>
+        </div>
+        <div className={cn("rounded-md border px-2 py-1", C_CURR_SUB)}>
+          <p className="text-[9px] text-blue-700/70">Sem 1 + Sem 2</p>
+          <p className="font-mono font-semibold text-right text-gray-700">{fmt(totals.cur_sem1)} + {fmt(totals.cur_sem2)}</p>
+        </div>
+        <div className={cn("rounded-md border px-2 py-1", C_CURR_SUB)}>
+          <p className="text-[9px] text-blue-700/70">Current Total</p>
+          <p className="font-mono font-semibold text-right text-gray-700">{fmt(totals.cur_total)}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -516,9 +728,83 @@ function AddItemDialog({
   );
 }
 
+// ─── Edit-Item Dialog (name / account code only — amounts untouched) ──────────
+
+interface EditItemDialogProps {
+  item: MdfItem | null;
+  onClose: () => void;
+  onSaved: (item: MdfItem) => void;
+}
+
+function EditItemDialog({ item, onClose, onSaved }: EditItemDialogProps) {
+  const [name,   setName]   = useState("");
+  const [code,   setCode]   = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setName(item.name);
+      setCode(item.account_code ?? "");
+    }
+  }, [item]);
+
+  const handleSave = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || !item) return;
+    setSaving(true);
+    try {
+      const res = await API.put<{ data: MdfItem }>(`/mdf-items/${item.item_id}`, {
+        name: trimmed,
+        account_code: code.trim() || null,
+      });
+      toast.success("Item updated.");
+      onSaved(res.data.data);
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Failed to update item.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!item} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden" aria-describedby={undefined}>
+        <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
+          <DialogTitle className="text-[15px] font-semibold text-gray-900">Edit Line Item</DialogTitle>
+          <p className="text-xs text-gray-400 mt-0.5">Amounts are unaffected — only name and account code change.</p>
+        </DialogHeader>
+        <div className="px-6 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-600 block">Item Name <span className="text-red-400">*</span></label>
+            <Input value={name} onChange={e => setName(e.target.value)}
+              placeholder="e.g. Land Banking / Land Acquisition Program"
+              className="h-9 text-sm" autoFocus
+              onKeyDown={e => e.key === "Enter" && name.trim() && handleSave()} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-600 block">Account Code <span className="font-normal text-gray-400">(optional)</span></label>
+            <Input value={code} onChange={e => setCode(e.target.value)} placeholder="e.g. 8-01-01" className="h-9 text-sm" />
+          </div>
+        </div>
+        <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}
+            className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800 disabled:opacity-50">
+            {saving
+              ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</>
+              : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MDFFund() {
+  const isMobile = useIsMobile();
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 const { user } = useAuth();
 const isViewer = user?.role === "viewer";
@@ -551,8 +837,20 @@ const isViewer = user?.role === "viewer";
   useEffect(() => { yearsRef.current      = years;           }, [years]);
 
   const [addDialog,    setAddDialog]    = useState<{ open: boolean; categoryId: number; categoryName: string } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MdfItem | null>(null);
-  const [deleting,     setDeleting]     = useState(false);
+
+  // ── Row click → edit context menu (mirrors AipProgramsTab pattern) ────────
+  const [ctxMenu, setCtxMenu]   = useState<{ x: number; y: number; item: MdfItem } | null>(null);
+  const ctxRef                  = useRef<HTMLDivElement>(null);
+  const [editTarget, setEditTarget] = useState<MdfItem | null>(null);
+
+  // ── "New item" highlight: badge + autofocus on the item just added ────────
+  const [newlyAddedItemId, setNewlyAddedItemId] = useState<number | null>(null);
+  const proposedInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
+  // ── Optimistic delete (undo window) — mirrors Form2's pattern ─────────────
+  const undoneDeleteIdsRef = useRef<Set<number>>(new Set());
+  const pendingDeleteItemsRef = useRef<Map<number, MdfItem>>(new Map());
+  const hasReconciledMdfDeletes = useRef(false);
 
   const activePlanId = activePlan?.budget_plan_id ?? null;
   const budgetYear   = activePlan?.year ?? new Date().getFullYear();
@@ -607,7 +905,7 @@ const isViewer = user?.role === "viewer";
       if (mdf.past_plan_missing) {
         toast.warning(
           `Budget plan for ${mdf.years.past} does not exist. Create it first to enable past year obligation amount entries.`,
-          { duration: 8000 }
+          { duration: 5000 }
         );
       }
 
@@ -637,6 +935,137 @@ const isViewer = user?.role === "viewer";
   }, [activePlanId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Close ctx menu on outside click ──────────────────────────────────────
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtxMenu(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [ctxMenu]);
+
+  // Puts a removed item back into the list — used when the user hits Undo,
+  // or when the actual delete request fails on the server.
+  const restoreItemToList = useCallback((item: MdfItem) => {
+    setCategories(prev => prev.map(cat =>
+      cat.category_id !== item.category_id ? cat
+        : cat.items.some(i => i.item_id === item.item_id)
+          ? cat
+          : { ...cat, items: [...cat.items, item] }
+    ));
+    setProposedEdits(prev => ({ ...prev, [item.item_id]: toStr(item.proposed) }));
+    setSem1Edits(prev => ({ ...prev, [item.item_id]: toStr(item.cur_sem1) }));
+    setObligationEdits(prev => ({ ...prev, [item.item_id]: toStr(item.past_obligation) }));
+    savedProposed.current.set(item.item_id, item.proposed);
+    savedSem1.current.set(item.item_id, item.cur_sem1);
+    savedObligation.current.set(item.item_id, item.past_obligation);
+  }, []);
+
+  // Actually calls the API once the 5s undo window has fully elapsed.
+  const finalizeItemDelete = useCallback((item: MdfItem) => {
+    if (!activePlanId) return;
+    API.delete(`/mdf-snapshots`, {
+      params: { item_id: item.item_id, budget_plan_id: activePlanId },
+    })
+      .then(() => {
+        setProposedEdits(prev   => { const n = { ...prev }; delete n[item.item_id]; return n; });
+        setSem1Edits(prev       => { const n = { ...prev }; delete n[item.item_id]; return n; });
+        setObligationEdits(prev => { const n = { ...prev }; delete n[item.item_id]; return n; });
+        savedProposed.current.delete(item.item_id);
+        savedSem1.current.delete(item.item_id);
+        savedObligation.current.delete(item.item_id);
+      })
+      .catch((err: any) => {
+        const msg: string = err?.response?.data?.message ?? err?.message ?? "Unknown error";
+        toast.error(`Couldn't remove "${item.name}": ${msg} — it's back in your table.`, { duration: 7000 });
+        restoreItemToList(item);
+      })
+      .finally(() => {
+        pendingDeleteItemsRef.current.delete(item.item_id);
+        localStorage.removeItem(mdfPendingDeleteKey(activePlanId, item.item_id));
+      });
+  }, [activePlanId, restoreItemToList]);
+
+  const showDeleteToast = useCallback((item: MdfItem, durationMs: number) => {
+    const itemId = item.item_id;
+    undoneDeleteIdsRef.current.delete(itemId);
+
+    toast(`Took "${item.name}" out of this budget plan`, {
+      id: `delete-mdf-item-${itemId}`,
+      description: "It's still safe — tap Undo if you didn't mean to",
+      duration: durationMs,
+      icon: <CountdownRing durationMs={durationMs} />,
+      classNames: {
+        title: "!text-red-900",
+        description: "!text-red-600",
+      },
+      action: {
+        label: "Undo",
+        onClick: () => {
+          undoneDeleteIdsRef.current.add(itemId);
+          pendingDeleteItemsRef.current.delete(itemId);
+          if (activePlanId) localStorage.removeItem(mdfPendingDeleteKey(activePlanId, itemId));
+          restoreItemToList(item);
+          toast.success(`Brought "${item.name}" back.`);
+        },
+      },
+      onAutoClose: () => {
+        if (undoneDeleteIdsRef.current.has(itemId)) return;
+        finalizeItemDelete(item);
+      },
+    });
+  }, [finalizeItemDelete, restoreItemToList, activePlanId]);
+
+  // Reset the "already reconciled" flag whenever we're looking at a
+  // different plan, so switching plans re-checks localStorage for that plan.
+  useEffect(() => {
+    hasReconciledMdfDeletes.current = false;
+  }, [activePlanId]);
+
+  // Resume any pending deletes that were still in their undo window when
+  // this component was last unmounted (e.g. a hard refresh mid-countdown).
+  useEffect(() => {
+    if (hasReconciledMdfDeletes.current) return;
+    if (!activePlanId) return;
+    hasReconciledMdfDeletes.current = true;
+
+    const prefix = `${MDF_PENDING_DELETE_PREFIX}${activePlanId}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      let parsed: { item: MdfItem; deleteAt: number } | null = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        localStorage.removeItem(key);
+        continue;
+      }
+      if (!parsed) continue;
+
+      const { item, deleteAt } = parsed;
+
+      // Re-remove from the freshly rebuilt list (the server never got
+      // the delete request, so it's still present).
+      setCategories(prev => prev.map(cat =>
+        cat.category_id !== item.category_id ? cat
+          : { ...cat, items: cat.items.filter(i => i.item_id !== item.item_id) }
+      ));
+      pendingDeleteItemsRef.current.set(item.item_id, item);
+
+      const remaining = deleteAt - Date.now();
+      if (remaining <= 0) {
+        localStorage.removeItem(key);
+        finalizeItemDelete(item);
+      } else {
+        showDeleteToast(item, remaining);
+      }
+    }
+  }, [categories, activePlanId, finalizeItemDelete, showDeleteToast]);
 
   // ── Live-computed categories ───────────────────────────────────────────────
 
@@ -820,36 +1249,94 @@ const isViewer = user?.role === "viewer";
         : { ...cat, items: [...cat.items, { ...newItem, has_prior_data: true }] }
     ));
     seedItems([newItem]);
+    setNewlyAddedItemId(newItem.item_id);
   }, [seedItems]);
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget || !activePlanId) return;
-    const target = deleteTarget;
-    setDeleting(true);
-    setCategories(prev => prev.map(cat =>
-      cat.category_id !== target.category_id ? cat
-        : { ...cat, items: cat.items.filter(i => i.item_id !== target.item_id) }
-    ));
-    setDeleteTarget(null);
-    try {
-      await API.delete(`/mdf-snapshots`, {
-        params: { item_id: target.item_id, budget_plan_id: activePlanId },
-      });
-      setProposedEdits(prev   => { const n = { ...prev }; delete n[target.item_id]; return n; });
-      setSem1Edits(prev       => { const n = { ...prev }; delete n[target.item_id]; return n; });
-      setObligationEdits(prev => { const n = { ...prev }; delete n[target.item_id]; return n; });
-      savedProposed.current.delete(target.item_id);
-      savedSem1.current.delete(target.item_id);
-      savedObligation.current.delete(target.item_id);
-      toast.success(`"${target.name}" removed from this budget plan.`);
-    } catch {
-      setCategories(prev => prev.map(cat =>
-        cat.category_id !== target.category_id ? cat
-          : { ...cat, items: [...cat.items, target] }
-      ));
-      toast.error("Remove failed. Item restored.");
-    } finally { setDeleting(false); }
+  // Autofocus + select the proposed-amount input for the newly added item,
+  // once it's actually mounted in the table.
+  useEffect(() => {
+    if (newlyAddedItemId == null) return;
+    const el = proposedInputRefs.current.get(newlyAddedItemId);
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, [newlyAddedItemId, categories]);
+
+  // Row click → open the edit context menu (name/account_code only; debt rows
+  // and viewers are not editable this way — debt rows are auto-synced, and
+  // viewers have no write access).
+  const handleItemRowClick = (e: React.MouseEvent, item: MdfItem) => {
+    if (item.obligation_id || isViewer) return;
+    if ((e.target as HTMLElement).closest("input, button")) return;
+    e.preventDefault();
+    const MENU_W = 170, MENU_H = 70;
+    const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
+    const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
+    setCtxMenu({ x, y, item });
   };
+
+  const handleEditIntent = (item: MdfItem) => {
+    setCtxMenu(null);
+    setEditTarget(item);
+  };
+
+  const handleItemUpdated = useCallback((updated: MdfItem) => {
+    setCategories(prev => prev.map(cat => ({
+      ...cat,
+      items: cat.items.map(i =>
+        i.item_id === updated.item_id
+          ? { ...i, name: updated.name, account_code: updated.account_code }
+          : i
+      ),
+    })));
+  }, []);
+
+  const handleDeleteIntent = useCallback((item: MdfItem) => {
+    setCtxMenu(null);
+    if (!activePlanId) return;
+
+    // ── Guard FIRST, before any optimistic UI — no point starting a 5s undo
+    // countdown for a delete that can never succeed. Reads live (possibly
+    // unsaved) edited values so a value the user just typed but hasn't
+    // blurred yet is still caught.
+    const liveObligation = parseNum(obligationRef.current[item.item_id] ?? "");
+    const liveSem1        = parseNum(sem1Ref.current[item.item_id] ?? "");
+    const liveProposed    = parseNum(proposedRef.current[item.item_id] ?? "");
+    const liveSem2        = Math.max(0, item.cur_total - liveSem1);
+
+    const hasPast    = liveObligation > 0;
+    const hasCurrent = liveSem1 > 0 || liveSem2 > 0 || item.cur_total > 0;
+    const hasBudget  = liveProposed > 0;
+
+    if (hasPast || hasCurrent || hasBudget) {
+      const y = yearsRef.current;
+      const parts: string[] = [];
+      if (hasPast)    parts.push(`${y?.past ?? "past year"} obligation of ${enPH(liveObligation)}`);
+      if (hasCurrent) parts.push(`${y?.current ?? "current year"} amount of ${enPH(item.cur_total)}`);
+      if (hasBudget)  parts.push(`${y?.proposed ?? "budget year"} proposed amount of ${enPH(liveProposed)}`);
+      toast.error(
+        `Can't remove "${item.name}" — it still has a ${parts.join(" and a ")}. Clear ${parts.length > 1 ? "these" : "it"} to 0 first, then remove.`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const deleteAt = Date.now() + DELETE_GRACE_MS;
+    // Persist BEFORE touching state, so a refresh during the undo window
+    // can pick this back up instead of silently losing track of it.
+    localStorage.setItem(
+      mdfPendingDeleteKey(activePlanId, item.item_id),
+      JSON.stringify({ item, deleteAt }),
+    );
+
+    pendingDeleteItemsRef.current.set(item.item_id, item);
+    setCategories(prev => prev.map(cat =>
+      cat.category_id !== item.category_id ? cat
+        : { ...cat, items: cat.items.filter(i => i.item_id !== item.item_id) }
+    ));
+    showDeleteToast(item, DELETE_GRACE_MS);
+  }, [activePlanId, showDeleteToast]);
 
   // ── Guards ─────────────────────────────────────────────────────────────────
 
@@ -867,12 +1354,12 @@ const isViewer = user?.role === "viewer";
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
 
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-gray-300 text-[10px]">·</span>
             {planLoading
               ? <Skeleton className="h-3 w-16 rounded" />
@@ -884,16 +1371,126 @@ const isViewer = user?.role === "viewer";
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">20% Municipal Development Fund</h1>
+          <h1 className="text-lg sm:text-2xl font-semibold text-zinc-900 tracking-tight leading-snug">20% Municipal Development Fund</h1>
         </div>
         {/* Sync button removed — debt items auto-sync on page load via server */}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        {(planLoading || loading) ? (
-          <MdfTableSkeleton />
+      {/* Table (desktop) / Cards (mobile) */}
+      {(planLoading || loading) ? (
+        isMobile ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-40 w-full rounded-lg" />
+            ))}
+          </div>
         ) : (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <MdfTableSkeleton />
+          </div>
+        )
+      ) : isMobile ? (
+        <div className="space-y-5">
+          {computedCategories.length === 0 ? (
+            <p className="text-center py-14 text-gray-400 text-sm">No MDF data found.</p>
+          ) : computedCategories.map(cat => (
+            <div key={`cat-${cat.category_id}`}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{cat.name}</span>
+                  {cat.is_debt_servicing && (
+                    <Badge variant="outline" className="text-[9px] font-semibold text-blue-600 bg-blue-50 border-blue-200 px-1.5 py-0.5 normal-case tracking-normal">
+                      Auto-synced
+                    </Badge>
+                  )}
+                </div>
+                {!cat.is_debt_servicing && !isViewer && (
+                  <Button size="sm" variant="outline"
+                    className="gap-1 text-[10px] h-6 px-2 border-gray-200 text-gray-600"
+                    onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
+                    <PlusIcon className="w-3 h-3" />Add
+                  </Button>
+                )}
+              </div>
+
+              {cat.items.length === 0 ? (
+                <p className="px-1 text-[11px] text-gray-400 italic mb-2">
+                  No expense items.{" "}
+                  {!cat.is_debt_servicing && !isViewer && (
+                    <button className="text-gray-600 underline underline-offset-2 font-medium"
+                      onClick={() => setAddDialog({ open: true, categoryId: cat.category_id, categoryName: cat.name })}>
+                      Add the first item
+                    </button>
+                  )}
+                </p>
+              ) : (
+                <div className="space-y-2 mb-2">
+                  {cat.items.map(item => {
+                    const sem1Str  = sem1Edits[item.item_id]       ?? "";
+                    const propStr  = proposedEdits[item.item_id]   ?? "";
+                    const oblStr   = obligationEdits[item.item_id] ?? "";
+                    const liveSem2 = Math.max(0, item.cur_total - parseNum(sem1Str));
+                    return (
+                      <MobileItemCard
+                        key={`item-${item.item_id}`}
+                        item={item}
+                        years={years}
+                        pastPlanMissing={pastPlanMissing}
+                        isViewer={isViewer}
+                        isNew={item.item_id === newlyAddedItemId}
+                        oblStr={oblStr}
+                        sem1Str={sem1Str}
+                        propStr={propStr}
+                        liveSem2={liveSem2}
+                        onObligationChange={(v) => setObligationEdits(prev => ({ ...prev, [item.item_id]: v }))}
+                        onObligationBlur={() => handleObligationBlur(item)}
+                        onSem1Change={(v) => setSem1Edits(prev => ({ ...prev, [item.item_id]: v }))}
+                        onSem1Blur={() => handleSem1Blur(item)}
+                        onProposedChange={(v) => setProposedEdits(prev => ({ ...prev, [item.item_id]: v }))}
+                        onProposedBlur={() => {
+                          if (newlyAddedItemId === item.item_id) setNewlyAddedItemId(null);
+                          handleProposedBlur(item.item_id);
+                        }}
+                        onEdit={() => handleEditIntent(item)}
+                        onDelete={() => handleDeleteIntent(item)}
+                        proposedInputRef={(el) => {
+                          if (el) proposedInputRefs.current.set(item.item_id, el);
+                          else proposedInputRefs.current.delete(item.item_id);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {cat.items.length > 0 && <MobileSubtotalCard totals={cat.totals} />}
+            </div>
+          ))}
+
+          {computedCategories.length > 0 && (
+            <div className="rounded-lg bg-gray-900 text-white px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+                Grand Total – MDF
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className={cn("rounded-md border px-2 py-1", C_PAST_GT)}>
+                  <p className="opacity-70 text-[9px]">Past Obligation</p>
+                  <p className="font-mono font-semibold text-right">{grandTotals.past_obligation === 0 ? "–" : fmtPeso(grandTotals.past_obligation)}</p>
+                </div>
+                <div className={cn("rounded-md border px-2 py-1", C_BUDG_GT)}>
+                  <p className="opacity-70 text-[9px]">Budget Year</p>
+                  <p className="font-mono font-semibold text-right">{grandTotals.proposed === 0 ? "–" : fmtPeso(grandTotals.proposed)}</p>
+                </div>
+                <div className={cn("rounded-md border px-2 py-1 col-span-2", C_CURR_GT)}>
+                  <p className="opacity-70 text-[9px]">Current Total</p>
+                  <p className="font-mono font-semibold text-right">{grandTotals.cur_total === 0 ? "–" : fmtPeso(grandTotals.cur_total)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 1120 }}>
               <colgroup>
@@ -1007,32 +1604,44 @@ const isViewer = user?.role === "viewer";
                         ? !!years?.current_plan_id  // debt: editable if current plan exists
                         : item.has_prior_data;       // regular: editable if has prior data
 
+                      const rowEditable = !item.obligation_id && !isViewer;
+
                       return (
-                        <tr key={`item-${item.item_id}`} className="hover:bg-gray-50/60 transition-colors">
+                        <tr key={`item-${item.item_id}`}
+                          onClick={rowEditable ? (e) => handleItemRowClick(e, item) : undefined}
+                          onContextMenu={rowEditable ? (e) => { e.preventDefault(); handleItemRowClick(e, item); } : undefined}
+                          className={cn(
+                            "transition-colors",
+                            item.item_id === newlyAddedItemId
+                              ? "bg-emerald-50 hover:bg-emerald-50 border-l-2 border-l-emerald-400"
+                              : "hover:bg-gray-50/60",
+                            rowEditable && "cursor-pointer"
+                          )}>
 
                           {/* (1) Name */}
                           <td className="border-r border-gray-100 px-3 py-2.5 align-top">
                             <div className="flex items-center justify-between gap-1">
-                              <span className={cn("text-[12px]",
+                              <span className={cn("text-[12px] flex items-center gap-1.5 min-w-0",
                                 item.debt_type === "interest"  && "pl-8 text-gray-400 italic",
                                 item.debt_type === "principal" && "pl-4 font-medium text-gray-800",
                                 !item.obligation_id            && "pl-4 text-gray-800")}>
-                                {item.obligation_id
-                                  ? item.debt_type === "principal"
-                                    ? `${item.name.replace(" - Principal", "")} – Principal`
-                                    : "– Interest"
-                                  : item.name}
+                                <span className="truncate">
+                                  {item.obligation_id
+                                    ? item.debt_type === "principal"
+                                      ? `${item.name.replace(" - Principal", "")} – Principal`
+                                      : "– Interest"
+                                    : item.name}
+                                </span>
+                                {item.item_id === newlyAddedItemId && (
+                                  <span className="flex-shrink-0 text-[9px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                                    New
+                                  </span>
+                                )}
                               </span>
                               <div className="flex items-center gap-1.5 flex-shrink-0">
                                 {item.obligation_id && (
                                   <Badge variant="outline" className="text-[9px] border-blue-200 text-blue-600 bg-blue-50 px-1 py-0">auto</Badge>
                                 )}
-                                {!item.obligation_id && !isViewer && (
-  <button className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
-    title="Remove item" onClick={() => setDeleteTarget(item)}>
-    <TrashIcon className="w-3.5 h-3.5" />
-  </button>
-)}
                               </div>
                             </div>
                           </td>
@@ -1099,7 +1708,14 @@ const isViewer = user?.role === "viewer";
     value={propStr}
     colorClass="focus:ring-orange-300 focus:border-orange-300"
     onChange={v => setProposedEdits(prev => ({ ...prev, [item.item_id]: v }))}
-    onBlur={() => handleProposedBlur(item.item_id)}
+    onBlur={() => {
+      if (newlyAddedItemId === item.item_id) setNewlyAddedItemId(null);
+      handleProposedBlur(item.item_id);
+    }}
+    inputRef={(el) => {
+      if (el) proposedInputRefs.current.set(item.item_id, el);
+      else proposedInputRefs.current.delete(item.item_id);
+    }}
   />
 )}
                           </td>
@@ -1160,8 +1776,8 @@ const isViewer = user?.role === "viewer";
               )}
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">
@@ -1200,32 +1816,41 @@ const isViewer = user?.role === "viewer";
         );
       })()}
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open && !deleting) setDeleteTarget(null); }}>
-        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">Remove item?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-gray-500">
-              <span className="font-medium text-gray-700">{deleteTarget?.name}</span>{" "}
-              will be removed from this budget plan's table. The item itself is preserved
-              and can be re-added in future or other budget years.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200" disabled={deleting}>Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleConfirmDelete} disabled={deleting}>
-                {deleting
-                  ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1.5" />Removing…</>
-                  : "Remove Item"}
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+
+      {/* ── Row context menu (Edit) ── */}
+      {ctxMenu && (
+        <div
+          ref={ctxRef}
+          style={{ position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
+          className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[170px] overflow-hidden"
+        >
+          <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
+          <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[150px]">
+              {ctxMenu.item.name}
+            </p>
+          </div>
+          <button
+            onClick={() => handleEditIntent(ctxMenu.item)}
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <PencilSquareIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            Edit Item
+          </button>
+          <div className="h-px bg-gray-100 my-1" />
+          <button
+            onClick={() => handleDeleteIntent(ctxMenu.item)}
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <TrashIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            Remove Item
+          </button>
+        </div>
+      )}
+
+      {/* ── Edit item dialog ── */}
+      <EditItemDialog item={editTarget} onClose={() => setEditTarget(null)} onSaved={handleItemUpdated} />
     </div>
   );
 }

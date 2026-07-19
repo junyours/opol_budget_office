@@ -5,6 +5,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
+import { Textarea } from '@/src/components/ui/textarea';
+import { Switch } from '@/src/components/ui/switch';
 import { Separator } from '@/src/components/ui/separator';
 import {
   AlertDialog,
@@ -26,6 +28,7 @@ import {
   XCircleIcon,
   ArrowPathIcon,
   ServerStackIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/tabs';
 import BudgetCallMemoAdminPage from './BudgetCallMemoAdminPage';
@@ -44,6 +47,11 @@ interface DbInfo {
   mysql_client: { found: boolean; path: string | null; env_override: string | null };
   database: { host: string; port: string; name: string; username: string };
   hint: string;
+}
+
+interface MaintenanceSettings {
+  maintenance_mode: boolean;
+  maintenance_message: string | null;
 }
 
 // ── Environment info panel ─────────────────────────────────────────────────────
@@ -150,6 +158,166 @@ const EnvInfoPanel: React.FC = () => {
           <p className="text-[11px] text-amber-800 leading-snug">{info.hint}</p>
         </div>
       )}
+    </div>
+  );
+};
+
+// ── Maintenance mode panel ──────────────────────────────────────────────────────
+
+const MaintenancePanel: React.FC = () => {
+  const [settings, setSettings] = useState<MaintenanceSettings | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [message,  setMessage]  = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValue, setPendingValue] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await API.get<MaintenanceSettings>('/maintenance/status');
+      setSettings(data);
+      setMessage(data.maintenance_message ?? '');
+    } catch {
+      toast.error('Failed to load maintenance settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const requestToggle = (next: boolean) => {
+    setPendingValue(next);
+    setConfirmOpen(true);
+  };
+
+  const applyToggle = async () => {
+    setSaving(true);
+    try {
+      const { data } = await API.post('/maintenance/toggle', {
+        maintenance_mode: pendingValue,
+        maintenance_message: message.trim() || null,
+      });
+      setSettings(data.data);
+      toast.success(pendingValue ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to update maintenance mode.');
+    } finally {
+      setSaving(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  const saveMessageOnly = async () => {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const { data } = await API.post('/maintenance/toggle', {
+        maintenance_mode: settings.maintenance_mode,
+        maintenance_message: message.trim() || null,
+      });
+      setSettings(data.data);
+      toast.success('Maintenance message updated.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to update message.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isOn = settings?.maintenance_mode ?? false;
+  const messageChanged = (settings?.maintenance_message ?? '') !== message.trim() && message.trim() !== (settings?.maintenance_message ?? '');
+
+  return (
+    <div className="mb-6">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Maintenance</p>
+
+      <div className={`rounded-xl border p-4 ${isOn ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isOn ? 'bg-amber-100' : 'bg-gray-100'}`}>
+              <WrenchScrewdriverIcon className={`w-4 h-4 ${isOn ? 'text-amber-600' : 'text-gray-500'}`} />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-gray-800 leading-tight">Maintenance Mode</p>
+              <p className="text-[12px] text-gray-500 mt-0.5">
+                {isOn
+                  ? 'The system is currently locked. Only Super Admins can access it.'
+                  : 'When enabled, all users except Super Admins are shown a maintenance screen.'}
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <span className="w-9 h-5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 self-start sm:self-auto" />
+          ) : (
+            <Switch
+              checked={isOn}
+              onCheckedChange={(checked) => requestToggle(checked)}
+              disabled={saving}
+              className="flex-shrink-0 self-start sm:self-auto"
+            />
+          )}
+        </div>
+
+        {!loading && (
+          <div className="mt-4 pt-4 border-t border-gray-100/80">
+            <label className="text-[11px] font-medium text-gray-600 mb-1.5 block">
+              Message shown to users (optional)
+            </label>
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g. We're performing scheduled maintenance. Please check back shortly."
+              className="text-[12px] resize-none"
+              rows={2}
+              disabled={saving}
+            />
+            <div className="flex justify-end mt-2">
+              <Button
+                variant="outline" size="sm"
+                onClick={saveMessageOnly}
+                disabled={saving || !messageChanged}
+                className="h-7 text-[11px] border-gray-200"
+              >
+                Save Message
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Confirm toggle dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => { if (!saving) setConfirmOpen(open); }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+              {pendingValue ? 'Enable maintenance mode?' : 'Disable maintenance mode?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              {pendingValue
+                ? 'All users except Super Admins will immediately lose access to the system and see a maintenance screen.'
+                : 'The system will become accessible to all users again.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" disabled={saving} className="h-8 text-xs border-gray-200">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                size="sm" onClick={applyToggle} disabled={saving}
+                className={`h-8 text-xs text-white ${pendingValue ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              >
+                {saving ? (
+                  <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1.5" />Applying…</>
+                ) : (pendingValue ? 'Yes, enable' : 'Yes, disable')}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -266,6 +434,10 @@ const SystemPage: React.FC = () => {
   const [clearing,    setClearing]    = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // ── Token maintenance ──────────────────────────────────────────────────────
+  const [pruningTokens,    setPruningTokens]    = useState(false);
+  const [confirmPruneOpen, setConfirmPruneOpen] = useState(false);
+
   // ── Backup / restore ───────────────────────────────────────────────────────
   const [dialogMode,  setDialogMode]  = useState<DialogMode>(null);
   const [dbBusy,      setDbBusy]      = useState(false);
@@ -285,6 +457,19 @@ const SystemPage: React.FC = () => {
     } finally {
       setClearing(false);
       setConfirmOpen(false);
+    }
+  };
+
+  const handlePruneTokens = async () => {
+    setPruningTokens(true);
+    try {
+      const { data } = await API.delete('/tokens/prune-stale');
+      toast.success(`Deleted ${data.data.deleted} stale token(s).`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to clear stale tokens.');
+    } finally {
+      setPruningTokens(false);
+      setConfirmPruneOpen(false);
     }
   };
 
@@ -359,7 +544,8 @@ const SystemPage: React.FC = () => {
       <p className="text-[13px] text-gray-500 mb-6">Manage system-level data, maintenance tasks, and public content.</p>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 mb-6">
+        <div className="overflow-x-auto mb-6 -mx-1 px-1">
+        <TabsList className="h-9 bg-gray-100 border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 w-max">
           <TabsTrigger value="general"
             className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
             General
@@ -368,164 +554,206 @@ const SystemPage: React.FC = () => {
             className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
             Budget Call Memo
           </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="system"
+              className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+              System
+            </TabsTrigger>
+          )}
         </TabsList>
+        </div>
 
+        {/* ══ GENERAL — budget plan list only ══ */}
         <TabsContent value="general" className="mt-0">
+          <div className="mb-6">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Budget</p>
 
-      {/* ── ANNUAL BUDGET YEAR ───────────────────────────────────────────── */}
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Budget</p>
-
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <React.Suspense fallback={
-            <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">
-              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
-              Loading…
-            </div>
-          }>
-            <BudgetPlanList />
-          </React.Suspense>
-        </div>
-      </div>
-
-      <Separator className="mb-6" />
-
-      <div className="max-w-3xl">
-
-      {/* ── DATABASE ─────────────────────────────────────────────────────── */}
-      {isSuperAdmin && (
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Database</p>
-
-        {/* Environment info — auto-detected */}
-        <div className="mb-3">
-          <EnvInfoPanel />
-        </div>
-
-        {/* Actions card */}
-        <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
-
-          {/* Backup */}
-          <div className="p-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <ArrowDownTrayIcon className="w-4 h-4 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold text-gray-800 leading-tight">Backup Database</p>
-                <p className="text-[12px] text-gray-500 mt-0.5">
-                  Downloads a compressed <span className="font-mono text-gray-600">.sql.gz</span> snapshot.
-                  Store the file in a safe, private location.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline" size="sm"
-              onClick={() => setDialogMode('backup')}
-              disabled={dbBusy}
-              className="flex-shrink-0 text-amber-700 border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-xs h-8"
-            >
-              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-              Backup
-            </Button>
-          </div>
-
-          {/* Restore */}
-          <div className="p-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <ArrowUpTrayIcon className="w-4 h-4 text-red-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-800 leading-tight">Restore Database</p>
-                <p className="text-[12px] text-gray-500 mt-0.5 mb-2">
-                  Overwrites the entire database with a backup file.{' '}
-                  <span className="text-red-500 font-medium">All current data will be replaced.</span>
-                </p>
-
-                {/* File picker */}
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".sql,.gz"
-                    onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
-                    className="hidden"
-                    id="restore-file-input"
-                  />
-                  <label
-                    htmlFor="restore-file-input"
-                    className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium
-                      px-2.5 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600
-                      hover:bg-gray-100 hover:border-gray-300 transition-colors"
-                  >
-                    Choose file
-                  </label>
-                  <span className="text-[11px] text-gray-400 truncate max-w-[180px]">
-                    {restoreFile ? restoreFile.name : 'No file chosen (.sql or .sql.gz)'}
-                  </span>
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <React.Suspense fallback={
+                <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">
+                  <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+                  Loading…
                 </div>
-              </div>
-            </div>
-
-            <Button
-              variant="outline" size="sm"
-              onClick={openRestoreDialog}
-              disabled={dbBusy || !restoreFile}
-              className="flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs h-8 self-start mt-0.5"
-            >
-              <ArrowUpTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-              Restore
-            </Button>
-          </div>
-        </div>
-
-        <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
-          <LockClosedIcon className="w-3 h-3" />
-          Admin password required for backup and restore.
-        </p>
-      </div>
-      )}
-
-      {isSuperAdmin && <Separator className="mb-6" />}
-
-      {/* ── NOTIFICATIONS ─────────────────────────────────────────────────── */}
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Notifications</p>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <BellSlashIcon className="w-4 h-4 text-red-500" />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-gray-800 leading-tight">Clear Read Notifications</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">
-                Permanently deletes all read notifications across all users. This cannot be undone.
-              </p>
+              }>
+                <BudgetPlanList />
+              </React.Suspense>
             </div>
           </div>
-          <Button
-            variant="outline" size="sm"
-            onClick={() => setConfirmOpen(true)}
-            disabled={clearing}
-            className="flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs h-8"
-          >
-            {clearing ? (
-              <>
-                <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin mr-1.5" />
-                Clearing…
-              </>
-            ) : 'Clear Read'}
-          </Button>
-        </div>
-      </div>
-      </div>
         </TabsContent>
 
+        {/* ══ BUDGET CALL MEMO — unchanged ══ */}
         <TabsContent value="budget-call-memo" className="mt-0">
           <BudgetCallMemoAdminPage />
         </TabsContent>
+
+        {/* ══ SYSTEM — database, notifications, tokens, maintenance ══ */}
+        {isSuperAdmin && (
+        <TabsContent value="system" className="mt-0">
+          <div className="max-w-3xl">
+
+            {/* ── MAINTENANCE MODE ─────────────────────────────────────────── */}
+            <MaintenancePanel />
+
+            <Separator className="mb-6" />
+
+            {/* ── DATABASE ─────────────────────────────────────────────────── */}
+            <div className="mb-6">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Database</p>
+
+              {/* Environment info — auto-detected */}
+              <div className="mb-3">
+                <EnvInfoPanel />
+              </div>
+
+              {/* Actions card */}
+              <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
+
+                {/* Backup */}
+                <div className="p-4 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <ArrowDownTrayIcon className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-gray-800 leading-tight">Backup Database</p>
+                      <p className="text-[12px] text-gray-500 mt-0.5">
+                        Downloads a compressed <span className="font-mono text-gray-600">.sql.gz</span> snapshot.
+                        Store the file in a safe, private location.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={() => setDialogMode('backup')}
+                    disabled={dbBusy}
+                    className="w-full sm:w-auto flex-shrink-0 text-amber-700 border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-xs h-8"
+                  >
+                    <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Backup
+                  </Button>
+                </div>
+
+                {/* Restore */}
+                <div className="p-4 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start gap-3 w-full sm:w-auto">
+                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <ArrowUpTrayIcon className="w-4 h-4 text-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 leading-tight">Restore Database</p>
+                      <p className="text-[12px] text-gray-500 mt-0.5 mb-2">
+                        Overwrites the entire database with a backup file.{' '}
+                        <span className="text-red-500 font-medium">All current data will be replaced.</span>
+                      </p>
+
+                      {/* File picker */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".sql,.gz"
+                          onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+                          className="hidden"
+                          id="restore-file-input"
+                        />
+                        <label
+                          htmlFor="restore-file-input"
+                          className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium
+                            px-2.5 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-600
+                            hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                        >
+                          Choose file
+                        </label>
+                        <span className="text-[11px] text-gray-400 truncate max-w-[180px]">
+                          {restoreFile ? restoreFile.name : 'No file chosen (.sql or .sql.gz)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={openRestoreDialog}
+                    disabled={dbBusy || !restoreFile}
+                    className="w-full sm:w-auto flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs h-8 self-stretch sm:self-start mt-0 sm:mt-0.5"
+                  >
+                    <ArrowUpTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Restore
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
+                <LockClosedIcon className="w-3 h-3" />
+                Admin password required for backup and restore.
+              </p>
+            </div>
+
+            <Separator className="mb-6" />
+
+            {/* ── NOTIFICATIONS ────────────────────────────────────────────── */}
+            <div className="mb-6">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Notifications</p>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <BellSlashIcon className="w-4 h-4 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-gray-800 leading-tight">Clear Read Notifications</p>
+                    <p className="text-[12px] text-gray-500 mt-0.5">
+                      Permanently deletes all read notifications across all users. This cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={clearing}
+                  className="w-full sm:w-auto flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs h-8"
+                >
+                  {clearing ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin mr-1.5" />
+                      Clearing…
+                    </>
+                  ) : 'Clear Read'}
+                </Button>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 mt-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <LockClosedIcon className="w-4 h-4 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-gray-800 leading-tight">Clear Stale Tokens</p>
+                    <p className="text-[12px] text-gray-500 mt-0.5">
+                      Permanently deletes expired and no-expiry access tokens for all users.
+                      Your current session token is never removed. This cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setConfirmPruneOpen(true)}
+                  disabled={pruningTokens}
+                  className="w-full sm:w-auto flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs h-8"
+                >
+                  {pruningTokens ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin mr-1.5" />
+                      Clearing…
+                    </>
+                  ) : 'Clear Stale'}
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Confirm clear-read dialog ─────────────────────────────────────── */}
@@ -547,6 +775,33 @@ const SystemPage: React.FC = () => {
               <Button size="sm" onClick={handleClearRead} disabled={clearing}
                 className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white">
                 {clearing ? (
+                  <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Clearing…</>
+                ) : 'Yes, clear all'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Confirm prune-stale-tokens dialog ─────────────────────────────── */}
+      <AlertDialog open={confirmPruneOpen} onOpenChange={setConfirmPruneOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
+              Clear stale tokens?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              All expired and no-expiry tokens will be permanently deleted. Your current session is safe. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button size="sm" onClick={handlePruneTokens} disabled={pruningTokens}
+                className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white">
+                {pruningTokens ? (
                   <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Clearing…</>
                 ) : 'Yes, clear all'}
               </Button>

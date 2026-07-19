@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { useDebounce } from "@/src/hooks/useDebounce";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 import API from "@/src/services/api";
 
 import { Button } from "@/src/components/ui/button";
@@ -439,6 +440,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, selected, depa
 
 const AipProgramsTab: React.FC = () => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: budgetPlans = [],  isLoading: plansLoading }      = useBudgetPlans();
@@ -664,15 +666,15 @@ const AipProgramsTab: React.FC = () => {
     <div className="p-6 relative">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">Expenditure</span>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">AIP Programs</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">AIP Programs</h1>
           <p className="text-xs text-gray-400 mt-1">
             Master list of Annual Investment Program entries with budget allocations.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {selectedIds.size > 0 && (
             <>
               <span className="text-xs text-gray-500">
@@ -692,7 +694,7 @@ const AipProgramsTab: React.FC = () => {
 
       {/* ── Filter bar ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+        <div className="relative flex-1 min-w-[160px] sm:max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input value={searchRaw} onChange={(e) => { setSearchRaw(e.target.value); resetPage(); }}
             placeholder="Search programs, ref code, dept…"
@@ -849,6 +851,7 @@ const AipProgramsTab: React.FC = () => {
           </div>
         ) : (
           <>
+            {!isMobile && (
             <div className="overflow-x-auto">
               <table className="w-full text-[12px] border-collapse">
                 <thead>
@@ -961,6 +964,76 @@ const AipProgramsTab: React.FC = () => {
                 )}
               </table>
             </div>
+            )}
+
+            {/* ── Mobile card list ── */}
+            {isMobile && (
+              <div className="flex flex-col gap-2.5 p-3">
+                {paginated.map((p) => {
+                  const dept       = deptMap.get(p.dept_id);
+                  const isSelected = selectedIds.has(p.aip_program_id);
+                  return (
+                    <div
+                      key={p.aip_program_id}
+                      onClick={(e) => handleRowClick(e, p)}
+                      className={cn(
+                        "w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 space-y-2 active:bg-gray-50 transition-colors",
+                        !p.is_active && "opacity-50",
+                        isSelected && "bg-blue-50/40 border-blue-200"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <div data-checkbox onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                            <Checkbox checked={isSelected} onCheckedChange={() => toggleOne(p.aip_program_id)} className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-gray-900">{p.program_description}</p>
+                            <p className="text-[11px] font-mono text-gray-400 mt-0.5">
+                              {p.aip_reference_code ?? '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0",
+                          p.is_active ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-gray-500 bg-gray-50 border-gray-200"
+                        )}>
+                          {p.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+
+                      {dept && (
+                        <p className="text-[11px] text-gray-500">
+                          {dept.dept_abbreviation && <span className="font-mono text-gray-400 mr-1">{dept.dept_abbreviation}</span>}
+                          {dept.dept_name}
+                        </p>
+                      )}
+
+                      {showAmounts && (
+                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100 text-[11px]">
+                          <div>
+                            <p className="text-gray-400 text-[9px] uppercase tracking-wide">PS</p>
+                            <p className="font-mono text-gray-700">{p.total_ps === 0 ? '—' : fmt(p.total_ps)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 text-[9px] uppercase tracking-wide">MOOE</p>
+                            <p className="font-mono text-gray-700">{p.total_mooe === 0 ? '—' : fmt(p.total_mooe)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 text-[9px] uppercase tracking-wide">CO</p>
+                            <p className="font-mono text-gray-700">{p.total_co === 0 ? '—' : fmt(p.total_co)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 text-[9px] uppercase tracking-wide">Total</p>
+                            <p className="font-mono font-semibold text-gray-900">{p.total_amount === 0 ? '—' : fmt(p.total_amount)}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
@@ -997,18 +1070,56 @@ const AipProgramsTab: React.FC = () => {
         )}
       </div>
 
-      {/* ── Context Menu (positioned fixed) ── */}
-      {ctxMenu && (
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[13px] font-semibold text-gray-900 truncate">
+                {ctxMenu.program.aip_reference_code
+                  ? ctxMenu.program.aip_reference_code
+                  : ctxMenu.program.program_description}
+              </p>
+            </div>
+            <button
+              onClick={() => handleEdit(ctxMenu.program)}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit Program
+            </button>
+            <button
+              onClick={() => handleToggleIntent(ctxMenu.program)}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100",
+                ctxMenu.program.is_active ? "text-amber-700 active:bg-amber-50" : "text-emerald-700 active:bg-emerald-50"
+              )}
+            >
+              {ctxMenu.program.is_active
+                ? <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
+                : <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
+              }
+            </button>
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <div
           ref={ctxRef}
           style={{ position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
           className="bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[175px] overflow-hidden"
         >
-          {/* Triangle pointer at top-left */}
-          <div
-            className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45"
-          />
-          {/* Program label */}
+          <div className="absolute -top-[5px] left-4 w-2.5 h-2.5 bg-white border-l border-t border-gray-200 rotate-45" />
           <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate max-w-[155px]">
               {ctxMenu.program.aip_reference_code
@@ -1038,7 +1149,7 @@ const AipProgramsTab: React.FC = () => {
             }
           </button>
         </div>
-      )}
+      ))}
 
       {/* ── Edit modal ── */}
       <EditModal program={editProgram} onClose={() => setEditProgram(null)} onSaved={onEditSaved} />

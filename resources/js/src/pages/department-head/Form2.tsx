@@ -26,25 +26,30 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { PlusIcon, TrashIcon, BanknotesIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, BanknotesIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Switch } from "@/src/components/ui/switch";
 import { cn } from "@/src/lib/utils";
 import { useCalamityFund } from "../../hooks/useCalamityFund";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/src/components/ui/alert-dialog";
+import { useAuth } from "../../hooks/useAuth";
+import { useIsMobile } from "../../hooks/use-mobile";
+
 import { MAX_AMOUNT, clampMoneyDigits as clampAmountDigits } from "@/src/utils/moneyInput";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PS_CLASS_ID = 1;
-const COL_WIDTHS = [110, 220, 100, 95, 95, 100, 100, 95, 75, 170];
+const COL_WIDTHS = [100, 210, 100, 95, 95, 100, 100, 95, 75, 170];
+
+// ─── Sticky first-two-columns (Acct Code / Object of Expenditure) ─────────
+const STICKY_1 = "sticky left-0 z-10";
+const STICKY_2 = "sticky left-[100px] z-10 border-r border-gray-200";
+
+// ─── Optimistic delete (undo window) ──────────────────────────────────────
+const DELETE_GRACE_MS = 5000;
+// Scoped by plan id since a single browser session can have pending deletes
+// across multiple department budget plans.
+const FORM2_PENDING_DELETE_PREFIX = "pending_delete_form2_item_";
+const form2PendingDeleteKey = (planId: number, itemId: number) =>
+    `${FORM2_PENDING_DELETE_PREFIX}${planId}_${itemId}`;
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 const C_APP_SUB = "bg-green-50 border-green-200";
@@ -54,13 +59,13 @@ const C_PRO_GT = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 
 // ─── Table class tokens ───────────────────────────────────────────────────────
 const TH =
-    "border-b border-gray-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 text-left";
+    "border-b border-gray-200 bg-white px-3 py-2 text-sm font-medium text-muted-foreground text-left";
 const TD = "px-3 py-2.5 text-[12px]";
 const TD_M = "px-3 py-2.5 text-[12px] font-mono tabular-nums text-right";
 const TH_APP =
-    "border-b border-green-200 bg-green-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-green-700 text-right";
+    "border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 text-right";
 const TH_PRO =
-    "border-b border-orange-200 bg-orange-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-orange-700 text-center";
+    "border-b border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 text-center";
 const TD_APP = `${TD_M} bg-green-50/30`;
 const TD_PRO = `${TD_M} bg-orange-50/30`;
 
@@ -72,7 +77,7 @@ const recCls =
     "text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300 disabled:opacity-50";
 
 const TH_CUR =
-    "border-b border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-blue-700 text-right";
+    "border-b border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 text-right";
 const TD_CUR = `${TD_M} bg-blue-50/30`;
 const C_CUR_SUB = "bg-blue-50 border-blue-200";
 const C_CUR_GT  = "bg-blue-950/20 border-blue-900/40 text-blue-300";
@@ -195,10 +200,10 @@ const SubHeader: React.FC<SubHeaderProps> = ({
 }) => (
     <>
         <tr>
-            <th className={cn(TH, "border-t-2 border-gray-300")} rowSpan={2}>
+            <th className={cn(TH, "border-t-2 border-gray-300 sticky left-0 z-20 bg-white")} rowSpan={2}>
                 Acct Code
             </th>
-            <th className={cn(TH, "border-t-2 border-gray-300")} rowSpan={2}>
+            <th className={cn(TH, "border-t-2 border-gray-300 sticky left-[100px] z-20 bg-white border-r border-gray-200")} rowSpan={2}>
                 Object of Expenditure
             </th>
             {isAdmin && (
@@ -262,6 +267,46 @@ const SubHeader: React.FC<SubHeaderProps> = ({
     </>
 );
 
+// ─── Countdown number for the delete-undo toast ────────────────────────────
+const CountdownRing: React.FC<{ durationMs: number }> = ({ durationMs }) => {
+    const totalSeconds = Math.ceil(durationMs / 1000);
+    const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+    const spanRef = useRef<HTMLSpanElement>(null);
+    const pausedRef = useRef(false);
+    const elapsedRef = useRef(0);
+    const lastTickRef = useRef(Date.now());
+
+    useEffect(() => {
+        const toastEl = spanRef.current?.closest('[data-sonner-toast]');
+        const onEnter = () => { pausedRef.current = true; };
+        const onLeave = () => { pausedRef.current = false; lastTickRef.current = Date.now(); };
+        toastEl?.addEventListener('mouseenter', onEnter);
+        toastEl?.addEventListener('mouseleave', onLeave);
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const delta = now - lastTickRef.current;
+            lastTickRef.current = now;
+            if (!pausedRef.current) {
+                elapsedRef.current += delta;
+                setSecondsLeft(Math.max(0, totalSeconds - Math.floor(elapsedRef.current / 1000)));
+            }
+        }, 200);
+
+        return () => {
+            clearInterval(interval);
+            toastEl?.removeEventListener('mouseenter', onEnter);
+            toastEl?.removeEventListener('mouseleave', onLeave);
+        };
+    }, [totalSeconds]);
+
+    return (
+        <span ref={spanRef} className="flex-shrink-0 w-5 text-center text-lg font-bold tabular-nums leading-none text-gray-700">
+            {secondsLeft}
+        </span>
+    );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Form2: React.FC<Form2Props> = ({
@@ -278,6 +323,10 @@ const Form2: React.FC<Form2Props> = ({
     useEffect(() => {
         ensureAnim();
     }, []);
+
+   const { user } = useAuth();
+    const isViewer = user?.role === 'viewer';
+    const isMobile = useIsMobile();
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -319,6 +368,38 @@ const Form2: React.FC<Form2Props> = ({
         new Map(),
     );
 
+    // ── Mobile-only search filter ──────────────────────────────────────────
+    const [mobileSearch, setMobileSearch] = useState('');
+    // Breakdown (Past Obligation / Sem 1 / Sem 2 / Total) is collapsed by default per card
+    const [expandedMobileItems, setExpandedMobileItems] = useState<Set<number>>(new Set());
+    const toggleMobileExpand = useCallback((id: number) => {
+        setExpandedMobileItems((prev) => {
+            const n = new Set(prev);
+            if (n.has(id)) n.delete(id); else n.add(id);
+            return n;
+        });
+    }, []);
+    // Same collapse behavior for AIP program cards, keyed separately (different id space)
+    const [expandedMobileAipItems, setExpandedMobileAipItems] = useState<Set<number>>(new Set());
+    const toggleMobileAipExpand = useCallback((id: number) => {
+        setExpandedMobileAipItems((prev) => {
+            const n = new Set(prev);
+            if (n.has(id)) n.delete(id); else n.add(id);
+            return n;
+        });
+    }, []);
+    const matchesMobileSearch = useCallback(
+        (item: ItemWithMeta) => {
+            if (!mobileSearch.trim()) return true;
+            const q = mobileSearch.toLowerCase();
+            return (
+                item.expense_item?.expense_class_item_name?.toLowerCase().includes(q) ||
+                item.expense_item?.expense_class_item_acc_code?.toLowerCase().includes(q)
+            );
+        },
+        [mobileSearch],
+    );
+
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
         classificationId: number;
@@ -329,7 +410,13 @@ const Form2: React.FC<Form2Props> = ({
         classificationId: number;
         classificationName: string;
     } | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<ItemWithMeta | null>(null);
+    // const [deleteTarget, setDeleteTarget] = useState<ItemWithMeta | null>(null);
+
+    // ── "New item" highlight: badge + autofocus on the item just added ────────
+    const [newlyAddedItemId, setNewlyAddedItemId] = useState<number | null>(null);
+    const preAddItemIdsRef = useRef<Set<number>>(new Set());
+    const pendingNewItemDetectionRef = useRef(false);
+    const proposedInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
     // ── Move-to / context menu (card review mode) ─────────────────────────────
     const [ctxMenuItem, setCtxMenuItem] = useState<ItemWithMeta | null>(null);
@@ -377,6 +464,82 @@ const Form2: React.FC<Form2Props> = ({
     const [moveAnchorPos, setMoveAnchorPos] = useState<{ x: number; y: number } | null>(null);
     const [moveClassFilter, setMoveClassFilter] = useState<string>('all');
     const moveModalRef = useRef<HTMLDivElement>(null);
+
+    // ── Horizontal scroll: click-and-drag + arrow-key support for the table ───
+    const tableScrollRef = useRef<HTMLDivElement>(null);
+    const dragStateRef = useRef<{ isDown: boolean; startX: number; startScrollLeft: number }>({
+        isDown: false,
+        startX: 0,
+        startScrollLeft: 0,
+    });
+    const [isDraggingTable, setIsDraggingTable] = useState(false);
+    const [tableIsScrollable, setTableIsScrollable] = useState(false);
+
+    // Recompute whenever the table's content or container size could have
+    // changed — covers initial mount, window resizes, and data/columns
+    // changing the table's rendered width.
+    useEffect(() => {
+        const el = tableScrollRef.current;
+        if (!el) return;
+
+        const checkOverflow = () => {
+            setTableIsScrollable(el.scrollWidth > el.clientWidth + 1);
+        };
+
+        checkOverflow();
+
+        const resizeObserver = new ResizeObserver(checkOverflow);
+        resizeObserver.observe(el);
+        window.addEventListener("resize", checkOverflow);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener("resize", checkOverflow);
+        };
+    }, [items, aipItems, isAdmin, cardView, isMobile]);
+
+    const handleTableMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (!tableIsScrollable) return;
+        // Don't hijack drags that start on interactive elements (inputs, buttons, links, etc.)
+        const target = e.target as HTMLElement;
+        if (target.closest('input, button, textarea, select, a')) return;
+        const el = tableScrollRef.current;
+        if (!el) return;
+        dragStateRef.current = { isDown: true, startX: e.pageX, startScrollLeft: el.scrollLeft };
+        setIsDraggingTable(true);
+    }, [tableIsScrollable]);
+
+    const handleTableMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        const el = tableScrollRef.current;
+        if (!el || !dragStateRef.current.isDown) return;
+        e.preventDefault();
+        const dx = e.pageX - dragStateRef.current.startX;
+        el.scrollLeft = dragStateRef.current.startScrollLeft - dx;
+    }, []);
+
+    const endTableDrag = useCallback(() => {
+        dragStateRef.current.isDown = false;
+        setIsDraggingTable(false);
+    }, []);
+
+    const handleTableKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        const el = tableScrollRef.current;
+        if (!el) return;
+        const step = e.shiftKey ? 300 : 80;
+        if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            el.scrollBy({ left: -step, behavior: "smooth" });
+        } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            el.scrollBy({ left: step, behavior: "smooth" });
+        } else if (e.key === "Home") {
+            e.preventDefault();
+            el.scrollTo({ left: 0, behavior: "smooth" });
+        } else if (e.key === "End") {
+            e.preventDefault();
+            el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+        }
+    }, []);
 
     // Close the move panel on outside click / scroll — same pattern as the ctx menu
     useEffect(() => {
@@ -426,6 +589,11 @@ const Form2: React.FC<Form2Props> = ({
     const aipOblEditsRef = useRef(new Map<number, number>());
     const aipSem1EditsRef = useRef(new Map<number, number>());
     const savedAipSem1 = useRef(new Map<number, number>());
+
+    // Optimistic-delete bookkeeping — keyed by dept_bp_form2_item_id
+    const undoneDeleteIdsRef = useRef<Set<number>>(new Set());
+    const pendingDeleteItemsRef = useRef<Map<number, ItemWithMeta>>(new Map());
+    const hasReconciledForm2Deletes = useRef(false);
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -741,6 +909,41 @@ const Form2: React.FC<Form2Props> = ({
         });
     }, []);
 
+    // Reset the "already reconciled" flag whenever we're looking at a
+    // different plan, so switching plans re-checks localStorage for that plan.
+    useEffect(() => {
+        hasReconciledForm2Deletes.current = false;
+    }, [plan.dept_budget_plan_id]);
+
+    // Detect the newly added expense item once `items` refreshes after
+    // AddItemModal's onItemAdded triggers onItemUpdate() → parent refetch.
+    // Diffing on expense_item_id is safe here: AddItemModal only offers
+    // expense items not already present in `items` (existingItemIds), so a
+    // freshly appearing expense_item_id is unambiguously the one just added.
+    useEffect(() => {
+        if (!pendingNewItemDetectionRef.current) return;
+        const added = items.find(
+            (i) => !preAddItemIdsRef.current.has(i.expense_item_id),
+        );
+        if (added) {
+            pendingNewItemDetectionRef.current = false;
+            setNewlyAddedItemId(added.expense_item_id);
+        }
+    }, [items]);
+
+    // Autofocus + select the proposed-amount input for the newly added item,
+    // once it's actually mounted in the table.
+    useEffect(() => {
+        if (newlyAddedItemId == null) return;
+        const el = proposedInputRefs.current.get(newlyAddedItemId);
+        if (el) {
+            el.focus();
+            el.select();
+        }
+    }, [newlyAddedItemId, items]);
+
+    // ── Handlers: proposed amount ───────────────────────────────────────────── [items, plan.dept_budget_plan_id, finalizeItemDelete, showDeleteToast]);
+
     // ── Handlers: proposed amount ─────────────────────────────────────────────
 
     const handleProposedChange = useCallback(
@@ -1055,6 +1258,76 @@ const Form2: React.FC<Form2Props> = ({
 
     // ── Handlers: delete item ─────────────────────────────────────────────────
 
+    // Puts a removed item back into the list if the delete is undone or the
+    // API call fails. Order doesn't matter — itemsByClassification re-sorts
+    // by expense_class_item_id every render.
+    const restoreItemToList = useCallback((item: ItemWithMeta) => {
+        setItems((prev) =>
+            prev.some((i) => i.dept_bp_form2_item_id === item.dept_bp_form2_item_id)
+                ? prev
+                : [...prev, item],
+        );
+    }, []);
+
+    const finalizeItemDelete = useCallback(
+        (item: ItemWithMeta) => {
+            const itemId = item.dept_bp_form2_item_id;
+            API.delete(
+                `/department-budget-plans/${plan.dept_budget_plan_id}/items/${itemId}`,
+            )
+                .then(() => {
+                    onItemUpdate();
+                })
+                .catch(() => {
+                    toast.error("Failed to delete item — restoring it.");
+                    restoreItemToList(item);
+                })
+                .finally(() => {
+                    pendingDeleteItemsRef.current.delete(itemId);
+                    localStorage.removeItem(
+                        form2PendingDeleteKey(plan.dept_budget_plan_id, itemId),
+                    );
+                });
+        },
+        [plan.dept_budget_plan_id, onItemUpdate, restoreItemToList],
+    );
+
+    const showDeleteToast = useCallback(
+        (item: ItemWithMeta, durationMs: number) => {
+            const itemId = item.dept_bp_form2_item_id;
+            undoneDeleteIdsRef.current.delete(itemId);
+
+            toast(`"${item.expense_item?.expense_class_item_name || "Item"}" deleted`, {
+                id: `delete-form2-item-${itemId}`,
+                description: "Cannot be undone",
+                duration: durationMs,
+                icon: <CountdownRing durationMs={durationMs} />,
+                classNames: {
+                    title: "!text-red-900",
+                    description: "!text-red-600",
+                },
+                action: {
+                    label: "Undo",
+                    onClick: () => {
+                        undoneDeleteIdsRef.current.add(itemId);
+                        pendingDeleteItemsRef.current.delete(itemId);
+                        localStorage.removeItem(
+                            form2PendingDeleteKey(plan.dept_budget_plan_id, itemId),
+                        );
+                        restoreItemToList(item);
+                    },
+                },
+                // fires only when Sonner's own timer completes — which Sonner
+                // already pauses automatically while the toast is hovered
+                onAutoClose: () => {
+                    if (undoneDeleteIdsRef.current.has(itemId)) return;
+                    finalizeItemDelete(item);
+                },
+            });
+        },
+        [finalizeItemDelete, restoreItemToList, plan.dept_budget_plan_id],
+    );
+
     const handleDeleteItem = useCallback(
         (itemId: number, expenseItemId: number) => {
             const item = items.find((i) => i.dept_bp_form2_item_id === itemId);
@@ -1071,25 +1344,68 @@ const Form2: React.FC<Form2Props> = ({
                 toast.warning("Cannot delete — this item has obligation data in the obligation year.");
                 return;
             }
-            setDeleteTarget(item);
+
+            const deleteAt = Date.now() + DELETE_GRACE_MS;
+            // Persist BEFORE touching state, so a refresh during the undo
+            // window can pick this back up instead of losing track of it.
+            localStorage.setItem(
+                form2PendingDeleteKey(plan.dept_budget_plan_id, itemId),
+                JSON.stringify({ item, deleteAt }),
+            );
+
+            // Optimistic removal — gone from the list immediately, undoable for 5s
+            pendingDeleteItemsRef.current.set(itemId, item);
+            setItems((prev) => prev.filter((i) => i.dept_bp_form2_item_id !== itemId));
+            showDeleteToast(item, DELETE_GRACE_MS);
         },
-        [items],
+        [items, showDeleteToast, plan.dept_budget_plan_id],
     );
 
-    const handleDeleteConfirmed = useCallback(async () => {
-        if (!deleteTarget) return;
-        const itemId = deleteTarget.dept_bp_form2_item_id;
-        setDeleteTarget(null);
-        try {
-            await API.delete(
-                `/department-budget-plans/${plan.dept_budget_plan_id}/items/${itemId}`,
-            );
-            toast.success("Item deleted");
-            onItemUpdate();
-        } catch {
-            toast.error("Failed to delete item.");
+    // ── Resume any pending deletes that were still in their undo window when
+    // this component was last unmounted (e.g. a hard refresh mid-countdown).
+    // Runs after `items` has been (re)built from plan/pastYearPlan/obligationYearPlan,
+    // so it can immediately re-remove the item if the server never got the delete.
+    // Placed after finalizeItemDelete/showDeleteToast so it can reference them
+    // without a "used before declaration" error.
+    useEffect(() => {
+        if (hasReconciledForm2Deletes.current) return;
+        const planId = plan.dept_budget_plan_id;
+        if (!planId) return;
+        hasReconciledForm2Deletes.current = true;
+
+        const prefix = `${FORM2_PENDING_DELETE_PREFIX}${planId}_`;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith(prefix)) continue;
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+
+            let parsed: { item: ItemWithMeta; deleteAt: number } | null = null;
+            try {
+                parsed = JSON.parse(raw);
+            } catch {
+                localStorage.removeItem(key);
+                continue;
+            }
+            if (!parsed) continue;
+
+            const { item, deleteAt } = parsed;
+            const itemId = item.dept_bp_form2_item_id;
+
+            // Re-remove from the freshly rebuilt list (the server never got
+            // the delete request, so it's still present in plan.items).
+            setItems((prev) => prev.filter((i) => i.dept_bp_form2_item_id !== itemId));
+            pendingDeleteItemsRef.current.set(itemId, item);
+
+            const remaining = deleteAt - Date.now();
+            if (remaining <= 0) {
+                localStorage.removeItem(key);
+                finalizeItemDelete(item);
+            } else {
+                showDeleteToast(item, remaining);
+            }
         }
-    }, [deleteTarget, plan.dept_budget_plan_id, onItemUpdate]);
+    }, [items, plan.dept_budget_plan_id, finalizeItemDelete, showDeleteToast]);
 
     // ── Card click → context menu (admin + review/card mode only) ─────────────
     const handleCardContextClick = useCallback(
@@ -1860,7 +2176,448 @@ const Form2: React.FC<Form2Props> = ({
                 </div>
             </div>
 
-            {cardView ? (
+            {/* Submissions closed — department head view only. Admins keep full
+                access regardless of isEditable, so this never shows for them. */}
+            {plan.status === 'draft' && (plan.budget_plan as any)?.is_open === false && !isAdmin && !isViewer && (
+                <div className="px-5 py-3 border-b border-amber-200 bg-amber-50 flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5c0 .199.079.39.22.53l3 3a.75.75 0 101.06-1.06l-2.78-2.78V6.75z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-[12.5px] text-amber-800">
+                        <span className="font-semibold">Submissions are closed.</span>{" "}
+                        Please wait for the Budget Office to open the Budget Preparation.
+                    </p>
+                </div>
+            )}
+
+           {isMobile ? (
+  <div className="p-3 flex flex-col gap-2.5">
+    <div className="sticky top-0 z-20 -mx-3 -mt-3 mb-1 px-3 pt-3 pb-2 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <div className="relative">
+        <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          value={mobileSearch}
+          onChange={(e) => setMobileSearch(e.target.value)}
+          placeholder="Search items…"
+          className="w-full h-10 pl-9 pr-9 text-[13px] rounded-full border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white"
+        />
+        {mobileSearch && (
+          <button
+            onClick={() => setMobileSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+    {itemsByClassification.map((cls) => {
+      const filteredItems = cls.items.filter(matchesMobileSearch);
+      if (cls.items.length === 0 || filteredItems.length === 0) return null;
+      const label = cls.expense_class_name === 'Prop/Plant/Eqpt'
+        ? 'Capital Outlay (CO)'
+        : cls.expense_class_name;
+      const clsPast = cls.items.reduce((s, i) => s + i.pastTotal, 0);
+      const clsProp = cls.items.reduce((s, i) => s + Number(i.total_amount), 0);
+      const clsDiff = clsProp - clsPast;
+      const clsPct = pctOf(clsPast, clsDiff);
+      const isPS = cls.expense_class_id === PS_CLASS_ID;
+      const canEdit = isEditable && (!isPS || isAdmin);
+      return (
+        <div key={cls.expense_class_id}>
+          <div className="flex items-center justify-between gap-2 mb-2 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-900 flex-shrink-0 mt-1" />
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-900 leading-snug">{label}</p>
+            </div>
+            {canEdit && (
+              <button
+                onClick={() =>
+                  setModalState({
+                    isOpen: true,
+                    classificationId: cls.expense_class_id,
+                    classificationName: cls.expense_class_name,
+                  })
+                }
+                className="flex items-center gap-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-full pl-2 pr-2.5 py-1 transition-colors flex-shrink-0"
+              >
+                <PlusIcon className="w-3 h-3" /> Add
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            {filteredItems.map((item) => {
+              const past = item.pastTotal;
+              const proposed = Number(item.total_amount);
+              const d = proposed - past;
+              const p = pctOf(past, d);
+              const isSaving = savingItems.has(item.expense_item_id);
+              const dispSem1 = pastSem1Edits.has(item.expense_item_id)
+                ? pastSem1Edits.get(item.expense_item_id)!
+                : item.pastSem1;
+              const sem2Cap = past > 0 ? past : 0;
+              const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
+              const sem1Editable = isAdmin && isEditable && past > 0 && !!pastYearPlan;
+              const isExpanded = expandedMobileItems.has(item.expense_item_id);
+              return (
+                <div key={item.expense_item_id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2 px-4 pt-3.5 pb-3">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 leading-snug">
+                        {item.expense_item?.expense_class_item_name ?? '—'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                        {item.expense_item?.expense_class_item_acc_code ?? '—'}
+                      </p>
+                    </div>
+                    {canEdit && item.dept_bp_form2_item_id > 0 && (
+                      <button
+                        onClick={() => handleDeleteItem(item.dept_bp_form2_item_id, item.expense_item_id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Proposed amount — the hero field, full-width tinted band, no border-box */}
+                  <div className="bg-orange-50/70 px-4 py-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-shrink">
+                      <p className="text-[9px] font-semibold uppercase tracking-wide text-orange-500 whitespace-nowrap">
+                        Proposed ({currYear})
+                      </p>
+                      <p className={cn('text-[10px] font-mono font-semibold mt-0.5 whitespace-nowrap', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                        {d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${fmtP(d)} · ${past === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}`}
+                      </p>
+                    </div>
+                    {canEdit && isEditable ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={13}
+                        value={getDraftValue(item.expense_item_id, "proposed", proposed)}
+                        onChange={(e) => {
+                          const pos = e.target.selectionStart ?? e.target.value.length;
+                          handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
+                        }}
+                        onBlur={() => handleCommaBlur(item.expense_item_id, "proposed")}
+                        disabled={isSaving}
+                        className="text-[16px] font-mono font-bold text-orange-700 w-full max-w-[168px] bg-white border border-orange-200 rounded-lg px-2.5 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-orange-300"
+                      />
+                    ) : (
+                      <p className="text-[18px] font-mono font-bold text-orange-700">
+                        {proposed === 0 ? '–' : fmtP(proposed)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Toggle — breakdown is collapsed by default */}
+                  <button
+                    onClick={() => toggleMobileExpand(item.expense_item_id)}
+                    className="w-full flex items-center justify-between px-4 py-2 border-t border-gray-100 text-[11px] font-medium text-gray-400 hover:bg-gray-50 transition-colors"
+                  >
+                    <span>{isExpanded ? 'Hide' : 'Show'} appropriation breakdown</span>
+                    <svg
+                      className={cn('w-3.5 h-3.5 transition-transform', isExpanded && 'rotate-180')}
+                      viewBox="0 0 20 20" fill="currentColor"
+                    >
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-100">
+                      {/* Past Obligation — green band, its own color like Proposed */}
+                      {isAdmin && (
+                        <div className="bg-emerald-50/70 px-4 py-2.5 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-emerald-600">
+                            Past Obligation ({obligationYearPlan?.budget_plan?.year ?? '—'})
+                          </span>
+                          {isEditable ? (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={getDraftValue(
+                                item.expense_item_id,
+                                "obligation",
+                                obligationEdits.has(item.expense_item_id)
+                                  ? obligationEdits.get(item.expense_item_id)!
+                                  : item.pastObligation,
+                              )}
+                              onChange={(e) => {
+                                const pos = e.target.selectionStart ?? e.target.value.length;
+                                handleCommaInput(item.expense_item_id, "obligation", e.target.value, e.target, pos);
+                              }}
+                              onBlur={() => handleCommaBlur(item.expense_item_id, "obligation")}
+                              disabled={savingObligations.has(item.expense_item_id)}
+                              className="text-[13px] font-mono font-semibold text-emerald-700 w-28 bg-white border border-emerald-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            />
+                          ) : (
+                            <span className="text-[13px] font-mono font-semibold text-emerald-700">
+                              {item.pastObligation === 0 ? '–' : fmtP(item.pastObligation)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Current appropriation — blue band, ordered Sem1 → Sem2 → Total */}
+                      <div className="bg-blue-50/70 divide-y divide-blue-100/60">
+                        <div className="px-4 py-2.5 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-blue-500">1st Sem</span>
+                          {sem1Editable ? (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={getDraftValue(item.expense_item_id, "sem1", dispSem1)}
+                              onChange={(e) => {
+                                const pos = e.target.selectionStart ?? e.target.value.length;
+                                handleCommaInput(item.expense_item_id, "sem1", e.target.value, e.target, pos);
+                              }}
+                              onBlur={() => handleCommaBlur(item.expense_item_id, "sem1")}
+                              disabled={savingPastItems.has(item.expense_item_id)}
+                              className="text-[13px] font-mono font-semibold text-blue-700 w-28 bg-white border border-blue-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            />
+                          ) : (
+                            <span className="text-[13px] font-mono font-semibold text-blue-700">
+                              {dispSem1 === 0 ? '–' : fmtP(dispSem1)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="px-4 py-2.5 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-blue-500">2nd Sem (auto)</span>
+                          <span className="text-[13px] font-mono font-medium text-blue-600">
+                            {dispSem2 === 0 ? '–' : fmtP(dispSem2)}
+                          </span>
+                        </div>
+
+                        <div className="px-4 py-2.5 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-blue-600">
+                            Total Current ({prevYear})
+                          </span>
+                          <span className="text-[13px] font-mono font-bold text-blue-700">
+                            {past === 0 ? '–' : fmtP(past)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendation — quiet footer strip */}
+                  {isAdmin && (
+                    <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-2.5">
+                      {isEditable ? (
+                        <input
+                          type="text"
+                          value={item.recommendation ?? ''}
+                          onChange={(e) => handleRecommendationChange(item.expense_item_id, e.target.value)}
+                          onBlur={() => handleRecommendationBlur(item.expense_item_id)}
+                          placeholder="Add recommendation note…"
+                          maxLength={255}
+                          className="text-[12px] w-full bg-transparent focus:outline-none placeholder:text-gray-300"
+                        />
+                      ) : (
+                        <span className="text-[12px] text-gray-500">{item.recommendation || 'No recommendation'}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mt-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+              Total · {label}
+            </p>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[19px] font-mono font-bold text-orange-700 leading-none">
+                {clsProp === 0 ? '–' : fmtP2(clsProp)}
+              </span>
+              {!(clsPast === 0 && clsDiff === 0) && (
+                <span className={cn(
+                  'text-[10px] font-mono font-bold px-2 py-1 rounded-full flex-shrink-0',
+                  clsDiff > 0 ? 'text-emerald-700 bg-emerald-100' : clsDiff < 0 ? 'text-red-700 bg-red-100' : 'text-gray-500 bg-gray-100',
+                )}>
+                  {clsDiff >= 0 ? '+' : ''}{fmtP2(clsDiff)} ({clsPct.toFixed(1)}%)
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    })}
+
+    {aipItems.length > 0 && (
+      <div>
+        <div className="flex items-center gap-2 mb-2 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-900">Special Programs (AIP)</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          {aipItems.map((item) => {
+            const appTotal = (item as any).app_total ?? 0;
+            const proposed = item.total_amount;
+            const d = proposed - appTotal;
+            const p = pctOf(appTotal, d);
+            const id = item.dept_bp_form4_item_id;
+            const isAipExpanded = expandedMobileAipItems.has(id);
+            return (
+              <div key={id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 px-4 pt-3.5 pb-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-800 leading-snug">
+                      {item.program_description || '—'}
+                    </p>
+                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                      {item.aip_reference_code || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Proposed amount — hero band, boxed value like the regular item cards */}
+                <div className="bg-orange-50/70 px-4 py-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-shrink">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-orange-500 whitespace-nowrap">
+                      Proposed ({currYear})
+                    </p>
+                    <p className={cn('text-[10px] font-mono font-semibold mt-0.5 whitespace-nowrap', d > 0 ? 'text-emerald-600' : d < 0 ? 'text-red-500' : 'text-gray-400')}>
+                      {d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${fmtP(d)} · ${appTotal === 0 && d === 0 ? '–' : `${p.toFixed(2)}%`}`}
+                    </p>
+                  </div>
+                  <span className="text-[16px] font-mono font-bold text-orange-700 w-full max-w-[168px] bg-white border border-orange-200 rounded-lg px-2.5 py-1.5 text-right flex-shrink-0">
+                    {proposed === 0 ? '–' : fmtP(proposed)}
+                  </span>
+                </div>
+
+                {/* Toggle — breakdown collapsed by default, same as regular expense items */}
+                <button
+                  onClick={() => toggleMobileAipExpand(id)}
+                  className="w-full flex items-center justify-between px-4 py-2 border-t border-gray-100 text-[11px] font-medium text-gray-400 hover:bg-gray-50 transition-colors"
+                >
+                  <span>{isAipExpanded ? 'Hide' : 'Show'} appropriation breakdown</span>
+                  <svg
+                    className={cn('w-3.5 h-3.5 transition-transform', isAipExpanded && 'rotate-180')}
+                    viewBox="0 0 20 20" fill="currentColor"
+                  >
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </button>
+
+                {isAipExpanded && (
+                  <div className="border-t border-gray-100">
+                    {/* Past Obligation — green band, editable, admin only — matches regular item cards */}
+                    {isAdmin && (
+                      <div className="bg-emerald-50/70 px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-emerald-600">
+                          Past Obligation ({obligationYearPlan?.budget_plan?.year ?? '—'})
+                        </span>
+                        {isEditable ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={
+                              inputDraft.has(`aip_${id}_obligation`)
+                                ? inputDraft.get(`aip_${id}_obligation`)!
+                                : comma(aipOblEdits.has(id) ? aipOblEdits.get(id)! : ((item as any).obligation_amount ?? 0))
+                            }
+                            onChange={(e) => handleAipCommaInput(id, "obligation", e.target.value)}
+                            onBlur={() => handleAipCommaBlur(id, "obligation")}
+                            disabled={savingAipObligations.has(id)}
+                            placeholder="0"
+                            className="text-[13px] font-mono font-semibold text-emerald-700 w-28 bg-white border border-emerald-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                          />
+                        ) : (
+                          <span className="text-[13px] font-mono font-semibold text-emerald-700">
+                            {((item as any).obligation_amount ?? 0) === 0 ? '–' : fmtP((item as any).obligation_amount)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Current appropriation — blue band, Sem1 → Sem2 → Total, same order as regular items */}
+                    <div className="bg-blue-50/70 divide-y divide-blue-100/60">
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-blue-500">1st Sem</span>
+                        {isEditable && isAdmin ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={
+                              inputDraft.has(`aip_${id}_sem1`)
+                                ? inputDraft.get(`aip_${id}_sem1`)!
+                                : comma(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
+                            }
+                            onChange={(e) => handleAipCommaInput(id, "sem1", e.target.value)}
+                            onBlur={() => handleAipCommaBlur(id, "sem1")}
+                            disabled={savingAipSem1.has(id)}
+                            className="text-[13px] font-mono font-semibold text-blue-700 w-28 bg-white border border-blue-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          />
+                        ) : (
+                          <span className="text-[13px] font-mono font-semibold text-blue-700">
+                            {((item as any).app_sem1 ?? 0) === 0 ? '–' : fmtP((item as any).app_sem1)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-blue-500">2nd Sem (auto)</span>
+                        <span className="text-[13px] font-mono font-medium text-blue-600">
+                          {(() => {
+                            const s1 = aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0);
+                            const s2 = Math.max(appTotal - s1, 0);
+                            return s2 === 0 ? '–' : fmtP(s2);
+                          })()}
+                        </span>
+                      </div>
+
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-blue-600">
+                          Total Current ({prevYear})
+                        </span>
+                        <span className="text-[13px] font-mono font-bold text-blue-700">
+                          {appTotal === 0 ? '–' : fmtP(appTotal)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {isSpecialAccount && (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-3 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-gray-600">5% Calamity Fund</p>
+        <span className="text-[13px] font-mono font-semibold text-orange-700">
+          {calamityLoading ? '…' : calamityTotal > 0 ? fmtP2(calamityTotal) : '–'}
+        </span>
+      </div>
+    )}
+
+    <div className="bg-gray-900 rounded-2xl px-5 py-4 mt-1">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Grand Total</p>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[24px] font-mono font-bold text-orange-300 leading-none">
+          {fmtP2(grandFinal.proposed)}
+        </span>
+        {!(grandFinal.pastTotal === 0 && gtDiff === 0) && (
+          <span className={cn(
+            'text-[11px] font-mono font-bold px-2.5 py-1 rounded-full flex-shrink-0',
+            gtDiff > 0 ? 'text-emerald-300 bg-emerald-900/40' : gtDiff < 0 ? 'text-red-300 bg-red-900/40' : 'text-gray-300 bg-gray-800',
+          )}>
+            {gtDiff >= 0 ? '+' : ''}{fmtP2(gtDiff)} ({gtPct.toFixed(1)}%)
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
+) : cardView ? (
   <div className="p-4 flex flex-col gap-3">
     {itemsByClassification.map((cls) => {
       if (cls.items.length === 0) return null;
@@ -1872,27 +2629,45 @@ const Form2: React.FC<Form2Props> = ({
       const clsDiff = clsProp - clsPast;
       const clsPct = pctOf(clsPast, clsDiff);
       const isCollapsed = collapsedClasses.has(cls.expense_class_id);
+      const isPS = cls.expense_class_id === PS_CLASS_ID;
+      const canEdit = isEditable && (!isPS || isAdmin);
       return (
         <div key={cls.expense_class_id}>
-          <button
-            onClick={() => toggleClassCollapsed(cls.expense_class_id)}
-            className="w-full flex items-center justify-between gap-2 mb-3 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5">
+          <div className="w-full flex items-center justify-between gap-2 mb-3 px-4 py-3 rounded-xl bg-white border border-gray-200 hover:border-gray-300 shadow-sm transition-colors group">
+            <button
+              onClick={() => toggleClassCollapsed(cls.expense_class_id)}
+              className="flex items-start gap-2.5 flex-1 min-w-0 text-left"
+            >
               <svg
-                className={cn('w-4 h-4 text-gray-400 transition-transform flex-shrink-0', isCollapsed ? '-rotate-90' : '')}
+                className={cn('w-4 h-4 text-gray-400 transition-transform flex-shrink-0 mt-0.5', isCollapsed ? '-rotate-90' : '')}
                 viewBox="0 0 20 20" fill="currentColor"
               >
                 <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
               </svg>
-              <p className="text-[15px] font-bold uppercase tracking-wider text-white">{label}</p>
-            </div>
-            {isCollapsed && (
-              <span className="text-[11px] font-semibold text-gray-400">
-                {cls.items.length} item{cls.items.length === 1 ? '' : 's'} · click to expand
+              <span className="min-w-0">
+                <p className="text-[15px] font-bold uppercase tracking-wider text-gray-900 leading-snug">{label}</p>
+                {isCollapsed && (
+                  <span className="text-[11px] font-semibold text-gray-400 block mt-0.5">
+                    {cls.items.length} item{cls.items.length === 1 ? '' : 's'} · click to expand
+                  </span>
+                )}
               </span>
+            </button>
+            {canEdit && (
+              <button
+                onClick={() =>
+                  setModalState({
+                    isOpen: true,
+                    classificationId: cls.expense_class_id,
+                    classificationName: cls.expense_class_name,
+                  })
+                }
+                className="flex items-center gap-1 text-[11px] font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-full pl-2.5 pr-3 py-1.5 transition-colors flex-shrink-0"
+              >
+                <PlusIcon className="w-3.5 h-3.5" /> Add
+              </button>
             )}
-          </button>
+          </div>
           {!isCollapsed && (
           <div className="flex flex-col gap-3">
             {cls.items.map((item, idx) => {
@@ -2247,10 +3022,22 @@ const Form2: React.FC<Form2Props> = ({
     </div>
   </div>
 ) : (
-            <div className="overflow-x-auto">
+            <div
+                ref={tableScrollRef}
+                tabIndex={0}
+                onMouseDown={handleTableMouseDown}
+                onMouseMove={handleTableMouseMove}
+                onMouseUp={endTableDrag}
+                onMouseLeave={endTableDrag}
+                onKeyDown={handleTableKeyDown}
+                className={cn(
+                    "overflow-x-auto focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-b-xl",
+                    tableIsScrollable && (isDraggingTable ? "cursor-grabbing select-none" : "cursor-grab"),
+                )}
+            >
                 <table
                     className="w-full text-[12px] border-collapse"
-                    style={{ minWidth: 960 }}
+                    style={{ minWidth: 960, tableLayout: "fixed" }}
                 >
                     <colgroup>
                         {COL_WIDTHS.map((w, i) => {
@@ -2262,10 +3049,10 @@ const Form2: React.FC<Form2Props> = ({
                     {/* ── Header ── */}
                     <thead className="sticky top-0 z-10">
                         <tr>
-                            <th className={TH} rowSpan={2}>
+                            <th className={cn(TH, "sticky left-0 z-20 bg-white")} rowSpan={2}>
                                 Acct Code
                             </th>
-                            <th className={TH} rowSpan={2}>
+                            <th className={cn(TH, "sticky left-[100px] z-20 bg-white border-r border-gray-200")} rowSpan={2}>
                                 Object of Expenditure
                             </th>
                             {isAdmin && (
@@ -2360,14 +3147,14 @@ const Form2: React.FC<Form2Props> = ({
 
                             return (
                                 <React.Fragment key={cls.expense_class_id}>
-                                    {/* Section header row */}
+                                    {/* Section header row — sticky both vertically (below column header) and horizontally (left edge) */}
                                     <tr className="bg-gray-50 border-y border-gray-200">
                                         <td
                                             colSpan={isAdmin ? 9 : 7}
-                                            className="px-4 py-2"
+                                            className="px-4 py-2 sticky top-[73px] z-[15] bg-gray-50"
                                         >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
+                                            <div className="relative flex items-center min-h-[28px]">
+                                                <div className="flex items-center gap-2 sticky left-4">
                                                     <span className="text-[12px] font-semibold text-gray-700">
                                                         {label}
                                                     </span>
@@ -2380,12 +3167,13 @@ const Form2: React.FC<Form2Props> = ({
                                                 </div>
 
                                                 {canEdit && (
+    <div className="ml-auto sticky right-4">
     <Tooltip>
         <TooltipTrigger asChild>
             <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900"
+                className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900 bg-gray-50"
                 onClick={() =>
                     setModalState({
                         isOpen: true,
@@ -2401,6 +3189,7 @@ const Form2: React.FC<Form2Props> = ({
             Add item in {cls.abbreviation}
         </TooltipContent>
     </Tooltip>
+    </div>
 )}
                                             </div>
                                         </td>
@@ -2460,14 +3249,21 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                     past > 0 &&
                                                     !!pastYearPlan;
 
+                                                const isNewlyAdded =
+                                                    newlyAddedItemId === item.expense_item_id;
+
                                                 return (
                                                     <tr
                                                         key={
                                                             item.expense_item_id
                                                         }
                                                         className={cn(
-                                                            "_rowAnim hover:bg-gray-50/60 transition-colors",
+                                                            "_rowAnim transition-colors",
+                                                            isNewlyAdded
+                                                                ? "bg-emerald-50 hover:bg-emerald-50 border-l-2 border-l-emerald-400"
+                                                                : "hover:bg-gray-50/60",
                                                             isPS &&
+                                                                !isNewlyAdded &&
                                                                 "bg-blue-50/10",
                                                         )}
                                                         style={{
@@ -2477,7 +3273,9 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         <td
                                                             className={cn(
                                                                 TD,
-                                                                "text-gray-400 font-mono text-[11px]",
+                                                                "text-gray-400 font-mono text-[11px] whitespace-nowrap align-top",
+                                                                STICKY_1,
+                                                                isNewlyAdded ? "bg-emerald-50" : "bg-white",
                                                             )}
                                                         >
                                                             {item.expense_item
@@ -2487,16 +3285,25 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                         <td
                                                             className={cn(
                                                                 TD,
-                                                                "text-gray-800 font-medium",
+                                                                "text-gray-800 font-medium align-top",
+                                                                STICKY_2,
+                                                                isNewlyAdded ? "bg-emerald-50" : "bg-white",
                                                             )}
                                                         >
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span>
-                                                                    {
-                                                                        item
-                                                                            .expense_item
-                                                                            ?.expense_class_item_name
-                                                                    }
+                                                            <div className="flex items-start justify-between gap-1">
+                                                                <span className="flex items-start gap-1.5 min-w-0">
+                                                                    <span className="whitespace-normal break-words leading-snug">
+                                                                        {
+                                                                            item
+                                                                                .expense_item
+                                                                                ?.expense_class_item_name
+                                                                        }
+                                                                    </span>
+                                                                    {newlyAddedItemId === item.expense_item_id && (
+                                                                        <span className="flex-shrink-0 text-[9px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide mt-0.5">
+                                                                            New
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                                 {canEdit &&
                                                                     item.dept_bp_form2_item_id >
@@ -2509,7 +3316,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                                     item.expense_item_id,
                                                                                 )
                                                                             }
-                                                                            className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+                                                                            className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
                                                                             title="Remove"
                                                                         >
                                                                             <TrashIcon className="w-3.5 h-3.5" />
@@ -2636,8 +3443,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                 "border-l border-orange-100",
                                                             )}
                                                         >
-                                                            {canEdit ? (
+                                                            {canEdit && isEditable ? (
                                                                 <input
+                                                                    ref={(el) => {
+                                                                        if (el) proposedInputRefs.current.set(item.expense_item_id, el);
+                                                                        else proposedInputRefs.current.delete(item.expense_item_id);
+                                                                    }}
                                                                     type="text"
                                                                     inputMode="numeric"
                                                                     maxLength={13}
@@ -2650,17 +3461,23 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                         const pos = e.target.selectionStart ?? e.target.value.length;
                                                                         handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
                                                                     }}
-                                                                    onBlur={() =>
+                                                                    onBlur={() => {
+                                                                        // Blurring the amount field is the signal that the
+                                                                        // user is done with the newly added item — drop
+                                                                        // the badge/highlight, independent of save success.
+                                                                        if (newlyAddedItemId === item.expense_item_id) {
+                                                                            setNewlyAddedItemId(null);
+                                                                        }
                                                                         handleCommaBlur(
                                                                             item.expense_item_id,
                                                                             "proposed",
-                                                                        )
-                                                                    }
+                                                                        );
+                                                                    }}
                                                                     onKeyDown={blurOnEnter}
                                                                     disabled={
-                                                                        isSaving
+                                                                        !isEditable || isSaving
                                                                     }
-                                                                    tabIndex={3000 + rowIdx}
+                                                                    tabIndex={isEditable ? 3000 + rowIdx : -1}
                                                                     className={
                                                                         inputCls
                                                                     }
@@ -2765,11 +3582,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
 
                                             {/* Classification subtotal */}
                                             <tr className="border-t border-gray-200">
-                                                <td className="bg-gray-100" />
+                                                <td className={cn("bg-gray-100", STICKY_1)} />
                                                 <td
                                                     className={cn(
                                                         TD,
                                                         "font-semibold text-gray-700 bg-gray-100",
+                                                        STICKY_2,
                                                     )}
                                                 >
                                                     Total {label}
@@ -2879,9 +3697,9 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 <tr className="bg-gray-50 border-y border-gray-200">
                                     <td
                                         colSpan={isAdmin ? 9 : 7}
-                                        className="px-4 py-2"
+                                        className="px-4 py-2 sticky top-[73px] z-[15] bg-gray-50"
                                     >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 sticky left-4 w-fit max-w-[calc(100vw-100px)]">
                                             <span className="text-[12px] font-semibold text-gray-700">
                                                 Special Programs
                                             </span>
@@ -2920,6 +3738,8 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 className={cn(
                                                     TD,
                                                     "text-gray-400 font-mono text-[11px]",
+                                                    STICKY_1,
+                                                    "bg-white",
                                                 )}
                                             >
                                                 {item.aip_reference_code || "–"}
@@ -2927,7 +3747,9 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                             <td
                                                 className={cn(
                                                     TD,
-                                                    "text-gray-800 font-medium",
+                                                    "text-gray-800 font-medium align-top whitespace-normal break-words leading-snug",
+                                                    STICKY_2,
+                                                    "bg-white",
                                                 )}
                                             >
                                                 {item.program_description ||
@@ -3083,11 +3905,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 })}
 
                                 <tr className="border-t border-gray-200">
-                                    <td className="bg-gray-100" />
+                                    <td className={cn("bg-gray-100", STICKY_1)} />
                                     <td
                                         className={cn(
                                             TD,
                                             "font-semibold text-gray-700 bg-gray-100",
+                                            STICKY_2,
                                         )}
                                     >
                                         Total Special Programs
@@ -3159,9 +3982,9 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 <tr className="bg-gray-50 border-y border-gray-200">
                                     <td
                                         colSpan={isAdmin ? 9 : 7}
-                                        className="px-4 py-2"
+                                        className="px-4 py-2 sticky top-[73px] z-[15] bg-gray-50"
                                     >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 sticky left-4 w-fit max-w-[calc(100vw-100px)]">
                                             <span className="text-[12px] font-semibold text-gray-700">
                                                 5% Calamity Fund
                                             </span>
@@ -3210,6 +4033,8 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 className={cn(
                                                     TD,
                                                     "text-gray-400 font-mono text-[11px]",
+                                                    STICKY_1,
+                                                    "bg-white",
                                                 )}
                                             >
                                                 {row.code}
@@ -3218,6 +4043,8 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 className={cn(
                                                     TD,
                                                     "text-gray-800",
+                                                    STICKY_2,
+                                                    "bg-white",
                                                 )}
                                             >
                                                 {row.label}
@@ -3290,11 +4117,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                 })}
 
                                 <tr className="border-t border-gray-200">
-                                    <td className="bg-gray-100" />
+                                    <td className={cn("bg-gray-100", STICKY_1)} />
                                     <td
                                         className={cn(
                                             TD,
                                             "font-semibold text-gray-700 bg-gray-100",
+                                            STICKY_2,
                                         )}
                                     >
                                         Total 5% Calamity Fund
@@ -3380,8 +4208,8 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                     <tfoot>
                         {hasRows && (
                             <tr className="bg-gray-900 text-white">
-                                <td className="px-3 py-3" />
-                                <td className="px-3 py-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                                <td className="px-3 py-3 sticky left-0 z-10 bg-gray-900" />
+                                <td className="px-3 py-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400 sticky left-[100px] z-10 bg-gray-900 border-r border-gray-700">
                                     Grand Total
                                     {isSpecialAccount && calamityTotal > 0 && (
                                         <span className="ml-2 text-[9px] font-normal text-gray-500 normal-case tracking-normal">
@@ -3473,43 +4301,20 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                     expenseItems={expenseItems}
                     existingItemIds={items.map((i) => i.expense_item_id)}
                     onItemAdded={() => {
+                        // Snapshot current ids so the detection effect above
+                        // can spot the one new id once onItemUpdate() causes
+                        // `items` to refresh with the newly saved item.
+                        preAddItemIdsRef.current = new Set(
+                            items.map((i) => i.expense_item_id),
+                        );
+                        pendingNewItemDetectionRef.current = true;
                         onItemUpdate();
                         toast.success("Item added successfully");
                     }}
                 />
             )}
 
-            <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
-                <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
-                            Remove this item?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-sm text-gray-500">
-                            <span className="font-medium text-gray-700">
-                                {deleteTarget?.expense_item?.expense_class_item_name ?? "This item"}
-                            </span>{' '}
-                            will be permanently removed from this budget plan. This cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel asChild>
-                            <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">
-                                Cancel
-                            </Button>
-                        </AlertDialogCancel>
-                        <AlertDialogAction asChild>
-                            <Button
-                                size="sm"
-                                className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
-                                onClick={handleDeleteConfirmed}
-                            >
-                                Remove
-                            </Button>
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+
 
             {ctxMenuItem && ctxMenuPos && createPortal(
                 <div

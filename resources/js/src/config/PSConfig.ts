@@ -49,6 +49,7 @@ export const PS_CONFIG = {
   },
   otherBenefits: {
     days: 5,                   // Other Personnel Benefits = (monthly / 22) × days
+    flat: 7000,                  // ← NEW: flat amount per active position
   },
 
   // ── MAGNA CARTA BENEFITS ──────────────────────────────────────────────────

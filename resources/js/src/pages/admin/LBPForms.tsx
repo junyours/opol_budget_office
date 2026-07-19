@@ -40,6 +40,7 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsMobile } from '../../hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 
 // import { useNotifications } from '@/src/hooks/useNotifications';
@@ -910,6 +911,8 @@ const LBPForms: React.FC = () => {
 
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const activePlanId = activePlan?.budget_plan_id;
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
 
   const queryClient = useQueryClient();
 
@@ -1076,11 +1079,12 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
 }, [notifications, markRead]);
 
   const handleSelectPlan = (id: number) => {
-      if (id === selectedPlanId) return;
+      if (id === selectedPlanId) { if (isMobile) setMobileView('detail'); return; }
       setSelectedPlanId(id);
       setPanelKey(k => k + 1);
       const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
       if (plan) markDeptNotificationsRead(plan.dept_id);
+      if (isMobile) setMobileView('detail');
   };
 
 //   // ── Called by Form2 when an item is saved ─────────────────────────────────
@@ -1221,12 +1225,15 @@ const handleAcknowledge = async () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full min-h-0 overflow-hidden w-full">
+    <div className={cn("flex h-full min-h-0 overflow-hidden w-full", isMobile && "flex-col")}>
 
       {/* ══ LEFT RAIL ══ */}
       <aside className={cn(
-        "shrink-0 border-r border-gray-100 bg-gray-50/40 flex-col py-4 px-2 gap-0.5 overflow-y-auto",
-        cardView ? "hidden" : "w-56 flex",
+        "shrink-0 min-h-0 border-r border-gray-100 bg-gray-50/40 flex-col py-4 px-2 gap-0.5 overflow-y-auto",
+        cardView && "hidden",
+        !cardView && (isMobile
+          ? cn("w-full border-r-0 h-full", mobileView === 'list' ? "flex" : "hidden")
+          : "w-56 flex h-full"),
       )}>
 
         <div className="px-2.5 mb-3">
@@ -1389,7 +1396,10 @@ const handleAcknowledge = async () => {
       </aside>
 
       {/* ══ MAIN CONTENT ══ */}
-      <div className="flex-1 min-w-0 w-0 flex flex-col overflow-hidden bg-gray-50/20">
+      <div className={cn(
+        "flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50/20",
+        isMobile ? cn("w-full", mobileView === 'list' && "hidden") : "w-0",
+      )}>
         {!selectedPlan ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
             Select a department to review their forms.
@@ -1397,12 +1407,23 @@ const handleAcknowledge = async () => {
         ) : (
           <div
             key={panelKey}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
             style={{ animation: '_panelIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
           >
             {/* Plan header */}
-            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between gap-4">
+            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center flex-wrap gap-y-2 justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
+                {isMobile && (
+                  <button
+                    onClick={() => setMobileView('list')}
+                    className="flex-shrink-0 -ml-1 mr-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    aria-label="Back to list"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
                 <DeptAvatar
                   logo={selectedPlan.dept_logo}
                   abbreviation={selectedPlan.dept_abbreviation}
@@ -1434,7 +1455,8 @@ const handleAcknowledge = async () => {
               </div>
 
               {/* Action buttons */}
-<div className="flex items-center gap-2 flex-shrink-0">
+<div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+  {!isMobile && (
   <div className="flex items-center gap-1.5 mr-1">
     <span className="text-[10px] text-gray-400 font-medium">Review Mode</span>
     <KbdGroup className="mr-1">
@@ -1469,12 +1491,13 @@ const handleAcknowledge = async () => {
       >
         ON
       </span>
-      <span
+     <span
         style={{ transform: cardView ? 'translateX(34px)' : 'translateX(2px)' }}
         className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
       />
     </button>
   </div>
+  )}
  {!isViewer && selectedPlan.status === 'submitted' && (
     <>
       <Button size="sm" variant="outline"
@@ -1532,7 +1555,7 @@ const handleAcknowledge = async () => {
             </div>
 
             {/* Forms area */}
-            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ isolation: 'auto' }}>
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5" style={{ isolation: 'auto' }}>
               {loadingPast ? (
                 <div className="space-y-3">
                   <Skeleton className="h-10 w-72 rounded-lg" />
@@ -1554,22 +1577,21 @@ const handleAcknowledge = async () => {
                   )}
 
                   <Tabs value={activeFormTab} onValueChange={setActiveFormTab}>
-                  <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 mb-4">
-                    <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-                      Form 2 — Expenditures
+                  <div className="overflow-x-auto mb-4 -mx-1 px-1">
+                  <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 w-max">
+                    <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+                      {isMobile ? 'Form 2' : 'Form 2 — Expenditures'}
                     </TabsTrigger>
-                    {/* <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-                      Form 3 — Personnel
-                    </TabsTrigger> */}
                     {!isViewer && (
-                      <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-                        Form 3 — Personnel
+                      <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+                        {isMobile ? 'Form 3' : 'Form 3 — Personnel'}
                       </TabsTrigger>
                     )}
-                    <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-                      Form 4 — AIP Programs
+                    <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+                      {isMobile ? 'Form 4' : 'Form 4 — AIP Programs'}
                     </TabsTrigger>
                   </TabsList>
+                  </div>
 
                   <TabsContent value="2">
                     <Form2

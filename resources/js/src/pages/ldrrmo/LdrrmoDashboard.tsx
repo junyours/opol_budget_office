@@ -671,13 +671,13 @@ const LdrrmoDashboard: React.FC = () => {
               </p>
               <h1 className="text-page-title">LDRRMO Overview</h1>
             </div>
-            {activePlan && (
+            {/* {activePlan && (
               <div className="flex items-center gap-1.5">
                 <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 opacity-60" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 <span className="text-[11px] font-medium text-emerald-500 tracking-wide ml-2">FY {activePlan.year}</span>
               </div>
-            )}
+            )} */}
           </div>
 
           {/* ── ROW 1: Budget Plan Year + Grand Total ── */}

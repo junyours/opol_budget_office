@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { cn } from '@/src/lib/utils';
 import { Pencil, Send, Inbox, Eye, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { useIsMobile } from '../../hooks/use-mobile';
 
 interface StepperProps {
   status: string;
@@ -102,6 +103,7 @@ const formatDateTime = (value?: string | null) => {
 export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
   const { status, isAdmin = false, className } = props;
   const [expanded, setExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   const STEPS = isAdmin ? [PREP_STEP, ...BASE_STEPS] : BASE_STEPS;
   const DONE_INDEX_MAP = isAdmin ? ADMIN_DONE_INDEX : NON_ADMIN_DONE_INDEX;
@@ -159,11 +161,11 @@ export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
 
       <div className="relative">
         <div
-          className="absolute top-[17px] h-0.5 bg-gray-200 rounded-full"
+          className={cn('absolute h-0.5 bg-gray-200 rounded-full', isMobile ? 'top-[12px]' : 'top-[17px]')}
           style={{ left: `${insetPct}%`, right: `${insetPct}%` }}
         />
         <div
-          className="absolute top-[17px] h-0.5 bg-emerald-500 rounded-full transition-all duration-300"
+          className={cn('absolute h-0.5 bg-emerald-500 rounded-full transition-all duration-300', isMobile ? 'top-[12px]' : 'top-[17px]')}
           style={{ left: `${insetPct}%`, width: `${trackSpanPct * progressPct}%` }}
         />
 
@@ -178,7 +180,8 @@ export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
               <div key={step.key} className="flex flex-1 min-w-0 flex-col items-center text-center px-1">
                 <div
                   className={cn(
-                    'w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 bg-white',
+                    'rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 bg-white',
+                    isMobile ? 'w-[24px] h-[24px]' : 'w-[34px] h-[34px]',
                     done
                       ? 'border-emerald-600 bg-emerald-600 text-white'
                       : active
@@ -186,20 +189,25 @@ export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
                       : 'border-gray-200 text-gray-300',
                   )}
                 >
-                  {done ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <Icon className="w-4 h-4" strokeWidth={2} />}
+                  {done
+                    ? <Check className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} strokeWidth={2.5} />
+                    : <Icon className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} strokeWidth={2} />}
                 </div>
                 <span
                   className={cn(
-                    'mt-2 text-[12px] font-semibold leading-tight break-words',
+                    'font-semibold leading-tight break-words',
+                    isMobile ? 'mt-1 text-[9px]' : 'mt-2 text-[12px]',
                     done ? 'text-emerald-700' : active ? step.text : 'text-gray-400',
                   )}
                 >
                   {step.label}
                 </span>
-                <span className="mt-0.5 text-[10.5px] text-gray-400 leading-snug px-1 break-words">
-                  {step.description}
-                </span>
-                {dateLabel && (done || active) && (
+                {!isMobile && (
+                  <span className="mt-0.5 text-[10.5px] text-gray-400 leading-snug px-1 break-words">
+                    {step.description}
+                  </span>
+                )}
+                {!isMobile && dateLabel && (done || active) && (
                   <span className="mt-1 text-[10px] font-medium text-gray-500 break-words">
                     {dateLabel}
                   </span>

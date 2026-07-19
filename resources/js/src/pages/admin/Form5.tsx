@@ -27,6 +27,7 @@ import { cn } from "@/src/lib/utils";
 import { MoreHorizontalIcon } from "lucide-react";
 import { PlusIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { MAX_AMOUNT, parseMoney, formatMoneyOnBlur } from "@/src/utils/moneyInput";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 // Previous Payments Made → green
@@ -361,6 +362,7 @@ function TruncatedCell({ text, className }: { text: string; className?: string }
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Form5() {
+  const isMobile = useIsMobile();
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 const { user } = useAuth();
 const isViewer = user?.role === "viewer";
@@ -593,6 +595,150 @@ const isViewer = user?.role === "viewer";
       {/* ── Table — skeleton while loading, real table when ready ─────── */}
       {loading ? (
         <TableSkeleton budgetYear={budgetYear} />
+      ) : isMobile ? (
+        <div className="space-y-3">
+          {computedRows.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-xl text-center py-14 text-gray-400 text-sm">
+              No indebtedness records.{" "}
+              {!isViewer && (
+                <button onClick={openAdd} className="text-gray-600 underline underline-offset-2 font-medium hover:text-gray-900">
+                  Add the first creditor
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {computedRows.map((ob, idx) => (
+                <div key={ob.obligation_id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="text-[10px] text-gray-400">#{idx + 1}</span>
+                      {!isViewer && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-6 -mt-1 -mr-1 text-gray-400 hover:text-gray-700">
+                              <MoreHorizontalIcon className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem onClick={() => openEdit(ob)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => setDeleteTarget(ob)}>Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                    <p className="text-[13px] font-medium text-gray-900 mb-1">{ob.creditor}</p>
+                    <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-1.5">
+                      <span>{ob.date_contracted}</span>
+                      <span>·</span>
+                      <span>Principal: <span className="font-mono text-gray-700">{fmtAlways(ob.principal_amount)}</span></span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mb-0.5">{ob.term}</p>
+                    <p className="text-[11px] text-gray-400">{ob.purpose}</p>
+                  </div>
+
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-green-700 mb-1.5">Previous Payments Made</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
+                        <p className="text-[9px] text-green-700/70 mb-0.5">Principal</p>
+                        <p className="font-mono text-[11.5px] text-gray-700 text-right">{fmt(ob.previous_principal)}</p>
+                      </div>
+                      <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
+                        <p className="text-[9px] text-green-700/70 mb-0.5">Interest</p>
+                        <p className="font-mono text-[11.5px] text-gray-700 text-right">{fmt(ob.previous_interest)}</p>
+                      </div>
+                      <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
+                        <p className="text-[9px] text-green-700/70 mb-0.5">Total</p>
+                        <p className="font-mono text-[11.5px] font-medium text-gray-700 text-right">{fmt(ob.previous_total)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-orange-700 mb-1.5">Amount Due — {budgetYear}</p>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className={cn("rounded-md border px-2 py-1.5", C_DUE_TD)}>
+                        <p className="text-[9px] text-orange-700/70 mb-1">Principal</p>
+                        {isViewer ? (
+                          <span className="block text-right text-[12px] font-mono text-gray-500">{fmt(ob.current_principal)}</span>
+                        ) : (
+                          <AmountCell obligationId={ob.obligation_id} field="principal"
+                            value={edits[ob.obligation_id]?.principal ?? ""}
+                            onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], principal: val } })); setDirty(true); }}
+                            onBlurSave={handleBlurSave} />
+                        )}
+                      </div>
+                      <div className={cn("rounded-md border px-2 py-1.5", C_DUE_TD)}>
+                        <p className="text-[9px] text-orange-700/70 mb-1">Interest</p>
+                        {isViewer ? (
+                          <span className="block text-right text-[12px] font-mono text-gray-500">{fmt(ob.current_interest)}</span>
+                        ) : (
+                          <AmountCell obligationId={ob.obligation_id} field="interest"
+                            value={edits[ob.obligation_id]?.interest ?? ""}
+                            onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], interest: val } })); setDirty(true); }}
+                            onBlurSave={handleBlurSave} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+                      <span className="text-[9px] text-gray-500">Total Due</span>
+                      <span className="font-mono text-[12px] font-medium text-gray-700">{fmt(ob.current_total)}</span>
+                    </div>
+                  </div>
+
+                  <div className="px-4 py-2.5 flex items-center justify-between bg-gray-50/60">
+                    <span className="text-[10px] text-gray-500">Balance of Principal</span>
+                    <span className={cn("font-mono text-[13px] font-semibold", ob.balance_principal <= 0 ? "text-green-500" : "text-gray-800")}>
+                      {fmtAlways(ob.balance_principal)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {/* ── Grand total card ── */}
+              <div className="rounded-xl bg-gray-900 text-white px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Total</p>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] text-gray-400">Principal Amount</span>
+                  <span className="font-mono font-semibold text-[12px]">{fmtAlways(totals.principal_amount)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className={cn("rounded-md border px-2 py-1.5", C_PREV_GT)}>
+                    <p className="opacity-70 text-[9px]">Prev. Principal</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.previous_principal === 0 ? "–" : fmtAlways(totals.previous_principal)}</p>
+                  </div>
+                  <div className={cn("rounded-md border px-2 py-1.5", C_PREV_GT)}>
+                    <p className="opacity-70 text-[9px]">Prev. Interest</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.previous_interest === 0 ? "–" : fmtAlways(totals.previous_interest)}</p>
+                  </div>
+                  <div className={cn("rounded-md border px-2 py-1.5", C_PREV_GT)}>
+                    <p className="opacity-70 text-[9px]">Prev. Total</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.previous_total === 0 ? "–" : fmtAlways(totals.previous_total)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className={cn("rounded-md border px-2 py-1.5", C_DUE_GT)}>
+                    <p className="opacity-70 text-[9px]">Due Principal</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.current_principal === 0 ? "–" : fmtAlways(totals.current_principal)}</p>
+                  </div>
+                  <div className={cn("rounded-md border px-2 py-1.5", C_DUE_GT)}>
+                    <p className="opacity-70 text-[9px]">Due Interest</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.current_interest === 0 ? "–" : fmtAlways(totals.current_interest)}</p>
+                  </div>
+                  <div className={cn("rounded-md border px-2 py-1.5", C_DUE_GT)}>
+                    <p className="opacity-70 text-[9px]">Due Total</p>
+                    <p className="font-mono font-semibold text-right text-[11px]">{totals.current_total === 0 ? "–" : fmtAlways(totals.current_total)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                  <span className="text-[11px] text-gray-400">Balance of Principal</span>
+                  <span className="font-mono font-semibold text-[12px]">{fmtAlways(totals.balance_principal)}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">

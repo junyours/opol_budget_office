@@ -18,6 +18,7 @@ import { cn } from '@/src/lib/utils';
 import API from '@/src/services/api';
 import { useAuth } from '@/src/hooks/useAuth';
 import { PdfGenerationLoader } from '@/src/components/report/PdfGenerationLoader';
+import { useIsMobile } from '@/src/hooks/use-mobile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ const LepHeaderEditor: React.FC<{
 
   return (
     // FIX: overflow-y-auto here so the header editor itself scrolls inside the right panel
-    <div className="flex-1 overflow-y-auto p-5 space-y-6">
+    <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-6">
       <div className="sticky top-0 z-10 -mx-5 -mt-5 mb-2 flex items-center justify-between
                       border-b border-zinc-200 bg-white/95 backdrop-blur px-5 py-2.5">
         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
@@ -326,6 +327,8 @@ export const AbpPanel: React.FC<{
   const [selectedDept,   setSelectedDept]   = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
 const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set());
+  const isMobile = useIsMobile();
+  const [mobileView,     setMobileView]     = useState<'options' | 'preview'>('options');
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingDl,      setLoadingDl]      = useState(false);
   const [loadingAll,     setLoadingAll]     = useState(false);
@@ -346,6 +349,10 @@ const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set());
   }, [restrictToDeptForms, lockedDeptId]);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+
+  useEffect(() => {
+    if (isMobile && previewUrl) setMobileView('preview');
+  }, [isMobile, previewUrl]);
 
   const visibleForms = restrictToDeptForms
     ? FORM_DEFS.filter(f => ['form2', 'form2a', 'form3', 'form4'].includes(f.id))
@@ -544,12 +551,15 @@ const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set());
 
   return (
     // FIX: use absolute inset instead of flex so the panel truly fills its TabsContent slot
-    <div className="absolute inset-0 flex overflow-hidden">
+    <div className={cn("absolute inset-0 flex overflow-hidden", isMobile && "flex-col")}>
 
       {/* ── Left sidebar — FIX: full height column, inner content scrolls ── */}
-      <div className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/30 overflow-hidden">
+      <div className={cn(
+        "flex-shrink-0 flex flex-col min-h-0 h-full border-r border-border bg-muted/30 overflow-hidden",
+        isMobile ? cn("w-full border-r-0", mobileView === 'preview' && "hidden") : "w-64"
+      )}>
         {/* Scrollable region */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
 
           <div>
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
@@ -733,15 +743,35 @@ const [selectedForms,  setSelectedForms]  = useState<Set<FormId>>(new Set());
             )}
           </div>
 
+          {isMobile && (previewUrl || isBusy) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 text-xs gap-1.5"
+              onClick={() => setMobileView('preview')}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {isBusy ? 'View Progress' : 'View Preview'}
+            </Button>
+          )}
+
           {/* Bottom padding so last item isn't clipped */}
           <div className="h-4" />
         </div>
       </div>
 
       {/* ── Right: iframe preview — FIX: flex-col, iframe gets flex-1 so it fills remaining height ── */}
-      <div className="flex-1 min-w-0 flex flex-col bg-zinc-100 overflow-hidden">
+      <div className={cn(
+        "flex-1 min-w-0 flex flex-col bg-zinc-100 overflow-hidden",
+        isMobile && mobileView === 'options' && "hidden"
+      )}>
         {previewUrl && (
           <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200 bg-white">
+            {isMobile && (
+              <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 -ml-1" onClick={() => setMobileView('options')}>
+                <ChevronRight className="h-3 w-3 rotate-180" />Options
+              </Button>
+            )}
             <span className="text-xs text-zinc-400">{selectedPlan ? `FY ${selectedPlan.year}` : ''}</span>
             <div className="flex-1" />
             <Button size="sm" variant="ghost" className="h-6 text-xs gap-1" onClick={handlePreview} disabled={isBusy}><RefreshCw className="h-3 w-3" />Refresh</Button>
@@ -806,6 +836,8 @@ const LepPanel: React.FC<{
   const [selectedForms,  setSelectedForms]  = useState<Set<LepFormId>>(new Set());
   const [selectedDept,   setSelectedDept]   = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const isMobile = useIsMobile();
+  const [mobileView,     setMobileView]     = useState<'options' | 'preview'>('options');
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingDl,      setLoadingDl]      = useState(false);
   const [previewUrl,     setPreviewUrl]     = useState<string | null>(null);
@@ -817,6 +849,10 @@ const LepPanel: React.FC<{
   }, [budgetPlans]);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+
+  useEffect(() => {
+    if (isMobile && previewUrl) setMobileView('preview');
+  }, [isMobile, previewUrl]);
 
   const toggleForm = (id: LepFormId) => {
     setSelectedForms(prev => {
@@ -923,11 +959,14 @@ const LepPanel: React.FC<{
 
   return (
     // FIX: same absolute inset pattern as AbpPanel
-    <div className="absolute inset-0 flex overflow-hidden">
+    <div className={cn("absolute inset-0 flex overflow-hidden", isMobile && "flex-col")}>
 
       {/* ── Left sidebar ── */}
-      <div className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/30 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className={cn(
+        "flex-shrink-0 flex flex-col min-h-0 h-full border-r border-border bg-muted/30 overflow-hidden",
+        isMobile ? cn("w-full border-r-0", mobileView === 'preview' && "hidden") : "w-64"
+      )}>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
 
           {/* Budget plan */}
           <div>
@@ -956,7 +995,7 @@ const LepPanel: React.FC<{
             {(['generate', 'settings'] as const).map(tab => (
               <button
                 key={tab}
-                onClick={() => setInnerTab(tab)}
+                onClick={() => { setInnerTab(tab); if (isMobile && tab === 'settings') setMobileView('preview'); }}
                 className={cn(
                   'flex-1 py-1.5 rounded-[5px] text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors',
                   innerTab === tab
@@ -1094,6 +1133,17 @@ const LepPanel: React.FC<{
                       : <><Download className="mr-1.5 h-3.5 w-3.5" />Download PDF</>}
                   </Button>
                 )}
+                {isMobile && (previewUrl || loadingPreview) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-8 text-xs gap-1.5"
+                    onClick={() => setMobileView('preview')}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    {loadingPreview ? 'View Progress' : 'View Preview'}
+                  </Button>
+                )}
               </div>
             </>
           )}
@@ -1111,12 +1161,20 @@ const LepPanel: React.FC<{
       </div>
 
       {/* ── Right content area ── */}
-      <div className="flex-1 min-w-0 flex flex-col bg-zinc-100 overflow-hidden">
+      <div className={cn(
+        "flex-1 min-w-0 flex flex-col bg-zinc-100 overflow-hidden",
+        isMobile && mobileView === 'options' && "hidden"
+      )}>
 
         {innerTab === 'generate' && (
           <>
             {previewUrl && (
               <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200 bg-white">
+                {isMobile && (
+                  <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 -ml-1" onClick={() => setMobileView('options')}>
+                    <ChevronRight className="h-3 w-3 rotate-180" />Options
+                  </Button>
+                )}
                 <span className="text-xs text-zinc-400">{selectedPlan ? `Budget Year ${selectedPlan.year}` : ''}</span>
                 <div className="flex-1" />
                 <Button size="sm" variant="ghost" className="h-6 text-xs gap-1" onClick={handlePreview} disabled={isBusy}>
@@ -1166,6 +1224,13 @@ const LepPanel: React.FC<{
         {innerTab === 'settings' && (
           // FIX: min-h-0 so the flex child doesn't overflow
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white">
+            {isMobile && (
+              <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200 bg-white">
+                <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 -ml-1" onClick={() => { setMobileView('options'); setInnerTab('generate'); }}>
+                  <ChevronRight className="h-3 w-3 rotate-180" />Options
+                </Button>
+              </div>
+            )}
             {selectedPlanId
               ? <LepHeaderEditor
                   budgetPlanId={selectedPlanId}
@@ -1193,6 +1258,7 @@ const UnifiedReportsPage: React.FC = () => {
   const restrictToDeptForms = user?.role === 'department-head';
   const lockedDeptId        = (user as any)?.dept_id ?? null;
   const canSeeLep = user?.role === 'admin' || user?.role === 'super-admin';
+  const isMobile = useIsMobile();
 
   const [budgetPlans,   setBudgetPlans]   = useState<BudgetPlan[]>([]);
   const [departments,   setDepartments]   = useState<Department[]>([]);
@@ -1230,7 +1296,7 @@ const UnifiedReportsPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-white">
+    <div className="h-dvh flex flex-col overflow-hidden bg-white">
 
       {/* ── Page header ── */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-zinc-100">
@@ -1249,26 +1315,26 @@ const UnifiedReportsPage: React.FC = () => {
         className="flex-1 min-h-0 flex flex-col overflow-hidden"
       >
         {/* Tab strip */}
-        <div className="flex-shrink-0 px-5 py-3 bg-white border-b border-zinc-100">
-          <TabsList className="h-10 bg-zinc-100 border-0 p-1 gap-1 rounded-lg inline-flex">
+        <div className="flex-shrink-0 px-5 py-3 bg-white border-b border-zinc-100 overflow-x-auto">
+          <TabsList className="h-10 bg-zinc-100 border-0 p-1 gap-1 rounded-lg inline-flex w-max">
             <TabsTrigger
               value="abp"
-              className="h-8 px-4 text-xs font-semibold rounded-md border-0
+              className="h-8 px-4 text-xs font-semibold rounded-md border-0 whitespace-nowrap flex-shrink-0
                          data-[state=active]:bg-zinc-900 data-[state=active]:text-white
                          data-[state=active]:shadow-sm
                          text-zinc-500 hover:text-zinc-700 gap-1.5 transition-colors"
             >
-              <BookOpen className="h-3.5 w-3.5" />Annual Budget Proposal
+              <BookOpen className="h-3.5 w-3.5" />{isMobile ? 'ABP' : 'Annual Budget Proposal'}
             </TabsTrigger>
             {canSeeLep && (
               <TabsTrigger
                 value="lep"
-                className="h-8 px-4 text-xs font-semibold rounded-md border-0
+                className="h-8 px-4 text-xs font-semibold rounded-md border-0 whitespace-nowrap flex-shrink-0
                            data-[state=active]:bg-zinc-900 data-[state=active]:text-white
                            data-[state=active]:shadow-sm
                            text-zinc-500 hover:text-zinc-700 gap-1.5 transition-colors"
               >
-                <ClipboardList className="h-3.5 w-3.5" />Local Expenditure Program
+                <ClipboardList className="h-3.5 w-3.5" />{isMobile ? 'LEP' : 'Local Expenditure Program'}
               </TabsTrigger>
             )}
           </TabsList>

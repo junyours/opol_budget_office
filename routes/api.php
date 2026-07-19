@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\{
     DatabaseBackupController,
     PsSettingController,
     BudgetCallMemoController,
+    TokenMaintenanceController,
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
@@ -57,8 +58,17 @@ Route::prefix('auth')->middleware('throttle:login')->group(function () {
     Route::post('/login-pin',     [AuthController::class, 'loginWithPin']);
 });
 
+Route::get('/maintenance/status', [\App\Http\Controllers\Api\MaintenanceController::class, 'status']);
+
 // ── Authenticated Routes (standard API rate limit) ─────────────────────────────
+// Exempt from maintenance-check: someone already on the forced-password-change
+// screen must still be able to submit it, even if maintenance mode gets flipped
+// on after they logged in but before they finished changing their password.
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    Route::post('/auth/change-forced-password', [AuthController::class, 'changeForcedPassword']);
+});
+
+Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-change-password'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
@@ -191,6 +201,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     Route::middleware('can:manage-database')->group(function () {
         Route::get('/database/info', [DatabaseBackupController::class, 'info']);
+        Route::post('/maintenance/toggle', [\App\Http\Controllers\Api\MaintenanceController::class, 'toggle']);
     });
     // ── File Uploads (5/min) ───────────────────────────────────────────────────
     Route::middleware('throttle:uploads')->group(function () {
@@ -297,5 +308,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post  ('/notifications/read-all',     [NotificationController::class, 'markAllRead']);
     Route::post  ('/notifications/{id}/read',    [NotificationController::class, 'markRead']);
     Route::delete('/notifications/clear-read',   [NotificationController::class, 'clearRead']);
+    Route::delete('/tokens/prune-stale',         [TokenMaintenanceController::class, 'pruneStale']);
 
 });

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { CheckCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/src/hooks/useAuth";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ function MatchBadge({ derived, calculated, label }: MatchBadgeProps) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LdrrmfPlanPage() {
+  const isMobile = useIsMobile();
   const [report,  setReport]  = useState<PlanReport | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -319,6 +321,290 @@ try {
       </div>
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
+      {isMobile ? (
+        <div className="space-y-4">
+          {special_accounts.map((sa, saIdx) => {
+            const itemsTotal    = sa.items.reduce((sum, i) => sum + i.total, 0);
+            const total5pctCalc = sa.budget_year.qrf_30 + itemsTotal;
+
+            const qrfObligKey      = `qrf-oblig-${sa.source}`;
+            const qrfSem1Key       = `qrf-sem1-${sa.source}`;
+            const isQrfObligSaving = savingKeys.has(qrfObligKey);
+            const isQrfSem1Saving  = savingKeys.has(qrfSem1Key);
+
+            const qrfObligDisplay = editingValues[qrfObligKey] !== undefined
+              ? editingValues[qrfObligKey] : fmtInput(sa.qrf_past_obligation);
+            const qrfSem1Display = editingValues[qrfSem1Key] !== undefined
+              ? editingValues[qrfSem1Key] : fmtInput(sa.qrf_current_sem1);
+            const qrfSem1Live = editingValues[qrfSem1Key] !== undefined
+              ? parseInput(editingValues[qrfSem1Key]) : sa.qrf_current_sem1;
+            const qrfSem2Live  = Math.max(0, Math.floor((sa.qrf_current_sem1 + sa.qrf_current_sem2) - qrfSem1Live));
+            const qrfTotalLive = sa.qrf_current_total;
+
+            return (
+              <div key={sa.source} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <span className="text-[12.5px] font-bold text-gray-900">{sa.label}</span>
+                </div>
+
+                {/* ── 30% QRF card ── */}
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[12px] font-medium text-gray-900">30% Quick Response Fund (QRF)</span>
+                    <span className="text-[9px] text-blue-400 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 font-semibold">derived</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-md border border-green-100 bg-green-50/40 px-2 py-1.5">
+                      <p className="text-[9px] text-green-700/70 mb-1">Past ({past_year})</p>
+                      <input
+                        type="text" inputMode="numeric"
+                        value={qrfObligDisplay} placeholder="–"
+                        disabled={isQrfObligSaving || !canEdit} readOnly={!canEdit}
+                        className={cn(
+                          "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-1 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                          isQrfObligSaving ? "text-gray-400 cursor-wait opacity-50"
+                            : !canEdit ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
+                            : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
+                        )}
+                        onFocus={() => handleAmountFocus(qrfObligKey, sa.qrf_past_obligation)}
+                        onChange={e => handleAmountChange(qrfObligKey, e.target.value)}
+                        onBlur={async () => {
+                          if (!past_plan_id) return;
+                          if (editingValues[qrfObligKey] === undefined) return;
+                          const raw = editingValues[qrfObligKey];
+                          setEditingValues(prev => { const n = { ...prev }; delete n[qrfObligKey]; return n; });
+                          const value = parseInput(raw);
+                          if (value === Math.floor(sa.qrf_past_obligation)) return;
+                          setSavingKeys(prev => new Set(prev).add(qrfObligKey));
+                          const promise = (async () => {
+                            await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                              budget_plan_id: past_plan_id, source: sa.source,
+                              description: '__QRF_30__', obligation_amount: value,
+                            });
+                            const res = await API.get("/ldrrmf-plan");
+                            setReport(res.data.data ?? null);
+                          })();
+                          toast.promise(promise, { loading: "Saving…", success: "QRF obligation saved", error: "Failed to save QRF obligation." });
+                          try { await promise; } catch { /* handled */ } finally {
+                            setSavingKeys(prev => { const n = new Set(prev); n.delete(qrfObligKey); return n; });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                      <p className="text-[9px] text-orange-700/70 mb-1">Budget Yr ({year})</p>
+                      <span className="block text-right font-mono text-[12px] font-bold text-blue-700 px-1.5 py-1">{fmtPeso(sa.budget_year.qrf_30)}</span>
+                    </div>
+                    <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                      <p className="text-[9px] text-blue-700/70 mb-1">1st Sem</p>
+                      <input
+                        type="text" inputMode="numeric"
+                        value={qrfSem1Display} placeholder="–"
+                        disabled={isQrfSem1Saving || !canEdit} readOnly={!canEdit}
+                        className={cn(
+                          "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-1 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                          isQrfSem1Saving ? "text-gray-400 cursor-wait opacity-50"
+                            : !canEdit ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
+                            : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+                        )}
+                        onFocus={() => handleAmountFocus(qrfSem1Key, sa.qrf_current_sem1)}
+                        onChange={e => handleAmountChange(qrfSem1Key, e.target.value)}
+                        onBlur={async () => {
+                          if (!current_plan_id) return;
+                          if (editingValues[qrfSem1Key] === undefined) return;
+                          const raw = editingValues[qrfSem1Key];
+                          setEditingValues(prev => { const n = { ...prev }; delete n[qrfSem1Key]; return n; });
+                          const value = parseInput(raw);
+                          if (value === Math.floor(sa.qrf_current_sem1)) return;
+                          setSavingKeys(prev => new Set(prev).add(qrfSem1Key));
+                          const promise = (async () => {
+                            await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                              budget_plan_id: current_plan_id, source: sa.source,
+                              description: '__QRF_30__', sem1_amount: value,
+                            });
+                            const res = await API.get("/ldrrmf-plan");
+                            setReport(res.data.data ?? null);
+                          })();
+                          toast.promise(promise, { loading: "Saving…", success: "QRF Sem 1 saved", error: "Failed to save QRF Sem 1." });
+                          try { await promise; } catch { /* handled */ } finally {
+                            setSavingKeys(prev => { const n = new Set(prev); n.delete(qrfSem1Key); return n; });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                      <p className="text-[9px] text-blue-700/70 mb-1">2nd Sem (auto)</p>
+                      <span className="block text-right font-mono text-[11.5px] text-gray-500 px-1.5 py-1">
+                        {qrfSem2Live > 0 ? qrfSem2Live.toLocaleString("en-PH") : "–"}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+                      <span className="text-[9px] text-gray-500">Current Total</span>
+                      <span className="text-[12px] font-mono font-bold text-blue-700">
+                        {qrfTotalLive > 0 ? Math.floor(qrfTotalLive).toLocaleString("en-PH") : "–"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 70% Preparedness label ── */}
+                <div className="px-4 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-semibold text-gray-900">70% Disaster Preparedness</span>
+                  <span className="text-[9px] text-blue-400 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 font-semibold">derived</span>
+                  <MatchBadge derived={sa.budget_year.preparedness_70} calculated={itemsTotal} label="70% of 5% calamity fund" />
+                </div>
+
+                {/* ── Item cards ── */}
+                {sa.items.length === 0 ? (
+                  <p className="px-4 py-4 text-gray-400 text-[12px] italic">No items entered yet. Add items in the LDRRMFIP page.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {sa.items.map(item => {
+                      const sem1Key       = `${sa.source}-${item.ldrrmfip_item_id}`;
+                      const obligKey      = `oblig-${sa.source}-${item.ldrrmfip_item_id}`;
+                      const isObligSaving = savingKeys.has(obligKey);
+                      const isSaving      = savingKeys.has(sem1Key);
+                      const obligDisplay  = editingValues[obligKey] !== undefined ? editingValues[obligKey] : fmtInput(item.obligation_amount);
+                      const sem1Display   = editingValues[sem1Key]  !== undefined ? editingValues[sem1Key]  : fmtInput(item.sem1_amount);
+                      const sem2Computed  = Math.max(0, Math.floor(item.total_amount - item.sem1_amount));
+
+                      return (
+                        <div key={item.ldrrmfip_item_id} className="px-4 py-3">
+                          <p className="text-[12px] text-gray-800 mb-2">
+                            <span className="text-gray-300 mr-1.5">·</span>{item.description}
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-md border border-green-100 bg-green-50/40 px-2 py-1.5">
+                              <p className="text-[9px] text-green-700/70 mb-1">Past ({past_year})</p>
+                              <input
+                                type="text" inputMode="numeric"
+                                value={obligDisplay} placeholder="–"
+                                disabled={isObligSaving || !canEdit} readOnly={!canEdit}
+                                className={cn(
+                                  "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-1 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                                  isObligSaving ? "text-gray-400 cursor-wait opacity-50"
+                                    : !canEdit ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
+                                    : "text-gray-700 focus:ring-2 focus:ring-green-300 focus:border-green-300"
+                                )}
+                                onFocus={() => handleAmountFocus(obligKey, item.obligation_amount)}
+                                onChange={e => handleAmountChange(obligKey, e.target.value)}
+                                onBlur={async () => {
+                                  if (!past_plan_id) return;
+                                  if (editingValues[obligKey] === undefined) return;
+                                  const raw = editingValues[obligKey];
+                                  setEditingValues(prev => { const n = { ...prev }; delete n[obligKey]; return n; });
+                                  const value = parseInput(raw);
+                                  if (value === Math.floor(item.obligation_amount)) return;
+                                  setSavingKeys(prev => new Set(prev).add(obligKey));
+                                  const promise = (async () => {
+                                    await API.patch(`/ldrrmfip/upsert-year-amounts`, {
+                                      budget_plan_id: past_plan_id, source: sa.source,
+                                      description: item.description, obligation_amount: value,
+                                    });
+                                    const res = await API.get("/ldrrmf-plan");
+                                    setReport(res.data.data ?? null);
+                                  })();
+                                  toast.promise(promise, { loading: "Saving…", success: `${item.description} saved`, error: "Failed to save obligation amount." });
+                                  try { await promise; } catch { /* handled */ } finally {
+                                    setSavingKeys(prev => { const n = new Set(prev); n.delete(obligKey); return n; });
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                              <p className="text-[9px] text-orange-700/70 mb-1">Budget Yr ({year})</p>
+                              <span className="block text-right font-mono text-[12px] text-blue-600 px-1.5 py-1">
+                                {item.total > 0 ? Math.floor(item.total).toLocaleString("en-PH") : "–"}
+                              </span>
+                            </div>
+                            <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                              <p className="text-[9px] text-blue-700/70 mb-1">1st Sem</p>
+                              <input
+                                type="text" inputMode="numeric"
+                                value={sem1Display} placeholder="–"
+                                disabled={isSaving || !canEdit} readOnly={!canEdit}
+                                className={cn(
+                                  "w-full text-right font-mono text-[11.5px] rounded px-1.5 py-1 placeholder-gray-300 border border-gray-200 bg-white focus:outline-none",
+                                  isSaving ? "text-gray-400 cursor-wait opacity-50"
+                                    : !canEdit ? "text-gray-500 bg-gray-50 cursor-default border-transparent"
+                                    : "text-gray-700 focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+                                )}
+                                onFocus={() => handleAmountFocus(sem1Key, item.sem1_amount)}
+                                onChange={e => handleAmountChange(sem1Key, e.target.value)}
+                                onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
+                              />
+                            </div>
+                            <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                              <p className="text-[9px] text-blue-700/70 mb-1">2nd Sem (auto)</p>
+                              <span className="block text-right font-mono text-[11.5px] text-gray-500 px-1.5 py-1">
+                                {sem2Computed > 0 ? sem2Computed.toLocaleString("en-PH") : "–"}
+                              </span>
+                            </div>
+                            <div className="col-span-2 flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+                              <span className="text-[9px] text-gray-500">Current Total</span>
+                              <span className="text-[12px] font-mono font-semibold text-gray-700">
+                                {item.total_amount > 0 ? Math.floor(item.total_amount).toLocaleString("en-PH") : "–"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── 70% subtotal ── */}
+                <div className="px-4 py-3 bg-blue-50/20 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-semibold text-gray-900">Total 70% Preparedness</span>
+                    <span className="text-[12px] font-mono font-bold text-gray-800">{fmtPeso(sa.budget_year.preparedness_70)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-500">
+                    <span>Past: {fmtPeso(sa.past.preparedness_70)}</span>
+                    <span>Sem1: {fmtAbs(sa.current.prep_70_sem1)}</span>
+                    <span>Sem2: {fmtAbs(sa.current.prep_70_sem2)}</span>
+                  </div>
+                </div>
+
+                {/* ── Total 5% Calamity Fund ── */}
+                <div className="px-4 py-3 bg-gray-50 border-t-2 border-gray-200">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    <span className="text-[12px] font-bold text-gray-900">Total 5% Calamity Fund</span>
+                    <MatchBadge derived={sa.budget_year.total_5pct} calculated={total5pctCalc} label="5% of Total Available Resources" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-500">Budget Year {year}</span>
+                    <span className="text-[13px] font-mono font-bold text-blue-700">{fmtPeso(sa.budget_year.total_5pct)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ── Grand total card ── */}
+          <div className="rounded-xl bg-gray-900 text-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+              Grand Total 5% Calamity Fund — S.A.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-md border border-green-900/40 bg-green-950/20 px-2 py-1.5">
+                <p className="opacity-70 text-[9px]">Past</p>
+                <p className="font-mono font-semibold text-right text-green-300">{fmtPeso(grand_total.past.total_5pct)}</p>
+              </div>
+              <div className="rounded-md border border-orange-900/40 bg-orange-950/20 px-2 py-1.5">
+                <p className="opacity-70 text-[9px]">Budget Year</p>
+                <p className="font-mono font-semibold text-right text-orange-300">{fmtPeso(grand_total.budget_year.total_5pct)}</p>
+              </div>
+              <div className="col-span-2 rounded-md border border-blue-900/40 bg-blue-950/20 px-2 py-1.5">
+                <p className="opacity-70 text-[9px]">Current (Sem1 + Sem2 = Total)</p>
+                <p className="font-mono font-semibold text-right text-blue-300">
+                  {fmtPeso(grand_total.current.total_sem1)} + {fmtPeso(grand_total.current.total_sem2)} = {fmtPeso(grand_total.current.total_5pct)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12px]" style={{ minWidth: 960 }}>
@@ -821,6 +1107,7 @@ onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
           </table>
         </div>
       </div>
+      )}
 
       {/* ── Legend ────────────────────────────────────────────────────────────── */}
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">

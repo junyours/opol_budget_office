@@ -1564,6 +1564,8 @@ import { BellIcon } from "@heroicons/react/24/outline";
 import { formatDistanceToNow } from "date-fns"; // optional — or use a simple formatter below
 
 import { PsLimitationCard } from "@/src/components/cards/PsLimitationCard";
+import { useAuth } from "../../hooks/useAuth";
+import API from "../../services/api";
 
 const getInitials = (d: Department) =>
   (d.dept_abbreviation ?? d.dept_name).slice(0, 2).toUpperCase();
@@ -1590,6 +1592,18 @@ const pesoC = (v: number): string => {
 };
 
 const st = (i: number): React.CSSProperties => ({ animationDelay: `${i * 60}ms` });
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
+};
 
 // Treat anything that rounds to ₱0.00 as fully appropriated (avoids float-precision false positives)
 const isZeroAmount = (v: number) => Math.round(v * 100) === 0;
@@ -1925,6 +1939,9 @@ const RecentActivityCard: React.FC<{
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
+  const isMobile = useIsMobile();
   const { activeVersion, loading: matrixLoading } = useSalaryMatrix();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -2183,7 +2200,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
           <div className="grid grid-cols-12 gap-3 sm:gap-4 items-stretch">
 
            {/* Active Plan */}
-<Card style={st(1)} onClick={() => navigate("/admin/budget-plans")}
+<Card style={st(1)} onClick={isViewer ? undefined : () => navigate("/admin/budget-plans")}
   className="col-span-6 lg:col-span-3 p-3.5 relative overflow-hidden flex flex-col rounded-lg">
   {activePlan && (
     <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
@@ -2192,11 +2209,11 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
       <span className="text-[11px] font-medium text-emerald-500 tracking-wide ml-2">Active</span>
     </div>
   )}
-  <div className="flex items-center gap-2 mb-3">
+  <div className="flex items-center gap-2 mb-3 pr-14">
     <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
       <DocumentTextIcon className="w-3.5 h-3.5 text-blue-500" />
     </div>
-    <p className="text-eyebrow leading-none">Budget Plan Year</p>
+    <p className="text-eyebrow leading-none truncate">Budget Plan Year</p>
   </div>
   <div className="flex-1">
     <p className="text-subtitle leading-snug">Proposed Annual Budget</p>
@@ -2204,14 +2221,16 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
       {activePlan ? activePlan.year : "—"}
     </p>
   </div>
-  <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
-    <span className="text-eyebrow">Budget Plans</span>
-    <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
-  </div>
+  {!isViewer && (
+    <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+      <span className="text-eyebrow">Budget Plans</span>
+      <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
+    </div>
+  )}
 </Card>
 
 {/* Departments */}
-<Card style={st(2)} onClick={() => navigate("/admin/departments")}
+<Card style={st(2)} onClick={isViewer ? undefined : () => navigate("/admin/departments")}
   className="col-span-6 lg:col-span-2 p-3.5 flex flex-col rounded-lg">
   <div className="flex items-center gap-2 mb-3">
     <div className="w-7 h-7 rounded-md bg-violet-50 flex items-center justify-center flex-shrink-0">
@@ -2225,14 +2244,16 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
     </p>
     <p className="text-metric-support mt-1">Registered Offices</p>
   </div>
-  <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
-    <span className="text-eyebrow">View all</span>
-    <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
-  </div>
+  {!isViewer && (
+    <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+      <span className="text-eyebrow">View all</span>
+      <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
+    </div>
+  )}
 </Card>
 
 {/* Salary Tranche */}
-<Card style={st(3)} onClick={() => navigate("/admin/tranche")}
+<Card style={st(3)} onClick={isViewer ? undefined : () => navigate("/admin/tranche")}
   className="col-span-6 lg:col-span-2 p-3.5 flex flex-col rounded-lg">
   <div className="flex items-center gap-2 mb-3">
     <div className="w-7 h-7 rounded-md bg-orange-50 flex items-center justify-center flex-shrink-0">
@@ -2248,10 +2269,12 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
       {activeVersion ? `${activeVersion.tranche} · ${activeVersion.income_class}` : "No active tranche"}
     </p>
   </div>
-  <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
-    <span className="text-eyebrow">Salary Standards</span>
-    <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
-  </div>
+  {!isViewer && (
+    <div className="border-t border-border pt-2.5 flex items-center justify-between mt-4">
+      <span className="text-eyebrow">Salary Standards</span>
+      <ChevronRightIcon className="w-3 h-3 text-muted-foreground" />
+    </div>
+  )}
 </Card>
 
             {/* Approval Progress */}
@@ -2466,7 +2489,10 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
             <BuildingLibraryIcon className="w-3 h-3 flex-shrink-0 text-fin-mdf" /> 20% MDF · From NTA
           </p>
-          <span className="text-[10px] text-muted-foreground">
+          <span className={cn(
+            "text-[10px] font-medium",
+            mdfActual > mdf ? "text-red-600" : "text-muted-foreground"
+          )}>
             {mdf > 0 ? `${Math.round((mdfActual / mdf) * 100)}%` : "0%"} allocated
           </span>
         </div>
@@ -2474,12 +2500,16 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
           <p className="text-base font-semibold text-foreground">{peso(mdfActual)} <span className="text-xs text-muted-foreground font-normal">/ {peso(mdf)}</span></p>
         )}
         <div className="h-1 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-fin-mdf rounded-full transition-all duration-700"
+          <div className={cn("h-full rounded-full transition-all duration-700", mdfActual > mdf ? "bg-red-500" : "bg-fin-mdf")}
             style={{ width: mdf > 0 ? `${Math.min(100, (mdfActual / mdf) * 100)}%` : "0%" }} />
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-muted-foreground">Unallocated</span>
-          <span className="font-medium">{peso(mdfRemaining)}</span>
+          <span className={cn(mdfActual > mdf ? "text-red-600 font-medium" : "text-muted-foreground")}>
+            {mdfActual > mdf ? "Over-appropriated" : "Unallocated"}
+          </span>
+          <span className={cn("font-medium", mdfActual > mdf ? "text-red-600" : undefined)}>
+            {mdfActual > mdf ? peso(mdfActual - mdf) : peso(mdfRemaining)}
+          </span>
         </div>
       </div>
     )}
@@ -2713,12 +2743,12 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                       <XAxis
                         dataKey="abbr"
                         interval={0}
-                        angle={-35}
+                        angle={isMobile ? -90 : -35}
                         textAnchor="end"
-                        tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
+                        tick={{ fontSize: isMobile ? 8 : 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
                         tickLine={false}
                         axisLine={false}
-                        height={40}
+                        height={isMobile ? 60 : 40}
                       />
                       <YAxis tickFormatter={v => pesoC(v)} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }} tickLine={false} axisLine={false} width={56} />
                       <RechartsTooltip content={<BarTip />} cursor={{ fill: "hsl(var(--muted))", radius: 4 }} />

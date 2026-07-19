@@ -19,6 +19,7 @@ import { useAuth } from "@/src/hooks/useAuth";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { useAipProgramData } from "@/src/hooks/useAipProgramData";
 import { useExpenseData } from "@/src/hooks/useExpenseData";
+import { usePreviousYearDeptTotal } from "@/src/hooks/usePreviousYearDeptTotal";
 import { useQuery } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { cn } from "@/src/lib/utils";
@@ -35,6 +36,7 @@ import {
     BuildingStorefrontIcon,
     ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -102,10 +104,12 @@ interface StatCardProps {
     label: string;
     value: string;
     sub?: string;
+    yoyChangePct?: number | null;
+    previousValue?: number | null;
+    previousYear?: number;
     accent?: "blue" | "violet" | "cyan" | "emerald" | "amber" | "rose";
     delay?: number;
 }
-
 const accentMap = {
     blue:    { tile: "bg-blue-50",    icon: "text-blue-600"    },
     violet:  { tile: "bg-violet-50",  icon: "text-violet-600"  },
@@ -120,24 +124,52 @@ const StatCard: React.FC<StatCardProps> = ({
     label,
     value,
     sub,
+    yoyChangePct,
+    previousValue,
+    previousYear,
     accent = "blue",
     delay = 0,
 }) => {
     const a = accentMap[accent];
+    const isMobile = useIsMobile();
     return (
         <Reveal delay={delay}>
-            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full">
-                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3 flex-shrink-0", a.tile)}>
-                    <Icon className={cn("w-[18px] h-[18px]", a.icon)} />
+            <div className={cn("bg-white border border-zinc-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow h-full", isMobile ? "p-3.5" : "p-5")}>
+                <div className={cn("rounded-xl flex items-center justify-center flex-shrink-0", a.tile, isMobile ? "w-7 h-7 mb-2" : "w-9 h-9 mb-3")}>
+                    <Icon className={cn(isMobile ? "w-3.5 h-3.5" : "w-[18px] h-[18px]", a.icon)} />
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
                     {label}
                 </p>
-                <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
-                    {value}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <p className={cn("font-bold text-zinc-900 tabular-nums leading-none", isMobile ? "text-[18px]" : "text-[22px]")}>
+                        {value}
+                    </p>
+                    {yoyChangePct != null && (
+                        <span
+                            className={cn(
+                                "inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                                yoyChangePct >= 0
+                                    ? "text-emerald-700 bg-emerald-50"
+                                    : "text-red-700 bg-red-50",
+                            )}
+                            title={
+                                previousValue != null
+                                    ? `vs FY ${(previousYear ?? 0)}: ${fmt(previousValue)}`
+                                    : undefined
+                            }
+                        >
+                            {yoyChangePct >= 0 ? (
+                                <ArrowTrendingUpIcon className="w-3 h-3" />
+                            ) : (
+                                <ArrowTrendingDownIcon className="w-3 h-3" />
+                            )}
+                            {Math.abs(yoyChangePct).toFixed(2)}%
+                        </span>
+                    )}
+                </div>
                 {sub && (
-                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">{sub}</p>
+                    <p className={cn("text-[11px] text-zinc-400 leading-snug", isMobile ? "mt-1" : "mt-1.5")}>{sub}</p>
                 )}
             </div>
         </Reveal>
@@ -201,12 +233,20 @@ const SectionHead = ({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const DepartmentHeadDashboard: React.FC = () => {
+    const isMobile = useIsMobile();
     const { user } = useAuth();
     const deptId = user?.dept_id;
 
     const { activePlan, loading: planLoading } = useActiveBudgetPlan();
     const { programs, loading: aipLoading } = useAipProgramData(activePlan?.budget_plan_id);
     const { items, amountMap, loading: expLoading } = useExpenseData(activePlan?.budget_plan_id);
+    const {
+        previousTotal,
+        previousPS,
+        previousMOOE,
+        previousCO,
+        loading: prevYearLoading,
+    } = usePreviousYearDeptTotal(deptId ?? undefined, activePlan?.year);
 
     const [showDraftAlert, setShowDraftAlert] = useState(false);
 
@@ -339,6 +379,28 @@ const nonTaxNode = allItems.find(
     const aipTotal     = useMemo(() => myPrograms.reduce((s, p) => s + p.total_amount, 0), [myPrograms]);
 
     const totalProposedExpenditure = totalExpense + aipTotal;
+
+    // Year-over-year % change vs the prior year's plan for this department.
+    // null means "no comparison available" (no prior plan, or prior total was 0).
+    const yoyChangePct = useMemo(() => {
+        if (previousTotal == null || previousTotal === 0) return null;
+        return ((totalProposedExpenditure - previousTotal) / previousTotal) * 100;
+    }, [totalProposedExpenditure, previousTotal]);
+
+    const yoyPSChangePct = useMemo(() => {
+        if (previousPS == null || previousPS === 0) return null;
+        return ((totalExpensePS - previousPS) / previousPS) * 100;
+    }, [totalExpensePS, previousPS]);
+
+    const yoyMOOEChangePct = useMemo(() => {
+        if (previousMOOE == null || previousMOOE === 0) return null;
+        return ((totalExpenseMOOE - previousMOOE) / previousMOOE) * 100;
+    }, [totalExpenseMOOE, previousMOOE]);
+
+    const yoyCOChangePct = useMemo(() => {
+        if (previousCO == null || previousCO === 0) return null;
+        return ((totalExpenseCO - previousCO) / previousCO) * 100;
+    }, [totalExpenseCO, previousCO]);
 
     const barData = useMemo(
         () =>
@@ -475,14 +537,17 @@ const sfPieData =
 
                 {/* ── Row 1: Stat cards ─────────────────────────────────────── */}
                 {isLoading ? (
-                    <div className="flex gap-4 mb-6">
+                    <div className={cn(isMobile ? "grid grid-cols-2 gap-3" : "flex gap-4", "mb-6")}>
                         {[...Array(5)].map((_, i) => <CardSkeleton key={i} />)}
                     </div>
                 ) : (
-                    <div className="flex gap-4 mb-6 items-stretch">
+                    <div className={cn(
+                        isMobile ? "grid grid-cols-2 gap-3" : "flex gap-4 items-stretch",
+                        "mb-6",
+                    )}>
 
                         {/* Budget plan year */}
-                        <Reveal delay={40} className="flex-shrink-0 w-[190px]">
+                        <Reveal delay={40} className={isMobile ? "" : "flex-shrink-0 w-[190px]"}>
                             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full relative overflow-hidden">
                                 <span className="absolute top-4 right-4 flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
@@ -503,10 +568,10 @@ const sfPieData =
                             </div>
                         </Reveal>
 
-                        <div className="w-px bg-zinc-200 my-2 flex-shrink-0" />
+                        {!isMobile && <div className="w-px bg-zinc-200 my-2 flex-shrink-0" />}
 
                         {/* Total proposed expenditure */}
-                        <Reveal delay={60} className="flex-1">
+                        <Reveal delay={60} className={cn(isMobile ? "col-span-2" : "flex-1")}>
                             {deptPlan ? (
                                 <Link
                                     to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
@@ -523,11 +588,31 @@ const sfPieData =
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
                                         Total Proposed Expenditure
                                     </p>
-                                    <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
-                                        {fmt(totalProposedExpenditure)}
-                                    </p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                                            {fmt(totalProposedExpenditure)}
+                                        </p>
+                                        {!prevYearLoading && yoyChangePct !== null && (
+                                            <span
+                                                className={cn(
+                                                    "inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                                                    yoyChangePct >= 0
+                                                        ? "text-emerald-700 bg-emerald-50"
+                                                        : "text-red-700 bg-red-50",
+                                                )}
+                                                title={`vs FY ${(activePlan?.year ?? 0) - 1}: ${fmt(previousTotal ?? 0)}`}
+                                            >
+                                                {yoyChangePct >= 0 ? (
+                                                    <ArrowTrendingUpIcon className="w-3 h-3" />
+                                                ) : (
+                                                    <ArrowTrendingDownIcon className="w-3 h-3" />
+                                                )}
+                                                {Math.abs(yoyChangePct).toFixed(2)}%
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug group-hover:text-blue-500 transition-colors">
-                                        Expense items + AIP programs →
+                                        Expense items + Special programs →
                                     </p>
                                 </Link>
                             ) : (
@@ -538,11 +623,31 @@ const sfPieData =
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
                                         Total Proposed Expenditure
                                     </p>
-                                    <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
-                                        {fmt(totalProposedExpenditure)}
-                                    </p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                                            {fmt(totalProposedExpenditure)}
+                                        </p>
+                                        {!prevYearLoading && yoyChangePct !== null && (
+                                            <span
+                                                className={cn(
+                                                    "inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                                                    yoyChangePct >= 0
+                                                        ? "text-emerald-700 bg-emerald-50"
+                                                        : "text-red-700 bg-red-50",
+                                                )}
+                                                title={`vs FY ${(activePlan?.year ?? 0) - 1}: ${fmt(previousTotal ?? 0)}`}
+                                            >
+                                                {yoyChangePct >= 0 ? (
+                                                    <ArrowTrendingUpIcon className="w-3 h-3" />
+                                                ) : (
+                                                    <ArrowTrendingDownIcon className="w-3 h-3" />
+                                                )}
+                                                {Math.abs(yoyChangePct).toFixed(2)}%
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
-                                        Expense items + AIP programs
+                                        Expense items + Special programs
                                     </p>
                                 </div>
                             )}
@@ -553,6 +658,9 @@ const sfPieData =
                             label="Personnel Services"
                             value={fmt(totalExpensePS)}
                             sub={`${pct(totalExpensePS, totalExpense)}% of expense items`}
+                            yoyChangePct={prevYearLoading ? undefined : yoyPSChangePct}
+                            previousValue={previousPS}
+                            previousYear={(activePlan?.year ?? 0) - 1}
                             accent="violet"
                             delay={110}
                         />
@@ -561,17 +669,25 @@ const sfPieData =
                             label="MOOE"
                             value={fmt(totalExpenseMOOE)}
                             sub={`${pct(totalExpenseMOOE, totalExpense)}% of expense items`}
+                            yoyChangePct={prevYearLoading ? undefined : yoyMOOEChangePct}
+                            previousValue={previousMOOE}
+                            previousYear={(activePlan?.year ?? 0) - 1}
                             accent="cyan"
                             delay={160}
                         />
-                        <StatCard
-                            icon={BuildingOfficeIcon}
-                            label="Capital Outlay"
-                            value={fmt(totalExpenseCO)}
-                            sub={`${pct(totalExpenseCO, totalExpense)}% of expense items`}
-                            accent="amber"
-                            delay={210}
-                        />
+                        <div className={isMobile ? "col-span-2" : "contents"}>
+                            <StatCard
+                                icon={BuildingOfficeIcon}
+                                label="Capital Outlay"
+                                value={fmt(totalExpenseCO)}
+                                sub={`${pct(totalExpenseCO, totalExpense)}% of expense items`}
+                                yoyChangePct={prevYearLoading ? undefined : yoyCOChangePct}
+                                previousValue={previousCO}
+                                previousYear={(activePlan?.year ?? 0) - 1}
+                                accent="amber"
+                                delay={210}
+                            />
+                        </div>
                     </div>
                 )}
 
@@ -585,7 +701,7 @@ const sfPieData =
                         <Reveal delay={260}>
                             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
                                 <SectionHead
-                                    eyebrow="AIP Program Allocation"
+                                    eyebrow="Special Program Allocation"
                                     title="PS / MOOE / CO"
                                     icon={CurrencyDollarIcon}
                                     iconBg="bg-indigo-50"
@@ -593,7 +709,7 @@ const sfPieData =
                                 />
                                 {radialData.length === 0 ? (
                                     <div className="h-48 flex items-center justify-center text-zinc-300 text-sm">
-                                        No AIP data yet
+                                        No Special Program data yet
                                     </div>
                                 ) : (
                                     <>
@@ -663,23 +779,23 @@ const sfPieData =
                     ) : (
                         <Reveal delay={310} className="lg:col-span-2">
                             <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
-                                <div className="flex items-start justify-between mb-4">
+                                <div className={cn("flex mb-4", isMobile ? "flex-col gap-3" : "items-start justify-between")}>
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
                                             <ClipboardDocumentListIcon className="w-4 h-4 text-violet-600" />
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
-                                                AIP Programs
+                                                Special Programs
                                             </p>
                                             <p className="text-[13px] font-bold text-zinc-800 leading-none">
                                                 Programs by Expenditure
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="text-right flex-shrink-0 ml-3">
+                                    <div className={cn(isMobile ? "text-left" : "text-right flex-shrink-0 ml-3")}>
                                         <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400">
-                                            Total AIP Expenditures
+                                            Total Special Program Expenditures
                                         </p>
                                         <p className="text-[18px] font-bold text-violet-600 tabular-nums leading-none">
                                             {fmt(aipTotal)}
@@ -691,7 +807,7 @@ const sfPieData =
                                 </div>
                                 {barData.length === 0 ? (
                                     <div className="h-52 flex items-center justify-center text-zinc-300 text-sm">
-                                        No AIP programs for this department
+                                        No Special programs for this department
                                     </div>
                                 ) : (
                                     <ResponsiveContainer width="100%" height={230}>
@@ -756,10 +872,10 @@ const sfPieData =
                             </div>
 
                             <div className="p-5 space-y-4">
-                                <div className="grid grid-cols-12 gap-3">
+                                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-12")}>
 
                                     {/* Estimated Revenue */}
-                                    <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5")}>
                                         <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">
                                             Estimated Revenue
                                         </p>
@@ -778,7 +894,7 @@ const sfPieData =
                                     </div>
 
                                     {/* Expenditures */}
-                                    <div className="col-span-3 bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5">
+                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5")}>
                                         <p className="text-[10px] font-medium uppercase tracking-widests text-zinc-500 mb-2 flex items-center gap-1">
                                             <ArrowTrendingDownIcon className="w-3 h-3 text-zinc-400" />
                                             Expenditures
@@ -798,7 +914,7 @@ const sfPieData =
                                     </div>
 
                                     {/* Pie + legend */}
-                                    <div className="col-span-6 flex items-center gap-3">
+                                    <div className={cn(isMobile ? "" : "col-span-6", "flex items-center gap-3")}>
                                         {specialFundLoading || expLoading ? (
                                             <div className="flex-1 flex items-center justify-center">
                                                 <div className="w-24 h-24 rounded-full bg-zinc-100 animate-pulse" />
@@ -941,8 +1057,8 @@ const sfPieData =
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 bg-white">
-                                            <div className="px-4 py-3 border-r border-zinc-100 space-y-1.5">
+                                        <div className={cn("grid bg-white", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                                            <div className={cn("px-4 py-3 space-y-1.5", isMobile ? "border-b border-zinc-100" : "border-r border-zinc-100")}>
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                                                         30% QRF
@@ -1094,7 +1210,7 @@ const sfPieData =
                     )}
 
                     {/* Plantilla */}
-                    {plantillaLoading ? (
+                    {/* {plantillaLoading ? (
                         <ChartSkeleton h="h-44" />
                     ) : (
                         <Reveal delay={410}>
@@ -1157,7 +1273,7 @@ const sfPieData =
                                 </div>
                             </div>
                         </Reveal>
-                    )}
+                    )} */}
                 </div>
 
 

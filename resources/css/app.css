@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, #app {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -117,7 +123,11 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.5) hsl(var(--background));
   }
 
-  #dept-tabs-scroll::-webkit-scrollbar {
+ #dept-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  #fund-source-tabs::-webkit-scrollbar {
     display: none;
   }
 
@@ -176,6 +186,15 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: hsl(var(--muted-foreground));
+  }
+
+  /* Table column header — large/emphasized variant, e.g. grouped year headers */
+  .text-table-header-lg {
+    font-size: 0.8125rem;    /* 13px */
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--foreground));
   }
 
   /* Table body cell — primary content (description, name) */

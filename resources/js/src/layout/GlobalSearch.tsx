@@ -232,11 +232,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ user }) => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="group flex items-center gap-2 h-8 pl-3 pr-2 rounded-lg border border-zinc-200 bg-zinc-50/80 text-zinc-400 hover:text-zinc-600 hover:bg-white hover:border-zinc-300 hover:shadow-sm transition-all w-64"
+        className="group flex items-center justify-center sm:justify-start gap-2 h-8 w-8 sm:w-64 px-0 sm:pl-3 sm:pr-2 rounded-lg border border-zinc-200 bg-zinc-50/80 text-zinc-400 hover:text-zinc-600 hover:bg-white hover:border-zinc-300 hover:shadow-sm transition-all flex-shrink-0"
       >
         <MagnifyingGlassIcon className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="text-[12px] flex-1 text-left truncate">Search pages…</span>
-        <KbdGroup className="flex-shrink-0 gap-1">
+        <span className="hidden sm:block text-[12px] flex-1 text-left truncate">Search pages…</span>
+        <KbdGroup className="hidden sm:flex flex-shrink-0 gap-1">
           <Kbd className="border border-zinc-200">{isMac ? "⌘" : "Ctrl"}</Kbd>
           <Kbd className="border border-zinc-200">{isMac ? "⇧" : "Shift"}</Kbd>
           <Kbd className="border border-zinc-200">F</Kbd>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -116,13 +116,13 @@ const FundToggle = ({
   value: FundFilter;
   onChange: (v: FundFilter) => void;
 }) => (
-  <div className="flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5 border border-border">
+  <div className="flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5 border border-border flex-shrink-0">
     {FILTER_OPTIONS.map(opt => (
       <button
         key={opt.value}
         onClick={() => onChange(opt.value)}
         className={cn(
-          "px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-150",
+          "px-2.5 py-1.5 rounded-md text-[10px] sm:text-[11px] font-semibold transition-all duration-150 whitespace-nowrap flex-shrink-0",
           value === opt.value
             ? "bg-primary text-primary-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
@@ -140,9 +140,22 @@ interface BudgetAreaChartProps {
   className?: string;
 }
 
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
+};
+
 export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) => {
   const { data: plans = [], isLoading: plansLoading } = useBudgetPlans();
   const { data: departments = [], isLoading: deptsLoading } = useDepartments();
+  const isMobile = useIsMobile();
 
   const [fundFilter, setFundFilter] = useState<FundFilter>("all");
 
@@ -244,29 +257,30 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-border">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center flex-shrink-0">
               <ChartBarIcon className="w-3.5 h-3.5 text-indigo-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-eyebrow">
                 Department Expenditures
               </p>
-              <p className="text-section-title mt-0.5">
+              <p className="text-section-title mt-0.5 truncate">
                 3-Year Comparison · {subtitleLabel}
               </p>
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:flex-shrink-0 overflow-x-auto">
             <FundToggle value={fundFilter} onChange={setFundFilter} />
             <Select
               value={String(centerYear)}
               onValueChange={v => setSelectedYear(Number(v))}
             >
-             <SelectTrigger className="w-[112px] h-8 text-xs font-semibold bg-muted/50 border-border text-foreground rounded-lg focus:ring-0 focus:ring-offset-0">
+              {/* trigger below gets ml-auto to push it to the far right */}
+             <SelectTrigger className="w-[112px] h-8 text-xs font-semibold bg-muted/50 border-border text-foreground rounded-lg focus:ring-0 focus:ring-offset-0 flex-shrink-0 ml-auto">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent className="bg-white border-border text-foreground rounded-lg">
@@ -285,16 +299,16 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
         </div>
 
         {/* Year pills */}
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
+        <div className="mt-3 grid grid-cols-1 sm:flex sm:items-center gap-2">
           {(["y0", "y1", "y2"] as const).map((key, i) => (
             <div
               key={key}
-              className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-muted/30 border-border"
+              className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-muted/30 border-border min-w-0"
             >
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: YEAR_COLORS[key] }} />
-              <span className="text-[11px] font-semibold text-foreground">{targetYears[i]}</span>
+              <span className="text-[11px] font-semibold text-foreground flex-shrink-0">{targetYears[i]}</span>
               {!loading && (
-                <span className="text-[11px] font-mono text-muted-foreground">{pesoC(totals[i])}</span>
+                <span className="text-[11px] font-mono text-muted-foreground truncate">{pesoC(totals[i])}</span>
               )}
             </div>
           ))}
@@ -338,12 +352,12 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
               <XAxis
                 dataKey="dept"
                 interval={0}
-                angle={-35}
+                angle={isMobile ? -90 : -35}
                 textAnchor="end"
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
+                tick={{ fontSize: isMobile ? 8 : 9, fill: "hsl(var(--muted-foreground))", fontWeight: 700 }}
                 tickLine={false}
                 axisLine={false}
-                height={44}
+                height={isMobile ? 60 : 44}
               />
               <YAxis
                 tickFormatter={v => pesoC(v)}

@@ -15,6 +15,7 @@ export interface User {
   dept_id?: number | null; // only for department-head
   is_online: boolean;
   is_active: boolean;
+  must_change_pass: boolean;
   created_at: string;
   updated_at: string;
   department?: Department; // when included via ?include=

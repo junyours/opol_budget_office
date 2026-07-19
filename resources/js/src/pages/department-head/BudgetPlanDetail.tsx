@@ -28,6 +28,7 @@ import { useNotificationStore } from '@/src/store/useNotificationStore';
 import { cn } from '@/src/lib/utils';
 import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
 import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
+import { useIsMobile } from '../../hooks/use-mobile';
 import {
   CheckCircleIcon,
   ArrowTrendingUpIcon,
@@ -74,6 +75,7 @@ const statusConfig: Record<string, { label: string; badge: string; dot: string }
 
 
 const BudgetPlanDetail: React.FC = () => {
+  const isMobile = useIsMobile();
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -170,15 +172,18 @@ const BudgetPlanDetail: React.FC = () => {
   if (loading) return <LoadingState />;
   if (!plan)   return <div className="p-6 text-gray-500">Budget plan not found.</div>;
 
-  const isEditable    = plan.status === 'draft';
+//   const isEditable    = plan.status === 'draft';
+//   const statusCfg     = statusConfig[plan.status] ?? statusConfig.draft;
+//   const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
+const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
+  const isEditable    = plan.status === 'draft' && parentIsOpen;
   const statusCfg     = statusConfig[plan.status] ?? statusConfig.draft;
-  const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
 
   return (
     <div className="p-6">
 
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
         <div>
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Department Budget Plan
@@ -260,17 +265,19 @@ const BudgetPlanDetail: React.FC = () => {
             Form 4 — AIP Programs
           </TabsTrigger>
         </TabsList> */}
-        <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 mb-4">
-  <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-    Form 2 — Expenditures
+        <div className="overflow-x-auto mb-4 -mx-1 px-1">
+        <TabsList className="h-9 bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-0.5 w-max">
+  <TabsTrigger value="2" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+    {isMobile ? 'Form 2' : 'Form 2 — Expenditures'}
   </TabsTrigger>
-  <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-    Form 3 — Personnel
+  <TabsTrigger value="3" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+    {isMobile ? 'Form 3' : 'Form 3 — Personnel'}
   </TabsTrigger>
-  <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-    Form 4 — Special Programs
+  <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
+    {isMobile ? 'Form 4' : 'Form 4 — Special Programs'}
   </TabsTrigger>
 </TabsList>
+        </div>
 
         <TabsContent value="2">
           <Form2
@@ -280,6 +287,7 @@ const BudgetPlanDetail: React.FC = () => {
             classifications={classifications}
             expenseItems={expenseItems}
             isEditable={isEditable}
+            isAdmin={false}
             onItemUpdate={fetchData}
           />
         </TabsContent>

@@ -2872,7 +2872,7 @@ export default function UnifiedPlanPage({ meta }: { meta: PlanMeta }) {
   // ── Pending-delete persistence ──────────────────────────────────────────
   // Survives a page refresh mid-countdown by tracking the pending delete
   // (and its exact expiry time) in localStorage.
-  const DELETE_GRACE_MS = 8000;
+  const DELETE_GRACE_MS = 5000;
   const pendingDeleteKey = (id: number) => `pending_delete_${meta.apiSlug}_${id}`;
 
   const finalizeDelete = (item: UpItem) => {

@@ -13,6 +13,7 @@ import { useForm4Items } from '@/src/hooks/useForm4Items';
 import { useCalamityFund } from '@/src/hooks/useCalamityFund';
 import { useQuery } from '@tanstack/react-query';
 import API from '@/src/services/api';
+import { useIsMobile } from '@/src/hooks/use-mobile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ interface BudgetComparisonBannerProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+  const isMobile = useIsMobile();
   const { data: currentAipItems = [], isLoading: currentAipLoading } =
     useForm4Items(plan.dept_budget_plan_id);
   const { data: pastAipItems = [], isLoading: pastAipLoadingRaw } =
@@ -124,10 +126,10 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
     )}>
 
       {/* ── Top row ── */}
-      <div className="flex items-center gap-0 flex-wrap">
+      <div className={cn("flex items-center gap-0 flex-wrap", isMobile && "flex-col items-stretch gap-3")}>
 
         {/* Appropriation */}
-        <div className="flex flex-col gap-0.5 pr-5">
+        <div className={cn("flex flex-col gap-0.5", !isMobile && "pr-5")}>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
             Appropriation {prevYear}
           </span>
@@ -143,10 +145,10 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
         </div>
 
         {/* Divider */}
-        <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
+        {!isMobile && <div className="w-px h-10 bg-gray-200 flex-shrink-0" />}
 
         {/* Proposed (+ calamity fund inline, special accounts only) */}
-        <div className="flex flex-col gap-0.5 px-5">
+        <div className={cn("flex flex-col gap-0.5", !isMobile && "px-5")}>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
             {isSpecialAccount ? `Total Proposed ${currYear}` : `Proposed ${currYear}`}
           </span>
@@ -174,7 +176,8 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
         {/* Inc/Dec badge */}
         {!aipLoading && (pastTotal > 0 || isOver) && (
           <div className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium border flex-shrink-0 mx-3',
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium border flex-shrink-0',
+            isMobile ? 'self-start' : 'mx-3',
             isOver     ? 'bg-red-50 border-red-200 text-red-700'
             : diff > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
             : diff < 0 ? 'bg-sky-50 border-sky-200 text-sky-700'
@@ -207,13 +210,15 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
           </div>
         )}
 
-        <div className="flex-1" />
+        {!isMobile && <div className="flex-1" />}
 
         {/* Status — right side, separated by a vertical rule */}
         {!aipLoading && (
           <div className={cn(
-            'flex items-start gap-2.5 pl-5 flex-shrink-0',
-            (pastTotal > 0 || (isSpecialAccount && threshold > 0)) && 'border-l border-gray-200',
+            'flex items-start gap-2.5 flex-shrink-0',
+            isMobile
+              ? 'pl-0 pt-3 border-t border-gray-200 w-full'
+              : cn('pl-5', (pastTotal > 0 || (isSpecialAccount && threshold > 0)) && 'border-l border-gray-200'),
           )}>
             {ceilingLoading ? (
               <span className="text-[12px] text-gray-400 italic">Loading Income Fund ceiling…</span>
@@ -230,7 +235,7 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
                   <span className="text-[11px] text-gray-500">
                     {isSpecialAccount ? 'Income Fund total' : 'Ceiling'}:{' '}
                     <span className="font-mono font-medium text-gray-700">{fmtP(threshold)}</span>
-                    
+
                   </span>
                   {isSpecialAccount && (
                     <span className="text-[10px] text-gray-400 italic">

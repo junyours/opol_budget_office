@@ -177,7 +177,8 @@ const invalidateActivePlanDependents = () => {
     if (newYear === "") return;
     setCreating(true);
     try {
-      const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive });
+    //   const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive });
+    const res     = await API.post("/budget-plans", { year: newYear, is_active: newActive, is_open: false });
       const created = res.data.data;
       const deptCount = created.department_plans?.length ?? 0;
     //   toast.success(`Budget plan ${created.year} created — ${deptCount} department plan${deptCount !== 1 ? "s" : ""} initialized.`);

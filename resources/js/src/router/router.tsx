@@ -149,6 +149,8 @@ const ExpenditurePage = React.lazy(
  );
 
 const NoInternet = React.lazy(() => import("../components/states/NoInternet"));
+const ChangePassword = React.lazy(() => import("../pages/common/ChangePassword"));
+const MaintenancePage = React.lazy(() => import("../pages/common/MaintenancePage"));
 
 
 /* ------------------ Suspense Wrapper ------------------ */
@@ -213,6 +215,39 @@ const GuestRoute = () => {
 //   return <Outlet />;
 // };
 
+// const ProtectedRoute = () => {
+//   const { user, loading } = useAuth();
+//   const location = useLocation();
+//   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+//   React.useEffect(() => {
+//     const onOnline  = () => setIsOnline(true);
+//     const onOffline = () => setIsOnline(false);
+//     window.addEventListener("online",  onOnline);
+//     window.addEventListener("offline", onOffline);
+//     return () => {
+//       window.removeEventListener("online",  onOnline);
+//       window.removeEventListener("offline", onOffline);
+//     };
+//   }, []);
+
+//   if (loading) return <LoadingState />;
+
+//   if (!isOnline) {
+//     return (
+//       <React.Suspense fallback={<LoadingState />}>
+//         <NoInternet />
+//       </React.Suspense>
+//     );
+//   }
+
+//   if (!user) {
+//     return <Navigate to="/login" replace />;
+//   }
+
+//   return <Outlet />;
+// };
+
 const ProtectedRoute = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -241,6 +276,15 @@ const ProtectedRoute = () => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Force password change: block every other route until resolved.
+  if (user.must_change_pass && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
+  // Already compliant — don't let them linger on the change-password page.
+  if (!user.must_change_pass && location.pathname === "/change-password") {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -287,6 +331,11 @@ const router = createBrowserRouter([
     children: [
 
       {
+        path: "change-password",
+        element: Lazy(ChangePassword),
+      },
+
+      {
         element: <MainLayout />,
         children: [
           {
@@ -311,8 +360,13 @@ const router = createBrowserRouter([
         //     },
 
           {
-            path: "department-budget-plans/:id",
-            element: Lazy(BudgetPlanDetail),
+            element: <RoleRoute roles={["department-head"]} />,
+            children: [
+              {
+                path: "department-budget-plans/:id",
+                element: Lazy(BudgetPlanDetail),
+              },
+            ],
           },
 
 
@@ -341,15 +395,31 @@ const router = createBrowserRouter([
             ],
           },
 
-          /* ---------------- ADMIN ---------------- */
+          /* ---------------- ADMIN (admin / super-admin only) ---------------- */
 
           {
-            element: <RoleRoute roles={["admin", "super-admin", "viewer"]} />,
+            element: <RoleRoute roles={["admin", "super-admin"]} />,
             children: [
               {
                 path: "admin/tranche",
                 element: Lazy(AdminTranche),
               },
+              {
+                path: "admin/departments",
+                element: Lazy(AdminDepartments),
+              },
+              {
+                path: "admin/budget-plans",
+                element: Lazy(BudgetPlanList),
+              },
+            ],
+          },
+
+          /* ---------------- ADMIN ---------------- */
+
+          {
+            element: <RoleRoute roles={["admin", "super-admin", "viewer"]} />,
+            children: [
               {
                 path: "admin/object-of-expenditures",
                 element: Lazy(ObjectOfExpenditures),
@@ -361,14 +431,6 @@ const router = createBrowserRouter([
               {
                 path: "admin/reports",
                 element: Lazy(Reports),
-              },
-              {
-                path: "admin/budget-plans",
-                element: Lazy(BudgetPlanList),
-              },
-              {
-                path: "admin/departments",
-                element: Lazy(AdminDepartments),
               },
               {
                 path: "admin/special-accounts",
@@ -570,6 +632,12 @@ const router = createBrowserRouter([
         ],
       },
     ],
+  },
+
+  {
+    path: "/maintenance",
+    element: Lazy(MaintenancePage),
+    errorElement: <ErrorBoundary />,
   },
 
   {

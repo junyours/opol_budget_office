@@ -30,9 +30,13 @@ import {
   isDeptEligible,
   type PsSettings,
 } from './PersonnelServicesSettings';
+// import { DeptDots } from '@/src/components/ui/DeptDots';
+// import { usePsSettings } from '@/src/hooks/usePsSettings';
+// import { useAuth } from '@/src/hooks/useAuth';
 import { DeptDots } from '@/src/components/ui/DeptDots';
 import { usePsSettings } from '@/src/hooks/usePsSettings';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useIsMobile } from '@/src/hooks/use-mobile';
 
 
 // ── Animation styles injected once ───────────────────────────────────────────
@@ -415,8 +419,12 @@ function sumAllowances(a: AllowanceResult): number {
 const PersonnelServices: React.FC = () => {
   useAnimationStyles();
 
-  const { user } = useAuth();
+//   const { user } = useAuth();
+// const isViewer = user?.role === 'viewer';
+// const { activePlan, loading: planLoading } = useActiveBudgetPlan();
+const { user } = useAuth();
 const isViewer = user?.role === 'viewer';
+const isMobile = useIsMobile();
 const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const { activeVersion, matrix, loading: matrixLoading, refresh } = useSalaryMatrix();
 
@@ -638,9 +646,14 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
         cashGift: 0, midYearBonus: 0, yearEndBonus: 0, magnaCarta1: 0, magnaCarta2: 0,
         retirementInsurance: 0, pagIbig: 0, philHealth: 0, ecip: 0, otherBenefits: 0,
       };
+
+
       const effBaseMon   = isExcluded ? 0 : baseMon;
       const effBaseAnn   = isExcluded ? 0 : baseAnn;
-      const effBaseAllow = isExcluded ? zeroAllow : baseAllow;
+      const otherBenefitsFlat = isExcluded ? 0 : (s.other_benefits_flat ?? 0);
+      const effBaseAllow = isExcluded
+        ? zeroAllow
+        : { ...baseAllow, otherBenefits: baseAllow.otherBenefits + otherBenefitsFlat };
 
       const rowSubTotal = effBaseAnn + sumAllowances(effBaseAllow) + honoraria + overtime + termLeave;
 
@@ -1127,8 +1140,13 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
             <TabsContent key={dept.dept_id} value={tabKey} className="mt-4">
 
               {/* Toolbar — animates in when tab becomes active */}
-              <div
+              {/* <div
                 className="flex items-center gap-3 mb-3 flex-wrap ps-animate-fade-up"
+                style={{ animationDelay: '40ms' }}
+                key={`toolbar-${tabAnimKey}-${tabKey}`}
+              > */}
+              <div
+                className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3 flex-wrap ps-animate-fade-up"
                 style={{ animationDelay: '40ms' }}
                 key={`toolbar-${tabAnimKey}-${tabKey}`}
               >
@@ -1150,7 +1168,8 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                     )}
                   </div>
                 )}
-                <div className="relative flex-1 min-w-[180px] max-w-xs ml-auto">
+                {/* <div className="relative flex-1 min-w-[180px] max-w-xs ml-auto"> */}
+                <div className={cn("relative flex-1 min-w-[180px]", isMobile ? "w-full max-w-none" : "max-w-xs ml-auto")}>
                   <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   <input
                     value={raw}
@@ -1490,7 +1509,9 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
 
       {/* ── Detail Sheet ── */}
       <Sheet open={!!detailRow} onOpenChange={(open) => { if (!open) setDetailRow(null); }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[480px] overflow-y-auto">
+        {/* <SheetContent side="right" className="w-[420px] sm:w-[480px] overflow-y-auto">
+          {detailRow && (() => { */}
+          <SheetContent side="right" className="w-full sm:w-[420px] lg:w-[480px] overflow-y-auto">
           {detailRow && (() => {
             const row = detailRow;
             const ir  = row.incrementRow;
@@ -1525,7 +1546,12 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
   style={{ animationDelay: '120ms' }}
 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Editable Fields</p>
-                  <div className="flex items-center justify-between gap-3 pb-2 mb-1 border-b border-gray-200">
+                  {/* <div className="flex items-center justify-between gap-3 pb-2 mb-1 border-b border-gray-200">
+                    <label className="text-xs text-gray-600 font-medium">
+                      Exclude from {activePlan.year} budget
+                      <span className="block text-[10px] text-gray-400 font-normal">Zeroes this row's money for this year only — item number stays put.</span>
+                    </label> */}
+                    <div className="flex items-start sm:items-center justify-between gap-3 pb-2 mb-1 border-b border-gray-200">
                     <label className="text-xs text-gray-600 font-medium">
                       Exclude from {activePlan.year} budget
                       <span className="block text-[10px] text-gray-400 font-normal">Zeroes this row's money for this year only — item number stays put.</span>
@@ -1677,7 +1703,9 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
 
       {/* ── Department Totals Detail Sheet ── */}
       <Sheet open={deptDetailDept !== null} onOpenChange={(open) => { if (!open) setDeptDetailDept(null); }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[480px] overflow-y-auto">
+        {/* <SheetContent side="right" className="w-[420px] sm:w-[480px] overflow-y-auto">
+          {deptDetailDept !== null && (() => { */}
+          <SheetContent side="right" className="w-full sm:w-[420px] lg:w-[480px] overflow-y-auto">
           {deptDetailDept !== null && (() => {
             const totals = departmentTotals[deptDetailDept] || {};
             const dept   = departments.find(d => d.dept_id === deptDetailDept);

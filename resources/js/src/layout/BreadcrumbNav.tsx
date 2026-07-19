@@ -56,22 +56,37 @@ export const BreadcrumbNav: React.FC = () => {
   }
 
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
+    <Breadcrumb className="min-w-0">
+      <BreadcrumbList className="flex-nowrap overflow-hidden">
         {breadcrumbItems.map((item, index) => {
           const isLast = index === breadcrumbItems.length - 1;
+          // On mobile, collapse everything except the current page into a
+          // single "…" so long trails don't wrap or overflow the header.
+          const isCollapsedOnMobile = !isLast && breadcrumbItems.length > 1;
           return (
             <React.Fragment key={index}>
-              <BreadcrumbItem>
+              <BreadcrumbItem
+                className={
+                  isCollapsedOnMobile
+                    ? "hidden sm:flex flex-shrink-0"
+                    : "flex-shrink min-w-0"
+                }
+              >
                 {isLast ? (
-                  <BreadcrumbPage>{item.name}</BreadcrumbPage>
+                  <BreadcrumbPage className="truncate block max-w-[140px] sm:max-w-none">
+                    {item.name}
+                  </BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link to={item.to!}>{item.name}</Link>
+                    <Link to={item.to!} className="whitespace-nowrap">
+                      {item.name}
+                    </Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
-              {!isLast && <BreadcrumbSeparator />}
+              {!isLast && (
+                <BreadcrumbSeparator className={isCollapsedOnMobile ? "hidden sm:flex" : ""} />
+              )}
             </React.Fragment>
           );
         })}

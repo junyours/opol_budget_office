@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src
 import { Input } from "@/src/components/ui/input";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 
 // ─────────────────────────────────────────────────────────────────────────
 // ✏️  EDIT YOUR NUMBERS HERE — this is the only section you need to touch.
@@ -90,11 +91,71 @@ interface SectionProps {
 }
 
 const ComparativeSection: React.FC<SectionProps> = ({ title, badgeText, badgeClass, rows, prevYear, currYear }) => {
+    const isMobile = useIsMobile();
     const totals = useMemo(() => {
         const prev = rows.reduce((s, r) => s + r.prev, 0);
         const curr = rows.reduce((s, r) => s + r.curr, 0);
         return { prev, curr, diff: curr - prev, pct: pctOf(prev, curr - prev) };
     }, [rows]);
+
+    if (isMobile) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="divide-y divide-gray-100">
+                    {rows.map((row) => {
+                        const diff = row.curr - row.prev;
+                        const pct = pctOf(row.prev, diff);
+                        return (
+                            <div key={row.label} className="px-4 py-3">
+                                <p className="text-[12px] font-medium text-gray-800 mb-2">{row.label}</p>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-blue-700/70 mb-0.5">{prevYear}</p>
+                                        <p className="font-mono text-[12px] text-blue-700 text-right">{fmtP(row.prev)}</p>
+                                    </div>
+                                    <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-orange-700/70 mb-0.5">{currYear}</p>
+                                        <p className="font-mono text-[12px] text-orange-700 text-right">{fmtP(row.curr)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                    <span className={cn("font-mono", clr(diff))}>
+                                        {diff === 0 ? "–" : (diff > 0 ? "+" : "") + fmtP(diff)}
+                                    </span>
+                                    <span className={cn("font-mono", clr(diff))}>
+                                        {row.prev === 0 && diff === 0 ? "–" : `${pct.toFixed(2)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="px-4 py-3 bg-gray-900 text-white">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+                        Expenditures Grand Total
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div className={cn("rounded-md border px-2 py-1.5", C_PREV_GT)}>
+                            <p className="opacity-70 text-[9px]">{prevYear}</p>
+                            <p className="font-mono font-bold text-right">{fmtP(totals.prev)}</p>
+                        </div>
+                        <div className={cn("rounded-md border px-2 py-1.5", C_CURR_GT)}>
+                            <p className="opacity-70 text-[9px]">{currYear}</p>
+                            <p className="font-mono font-bold text-right">{fmtP(totals.curr)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                        <span className={cn("font-mono font-semibold", clr(totals.diff))}>
+                            {totals.diff === 0 ? "–" : (totals.diff > 0 ? "+" : "") + fmtP(totals.diff)}
+                        </span>
+                        <span className={cn("font-mono font-semibold", clr(totals.diff))}>
+                            {totals.prev === 0 && totals.diff === 0 ? "–" : `${totals.pct.toFixed(2)}%`}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -238,6 +299,7 @@ const buildItemRows = (
 };
 
 const ComparativeSummaryPage: React.FC = () => {
+    const isMobile = useIsMobile();
     const { user, loading } = useAuth();
     const { activePlan, loading: planLoading } = useActiveBudgetPlan();
 
@@ -373,6 +435,29 @@ const ComparativeSummaryPage: React.FC = () => {
                                 GF
                             </span>
                         </div>
+                        {isMobile ? (
+                            <div className="px-4 py-3">
+                                <p className="text-[12px] font-medium text-gray-800 mb-2">{ESTIMATED_INCOME_ROW.label}</p>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-blue-700/70 mb-0.5">{prevYear}</p>
+                                        <p className="font-mono text-[12px] text-blue-700 text-right">{fmtP(ESTIMATED_INCOME_ROW.prev)}</p>
+                                    </div>
+                                    <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-orange-700/70 mb-0.5">{currYear}</p>
+                                        <p className="font-mono text-[12px] text-orange-700 text-right">{fmtP(ESTIMATED_INCOME_ROW.curr)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                    <span className={cn("font-mono", clr(incomeDiff))}>
+                                        {incomeDiff === 0 ? "–" : (incomeDiff > 0 ? "+" : "") + fmtP(incomeDiff)}
+                                    </span>
+                                    <span className={cn("font-mono", clr(incomeDiff))}>
+                                        {ESTIMATED_INCOME_ROW.prev === 0 && incomeDiff === 0 ? "–" : `${incomePct.toFixed(2)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
                                 <colgroup>
@@ -404,6 +489,7 @@ const ComparativeSummaryPage: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+                        )}
                     </div>
 
                     <ComparativeSection
@@ -424,6 +510,29 @@ const ComparativeSummaryPage: React.FC = () => {
                                 SA
                             </span>
                         </div>
+                        {isMobile ? (
+                            <div className="px-4 py-3">
+                                <p className="text-[12px] font-medium text-gray-800 mb-2">{SA_ESTIMATED_INCOME_ROW.label}</p>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-blue-700/70 mb-0.5">{prevYear}</p>
+                                        <p className="font-mono text-[12px] text-blue-700 text-right">{fmtP(SA_ESTIMATED_INCOME_ROW.prev)}</p>
+                                    </div>
+                                    <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                                        <p className="text-[9px] text-orange-700/70 mb-0.5">{currYear}</p>
+                                        <p className="font-mono text-[12px] text-orange-700 text-right">{fmtP(SA_ESTIMATED_INCOME_ROW.curr)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                    <span className={cn("font-mono", clr(saIncomeDiff))}>
+                                        {saIncomeDiff === 0 ? "–" : (saIncomeDiff > 0 ? "+" : "") + fmtP(saIncomeDiff)}
+                                    </span>
+                                    <span className={cn("font-mono", clr(saIncomeDiff))}>
+                                        {SA_ESTIMATED_INCOME_ROW.prev === 0 && saIncomeDiff === 0 ? "–" : `${saIncomePct.toFixed(2)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
                                 <colgroup>
@@ -455,6 +564,7 @@ const ComparativeSummaryPage: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+                        )}
                     </div>
 
                     <ComparativeSection
@@ -504,6 +614,46 @@ const ComparativeSummaryPage: React.FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
+                    {isMobile ? (
+                        <div className="max-h-[480px] overflow-y-auto divide-y divide-gray-100">
+                            {filteredItemRows.length === 0 ? (
+                                <p className="py-10 text-center text-gray-400 text-sm">No matching items.</p>
+                            ) : (
+                                filteredItemRows.map((row, idx) => {
+                                    const diff = row.curr - row.prev;
+                                    const pct  = pctOf(row.prev, diff);
+                                    return (
+                                        <div key={`${row.accountCode}-${row.label}-${idx}`} className="px-4 py-3">
+                                            <div className="mb-2">
+                                                {row.accountCode && (
+                                                    <span className="text-gray-400 font-mono text-[10px] block">{row.accountCode}</span>
+                                                )}
+                                                <span className="text-[12px] font-medium text-gray-800">{row.label}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                                <div className="rounded-md border border-blue-100 bg-blue-50/40 px-2 py-1.5">
+                                                    <p className="text-[9px] text-blue-700/70 mb-0.5">{prevYear}</p>
+                                                    <p className="font-mono text-[12px] text-blue-700 text-right">{fmtP(row.prev)}</p>
+                                                </div>
+                                                <div className="rounded-md border border-orange-100 bg-orange-50/40 px-2 py-1.5">
+                                                    <p className="text-[9px] text-orange-700/70 mb-0.5">{currYear}</p>
+                                                    <p className="font-mono text-[12px] text-orange-700 text-right">{fmtP(row.curr)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className={cn("font-mono", clr(diff))}>
+                                                    {diff === 0 ? "–" : (diff > 0 ? "+" : "") + fmtP(diff)}
+                                                </span>
+                                                <span className={cn("font-mono", clr(diff))}>
+                                                    {row.prev === 0 && diff === 0 ? "–" : `${pct.toFixed(2)}%`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    ) : (
                     <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
                         <table className="w-full text-[12px] border-collapse table-fixed" style={{ minWidth: 640 }}>
                             <colgroup>
@@ -554,6 +704,7 @@ const ComparativeSummaryPage: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

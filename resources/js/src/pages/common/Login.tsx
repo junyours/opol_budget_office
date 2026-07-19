@@ -14,7 +14,7 @@ import LegalDialog, { type LegalTab } from "../../components/dialog/LegalDialog"
 import { Input }                   from "@/src/components/ui/input";
 import { Label }                   from "@/src/components/ui/label";
 import { Button }                  from "@/src/components/ui/button";
-import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Separator }               from "@/src/components/ui/separator";
 import { toast }                   from "sonner";
 import {
@@ -173,12 +173,29 @@ export default function Login() {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
 
+  // ── Maintenance mode notice ────────────────────────────────────────────────────
+  const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+
   // ── Init ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 40);
     checkRateLimit();
     setSavedAccounts(getRememberedAccounts());
     return () => { clearTimeout(t); if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  // Heads-up banner only — doesn't block anyone from attempting to sign in.
+  // The backend (login endpoint) is the actual source of truth on who gets through.
+  useEffect(() => {
+    API.get('/maintenance/status')
+      .then(({ data }) => {
+        if (data?.maintenance_mode) {
+          setMaintenanceNotice(
+            data.maintenance_message ?? "We're currently performing scheduled maintenance. Some accounts may be temporarily unable to sign in — please check back shortly."
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -264,6 +281,10 @@ export default function Login() {
 
       navigate('/dashboard');
     } catch (err: any) {
+      if (err.response?.status === 503 && err.response?.data?.maintenance_mode) {
+        navigate('/maintenance');
+        return;
+      }
       if (err.response?.status === 429 || (err as any).isRateLimit) {
         const retryAfterSec = err.response?.headers?.['retry-after'] ?? err.response?.data?.retry_after;
         const waitMs = retryAfterSec ? parseInt(retryAfterSec, 10) * 1000 : 0;
@@ -296,6 +317,10 @@ export default function Login() {
       login(data.user, data.token);
       navigate('/dashboard');
     } catch (err: any) {
+      if (err.response?.status === 503 && err.response?.data?.maintenance_mode) {
+        navigate('/maintenance');
+        return;
+      }
       setPinError(err.response?.data?.message ?? 'Incorrect password.');
       setPinPassword('');
     } finally {
@@ -353,8 +378,8 @@ export default function Login() {
         @keyframes panelFadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
       `}</style>
 
-      <div className="login-wrap min-h-screen bg-zinc-50 flex flex-col">
-        <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+      <div className="login-wrap h-screen overflow-y-auto bg-zinc-50 flex flex-col">
+        <div className="flex-1 flex items-start lg:items-center justify-center p-4 lg:p-8 py-8">
           <div className="w-full max-w-5xl bg-white border border-zinc-200 rounded-2xl shadow-md overflow-hidden">
             <div className="flex flex-col lg:flex-row">
 
@@ -688,6 +713,16 @@ export default function Login() {
         </Button>
       </div>
 
+      {maintenanceNotice && (
+        <Alert className="mb-5 border-amber-200 bg-amber-50 text-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-sm font-semibold text-amber-800">System Maintenance</AlertTitle>
+          <AlertDescription className="text-sm text-amber-700">
+            {maintenanceNotice}
+          </AlertDescription>
+        </Alert>
+      )}
+
      {/* Account cards — max 3 visible, scrollable */}
       <div
         className={sl("right","d2")}
@@ -708,7 +743,7 @@ export default function Login() {
           <button
             key={acct.user_id}
             onClick={() => openPinPanel(acct)}
-            className="group w-full flex items-center gap-3 px-3.5 py-3 bg-white border border-zinc-200 rounded-xl text-left transition-all hover:border-zinc-300 hover:shadow-sm hover:-translate-y-0.5"
+            className="group w-full flex items-center gap-3 px-3.5 py-3 bg-white border border-zinc-200 rounded-xl text-left transition-colors duration-150 hover:border-zinc-300 hover:shadow-sm"
           >
             <AvatarImg acct={acct} size={44} />
             <div className="flex-1 min-w-0">
@@ -768,6 +803,16 @@ export default function Login() {
                         <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Welcome back</h2>
                         <p className="text-sm text-zinc-500 mt-1">Sign in to your account to continue.</p>
                       </div>
+
+                      {maintenanceNotice && (
+                        <Alert className="mb-5 border-amber-200 bg-amber-50 text-amber-800">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <AlertTitle className="text-sm font-semibold text-amber-800">System Maintenance</AlertTitle>
+                          <AlertDescription className="text-sm text-amber-700">
+                            {maintenanceNotice}
+                          </AlertDescription>
+                        </Alert>
+                      )}
 
                       {(rateLimitError || loginError) && (
                         <Alert variant="destructive" className="mb-5" role="alert" aria-live="assertive" id="login-error">

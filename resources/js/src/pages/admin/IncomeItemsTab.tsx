@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { useDebounce } from "@/src/hooks/useDebounce";
+import { useIsMobile } from "@/src/hooks/use-mobile";
 import API from "@/src/services/api";
 
 import { Button } from "@/src/components/ui/button";
@@ -361,6 +362,7 @@ const FormModal: React.FC<FormModalProps> = ({
 
 const IncomeItemsTab: React.FC = () => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const { data: items = [], isLoading } = useIncomeItems();
   const { data: sources = [] } = useSources();
@@ -512,10 +514,10 @@ const IncomeItemsTab: React.FC = () => {
     <div className="p-6 relative">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <span className="text-eyebrow">Expenditure</span>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">
             Income Items
           </h1>
           <p className="text-xs text-gray-400 mt-1">
@@ -524,7 +526,7 @@ const IncomeItemsTab: React.FC = () => {
         </div>
         <Button
           size="sm"
-          className="h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800"
+          className="h-9 sm:h-8 text-xs gap-1.5 bg-gray-900 hover:bg-gray-800 w-full sm:w-auto"
           onClick={() => setAddOpen(true)}
         >
           <PlusIcon className="w-3.5 h-3.5" />
@@ -535,7 +537,7 @@ const IncomeItemsTab: React.FC = () => {
       {/* ── Filter bar ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+        <div className="relative flex-1 min-w-[160px] sm:max-w-xs">
           <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
             value={searchRaw}
@@ -660,6 +662,7 @@ const IncomeItemsTab: React.FC = () => {
           </div>
         ) : (
           <>
+            {!isMobile && (
             <div className="overflow-x-auto">
               <table className="w-full text-[12px] border-collapse">
                 <thead>
@@ -763,6 +766,54 @@ const IncomeItemsTab: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* ── Mobile card list ── */}
+            {isMobile && (
+              <div className="flex flex-col gap-2.5 p-3">
+                {paginated.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={(e) => handleRowClick(e, item)}
+                    style={{ paddingLeft: `${16 + item.level * 12}px` }}
+                    className={cn(
+                      "w-full text-left bg-white border border-gray-200 rounded-2xl pr-4 py-3.5 space-y-2 active:bg-gray-50 transition-colors",
+                      !item.is_active && "opacity-50"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[13px] font-semibold text-gray-900 truncate">{item.name}</p>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0",
+                          item.is_active
+                            ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                            : "text-gray-500 bg-gray-50 border-gray-200"
+                        )}
+                      >
+                        {item.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                      <Badge
+                        variant="outline"
+                        className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", sourceBadgeClass(item.source))}
+                      >
+                        {sourceLabel(item.source)}
+                      </Badge>
+                      {item.code && (
+                        <span className="text-gray-500 font-mono">{item.code}</span>
+                      )}
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-400">Lvl {item.level}</span>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-400">Order {item.sort_order}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -825,8 +876,47 @@ const IncomeItemsTab: React.FC = () => {
         )}
       </div>
 
-      {/* ── Context Menu ── */}
-      {ctxMenu && (
+      {/* ── Context Menu (desktop) / Action Sheet (mobile) ── */}
+      {ctxMenu && (isMobile ? (
+        <div className="fixed inset-0 z-[9999] flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCtxMenu(null)} />
+          <div
+            ref={ctxRef}
+            className="relative w-full bg-white rounded-t-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-2.5 mb-1" />
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[13px] font-semibold text-gray-900 truncate">{ctxMenu.item.name}</p>
+            </div>
+            <button
+              onClick={() => { setCtxMenu(null); setEditItem(ctxMenu.item); }}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors"
+            >
+              <PencilSquareIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              Edit Item
+            </button>
+            <button
+              onClick={() => handleToggleIntent(ctxMenu.item)}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100",
+                ctxMenu.item.is_active ? "text-amber-700 active:bg-amber-50" : "text-emerald-700 active:bg-emerald-50"
+              )}
+            >
+              {ctxMenu.item.is_active ? (
+                <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
+              ) : (
+                <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
+              )}
+            </button>
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="w-full px-4 py-3.5 text-[14px] font-medium text-gray-400 border-t border-gray-100 active:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <div
           ref={ctxRef}
           style={{ position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
@@ -861,7 +951,7 @@ const IncomeItemsTab: React.FC = () => {
             )}
           </button>
         </div>
-      )}
+      ))}
 
       {/* ── Add / Edit modal ── */}
       {(addOpen || editItem) && (

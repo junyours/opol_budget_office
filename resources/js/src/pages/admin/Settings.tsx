@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
+import { useIsMobile } from '../../hooks/use-mobile';
 // import {
 //   WrenchScrewdriverIcon,
 //   ClipboardDocumentListIcon,
@@ -155,6 +156,8 @@ type TabKey = typeof ALL_TABS[number]['key'];
 const DEFAULT_TAB: TabKey = ALL_TABS[0].key;
 
 const SettingsPage: React.FC = () => {
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabKey) || DEFAULT_TAB;
   const [activeTab, setActiveTabState] = useState<TabKey>(
@@ -169,6 +172,7 @@ const SettingsPage: React.FC = () => {
       next.set('tab', key);
       return next;
     }, { replace: true });
+    if (isMobile) setMobileView('detail');
   };
 
   // If the user arrives via a link/search result with a different ?tab=, sync it
@@ -187,7 +191,12 @@ const SettingsPage: React.FC = () => {
     <div className="flex h-full min-h-0 overflow-hidden w-full">
 
       {/* ── Left rail ─────────────────────────────────────────────────── */}
-      <aside className="w-52 shrink-0 border-r border-gray-100 bg-gray-50/40 flex flex-col py-4 px-2 gap-0 overflow-y-auto">
+      <aside className={cn(
+        "shrink-0 border-r border-gray-100 bg-gray-50/40 flex-col py-4 px-2 gap-0 overflow-y-auto",
+        isMobile
+          ? cn("w-full border-r-0 h-full", mobileView === 'list' ? "flex" : "hidden")
+          : "w-52 flex",
+      )}>
 
         <p className="px-2.5 mb-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
           Settings
@@ -247,7 +256,24 @@ const SettingsPage: React.FC = () => {
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 w-0 flex flex-col overflow-hidden bg-gray-50/20">
+      <div className={cn(
+        "flex-1 min-h-0 flex flex-col overflow-hidden bg-gray-50/20",
+        isMobile ? cn("w-full", mobileView === 'list' && "hidden") : "min-w-0 w-0",
+      )}>
+        {isMobile && (
+          <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2">
+            <button
+              onClick={() => setMobileView('list')}
+              className="flex-shrink-0 -ml-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              aria-label="Back to settings list"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <span className="text-[13px] font-semibold text-gray-800 truncate">{current.short}</span>
+          </div>
+        )}
         <div className="flex-1 min-w-0 overflow-y-auto overflow-x-auto">
           <React.Suspense fallback={
             <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">

@@ -2110,6 +2110,16 @@ $items = $allDescriptions->map(function ($desc) use (
     ];
 })->filter()->values()->toArray();
 
+        // ── Past-year fallback: some sources have no past-year Income Fund
+        //    data (derived 5% calamity fund = 0) even though item-level
+        //    obligation amounts exist. Apply the same fallback used for
+        //    display here too, so the Grand Total row isn't blank for the
+        //    Past Year column.
+        if ($pastData['total_5pct'] <= 0) {
+            $pastItemsTotal = array_sum(array_column($items, 'obligation_amount'));
+            $pastData['total_5pct'] = $pastData['qrf_30'] + $pastItemsTotal;
+        }
+
         $sections[] = [
             'source'      => $source,
             'dept_name'   => $dept->dept_name,

@@ -19,8 +19,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
+import { Textarea } from '@/src/components/ui/textarea';
+import { Label } from '@/src/components/ui/label';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
@@ -41,7 +44,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/use-mobile';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 // import { useNotifications } from '@/src/hooks/useNotifications';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
@@ -904,6 +907,8 @@ const LBPForms: React.FC = () => {
   useEffect(() => { ensurePanelAnim(); }, []);
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { planId } = useParams<{ planId: string }>();
   const notifications = useNotificationStore(s => s.notifications);
   const markRead      = useNotificationStore(s => s.markRead);
   const isAdmin = user?.role === 'admin' || user?.role === 'super-admin';
@@ -912,7 +917,6 @@ const LBPForms: React.FC = () => {
   const { activePlan, loading: planLoading } = useActiveBudgetPlan();
   const activePlanId = activePlan?.budget_plan_id;
   const isMobile = useIsMobile();
-  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
 
   const queryClient = useQueryClient();
 
@@ -978,17 +982,18 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
   useEffect(() => {
     if (isViewer && activeFormTab === '3') setActiveFormTab('2');
   }, [isViewer, activeFormTab]);
-  const [search,          setSearch]         = useState('');
   const [panelKey,        setPanelKey]       = useState(0);
 //   const [approveTarget,   setApproveTarget]  = useState<DeptPlanWithName | null>(null);
 //   const [rejectTarget,    setRejectTarget]   = useState<DeptPlanWithName | null>(null);
     const [approveTarget,    setApproveTarget]    = useState<DeptPlanWithName | null>(null);
   const [rejectTarget,     setRejectTarget]     = useState<DeptPlanWithName | null>(null);
+  const [rejectReason,     setRejectReason]     = useState('');
   const [acknowledgeTarget, setAcknowledgeTarget] = useState<DeptPlanWithName | null>(null);
   const [acting,          setActing]         = useState(false);
   const [acknowledging,   setAcknowledging]  = useState(false);
-  const [statusFilter,   setStatusFilter]   = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [stepperModalOpen, setStepperModalOpen] = useState(false);
+//   const [statusFilter,   setStatusFilter]   = useState<string>('all');
+//   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { reviewMode: cardView, setReviewMode: setCardView } = useReviewModeStore();
 
   // ── Shift+R toggles Review Mode (cardView) ──────────────────────────────────
@@ -1008,13 +1013,13 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // ── Default selection once plans are loaded ────────────────────────────────
+  // ── Selection comes from the route param (list page → card click) ─────────
   useEffect(() => {
-    if (!selectedPlanId && deptPlans.length > 0) {
-      const firstSubmitted = deptPlans.find(p => p.status === 'submitted');
-      setSelectedPlanId((firstSubmitted ?? deptPlans[0]).dept_budget_plan_id);
+    if (planId && Number(planId) !== selectedPlanId) {
+      setSelectedPlanId(Number(planId));
+      setPanelKey(k => k + 1);
     }
-  }, [deptPlans, selectedPlanId]);
+  }, [planId]);
 
   // ── Refresh the dept plans list (status badges, totals) after an action ───
   const refreshDeptPlans = useCallback(() => {
@@ -1078,14 +1083,14 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
         .forEach(n => markRead(n.id));
 }, [notifications, markRead]);
 
-  const handleSelectPlan = (id: number) => {
-      if (id === selectedPlanId) { if (isMobile) setMobileView('detail'); return; }
-      setSelectedPlanId(id);
-      setPanelKey(k => k + 1);
-      const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
-      if (plan) markDeptNotificationsRead(plan.dept_id);
-      if (isMobile) setMobileView('detail');
-  };
+//   const handleSelectPlan = (id: number) => {
+//       if (id === selectedPlanId) { if (isMobile) setMobileView('detail'); return; }
+//       setSelectedPlanId(id);
+//       setPanelKey(k => k + 1);
+//       const plan = deptPlans.find(p => p.dept_budget_plan_id === id);
+//       if (plan) markDeptNotificationsRead(plan.dept_id);
+//       if (isMobile) setMobileView('detail');
+//   };
 
 //   // ── Called by Form2 when an item is saved ─────────────────────────────────
 //   const handleItemUpdate = useCallback(() => {
@@ -1149,9 +1154,12 @@ const handleAcknowledge = async () => {
     if (!rejectTarget) return;
     setActing(true);
     try {
-      await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`);
+      await API.post(`/department-budget-plans/${rejectTarget.dept_budget_plan_id}/reject`, {
+        reason: rejectReason.trim() || null,
+      });
       toast.success(`${rejectTarget.dept_abbreviation} plan returned to draft.`);
       setRejectTarget(null);
+      setRejectReason('');
       refreshDeptPlans();
       refreshSubmittedCount();
     } catch (err: any) {
@@ -1159,59 +1167,59 @@ const handleAcknowledge = async () => {
     } finally { setActing(false); }
   };
 
-  // ── Filtered list ──────────────────────────────────────────────────────────
-  const getCategoryName = useCallback(
-    (p: DeptPlanWithName) =>
-      p.department?.category?.dept_category_name
-      ?? categoryMap[p.department?.dept_category_id ?? -1]
-      ?? null,
-    [categoryMap]
-  );
+//   // ── Filtered list ──────────────────────────────────────────────────────────
+//   const getCategoryName = useCallback(
+//     (p: DeptPlanWithName) =>
+//       p.department?.category?.dept_category_name
+//       ?? categoryMap[p.department?.dept_category_id ?? -1]
+//       ?? null,
+//     [categoryMap]
+//   );
 
-  const deptCategories = useMemo(() => {
-    const cats = deptPlans
-      .map(p => getCategoryName(p))
-      .filter((c): c is string => !!c);
-    return Array.from(new Set(cats)).sort();
-  }, [deptPlans, getCategoryName]);
+//   const deptCategories = useMemo(() => {
+//     const cats = deptPlans
+//       .map(p => getCategoryName(p))
+//       .filter((c): c is string => !!c);
+//     return Array.from(new Set(cats)).sort();
+//   }, [deptPlans, getCategoryName]);
 
-  const filteredPlans = useMemo(() => {
-    const q = search.toLowerCase();
-    return deptPlans.filter(p => {
-      const matchSearch =
-        !q ||
-        p.dept_name.toLowerCase().includes(q) ||
-        p.dept_abbreviation.toLowerCase().includes(q);
+//   const filteredPlans = useMemo(() => {
+//     const q = search.toLowerCase();
+//     return deptPlans.filter(p => {
+//       const matchSearch =
+//         !q ||
+//         p.dept_name.toLowerCase().includes(q) ||
+//         p.dept_abbreviation.toLowerCase().includes(q);
 
-      const matchStatus =
-        statusFilter === 'all' || p.status === statusFilter;
+//       const matchStatus =
+//         statusFilter === 'all' || p.status === statusFilter;
 
-      const matchCategory =
-        categoryFilter === 'all' ||
-        (getCategoryName(p) ?? '') === categoryFilter;
+//       const matchCategory =
+//         categoryFilter === 'all' ||
+//         (getCategoryName(p) ?? '') === categoryFilter;
 
-      return matchSearch && matchStatus && matchCategory;
-    });
-  }, [deptPlans, search, statusFilter, categoryFilter, getCategoryName]);
+//       return matchSearch && matchStatus && matchCategory;
+//     });
+//   }, [deptPlans, search, statusFilter, categoryFilter, getCategoryName]);
 
-  const groupedPlans = useMemo(() => {
-    const map = new Map<string, { categoryName: string; categoryId: number; plans: DeptPlanWithName[] }>();
-    filteredPlans.forEach(plan => {
-      const categoryName = getCategoryName(plan) ?? 'Uncategorized';
-      const categoryId    = plan.department?.dept_category_id ?? 9999;
-      if (!map.has(categoryName)) {
-        map.set(categoryName, { categoryName, categoryId, plans: [] });
-      }
-      map.get(categoryName)!.plans.push(plan);
-    });
-    return Array.from(map.values()).sort((a, b) => a.categoryId - b.categoryId);
-  }, [filteredPlans, getCategoryName]);
+//   const groupedPlans = useMemo(() => {
+//     const map = new Map<string, { categoryName: string; categoryId: number; plans: DeptPlanWithName[] }>();
+//     filteredPlans.forEach(plan => {
+//       const categoryName = getCategoryName(plan) ?? 'Uncategorized';
+//       const categoryId    = plan.department?.dept_category_id ?? 9999;
+//       if (!map.has(categoryName)) {
+//         map.set(categoryName, { categoryName, categoryId, plans: [] });
+//       }
+//       map.get(categoryName)!.plans.push(plan);
+//     });
+//     return Array.from(map.values()).sort((a, b) => a.categoryId - b.categoryId);
+//   }, [filteredPlans, getCategoryName]);
 
-  const counts = useMemo(() => ({
-    submitted: deptPlans.filter(p => p.status === 'submitted').length,
-    approved:  deptPlans.filter(p => p.status === 'approved').length,
-    draft:     deptPlans.filter(p => p.status === 'draft').length,
-  }), [deptPlans]);
+//   const counts = useMemo(() => ({
+//     submitted: deptPlans.filter(p => p.status === 'submitted').length,
+//     approved:  deptPlans.filter(p => p.status === 'approved').length,
+//     draft:     deptPlans.filter(p => p.status === 'draft').length,
+//   }), [deptPlans]);
 
   // ── Guards ─────────────────────────────────────────────────────────────────
   if (planLoading || loading) return <LoadingState />;
@@ -1227,182 +1235,14 @@ const handleAcknowledge = async () => {
   return (
     <div className={cn("flex h-full min-h-0 overflow-hidden w-full", isMobile && "flex-col")}>
 
-      {/* ══ LEFT RAIL ══ */}
-      <aside className={cn(
-        "shrink-0 min-h-0 border-r border-gray-100 bg-gray-50/40 flex-col py-4 px-2 gap-0.5 overflow-y-auto",
-        cardView && "hidden",
-        !cardView && (isMobile
-          ? cn("w-full border-r-0 h-full", mobileView === 'list' ? "flex" : "hidden")
-          : "w-56 flex h-full"),
-      )}>
-
-        <div className="px-2.5 mb-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 mb-0.5">
-            Budget Proposals Review
-          </p>
-          <p className="text-[13px] font-semibold text-gray-800">Budget Year {activePlan.year}</p>
-        </div>
-
-        {/* Search */}
- <div className="px-1 mb-2">
-  <div className="relative">
-    <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-    <Input
-      placeholder="Search…"
-      value={search}
-      onChange={e => setSearch(e.target.value)}
-      className="pl-8 h-8 text-xs border-gray-200 bg-white"
-    />
-  </div>
-</div>
-
-{/* Status filter */}
-<div className="px-1 mb-1">
-  <p className="px-1.5 mb-1 text-[9px] font-semibold uppercase tracking-widest text-gray-400">
-    Status
-  </p>
-  <div className="flex flex-col gap-0.5">
-    {(['all', 'draft', 'submitted', 'under_review', 'approved'] as const).map(s => {
-      const labels: Record<string, string> = {
-        all: 'All', draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review', approved: 'Approved',
-      };
-      const dots: Record<string, string> = {
-        all: 'bg-gray-400', draft: 'bg-amber-400',
-        submitted: 'bg-blue-400', under_review: 'bg-indigo-400', approved: 'bg-emerald-500',
-      };
-      const active = statusFilter === s;
-      return (
-        <button
-          key={s}
-          onClick={() => setStatusFilter(s)}
-          className={cn(
-            'flex items-center gap-2 w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-all',
-            active
-              ? 'bg-gray-900 text-white font-medium'
-              : 'text-gray-600 hover:bg-white/70 hover:text-gray-800',
-          )}
-        >
-          <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', dots[s])} />
-          {labels[s]}
-          {s !== 'all' && (
-            <span className={cn(
-              'ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full border',
-              active
-                ? 'text-gray-300 bg-white/10 border-white/20'
-                : STATUS_CFG[s]?.badge ?? '',
-            )}>
-              {deptPlans.filter(p => p.status === s).length}
-            </span>
-          )}
-        </button>
-      );
-    })}
-  </div>
-</div>
-
-{/* Category filter — only shown if there are categories */}
-{deptCategories.length > 0 && (
-  <div className="px-1 mb-2">
-    <p className="px-1.5 mb-1 mt-2 text-[9px] font-semibold uppercase tracking-widest text-gray-400">
-      Category
-    </p>
-    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-      <SelectTrigger className="h-8 text-xs border-gray-200 bg-white">
-        <SelectValue placeholder="All Categories" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all" className="text-xs">
-          All Categories
-        </SelectItem>
-        {deptCategories.map(cat => (
-          <SelectItem key={cat} value={cat} className="text-xs">
-            {cat}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-)}
-
-{/* Divider before list */}
-<div className="border-t border-gray-100 mx-2 mb-2" />
-
-        {/* Department list — grouped by category */}
-        {filteredPlans.length === 0 ? (
-          <p className="px-2.5 py-6 text-xs text-gray-400 text-center">No departments found.</p>
-        ) : (
-          groupedPlans.map(group => (
-            <div key={group.categoryName} className="mb-3 last:mb-0">
-              <p className="px-2.5 mb-1 mt-1 text-[9px] font-semibold uppercase tracking-widest text-gray-400/70 truncate">
-                {group.categoryName}
-              </p>
-              <div className="flex flex-col gap-0.5">
-                {group.plans.map(plan => {
-                  const cfg    = getStatusCfg(plan.status);
-                  const active = plan.dept_budget_plan_id === selectedPlanId;
-
-                  return (
-                    <button
-                      key={plan.dept_budget_plan_id}
-                      onClick={() => handleSelectPlan(plan.dept_budget_plan_id)}
-                      className={cn(
-                        'group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-all border',
-                        active
-                          ? cn('bg-gray-900 text-white shadow-md', getCatColors(plan.department?.dept_category_id).activeBorder)
-                          : cn(getCatColors(plan.department?.dept_category_id).card, 'text-gray-700'),
-                      )}
-                    >
-                      <DeptAvatar
-                        logo={plan.dept_logo}
-                        abbreviation={plan.dept_abbreviation}
-                        name={plan.dept_name}
-                        deptId={plan.dept_id}
-                        active={active}
-                        size="sm"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <span className={cn(
-                          'text-[12px] font-medium leading-tight block truncate',
-                          active ? 'text-white' : 'text-gray-800',
-                        )}>
-                          {plan.dept_abbreviation
-                            ? plan.dept_abbreviation.replace(/[()]/g, '').trim()
-                            : plan.dept_name}
-                        </span>
-                        {active && (
-                          <span className={cn(
-                            'text-[10px] leading-tight block truncate mt-0.5',
-                            active ? 'text-gray-300' : 'text-gray-400',
-                          )}>
-                            {plan.dept_name}
-                          </span>
-                        )}
-                      </div>
-
-                      <span className={cn(
-                        'text-[9px] font-semibold px-1.5 py-0.5 rounded-full border flex-shrink-0',
-                        active ? 'bg-white/20 text-white border-white/30' : cfg.badge,
-                      )}>
-                        {cfg.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))
-        )}
-      </aside>
-
       {/* ══ MAIN CONTENT ══ */}
-      <div className={cn(
-        "flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50/20",
-        isMobile ? cn("w-full", mobileView === 'list' && "hidden") : "w-0",
-      )}>
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50/20 w-full">
         {!selectedPlan ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-            Select a department to review their forms.
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 text-sm gap-3">
+            <p>Department budget plan not found.</p>
+            <Button size="sm" variant="outline" onClick={() => navigate('/admin/lbp-forms')}>
+              Back to Departments
+            </Button>
           </div>
         ) : (
           <div
@@ -1411,19 +1251,18 @@ const handleAcknowledge = async () => {
             style={{ animation: '_panelIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
           >
             {/* Plan header */}
-            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center flex-wrap gap-y-2 justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                {isMobile && (
-                  <button
-                    onClick={() => setMobileView('list')}
-                    className="flex-shrink-0 -ml-1 mr-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                    aria-label="Back to list"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
+            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center flex-wrap gap-y-2 gap-4 sticky top-0 z-20">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <button
+                  onClick={() => navigate('/admin/lbp-forms')}
+                  className="flex-shrink-0 mr-1 p-1.5 rounded-full border border-gray-200 bg-gray-50 text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                  aria-label="Back to Departments"
+                  title="Back to Departments"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                  </svg>
+                </button>
                 <DeptAvatar
                   logo={selectedPlan.dept_logo}
                   abbreviation={selectedPlan.dept_abbreviation}
@@ -1454,8 +1293,22 @@ const handleAcknowledge = async () => {
                 </div>
               </div>
 
+              {/* Timeline stepper — centered, click for details */}
+              <div className="flex-shrink-0 order-3 sm:order-none mx-auto">
+                <BudgetPlanStepper
+                  compact
+                  status={selectedPlan.status}
+                  submittedAt={selectedPlan.submitted_at}
+                  acknowledgedAt={selectedPlan.acknowledged_at}
+                  approvedAt={selectedPlan.approved_at}
+                  createdAt={selectedPlan.created_at}
+                  isAdmin={isAdmin}
+                  onClick={() => setStepperModalOpen(true)}
+                />
+              </div>
+
               {/* Action buttons */}
-<div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+<div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end flex-1">
   {!isMobile && (
   <div className="flex items-center gap-1.5 mr-1">
     <span className="text-[10px] text-gray-400 font-medium">Review Mode</span>
@@ -1542,18 +1395,6 @@ const handleAcknowledge = async () => {
 </div>
             </div>
 
-            {/* Progress stepper */}
-            <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4">
-              <BudgetPlanStepper
-                status={selectedPlan.status}
-                submittedAt={selectedPlan.submitted_at}
-                acknowledgedAt={selectedPlan.acknowledged_at}
-                approvedAt={selectedPlan.approved_at}
-                createdAt={selectedPlan.created_at}
-                isAdmin={isAdmin}
-              />
-            </div>
-
             {/* Forms area */}
             <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5" style={{ isolation: 'auto' }}>
               {loadingPast ? (
@@ -1588,7 +1429,7 @@ const handleAcknowledge = async () => {
                       </TabsTrigger>
                     )}
                     <TabsTrigger value="4" className="rounded-md text-xs font-medium px-3 h-7 whitespace-nowrap flex-shrink-0 data-[state=active]:bg-gray-900 data-[state=active]:text-white text-gray-500">
-                      {isMobile ? 'Form 4' : 'Form 4 — AIP Programs'}
+                      {isMobile ? 'Form 4' : 'Form 4 — Special Programs'}
                     </TabsTrigger>
                   </TabsList>
                   </div>
@@ -1693,7 +1534,7 @@ const handleAcknowledge = async () => {
       </AlertDialog>
 
       {/* ════ RETURN TO DRAFT CONFIRM ════ */}
-      <AlertDialog open={!!rejectTarget} onOpenChange={o => { if (!o) setRejectTarget(null); }}>
+      <AlertDialog open={!!rejectTarget} onOpenChange={o => { if (!o) { setRejectTarget(null); setRejectReason(''); } }}>
         <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[15px] font-semibold text-gray-900">
@@ -1705,6 +1546,18 @@ const handleAcknowledge = async () => {
               returned to draft so the department head can revise and resubmit.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-gray-600">
+              Reason <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="Let the department head know what needs revision…"
+              className="text-sm min-h-[80px] resize-none"
+              maxLength={1000}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
               <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200">Cancel</Button>
@@ -1717,6 +1570,29 @@ const handleAcknowledge = async () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ════ TIMELINE MODAL ════ */}
+      <Dialog open={stepperModalOpen} onOpenChange={setStepperModalOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-[15px] font-semibold text-gray-900">
+              {selectedPlan?.dept_name} — Timeline
+            </DialogTitle>
+          </DialogHeader>
+          {selectedPlan && (
+            <div className="pt-2 pb-1">
+              <BudgetPlanStepper
+                status={selectedPlan.status}
+                submittedAt={selectedPlan.submitted_at}
+                acknowledgedAt={selectedPlan.acknowledged_at}
+                approvedAt={selectedPlan.approved_at}
+                createdAt={selectedPlan.created_at}
+                isAdmin={isAdmin}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

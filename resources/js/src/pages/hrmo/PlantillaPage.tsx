@@ -90,8 +90,8 @@ useEffect(() => {
     }
   }, [createDialogOpen]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [posRes, deptRes, assignRes] = await Promise.all([
         API.get('/plantilla-positions'),
@@ -106,9 +106,9 @@ useEffect(() => {
       const nums = new Set<string>();
       posData.forEach((p: any) => { if (p.new_item_number) nums.add(p.new_item_number.trim()); });
       setExistingNewNumbers(nums);
-      if (deptData.length > 0) setSelectedDeptId(deptData[0].dept_id);
+      if (!silent && deptData.length > 0 && selectedDeptId === null) setSelectedDeptId(deptData[0].dept_id);
     } catch { toast.error('Failed to load data.'); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -273,7 +273,7 @@ useEffect(() => {
       // and misfiles it into the "inactive" group (numbered last, globally).
       const freshPositions = newPos ? [...positions, { ...newPos, is_active: true }] : positions;
       await runRenumber(freshPositions, assignmentsForRenumber);
-      toast.success('Position created and renumbered.'); fetchData(); setCreateDialogOpen(false);
+      toast.success('Position created and renumbered.'); fetchData(true); setCreateDialogOpen(false);
       setCreateForm({ old_item_number: '', new_item_number: '', position_title: '', salary_grade: 1, dept_id: selectedDeptId || 0, extension_department_id: '' });
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
@@ -295,7 +295,7 @@ useEffect(() => {
           : p
       );
       await runRenumber(freshPositions, assignmentsForRenumber);
-      toast.success('Position updated and renumbered.'); fetchData(); setEditDialogOpen(false); setEditingPosition(null);
+      toast.success('Position updated and renumbered.'); fetchData(true); setEditDialogOpen(false); setEditingPosition(null);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
 
@@ -327,7 +327,7 @@ const confirmToggleActive = async () => {
           : p
       );
       await runRenumber(freshPositions, assignmentsForRenumber);
-      toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'} and renumbered.`); fetchData();
+      toast.success(`Position ${togglePosition.is_active ? 'deactivated' : 'activated'} and renumbered.`); fetchData(true);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed.'); }
     finally { setToggleActiveOpen(false); setTogglePosition(null); }
   };
@@ -336,7 +336,7 @@ const confirmToggleActive = async () => {
     if (!deletePosition) return;
     try {
       await API.delete(`/plantilla-positions/${deletePosition.plantilla_position_id}`);
-      toast.success('Position deleted.'); fetchData();
+      toast.success('Position deleted.'); fetchData(true);
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to delete.'); }
     finally { setDeleteOpen(false); setDeletePosition(null); }
   };
@@ -348,7 +348,7 @@ const confirmToggleActive = async () => {
   const duplicateChecker = (row: any) => !!row.new_item_number && existingNewNumbers.has(row.new_item_number);
   const savePlantilla = async (data: any[]) => {
     await API.post('/plantilla-positions/bulk', { positions: data });
-    toast.success(`Uploaded ${data.length} positions.`); fetchData(); setUploadOpen(false);
+    toast.success(`Uploaded ${data.length} positions.`); fetchData(true); setUploadOpen(false);
   };
 
   const isSearching = debouncedSearch.trim().length > 0;

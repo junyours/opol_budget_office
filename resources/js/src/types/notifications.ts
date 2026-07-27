@@ -1,7 +1,8 @@
 export interface AppNotification {
   id: string;
-  type: 'budget_submitted' | 'budget_approved' | 'budget_returned';
+  type: 'budget_submitted' | 'budget_under_review' | 'budget_approved' | 'budget_returned';
   message: string;
+  reason?: string | null;
   dept_id?: number;
   dept_name?: string;
   dept_abbreviation?: string;

@@ -119,7 +119,7 @@ export default function ChangePassword() {
       `}</style>
 
       <div className="h-dvh overflow-y-auto overscroll-auto bg-zinc-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-6xl my-auto">
+        <div className="w-full max-w-4xl my-auto">
           <Card className="border-zinc-200 shadow-md overflow-hidden">
             <div className="flex flex-col lg:flex-row">
 
@@ -162,7 +162,7 @@ export default function ChangePassword() {
                     right before the form section starts */}
                 <div className="hidden lg:block w-full mt-10 pt-5 border-t border-zinc-100">
                   <p className="text-[10px] uppercase tracking-widest text-zinc-300 text-center font-medium">
-                    Secure · Encrypted · Compliant
+                    Secure · Centralized · Role-Based
                   </p>
                 </div>
 
@@ -171,6 +171,7 @@ export default function ChangePassword() {
               {/* ══ RIGHT COLUMN — form ══ */}
               <div className="w-full lg:w-[52%]">
                 <CardContent className="p-6 lg:p-8">
+                  <div className="max-w-sm mx-auto">
 
                   <div className="flex items-center gap-2.5 mb-5">
                     <div className="w-9 h-9 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
@@ -343,6 +344,7 @@ export default function ChangePassword() {
                     <LogOut className="w-3.5 h-3.5" /> Not you? Sign out
                   </button>
 
+                  </div>
                 </CardContent>
               </div>
 

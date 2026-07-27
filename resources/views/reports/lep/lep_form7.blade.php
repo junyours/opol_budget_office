@@ -49,7 +49,7 @@ $colCount = 7;
 
 {{-- ── Report header ── --}}
 <div style="font-weight:bold; font-size:8pt; text-align:center; margin-bottom:1px; text-transform:uppercase;">
-    Summary of New Appropriations, by Object of Expenditures and by Sector
+    PART IV: Summary of New Appropriations, by Object of Expenditures and by Sector
 </div>
 <div style="font-size:7pt; text-align:center; margin-bottom:1px;">
     LGU: {{ $lgu }}

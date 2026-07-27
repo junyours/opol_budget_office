@@ -47,7 +47,7 @@ $gfIncrease = $gfProposedTotal - $gfCurrentTotal;
 $hasData = fn($grp) => $grp['total_current'] > 0 || $grp['total_proposed'] > 0 || count($grp['rows']) > 0;
 
 /* Shared table header closure */
-$tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche_current, $lep_tranche_proposed, $proposed_year) { ?>
+$tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche_current, $lep_tranche_proposed, $proposed_year, $current_year) { ?>
 <thead>
   <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
     <td style="width:4%;  padding:0;border:none;"></td>
@@ -65,7 +65,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     <th rowspan="2" style="width:27%;">Position Title</th>
     <th rowspan="2" style="width:20%;">Name of Incumbent</th>
     <th colspan="2" style="line-height:1.2;">
-      Current Year Authorized Rate / Annum<br>
+      Current Year <?php echo $current_year; ?> Authorized Rate / Annum<br>
       <?php if($lep_lbc_current) echo $lep_lbc_current . '<br>'; ?>
       <?php if($lep_tranche_current) echo '<span style="font-size:6pt;">' . $lep_tranche_current . '</span>'; ?>
     </th>
@@ -98,14 +98,14 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
 ══════════════════════════════════════════════════════════ --}}
 <div style="page-break-after: always;">
 
-  <div style="font-weight:bold; font-size:8.5pt; margin-bottom:4px; text-transform:uppercase;">
+  <div style="font-weight:bold; font-size:8.5pt; margin-top:20px; margin-bottom:4px; text-transform:uppercase;">
     PART I: CONSOLIDATED PLANTILLA OF PERSONNEL
   </div>
   <div style="font-weight:bold; font-size:7.5pt; text-align:left; margin-bottom:4px; text-transform:uppercase;">
     A. GENERAL FUND
   </div>
 
-  <table class="data-table" style="margin-top:4px; width:100% !important; table-layout:fixed; font-size:6.5pt;">
+  <table class="data-table" style="margin-top:4px; width:100% !important; table-layout:fixed; font-size:7pt;">
     {!! $tableHeader() !!}
     <tbody>
 
@@ -156,8 +156,8 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             $noCurrent = $curAmt <= 0;
         @endphp
        <td class="c" style="font-size:6pt;">
-            {{ $row['step_current'] ? ($row['salary_grade'] ?? '') : '' }}<br>
-            {{ $row['step_current'] ?? '' }}
+            {{ $row['salary_grade'] ?? '' }}<br>
+            {{ $row['step_current'] ?? '1' }}
         </td>
         <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
           <td class="c" style="font-size:6pt;">
@@ -165,7 +165,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             {{ $row['step_proposed'] ?? '' }}
           </td>
           <td class="r">
-            {!! $fmt($row['proposed_amount'] ?? 0) !!}
+            {!! (float)($row['proposed_amount'] ?? 0) > 0 ? $fmt($row['proposed_amount']) : '' !!}
             @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif
@@ -219,7 +219,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
     PART I: CONSOLIDATED PLANTILLA OF PERSONNEL (Continuation)
   </div>
 
-  <table class="data-table" style="width:100%; table-layout:fixed; font-size:6pt;">
+  <table class="data-table" style="width:100%; table-layout:fixed; font-size:7pt;">
     {!! $tableHeader() !!}
     <tbody>
 
@@ -298,8 +298,8 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
                 $noCurrent = $curAmt <= 0;
             @endphp
             <td class="c" style="font-size:6pt;">
-                {{ $row['step_current'] ? ($row['salary_grade'] ?? '') : '' }}<br>
-                {{ $row['step_current'] ?? '' }}
+                {{ $row['salary_grade'] ?? '' }}<br>
+                {{ $row['step_current'] ?? '1' }}
             </td>
             <td class="r">{!! $curAmt > 0 ? $fmt($curAmt) : '' !!}</td>
             <td class="c" style="font-size:6pt;">
@@ -307,7 +307,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
               {{ $row['step_proposed'] ?? '' }}
             </td>
             <td class="r">
-            {!! $fmt($row['proposed_amount'] ?? 0) !!}
+            {!! (float)($row['proposed_amount'] ?? 0) > 0 ? $fmt($row['proposed_amount']) : '' !!}
             @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
                 <br><span style="font-size:5.5pt;font-style:italic;color:#1a7a3c;">+{!! $fmt($row['annual_increment']) !!}</span>
             @endif

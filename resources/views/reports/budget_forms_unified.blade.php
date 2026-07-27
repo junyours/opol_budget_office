@@ -455,40 +455,34 @@ $maybeBreak = function(
 </tbody>
 </table>
 
-<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;">
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;page-break-inside:avoid;">
   <tr>
-    <td style="border:1px solid #000;border-bottom:none;text-align:left;padding:6px 6px 18px;">
+    <td style="border:1px solid #000;border-bottom:none;text-align:left;padding:6px 6px 10px;">
       We hereby certify that the information presented above are true and correct.
       We further certify that the foregoing estimated receipts are reasonably projected as collectible for the budget year.
     </td>
   </tr>
+  @php $sigMaxCols = collect($signatories['rows'])->map(fn($r) => count($r))->max() ?: 1; @endphp
+  @foreach($signatories['rows'] as $row)
+  @php $sigRowWidth = round(100 * count($row) / $sigMaxCols, 2); @endphp
   <tr>
     <td style="border-left:1px solid #000;border-right:1px solid #000;padding:0;">
-      <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+      <table style="width:{{ $sigRowWidth }}%;margin:0 auto;border-collapse:collapse;font-size:6.5pt;">
         <tr>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+          @foreach($row as $sig)
+          <td style="border:none;text-align:center;vertical-align:top;width:{{ 100 / count($row) }}%;padding:3px 6px 2px;">
+            <span class="sig-name">{{ $sig['name'] }}</span>
+            <span class="sig-title">{{ $sig['title'] }}</span>
           </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['administrator']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['administrator']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
-          </td>
+          @endforeach
         </tr>
       </table>
     </td>
   </tr>
+  @endforeach
   <tr>
-    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
-      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:3px 6px 6px;">
+      <p style="font-size:6.5pt;margin-bottom:1px;font-weight:bold;">Approved :</p>
       <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
       <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
     </td>
@@ -771,40 +765,34 @@ $maybeBreak = function(
 </table>
 
 {{-- Cert + Signatures --}}
-<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;">
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;page-break-inside:avoid;">
   <tr>
-    <td style="border:1px solid #000;border-bottom:none;text-align:left;padding:6px 6px 18px;">
+    <td style="border:1px solid #000;border-bottom:none;text-align:left;padding:6px 6px 10px;">
       We hereby certify that the information presented above are true and correct.
       We further certify that the foregoing estimated receipts are reasonably projected as collectible for the budget year.
     </td>
   </tr>
+  @php $sigMaxCols = collect($signatories['rows'])->map(fn($r) => count($r))->max() ?: 1; @endphp
+  @foreach($signatories['rows'] as $row)
+  @php $sigRowWidth = round(100 * count($row) / $sigMaxCols, 2); @endphp
   <tr>
     <td style="border-left:1px solid #000;border-right:1px solid #000;padding:0;">
-      <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+      <table style="width:{{ $sigRowWidth }}%;margin:0 auto;border-collapse:collapse;font-size:6.5pt;">
         <tr>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+          @foreach($row as $sig)
+          <td style="border:none;text-align:center;vertical-align:top;width:{{ 100 / count($row) }}%;padding:3px 6px 2px;">
+            <span class="sig-name">{{ $sig['name'] }}</span>
+            <span class="sig-title">{{ $sig['title'] }}</span>
           </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['administrator']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['administrator']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
-          </td>
+          @endforeach
         </tr>
       </table>
     </td>
   </tr>
+  @endforeach
   <tr>
-    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
-      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:3px 6px 6px;">
+      <p style="font-size:6.5pt;margin-bottom:1px;font-weight:bold;">Approved :</p>
       <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
       <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
     </td>
@@ -966,8 +954,8 @@ $showForm2A = in_array('form2a', $forms);
     @foreach($psItems as $psRIdx => $item)
     @php
     $fmt2ps = ($psRIdx === 0)
-        ? $pesoA
-        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    ? $pesoA
+    : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
     @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
@@ -997,8 +985,8 @@ $showForm2A = in_array('form2a', $forms);
     @foreach($mooeItems as $mooeRIdx => $item)
     @php
     $fmt2mooe = ($mooeRIdx === 0)
-        ? $pesoA
-        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    ? $pesoA
+    : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
     @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
@@ -1028,8 +1016,8 @@ $showForm2A = in_array('form2a', $forms);
     @foreach($capItems as $capRIdx => $item)
     @php
     $fmt2cap = ($capRIdx === 0)
-        ? $pesoA
-        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    ? $pesoA
+    : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
     @endphp
     <tr>
         <td class="l">{{ $item['description'] }}</td>
@@ -1059,8 +1047,8 @@ $showForm2A = in_array('form2a', $forms);
     @foreach($spItems as $spRIdx2 => $sp)
     @php
     $fmt2sp = ($spRIdx2 === 0)
-        ? $pesoA
-        : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    ? $pesoA
+    : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
     @endphp
     <tr>
         <td class="l">{{ $sp['program_description'] }}</td>
@@ -1100,7 +1088,7 @@ $showForm2A = in_array('form2a', $forms);
     @if($qrfRow)
     <tr>
         <td class="l"><strong>30% Quick Response Fund (QRF)</strong> — {{ $qrfRow['note'] ?? 'QRF — Standby Trust Fund' }}</td>
-        <td class="c">{{ $qrfRow['account_code'] ?? '9000-2-01-001' }}</td>
+        <td class="c">{{ $qrfRow['account_code'] ?? '' }}</td>
         <td class="r">{!! $qrfRow['past_total']    > 0 ? $pesoA($qrfRow['past_total'])    : '' !!}</td>
         <td class="r">{!! $qrfRow['current_sem1']  > 0 ? $pesoA($qrfRow['current_sem1'])  : '' !!}</td>
         <td class="r">{!! $qrfRow['current_sem2']  > 0 ? $pesoA($qrfRow['current_sem2'])  : '' !!}</td>
@@ -1119,11 +1107,11 @@ $showForm2A = in_array('form2a', $forms);
     <tr>
         <td class="l" style="padding-left:14pt;">· {{ $prepRow['description'] }}</td>
         <td class="c">{{ $prepRow['account_code'] ?? '' }}</td>
-        <td class="r">{!! $prepRow['past_total']    > 0 ? number_format((float)$prepRow['past_total'],    0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_sem1']  > 0 ? number_format((float)$prepRow['current_sem1'],  0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_sem2']  > 0 ? number_format((float)$prepRow['current_sem2'],  0) : '' !!}</td>
-        <td class="r">{!! $prepRow['current_total'] > 0 ? number_format((float)$prepRow['current_total'], 0) : '' !!}</td>
-        <td class="r">{!! $prepRow['proposed']      > 0 ? number_format((float)$prepRow['proposed'],      0) : '' !!}</td>
+        <td class="r">{!! $prepRow['past_total']    > 0 ? number_format((float)$prepRow['past_total'],    2) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem1']  > 0 ? number_format((float)$prepRow['current_sem1'],  2) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_sem2']  > 0 ? number_format((float)$prepRow['current_sem2'],  2) : '' !!}</td>
+        <td class="r">{!! $prepRow['current_total'] > 0 ? number_format((float)$prepRow['current_total'], 2) : '' !!}</td>
+        <td class="r">{!! $prepRow['proposed']      > 0 ? number_format((float)$prepRow['proposed'],      2) : '' !!}</td>
     </tr>
     @endforeach
     <tr class="subtotal">
@@ -1268,7 +1256,7 @@ $showForm2A = in_array('form2a', $forms);
 
     @if($qrfRowB)
     <tr>
-        <td class="c">{{ $qrfRowB['account_code'] ?? '9000-2-01-001' }}</td>
+        <td class="c">{{ $qrfRowB['account_code'] ?? '' }}</td>
         <td class="c">{{ $qrfRowB['sector'] ?? 'General Public Services' }}</td>
         <td class="l">
             <strong>30% Quick Response Fund (QRF)</strong>
@@ -1424,7 +1412,7 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
     $thisExt3  = $row['extensionDeptId'] ?? null;
     $showGrpHdr= ($thisExt3 !== $lastExtId3) && ($thisExt3 !== null);
     $lastExtId3= $thisExt3;
-    $fmt3      = $form3RowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+    $fmt3      = $form3RowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
     $curAmt3   = (float) ($row['current_amount'] ?? 0);
     $noCurrent = $curAmt3 <= 0;
     $form3RowIdx++;
@@ -1447,14 +1435,14 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
         @endif
     </td>
     <td class="c" style="font-size:6.5pt;">
-        {{ $row['step_current'] ? $row['salary_grade'] : '' }}<br>{{ $row['step_current'] ?? '' }}
+        {{ $row['salary_grade'] ?? '' }}<br>{{ $row['step_current'] ?? '1' }}
     </td>
     <td class="r">{!! $curAmt3 > 0 ? $fmt3($curAmt3) : '' !!}</td>
     <td class="c" style="font-size:6.5pt;">
-        {{ $row['step_proposed'] ? $row['salary_grade'] : '' }}<br>{{ $row['step_proposed'] ?? '' }}
+        {{ $row['salary_grade'] ?? '' }}<br>{{ $row['step_proposed'] ?? '1' }}
     </td>
     <td class="r">
-        {!! $fmt3($row['proposed_amount'] ?? 0) !!}
+        {!! (float)($row['proposed_amount'] ?? 0) > 0 ? $fmt3($row['proposed_amount']) : '' !!}
         @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
             <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
                 +{!! $fmt3($row['annual_increment']) !!}
@@ -1514,12 +1502,8 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
 @if(in_array('form4', $forms) && isset($dr['form4']))
 @php
 $form4      = $dr['form4'];
-$rows4      = $form4['rows'];
-$firstChunk = array_slice($rows4, 0, 30);
-$rest       = array_slice($rows4, 30);
-$extraChunks= array_chunk($rest, 18);
-$pages4     = count($rows4) > 0 ? array_merge([$firstChunk], $extraChunks) : [[]];
-$totalPages4= count($pages4);
+$rows4      = array_values(array_filter($form4['rows'], fn($r) => (float)($r['total_amount'] ?? 0) > 0));
+$pages4     = [$rows4];$totalPages4= count($pages4);
 $grandPS    = (float) array_sum(array_column($rows4, 'ps_amount'));
 $grandMOOE  = (float) array_sum(array_column($rows4, 'mooe_amount'));
 $grandCO    = (float) array_sum(array_column($rows4, 'co_amount'));
@@ -1659,7 +1643,7 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
 
 @if($isLast4)
 {{-- ── Signatures: same border style as Form 1 ── --}}
-<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;">
+<table style="width:100%;border-collapse:collapse;font-size:6.5pt;margin-top:0;page-break-inside:avoid;-webkit-region-break-inside:avoid;">
   <tr>
     <td style="border:1px solid #000;border-bottom:none;padding:4px 6px 2px 6px;">
       <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
@@ -1682,15 +1666,16 @@ $orgOutcome  = "Harmonious relationship among the constituents, citizen's partic
             <span class="sig-title">{{ $dr['signatory_title'] ?? '' }}</span>
           </td>
           <td style="border:none;text-align:center;vertical-align:top;padding:0 6px 6px;">
-            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
-            <br>
-            <span class="sig-name" style="margin-top:14px;">{{ $signatories['treasurer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;padding:0 0 6px 6px;">
             <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
             <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+            <div style="width:100%;text-align:center;margin-top:14px;">
+              <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
+              <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
+            </div>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;padding:0 0 6px 6px;">
+            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
           </td>
         </tr>
       </table>
@@ -1731,14 +1716,14 @@ $totals = $data['totals'];
 <table class="form5-table">
   <thead>
     <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
-      <td style="width:20%;padding:0;border:none;"></td>
+      <td style="width:19%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
       <td style="width:14%;padding:0;border:none;"></td>
       <td style="width:7%;padding:0;border:none;"></td>
       <td style="width:10%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
-      <td style="width:6%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
       <td style="width:6%;padding:0;border:none;"></td>
@@ -2179,15 +2164,20 @@ foreach ($rows as $r) { $computeAmount($r); }
     <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:none;border-bottom:none;padding:0;">
       <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
         <tr>
-          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
+
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
             <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
             <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
           </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 6px;">
+           <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
+            <span class="sig-name">{{ $signatories['administrator']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['administrator']['title'] }}</span>
+          </td>
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
             <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
             <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
           </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
+          <td style="border:none;text-align:center;vertical-align:top;width:25%;padding:8px 6px 6px;">
             <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
             <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
           </td>
@@ -2197,8 +2187,8 @@ foreach ($rows as $r) { $computeAmount($r); }
   </tr>
   {{-- Approved row: full border except no top --}}
   <tr>
-    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
-      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:3px 6px 6px;">
+      <p style="font-size:6.5pt;margin-bottom:1px;font-weight:bold;">Approved :</p>
       <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
       <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
     </td>
@@ -2378,30 +2368,21 @@ $colCount   = 7; // always 7 columns — SA sector cols show — but are still r
     </td>
   </tr>
   <tr>
-    <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:none;border-bottom:none;padding:0;">
-      <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
+    <td style="border:1px solid #000;border-top:none;text-align:center;padding:8px 6px 6px;">
+     <table style="width:100%;border-collapse:collapse;font-size:6.5pt;">
         <tr>
-          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
+          <td style="border:none;text-align:center;vertical-align:top;width:50%;padding:0 6px;">
+            <p style="font-size:6.5pt;margin-bottom:1px;font-weight:bold;">Certified Correct :</p>
             <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
             <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
           </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
-          </td>
-          <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['treasurer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['treasurer']['title'] }}</span>
+          <td style="border:none;text-align:center;vertical-align:top;width:50%;padding:0 6px;">
+            <p style="font-size:6.5pt;margin-bottom:1px;font-weight:bold;">Approved :</p>
+            <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
           </td>
         </tr>
       </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
-      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
-      <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
-      <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
     </td>
   </tr>
 </table>
@@ -2555,27 +2536,21 @@ $nf = function($n): string {
         <tr>
           <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
             Prepared by :
-            <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
+            <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
           </td>
           <td style="border:none;text-align:center;vertical-align:top;width:34%;padding:8px 6px 6px;">
             Reviewed by :
-            <span class="sig-name">{{ $signatories['mpdc']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['mpdc']['title'] }}</span>
+            <span class="sig-name">{{ $signatories['budget_officer']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['budget_officer']['title'] }}</span>
           </td>
           <td style="border:none;text-align:center;vertical-align:top;width:33%;padding:8px 6px 6px;">
-            <span class="sig-name">{{ $signatories['administrator']['name'] }}</span>
-            <span class="sig-title">{{ $signatories['administrator']['title'] }}</span>
+            Approved :
+            <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
+            <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
           </td>
         </tr>
       </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #000;border-top:none;text-align:center;padding:6px 6px 18px;">
-      <p style="font-size:6.5pt;margin-bottom:3px;font-weight:bold;">Approved :</p>
-      <span class="sig-name">{{ $signatories['mayor']['name'] }}</span>
-      <span class="sig-title">{{ $signatories['mayor']['title'] }}</span>
     </td>
   </tr>
 </table>

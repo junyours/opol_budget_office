@@ -82,7 +82,7 @@ foreach ($rows as $r) { $computeAmount($r); }
 <div class="page" style="page-break-after: always; break-after: page;">
 
     <div style="font-size:7.5pt; font-weight:bold; text-align:center; margin-bottom:1px;">
-        STATEMENT OF STATUTORY AND CONTRACTUAL OBLIGATIONS AND BUDGETARY REQUIREMENTS
+        PART V: STATEMENT OF STATUTORY AND CONTRACTUAL OBLIGATIONS AND BUDGETARY REQUIREMENTS
     </div>
     <div style="font-size:7pt; text-align:center; margin-bottom:1px;">LGU : {{ $lgu }}</div>
     <div style="font-size:7pt; text-align:center; margin-bottom:6px; font-weight:bold;">

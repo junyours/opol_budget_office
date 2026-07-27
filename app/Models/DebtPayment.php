@@ -15,6 +15,8 @@ class DebtPayment extends Model
     protected $fillable = [
         'obligation_id',
         'budget_plan_id',
+        'prev_payment_principal',
+        'prev_payment_interest',
         'principal_sem1',
         'principal_sem2',
         'principal_due',
@@ -26,6 +28,8 @@ class DebtPayment extends Model
     ];
 
     protected $casts = [
+        'prev_payment_principal'      => 'decimal:2',
+        'prev_payment_interest'       => 'decimal:2',
         'principal_sem1'              => 'decimal:2',
         'principal_sem2'              => 'decimal:2',
         'principal_due'               => 'decimal:2',

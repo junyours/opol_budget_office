@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\Personnel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class PersonnelController extends BaseMasterCrudController
 {
@@ -27,9 +29,31 @@ class PersonnelController extends BaseMasterCrudController
         return [
             'first_name'  => [$id ? 'sometimes' : 'required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
-            'last_name'   => [$id ? 'sometimes' : 'required', 'string', 'max:255'],
-            // 'step'        => ['nullable', 'integer', 'min:1'],
-            // plantilla_position_id is NOT required here
+            'status'      => ['sometimes', 'in:active,inactive'],
+            // The uniqueness constraint lives on last_name, scoped to rows that
+            // also match the submitted first_name + middle_name — this is what
+            // enforces "the combination of all 3 must be unique," while still
+            // allowing duplicate first names, duplicate middle names, or
+            // duplicate last names individually.
+            'last_name' => [
+                $id ? 'sometimes' : 'required',
+                'string',
+                'max:255',
+                Rule::unique('personnels')->where(function ($query) {
+                    $query->where('first_name', trim((string) request('first_name')));
+
+                    $middle = request('middle_name');
+                    $middle = $middle !== null ? trim($middle) : null;
+
+                    if ($middle === null || $middle === '') {
+                        $query->where(function ($q) {
+                            $q->whereNull('middle_name')->orWhere('middle_name', '');
+                        });
+                    } else {
+                        $query->where('middle_name', $middle);
+                    }
+                })->ignore($id, 'personnel_id'),
+            ],
         ];
     }
 
@@ -98,5 +122,52 @@ class PersonnelController extends BaseMasterCrudController
         });
 
         return $this->success(['message' => 'Personnels uploaded successfully'], 201);
+    }
+
+    /**
+     * Delete a personnel record — restricted to super admins, requires
+     * password re-entry + typing the full name to confirm (GitHub-style),
+     * and only allowed if the person has no active plantilla assignment.
+     */
+    public function destroy($id)
+    {
+        $personnel = Personnel::findOrFail($id);
+
+        $request = request();
+
+        $user = $request->user();
+        if (!$user || ($user->role ?? null) !== 'super-admin') {
+            return response()->json([
+                'message' => 'Only a super admin can delete personnel records.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'password'     => ['required', 'string'],
+            'confirm_name' => ['required', 'string'],
+        ]);
+
+        if (!Hash::check($validated['password'], $user->password)) {
+            return response()->json(['message' => 'Incorrect password.'], 422);
+        }
+
+        $expectedName = trim("{$personnel->first_name} {$personnel->middle_name} {$personnel->last_name}");
+        $expectedName = preg_replace('/\s+/', ' ', $expectedName);
+
+        if (trim($validated['confirm_name']) !== $expectedName) {
+            return response()->json([
+                'message' => "Confirmation text doesn't match this personnel's name.",
+            ], 422);
+        }
+
+        if ($personnel->plantillaAssignments()->whereNotNull('personnel_id')->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete — this personnel is currently assigned to a position. Unassign first.',
+            ], 422);
+        }
+
+        $personnel->delete();
+
+        return $this->success(['message' => 'Personnel deleted successfully.']);
     }
 }

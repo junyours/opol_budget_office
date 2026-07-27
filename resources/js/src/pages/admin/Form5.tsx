@@ -276,13 +276,14 @@ function TableSkeleton({ budgetYear }: { budgetYear: number }) {
 
 interface AmountCellProps {
   obligationId: number;
-  field: "principal" | "interest";
+  field: "principal" | "interest" | "prevPrincipal" | "prevInterest";
   value: string;
   onChange: (val: string) => void;
-  onBlurSave: (obligationId: number, field: "principal" | "interest") => void;
+  onBlurSave: (obligationId: number, field: "principal" | "interest" | "prevPrincipal" | "prevInterest") => void;
+  tone?: "orange" | "green";
 }
 
-function AmountCell({ obligationId, field, value, onChange, onBlurSave }: AmountCellProps) {
+function AmountCell({ obligationId, field, value, onChange, onBlurSave, tone = "orange" }: AmountCellProps) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(value);
   const valueAtFocus = useRef<number>(0);
@@ -332,7 +333,10 @@ function AmountCell({ obligationId, field, value, onChange, onBlurSave }: Amount
       className={cn(
         "w-full text-right text-[12px] font-mono",
         "h-8 px-2.5 rounded-md border bg-white",
-        "border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300",
+        "border-gray-200 focus:outline-none focus:ring-2",
+        tone === "green"
+          ? "focus:ring-green-300 focus:border-green-300"
+          : "focus:ring-orange-300 focus:border-orange-300",
         "placeholder:text-gray-300 transition-colors",
       )}
     />
@@ -372,8 +376,8 @@ const isViewer = user?.role === "viewer";
   const [saving, setSaving]   = useState(false);
   const [dirty, setDirty]     = useState(false);
 
-  const [edits, setEdits] = useState<Record<number, { principal: string; interest: string }>>({});
-  const savedValues = useRef<Map<number, { principal: number; interest: number }>>(new Map());
+  const [edits, setEdits] = useState<Record<number, { principal: string; interest: string; prevPrincipal: string; prevInterest: string }>>({});
+  const savedValues = useRef<Map<number, { principal: number; interest: number; prevPrincipal: number; prevInterest: number }>>(new Map());
 
   const [dialogOpen, setDialogOpen]     = useState(false);
   const [editTarget, setEditTarget]     = useState<DebtObligation | null>(null);
@@ -394,15 +398,19 @@ const isViewer = user?.role === "viewer";
       const obligations: DebtObligation[] = res.data.data;
       const active = obligations.filter(ob => ob.balance_principal > 0 || ob.payment_id !== null);
       setRows(active);
-      const seed: Record<number, { principal: string; interest: string }> = {};
+      const seed: Record<number, { principal: string; interest: string; prevPrincipal: string; prevInterest: string }> = {};
       active.forEach(ob => {
         seed[ob.obligation_id] = {
-          principal: seedDisplay(ob.current_principal),
-          interest:  seedDisplay(ob.current_interest),
+          principal:     seedDisplay(ob.current_principal),
+          interest:      seedDisplay(ob.current_interest),
+          prevPrincipal: seedDisplay(ob.previous_principal),
+          prevInterest:  seedDisplay(ob.previous_interest),
         };
         savedValues.current.set(ob.obligation_id, {
-          principal: ob.current_principal,
-          interest:  ob.current_interest,
+          principal:     ob.current_principal,
+          interest:      ob.current_interest,
+          prevPrincipal: ob.previous_principal,
+          prevInterest:  ob.previous_interest,
         });
       });
       setEdits(seed);
@@ -416,10 +424,14 @@ const isViewer = user?.role === "viewer";
   }, [activePlan, fetchData]);
 
   const computedRows = rows.map(ob => {
-    const curP = parseFormatted(edits[ob.obligation_id]?.principal || "");
-    const curI = parseFormatted(edits[ob.obligation_id]?.interest  || "");
-    return { ...ob, current_principal: curP, current_interest: curI, current_total: curP + curI,
-      balance_principal: ob.principal_amount - ob.previous_principal - curP };
+    const curP  = parseFormatted(edits[ob.obligation_id]?.principal     || "");
+    const curI  = parseFormatted(edits[ob.obligation_id]?.interest      || "");
+    const prevP = parseFormatted(edits[ob.obligation_id]?.prevPrincipal || "");
+    const prevI = parseFormatted(edits[ob.obligation_id]?.prevInterest  || "");
+    return { ...ob,
+      current_principal: curP, current_interest: curI, current_total: curP + curI,
+      previous_principal: prevP, previous_interest: prevI, previous_total: prevP + prevI,
+      balance_principal: ob.principal_amount - prevP - curP };
   });
 
   const totals = computedRows.reduce(
@@ -437,21 +449,26 @@ const isViewer = user?.role === "viewer";
       current_principal: 0, current_interest: 0, current_total: 0, balance_principal: 0 }
   );
 
-  const buildItems = (currentEdits: Record<number, { principal: string; interest: string }>) =>
+  const buildItems = (currentEdits: Record<number, { principal: string; interest: string; prevPrincipal: string; prevInterest: string }>) =>
     rowsRef.current.map(ob => ({
-      obligation_id: ob.obligation_id,
-      principal_due: parseFormatted(currentEdits[ob.obligation_id]?.principal || ""),
-      interest_due:  parseFormatted(currentEdits[ob.obligation_id]?.interest  || ""),
+      obligation_id:          ob.obligation_id,
+      principal_due:          parseFormatted(currentEdits[ob.obligation_id]?.principal     || ""),
+      interest_due:           parseFormatted(currentEdits[ob.obligation_id]?.interest      || ""),
+      prev_payment_principal: parseFormatted(currentEdits[ob.obligation_id]?.prevPrincipal || ""),
+      prev_payment_interest:  parseFormatted(currentEdits[ob.obligation_id]?.prevInterest  || ""),
     }));
 
-  const handleBlurSave = useCallback((obligationId: number, _field: "principal" | "interest") => {
+  const handleBlurSave = useCallback((obligationId: number, _field: "principal" | "interest" | "prevPrincipal" | "prevInterest") => {
     if (!activePlan?.budget_plan_id) return;
     const current = editsRef.current[obligationId];
     if (!current) return;
     const last = savedValues.current.get(obligationId);
-    const curP = parseFormatted(current.principal);
-    const curI = parseFormatted(current.interest);
-    if (last && last.principal === curP && last.interest === curI) return;
+    const curP  = parseFormatted(current.principal);
+    const curI  = parseFormatted(current.interest);
+    const prevP = parseFormatted(current.prevPrincipal);
+    const prevI = parseFormatted(current.prevInterest);
+    if (last && last.principal === curP && last.interest === curI
+        && last.prevPrincipal === prevP && last.prevInterest === prevI) return;
     const promise = API.post("/debt-obligations/payments/bulk", {
       budget_plan_id: activePlan.budget_plan_id,
       items: buildItems(editsRef.current),
@@ -459,8 +476,10 @@ const isViewer = user?.role === "viewer";
       rowsRef.current.forEach(ob => {
         const e = editsRef.current[ob.obligation_id];
         if (e) savedValues.current.set(ob.obligation_id, {
-          principal: parseFormatted(e.principal),
-          interest:  parseFormatted(e.interest),
+          principal:     parseFormatted(e.principal),
+          interest:      parseFormatted(e.interest),
+          prevPrincipal: parseFormatted(e.prevPrincipal),
+          prevInterest:  parseFormatted(e.prevInterest),
         });
       });
       setDirty(false);
@@ -482,8 +501,10 @@ const isViewer = user?.role === "viewer";
       rowsRef.current.forEach(ob => {
         const e = editsRef.current[ob.obligation_id];
         if (e) savedValues.current.set(ob.obligation_id, {
-          principal: parseFormatted(e.principal),
-          interest:  parseFormatted(e.interest),
+          principal:     parseFormatted(e.principal),
+          interest:      parseFormatted(e.interest),
+          prevPrincipal: parseFormatted(e.prevPrincipal),
+          prevInterest:  parseFormatted(e.prevInterest),
         });
       });
       toast.success("Saved successfully");
@@ -639,19 +660,33 @@ const isViewer = user?.role === "viewer";
 
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-[9px] font-semibold uppercase tracking-wide text-green-700 mb-1.5">Previous Payments Made</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2 mb-2">
                       <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
-                        <p className="text-[9px] text-green-700/70 mb-0.5">Principal</p>
-                        <p className="font-mono text-[11.5px] text-gray-700 text-right">{fmt(ob.previous_principal)}</p>
+                        <p className="text-[9px] text-green-700/70 mb-1">Principal</p>
+                        {isViewer ? (
+                          <span className="block text-right text-[12px] font-mono text-gray-500">{fmt(ob.previous_principal)}</span>
+                        ) : (
+                          <AmountCell obligationId={ob.obligation_id} field="prevPrincipal" tone="green"
+                            value={edits[ob.obligation_id]?.prevPrincipal ?? ""}
+                            onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], prevPrincipal: val } })); setDirty(true); }}
+                            onBlurSave={handleBlurSave} />
+                        )}
                       </div>
                       <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
-                        <p className="text-[9px] text-green-700/70 mb-0.5">Interest</p>
-                        <p className="font-mono text-[11.5px] text-gray-700 text-right">{fmt(ob.previous_interest)}</p>
+                        <p className="text-[9px] text-green-700/70 mb-1">Interest</p>
+                        {isViewer ? (
+                          <span className="block text-right text-[12px] font-mono text-gray-500">{fmt(ob.previous_interest)}</span>
+                        ) : (
+                          <AmountCell obligationId={ob.obligation_id} field="prevInterest" tone="green"
+                            value={edits[ob.obligation_id]?.prevInterest ?? ""}
+                            onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], prevInterest: val } })); setDirty(true); }}
+                            onBlurSave={handleBlurSave} />
+                        )}
                       </div>
-                      <div className={cn("rounded-md border px-2 py-1.5", C_PREV_TD)}>
-                        <p className="text-[9px] text-green-700/70 mb-0.5">Total</p>
-                        <p className="font-mono text-[11.5px] font-medium text-gray-700 text-right">{fmt(ob.previous_total)}</p>
-                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+                      <span className="text-[9px] text-gray-500">Total Previous</span>
+                      <span className="font-mono text-[12px] font-medium text-gray-700">{fmt(ob.previous_total)}</span>
                     </div>
                   </div>
 
@@ -805,9 +840,31 @@ const isViewer = user?.role === "viewer";
                     <td className="border-r border-gray-100 px-3 py-3 text-gray-500 align-top max-w-[200px]"><TruncatedCell text={ob.term} /></td>
                     <td className="border-r border-gray-100 px-3 py-3 text-right font-mono text-gray-800 align-top tabular-nums">{fmtAlways(ob.principal_amount)}</td>
                     <td className="border-r border-gray-100 px-3 py-3 text-gray-500 align-top max-w-[160px]"><TruncatedCell text={ob.purpose} /></td>
-                    {/* Previous — green, read-only */}
-                    <td className={cn("border-r border-l px-3 py-3 text-right font-mono text-gray-600 align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_principal)}</td>
-                    <td className={cn("border-r px-3 py-3 text-right font-mono text-gray-600 align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_interest)}</td>
+                    {/* Previous — green, editable (read-only for viewer) */}
+<td className={cn("border-r border-l px-2 py-2 align-top", C_PREV_TD)}>
+  {isViewer ? (
+    <span className="block w-full text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">
+      {fmt(ob.previous_principal)}
+    </span>
+  ) : (
+    <AmountCell obligationId={ob.obligation_id} field="prevPrincipal" tone="green"
+      value={edits[ob.obligation_id]?.prevPrincipal ?? ""}
+      onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], prevPrincipal: val } })); setDirty(true); }}
+      onBlurSave={handleBlurSave} />
+  )}
+</td>
+<td className={cn("border-r px-2 py-2 align-top", C_PREV_TD)}>
+  {isViewer ? (
+    <span className="block w-full text-right text-[12px] font-mono px-2 py-1.5 text-gray-500 tabular-nums">
+      {fmt(ob.previous_interest)}
+    </span>
+  ) : (
+    <AmountCell obligationId={ob.obligation_id} field="prevInterest" tone="green"
+      value={edits[ob.obligation_id]?.prevInterest ?? ""}
+      onChange={val => { setEdits(prev => ({ ...prev, [ob.obligation_id]: { ...prev[ob.obligation_id], prevInterest: val } })); setDirty(true); }}
+      onBlurSave={handleBlurSave} />
+  )}
+</td>
                     <td className={cn("border-r px-3 py-3 text-right font-mono text-gray-700 font-medium align-top tabular-nums", C_PREV_TD)}>{fmt(ob.previous_total)}</td>
                     {/* Amount Due — orange, editable (read-only for viewer) */}
 <td className={cn("border-r border-l px-2 py-2 align-top", C_DUE_TD)}>
@@ -905,7 +962,7 @@ const isViewer = user?.role === "viewer";
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-green-50 border border-green-200 inline-block" />
-          <span className="text-green-600 font-semibold">Green</span> = Previous payments (read-only)
+          <span className="text-green-600 font-semibold">Green</span> = Previous payments made (editable · specific to this year · auto-saves on change)
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-orange-50 border border-orange-200 inline-block" />

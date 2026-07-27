@@ -15,7 +15,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-    font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', Arial, sans-serif;
+    /* font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', Arial, sans-serif; */
+    font-family: Arial, sans-serif;
     font-size: 7pt;
     color: #000;
 }
@@ -97,7 +98,7 @@ body {
 table.data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 6.5pt;
+    font-size: 7pt;
     table-layout: fixed;
 }
 table.data-table th,
@@ -243,13 +244,23 @@ $introBy         = $hdr['introduced_by']       ?? '';
     The budget documents consisting of the following are incorporated herein and made integral part of this Ordinance&nbsp;:
   </div>
 
-  <div class="doc-list">
-    1. Local Expenditure Program, (LEP);<br>
-    2. Budget Expenditures and Sources of Financing, (BESF);<br>
-    3. Annual Investment Program, (AIP);<br>
-    4. Plantilla of Personnel;<br>
-    5. Others
-  </div>
+  <table style="width:100%; border-collapse:collapse; font-size:7pt; margin:4px 0 4px 24pt;">
+    <tr>
+      <td style="width:50%; vertical-align:top; padding:0; line-height:1.8; border:none;">
+        1. Local Expenditure Program, (LEP)<br>
+        2. Budget Expenditures and Sources of Financing, (BESF)<br>
+        3. Annual Investment Program, (AIP)<br>
+        4. Plantilla of Personnel<br>
+        5. Receipts Program
+      </td>
+      <td style="width:50%; vertical-align:top; padding:0; line-height:1.8; border:none;">
+        6. Appropriation and Obligation by Office<br>
+        7. Summary of New Appropriations by Sector<br>
+        8. Statement of Statutory and Contractual Obligations<br>
+        9. 5% Calamity Fund General Fund & SA Consolidated
+      </td>
+    </tr>
+  </table>
   @endif {{-- only consolidated_plantilla gets the ordinance header --}}
 
 {{-- ══════════════════════════════════════════════════════════
@@ -300,6 +311,9 @@ $introBy         = $hdr['introduced_by']       ?? '';
         'grand_total'  => $grand_total  ?? [],
         'signatories'  => $signatories  ?? [],
     ]])
+    @include('reports.lep.general_provisions', [
+        'proposed_year' => $proposed_year ?? ($year ?? null),
+    ])
 
 @else
     @include('reports.lep.consolidated_plantilla_of_personnel', [

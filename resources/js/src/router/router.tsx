@@ -72,8 +72,11 @@ const Form5 = React.lazy(
   () => import("../pages/admin/Form5")
 );
 
-const LBPForms = React.lazy(
-  () => import("../pages/admin/LBPForms")
+const LBPFormsList = React.lazy(
+  () => import("../pages/admin/LBPFormsList")
+);
+const LBPFormsDetail = React.lazy(
+  () => import("../pages/admin/LBPFormsDetails")
 );
 
 const Form6Page = React.lazy(
@@ -426,7 +429,11 @@ const router = createBrowserRouter([
               },
               {
                 path: "admin/lbp-forms",
-                element: Lazy(LBPForms),
+                element: Lazy(LBPFormsList),
+              },
+              {
+                path: "admin/lbp-forms/:planId",
+                element: Lazy(LBPFormsDetail),
               },
               {
                 path: "admin/reports",
@@ -459,10 +466,6 @@ const router = createBrowserRouter([
               {
                 path: "admin/lbp-form5",
                 element: Lazy(Form5),
-              },
-              {
-                path: "admin/lbp-forms",
-                element: Lazy(LBPForms),
               },
               {
                 path: "admin/lbp-form6",

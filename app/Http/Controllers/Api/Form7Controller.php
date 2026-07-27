@@ -186,8 +186,8 @@ class Form7Controller extends BaseApiController
         if ($calamity5 > 0) {
             $qrf30 = round($calamity5 * 0.30, 2);
             $pda70 = round($calamity5 * 0.70, 2);
-            $feRows[] = $this->makeFeRow('5% Calamity Fund: Quick Response Fund (30% QRF)', '9000-2-01-001', $qrf30);
-            $feRows[] = $this->makeFeRow('70% Pre-Disaster Preparedness Fund', '9000-2-02-001', $pda70);
+            $feRows[] = $this->makeFeRow('5% Calamity Fund: Quick Response Fund (30% QRF)', '', $qrf30);
+            $feRows[] = $this->makeFeRow('70% Pre-Disaster Preparedness Fund', '', $pda70);
         }
         $feSubtotal = $this->sumRows($feRows);
 

@@ -8,12 +8,12 @@ import { useIsMobile } from '../../hooks/use-mobile';
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
 
-const C_PREV_TH = 'bg-blue-50   border-blue-200   text-blue-700';
-const C_PREV_TD = 'bg-blue-50/30  border-blue-100';
+const C_PREV_TH = 'bg-blue-100   border-blue-300   text-blue-800';
+const C_PREV_TD = 'bg-blue-100/50  border-blue-200';
 const C_PREV_GT = 'bg-blue-950/20  border-blue-900/40  text-blue-300';
 
-const C_CURR_TH = 'bg-orange-50  border-orange-200  text-orange-700';
-const C_CURR_TD = 'bg-orange-50/30 border-orange-100';
+const C_CURR_TH = 'bg-orange-100  border-orange-300  text-orange-800';
+const C_CURR_TD = 'bg-orange-100/50 border-orange-200';
 const C_CURR_GT = 'bg-orange-950/20 border-orange-900/40 text-orange-300';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

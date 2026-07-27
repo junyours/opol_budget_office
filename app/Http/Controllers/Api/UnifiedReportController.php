@@ -826,7 +826,8 @@ private function buildOneCalamity5(
         ->value('grand');
 
     $calamityFund = $this->computeCalamity5Fund($budgetPlanId, $source);
-    $reserved30   = round($calamityFund * 0.30, 2);
+    // $reserved30   = round($calamityFund * 0.30, 2);
+    $reserved30 = round($calamityFund - $total70, 2);
 
     return [
         'label'      => $label,
@@ -954,8 +955,11 @@ private function buildMdf20Data(int $budgetPlanId): array
             if ($item->obligation_id && $item->debt_type) {
                 $dueField = $item->debt_type === 'principal' ? 'principal_due'  : 'interest_due';
                 $s1Field  = $item->debt_type === 'principal' ? 'principal_sem1' : 'interest_sem1';
+                $oblField = $item->debt_type === 'principal'
+                    ? 'obligation_principal_amount'
+                    : 'obligation_interest_amount';
 
-                $pastTotal = $pay($item->obligation_id, $pastPlan?->budget_plan_id,    $dueField);
+                $pastTotal = $pay($item->obligation_id, $pastPlan?->budget_plan_id,    $oblField);
                 $curTotal  = $pay($item->obligation_id, $currentPlan?->budget_plan_id, $dueField);
                 $curSem1   = $pay($item->obligation_id, $currentPlan?->budget_plan_id, $s1Field);
                 $curSem2   = max(0, $curTotal - $curSem1);
@@ -1001,7 +1005,7 @@ if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
             $currentSnap = $currentPlan ? $byPlan->get($currentPlan->budget_plan_id) : null;
             $pastSnap    = $pastPlan    ? $byPlan->get($pastPlan->budget_plan_id)    : null;
 
-            $pastTotal = (float) ($pastSnap?->total_amount  ?? 0);
+            $pastTotal = (float) ($pastSnap?->obligation_amount  ?? 0);
             $curTotal  = (float) ($currentSnap?->total_amount ?? 0);
             $curSem1   = (float) ($currentSnap?->sem1_actual  ?? 0);
             $curSem2   = max(0, $curTotal - $curSem1);
@@ -1520,8 +1524,10 @@ private function form7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string $s
         $prop70    = (float) \App\Models\LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
             ->where('source', 'general-fund')
             ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')->value('grand');
-        $qrf30     = round($calamity5 * 0.30, 2);
-        $pda70     = round($calamity5 * 0.70, 2);
+        // Round 30% first, then 70% = remainder — avoids the two halves
+        // being rounded independently and no longer summing to the total.
+        $qrf30 = round($calamity5 * 0.30, 2);
+        $pda70 = round($calamity5 - $qrf30, 2);
 
         if ($calamity5 > 0) {
             $rows[] = [
@@ -1547,13 +1553,13 @@ private function form7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string $s
         // ── Special Account: only 5% calamity split ───────────────────────
         if (!$source) return [];
         $calamity5 = $this->computeCalamity5Fund($budgetPlanId, $source);
-        $qrf30     = round($calamity5 * 0.30, 2);
-        $pda70     = round($calamity5 * 0.70, 2);
+        $qrf30 = round($calamity5 * 0.30, 2);
+        $pda70 = round($calamity5 - $qrf30, 2);
 
         if ($calamity5 > 0) {
             $rows[] = [
                 'item_name'               => '5% Calamity Fund: Quick Response Fund (30% QRF)',
-                'account_code'            => '9000-2-01-001',
+                'account_code'            => '',
                 'general_public_services' => 0.0,
                 'social_services'         => 0.0,
                 'economic_services'       => 0.0,
@@ -1562,7 +1568,7 @@ private function form7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string $s
             ];
             $rows[] = [
                 'item_name'               => '70% Pre-Disaster Preparedness Fund',
-                'account_code'            => '9000-2-02-001',
+                'account_code'            => '',
                 'general_public_services' => 0.0,
                 'social_services'         => 0.0,
                 'economic_services'       => 0.0,
@@ -1839,7 +1845,8 @@ return response()->stream(function () use ($zipPath) {
         array $forms = [],
         ?array $reportData = null
     ): string {
-        $signatories = $this->buildSignatories();
+        // $signatories = $this->buildSignatories();
+        $signatories = $this->buildSignatories($mode);
         return view('reports.budget_forms_unified', compact('mode', 'data', 'forms', 'reportData', 'signatories'))->render();
     }
 
@@ -2073,15 +2080,13 @@ return response()->stream(function () use ($zipPath) {
         $rows        = [];
 
         foreach ($obligations as $ob) {
-            $prevAgg = $ob->payments()->where('budget_plan_id', '!=', $budgetPlanId)
-                ->selectRaw('SUM(principal_due) as prev_principal, SUM(interest_due) as prev_interest')
-                ->first();
-            $prevPrincipal = (float) ($prevAgg->prev_principal ?? 0);
-            $prevInterest  = (float) ($prevAgg->prev_interest  ?? 0);
-
             $currentPayment = $ob->payments()->where('budget_plan_id', $budgetPlanId)->first();
-            $curPrincipal   = (float) ($currentPayment->principal_due ?? 0);
-            $curInterest    = (float) ($currentPayment->interest_due  ?? 0);
+
+            $prevPrincipal = (float) ($currentPayment->prev_payment_principal ?? 0);
+            $prevInterest  = (float) ($currentPayment->prev_payment_interest  ?? 0);
+
+            $curPrincipal  = (float) ($currentPayment->principal_due ?? 0);
+            $curInterest   = (float) ($currentPayment->interest_due  ?? 0);
 
             $balance = (float) $ob->principal_amount - $prevPrincipal - $curPrincipal;
 
@@ -3123,6 +3128,63 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
         return $result;
     }
 
+    // private function buildLdrrmfForm2aRows(string $source, int $proposedBpId, ?int $currentBpId, ?int $pastBpId): array
+    // {
+    //     $rows = [];
+
+    //     $propCalamity = $this->computeCalamity5Fund($proposedBpId, $source);
+    //     $currCalamity = $currentBpId ? $this->computeCalamity5Fund($currentBpId, $source) : 0.0;
+    //     $pastCalamity = $pastBpId   ? $this->computeCalamity5Fund($pastBpId,    $source) : 0.0;
+
+    //     $prop70 = (float) LdrrmfipItem::where('budget_plan_id', $proposedBpId)
+    //         ->where('source', $source)->selectRaw('COALESCE(SUM(mooe+co),0) as t')->value('t');
+    //     $curr70 = $currentBpId ? (float) LdrrmfipItem::where('budget_plan_id', $currentBpId)
+    //         ->where('source', $source)->selectRaw('COALESCE(SUM(total_amount),0) as t')->value('t') : 0.0;
+    //     $past70 = $pastBpId ? (float) LdrrmfipItem::where('budget_plan_id', $pastBpId)
+    //         ->where('source', $source)->selectRaw('COALESCE(SUM(obligation_amount),0) as t')->value('t') : 0.0;
+
+    //     $rows[] = [
+    //         'kind'          => 'qrf',
+    //         'account_code'  => '',
+    //         'sector'        => 'General Public Services',
+    //         'note'          => 'QRF — Standby Trust Fund',
+    //         'past_total'    => round(max(0, $pastCalamity - $past70), 2),
+    //         'current_sem1'  => 0.0,
+    //         'current_sem2'  => 0.0,
+    //         'current_total' => round(max(0, $currCalamity - $curr70), 2),
+    //         'proposed'      => round(max(0, $propCalamity - $prop70), 2),
+    //     ];
+
+    //     $propItems = LdrrmfipItem::where('budget_plan_id', $proposedBpId)
+    //         ->where('source', $source)
+    //         ->with('category')
+    //         ->orderBy('ldrrmfip_item_id')
+    //         ->get();
+
+    //     $pastItems    = $pastBpId    ? LdrrmfipItem::where('budget_plan_id', $pastBpId)
+    //         ->where('source', $source)->get()->keyBy('description') : collect();
+    //     $currentItems = $currentBpId ? LdrrmfipItem::where('budget_plan_id', $currentBpId)
+    //         ->where('source', $source)->get()->keyBy('description') : collect();
+
+    //     foreach ($propItems as $item) {
+    //         $pastRow    = $pastItems->get($item->description);
+    //         $currentRow = $currentItems->get($item->description);
+    //         $rows[] = [
+    //             'kind'          => 'preparedness',
+    //             'account_code'  => $item->account_code ?? '',
+    //             'sector'        => $item->category?->name ?? 'General Public Services',
+    //             'description'   => $item->description,
+    //             'past_total'    => (float) ($pastRow?->obligation_amount ?? 0),
+    //             'current_sem1'  => (float) ($currentRow?->sem1_amount   ?? 0),
+    //             'current_sem2'  => (float) ($currentRow?->sem2_amount   ?? 0),
+    //             'current_total' => (float) ($currentRow?->total_amount  ?? 0),
+    //             'proposed'      => (float) ($item->mooe + $item->co),
+    //         ];
+    //     }
+
+    //     return $rows;
+    // }
+
     private function buildLdrrmfForm2aRows(string $source, int $proposedBpId, ?int $currentBpId, ?int $pastBpId): array
     {
         $rows = [];
@@ -3132,48 +3194,91 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
         $pastCalamity = $pastBpId   ? $this->computeCalamity5Fund($pastBpId,    $source) : 0.0;
 
         $prop70 = (float) LdrrmfipItem::where('budget_plan_id', $proposedBpId)
-            ->where('source', $source)->selectRaw('COALESCE(SUM(mooe+co),0) as t')->value('t');
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->selectRaw('COALESCE(SUM(mooe+co),0) as t')->value('t');
         $curr70 = $currentBpId ? (float) LdrrmfipItem::where('budget_plan_id', $currentBpId)
-            ->where('source', $source)->selectRaw('COALESCE(SUM(total_amount),0) as t')->value('t') : 0.0;
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->selectRaw('COALESCE(SUM(total_amount),0) as t')->value('t') : 0.0;
         $past70 = $pastBpId ? (float) LdrrmfipItem::where('budget_plan_id', $pastBpId)
-            ->where('source', $source)->selectRaw('COALESCE(SUM(obligation_amount),0) as t')->value('t') : 0.0;
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->selectRaw('COALESCE(SUM(obligation_amount),0) as t')->value('t') : 0.0;
+
+        // ── QRF: use the actual saved __QRF_30__ snapshot (same field the
+        //    LDRRMF Plan page edits) for Past/Sem1, falling back to the
+        //    derived calamityFund − 70% split only when no snapshot exists.
+        $qrfPastItem    = $pastBpId
+            ? LdrrmfipItem::where('budget_plan_id', $pastBpId)->where('source', $source)
+                ->where('description', '__QRF_30__')->first()
+            : null;
+        $qrfCurrentItem = $currentBpId
+            ? LdrrmfipItem::where('budget_plan_id', $currentBpId)->where('source', $source)
+                ->where('description', '__QRF_30__')->first()
+            : null;
+
+        $qrfPastTotal    = $qrfPastItem ? (float) $qrfPastItem->obligation_amount : round(max(0, $pastCalamity - $past70), 2);
+        $qrfCurrentTotal = round(max(0, $currCalamity - $curr70), 2);
+        $qrfCurrentSem1  = $qrfCurrentItem ? (float) $qrfCurrentItem->sem1_amount : 0.0;
+        $qrfCurrentSem2  = max(0, $qrfCurrentTotal - $qrfCurrentSem1);
 
         $rows[] = [
             'kind'          => 'qrf',
-            'account_code'  => '9000-2-01-001',
+            'account_code'  => '',
             'sector'        => 'General Public Services',
             'note'          => 'QRF — Standby Trust Fund',
-            'past_total'    => round(max(0, $pastCalamity - $past70), 2),
-            'current_sem1'  => 0.0,
-            'current_sem2'  => 0.0,
-            'current_total' => round(max(0, $currCalamity - $curr70), 2),
+            'past_total'    => $qrfPastTotal,
+            'current_sem1'  => $qrfCurrentSem1,
+            'current_sem2'  => $qrfCurrentSem2,
+            'current_total' => $qrfCurrentTotal,
             'proposed'      => round(max(0, $propCalamity - $prop70), 2),
         ];
 
+        // ── 70% Preparedness: UNION of descriptions across past / current /
+        //    proposed plans (mirrors LdrrmfPlanController::index) so items
+        //    that only exist in the past or current year still show up even
+        //    when they haven't been copied into the budget-year plan yet.
         $propItems = LdrrmfipItem::where('budget_plan_id', $proposedBpId)
             ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
             ->with('category')
             ->orderBy('ldrrmfip_item_id')
-            ->get();
+            ->get()
+            ->keyBy('description');
 
         $pastItems    = $pastBpId    ? LdrrmfipItem::where('budget_plan_id', $pastBpId)
-            ->where('source', $source)->get()->keyBy('description') : collect();
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->get()->keyBy('description') : collect();
         $currentItems = $currentBpId ? LdrrmfipItem::where('budget_plan_id', $currentBpId)
-            ->where('source', $source)->get()->keyBy('description') : collect();
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->get()->keyBy('description') : collect();
 
-        foreach ($propItems as $item) {
-            $pastRow    = $pastItems->get($item->description);
-            $currentRow = $currentItems->get($item->description);
+        $allDescriptions = $propItems->keys()
+            ->merge($currentItems->keys())
+            ->merge($pastItems->keys())
+            ->unique()
+            ->values();
+
+        foreach ($allDescriptions as $description) {
+            $propItem   = $propItems->get($description);
+            $pastRow    = $pastItems->get($description);
+            $currentRow = $currentItems->get($description);
+            $meta       = $propItem ?? $currentRow ?? $pastRow;
+            if (! $meta) continue;
+
             $rows[] = [
                 'kind'          => 'preparedness',
-                'account_code'  => $item->account_code ?? '9000-2-02-001',
-                'sector'        => $item->category?->name ?? 'General Public Services',
-                'description'   => $item->description,
+                'account_code'  => $meta->account_code ?? '',
+                'sector'        => $meta->category?->name ?? 'General Public Services',
+                'description'   => $description,
                 'past_total'    => (float) ($pastRow?->obligation_amount ?? 0),
                 'current_sem1'  => (float) ($currentRow?->sem1_amount   ?? 0),
                 'current_sem2'  => (float) ($currentRow?->sem2_amount   ?? 0),
                 'current_total' => (float) ($currentRow?->total_amount  ?? 0),
-                'proposed'      => (float) ($item->mooe + $item->co),
+                'proposed'      => (float) ($propItem ? ($propItem->mooe + $propItem->co) : 0),
             ];
         }
 
@@ -3221,7 +3326,7 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
             ['name' => '5% LDRRM Fund Prog./Proj. (net of 70%PdA)', 'account_code' => '5-02', 'kind' => 'ldrrmf',
              'past_total' => max(0, $past5 - $past70), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
              'current_total' => max(0, $curr5 - $curr70), 'proposed' => max(0, $prop5 - $prop70)],
-            ['name' => '30% Quick Response Fund (QRF)', 'account_code' => '9000-2-01-001', 'kind' => 'ldrrmf-30',
+            ['name' => '30% Quick Response Fund (QRF)', 'account_code' => '', 'kind' => 'ldrrmf-30',
              'past_total' => round($past5 * 0.30, 2), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
              'current_total' => round($curr5 * 0.30, 2), 'proposed' => round($prop5 * 0.30, 2)],
             ['name' => '70% Pre-Disaster Act. (JMC 2013-1, R.A. 10121)', 'account_code' => '5-02', 'kind' => 'ldrrmf-70',
@@ -3353,18 +3458,62 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
     //         'accountant'      => $this->getDeptHeadByName('accounting'),
     //     ];
     // }
-    private function buildSignatories(): array
+    // private function buildSignatories(): array
+    // {
+    //     return [
+    //         'budget_officer'  => $this->getDeptHeadByName('budget'),
+    //         'administrator'   => $this->getDeptHeadByName('administration'),
+    //         'mpdc'            => $this->getDeptHeadByName('planning and development'),
+    //         'treasurer'       => $this->getDeptHeadByName('treasurer'),
+    //         'mayor'           => $this->getDeptHeadByName('mayor'),
+    //         'hrmo'            => $this->getDeptHeadByName('human resources'),
+    //         'accountant'      => $this->getDeptHeadByName('accounting'),
+    //         'drrm_officer'    => $this->getDeptHeadByName('disaster'),
+    //     ];
+    // }
+    // Mirrors data/signatory.ts → `signatories` table
+    private function signatoryData(): array
     {
-        return [
-            'budget_officer'  => $this->getDeptHeadByName('budget'),
-            'administrator'   => $this->getDeptHeadByName('administration'),
-            'mpdc'            => $this->getDeptHeadByName('planning and development'),
-            'treasurer'       => $this->getDeptHeadByName('treasurer'),
-            'mayor'           => $this->getDeptHeadByName('mayor'),
-            'hrmo'            => $this->getDeptHeadByName('human resources'),
-            'accountant'      => $this->getDeptHeadByName('accounting'),
-            'drrm_officer'    => $this->getDeptHeadByName('disaster'),
-        ];
+        static $data = null;
+        if ($data === null) {
+            // $path = resource_path('data/signatories.json');
+            $path = resource_path('js/src/data/signatories.json');
+            $data = json_decode(file_get_contents($path), true) ?? ['signatories' => [], 'layouts' => []];
+        }
+        return $data;
+    }
+
+    private function signatoryMasterList(): array
+    {
+        return $this->signatoryData()['signatories'];
+    }
+
+    // Reads from resources/data/signatories.json → "layouts"
+    // Each sub-array is a row; row order = top-to-bottom, item order = left-to-right.
+    // The mayor is always rendered separately as the "Approved" row.
+    private function formSignatoryLayout(): array
+    {
+        return $this->signatoryData()['layouts'];
+    }
+
+
+    private function buildSignatories(string $formCode = 'form1'): array
+    {
+        $master = $this->signatoryMasterList();
+        $layout = $this->formSignatoryLayout()[$formCode] ?? [];
+
+        $rows = array_map(
+            fn ($keys) => array_map(fn ($k) => $master[$k] ?? ['name' => strtoupper($k), 'title' => ucwords($k)], $keys),
+            $layout
+        );
+
+        // Merge the full master list so every blade partial can access
+        // $signatories['accountant'], $signatories['budget_officer'], etc.
+        // directly, while form1 still gets its 'rows' + 'mayor' structure.
+        return array_merge($master, [
+            'rows'  => $rows,
+            'mayor' => $master['mayor'],
+        ]);
     }
 
     private function getDeptHeadByName(string $keyword): array
@@ -3656,8 +3805,10 @@ private function buildSACalamityCurrentYear(?int $planId, string $source): array
     // QRF split proportionally
     $sem1Calamity = round($sem1Total + ($reserved30 * ($sem1Total / max($total70, 1))), 2);
     $sem2Calamity = round($calamity - $sem1Calamity, 2);
-    $qrf30Sem1    = round($sem1Calamity * 0.30, 2);
-    $qrf30Sem2    = round($sem2Calamity * 0.30, 2);
+    $sem1Cents    = (int) round($sem1Calamity * 100);
+    $sem2Cents    = (int) round($sem2Calamity * 100);
+    $qrf30Sem1    = round(($sem1Cents * 3) / 10) / 100;
+    $qrf30Sem2    = round(($sem2Cents * 3) / 10) / 100;
 
     return [
         'qrf_30_sem1'   => $qrf30Sem1,

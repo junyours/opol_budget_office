@@ -11,23 +11,7 @@ class Department extends Model
 
     protected $table      = 'departments';
     protected $primaryKey = 'dept_id';
-    // protected $fillable   = [
-    //     'dept_name',
-    //     'dept_abbreviation',
-    //     'dept_category_id',
-    //     'mandate',
-    //     'special_provisions',
-    //     'logo',
-    // ];
-    // protected $fillable   = [
-    //     'dept_name',
-    //     'dept_abbreviation',
-    //     'dept_category_id',
-    //     'mandate',
-    //     'special_provisions',
-    //     'logo',
-    //     'sort_order',
-    // ];
+   
     protected $fillable   = [
         'dept_name',
         'dept_abbreviation',

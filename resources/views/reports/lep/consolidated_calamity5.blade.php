@@ -32,7 +32,7 @@ $num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(round(abs($n)), 0
 
 {{-- Report title --}}
 <div style="text-align:center; font-weight:bold; font-size:7.5pt; margin-bottom:2px;">
-    CY-{{ $year }} 5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) - JMC 2013-1, RA-10121
+    PART VI: CY-{{ $year }} 5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) - JMC 2013-1, RA-10121
 </div>
 <div style="text-align:center; font-size:7pt; margin-bottom:2px;">
     Special Account:
@@ -86,6 +86,14 @@ $num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(round(abs($n)), 0
         $_itemsTotalBudget = array_sum(array_column($_src['items'], 'total'));
         $_prep70Matched    = abs($_src['budget_year']['preparedness_70'] - $_itemsTotalBudget) <= 1;
         $_recovAmt         = $_src['budget_year']['preparedness_70'] - $_itemsTotalBudget;
+
+        // Past-year subtotal fallback: some sources have no past-year Income Fund
+        // data (derived 5% calamity fund = 0) even though item-level obligation
+        // amounts exist. Fall back to summed items so this row is never blank.
+        $_pastItemsTotal = array_sum(array_column($_src['items'], 'obligation_amount'));
+        $_pastTotal5pct  = $_src['past']['total_5pct'] > 0
+            ? $_src['past']['total_5pct']
+            : ($_src['past']['qrf_30'] + $_pastItemsTotal);
     @endphp
 
     {{-- Dept header row --}}
@@ -153,7 +161,7 @@ $num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(round(abs($n)), 0
         <td colspan="2" class="l" style="padding-left:4px;">
             Total 5% Calamity Fund - {{ $_src['dept_total_label'] }}
         </td>
-        <td class="r">{!! $pesoA($_src['past']['total_5pct']) !!}</td>
+        <td class="r">{!! $pesoA($_pastTotal5pct) !!}</td>
         <td class="r">{!! $pesoA($_src['current']['total_sem1']) !!}</td>
         <td class="r">{!! $pesoA($_src['current']['total_sem2']) !!}</td>
         <td class="r">{!! $pesoA($_src['current']['total_5pct']) !!}</td>

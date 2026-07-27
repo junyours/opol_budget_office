@@ -1,0 +1,18 @@
+{
+  "signatories": {
+    "administrator":  { "name": "ATTY. KENNETH M. KEMPIS",    "title": "Municipal Administrator" },
+    "budget_officer": { "name": "GREG M. RADAZA, MBA",        "title": "Municipal Budget Officer" },
+    "treasurer":      { "name": "LALAINE M. CARILIMAN",       "title": "Assistant Municipal Treasurer" },
+    "mpdc":           { "name": "AILEL ROSE S. ASEQUIA, EnP", "title": "Municipal Planning & Development Coordinator" },
+    "accountant":     { "name": "HILAIRE MAY F. BACULIO, CPA", "title": "Municipal Accountant" },
+    "mayor":          { "name": "ATTY. JAYFRANCIS D. BAGO",   "title": "Municipal Mayor" },
+    "hrmo":           { "name": "JOSEPH A. ACTUB",            "title": "HRMO - Designate" },
+    "drrm_officer":   { "name": "ENGR. ROMEL C. LONOY, REE",  "title": "Local DRRM Officer V" }
+  },
+  "layouts": {
+    "form1": [
+      ["administrator", "budget_officer", "treasurer"],
+      ["mpdc", "accountant"]
+    ]
+  }
+}

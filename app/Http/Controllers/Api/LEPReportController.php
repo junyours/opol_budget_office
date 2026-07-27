@@ -18,6 +18,7 @@ use App\Models\DeptBpForm4Item;
 use App\Models\Form6Template;
 use App\Models\Form6Item;
 use App\Models\LdrrmfipItem;
+use App\Models\LdrrmfipCategory;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -335,7 +336,53 @@ class LEPReportController extends Controller
         return $beginningCash + (float) $query->sum('proposed_amount');
     }
 
-    // ─── Special account income fund totals ──────────────────────────────
+    // // ─── Special account income fund totals ──────────────────────────────
+    // private function getSpecialAccountTotals(int $budgetPlanId, $specialDepts): array
+    // {
+    //     $totals     = [];
+    //     $grandTotal = 0.0;
+
+    //     foreach ($specialDepts as $dept) {
+    //         $source = $this->resolveSourceKey($dept);
+
+    //         $nonIncomeParent = \DB::table('income_fund_objects')
+    //             ->where('source', $source)
+    //             ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+    //             ->first(['id']);
+
+    //         $excludeIds = [];
+    //         if ($nonIncomeParent) {
+    //             $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
+    //             $excludeIds[] = $nonIncomeParent->id;
+    //         }
+
+    //         $query = \DB::table('income_fund_amounts')
+    //             ->where('budget_plan_id', $budgetPlanId)
+    //             ->where('source', $source);
+    //         if (!empty($excludeIds)) {
+    //             $query->whereNotIn('income_fund_object_id', $excludeIds);
+    //         }
+
+    //         $amount = (float) $query->sum('proposed_amount');
+    //         $grandTotal += $amount;
+
+    //         $totals[] = [
+    //             'dept_name' => $dept->dept_name,
+    //             'dept_abbr' => strtoupper($dept->dept_abbreviation ?? ''),
+    //             'source'    => $source,
+    //             'amount'    => $amount,
+    //         ];
+    //     }
+
+    //     return [
+    //         'items'       => $totals,
+    //         'grand_total' => $grandTotal,
+    //     ];
+    // }
+
+    // ─── Special account EXPENDITURE totals (Form2 + AIP + 5% Calamity) ───
+    // NOTE: renamed conceptually — this now returns actual spending, not
+    // estimated revenue, to match what the dashboard shows for each SA.
     private function getSpecialAccountTotals(int $budgetPlanId, $specialDepts): array
     {
         $totals     = [];
@@ -344,32 +391,38 @@ class LEPReportController extends Controller
         foreach ($specialDepts as $dept) {
             $source = $this->resolveSourceKey($dept);
 
-            $nonIncomeParent = \DB::table('income_fund_objects')
-                ->where('source', $source)
-                ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
-                ->first(['id']);
-
-            $excludeIds = [];
-            if ($nonIncomeParent) {
-                $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
-                $excludeIds[] = $nonIncomeParent->id;
-            }
-
-            $query = \DB::table('income_fund_amounts')
+            $deptPlan = DepartmentBudgetPlan::where('dept_id', $dept->dept_id)
                 ->where('budget_plan_id', $budgetPlanId)
-                ->where('source', $source);
-            if (!empty($excludeIds)) {
-                $query->whereNotIn('income_fund_object_id', $excludeIds);
+                ->first();
+
+            $deptExpenditure = 0.0;
+            if ($deptPlan) {
+                // Form2 items (PS/MOOE/CO)
+                $form2Total = (float) \DB::table('dept_bp_form2_items')
+                    ->where('dept_budget_plan_id', $deptPlan->dept_budget_plan_id)
+                    ->sum('total_amount');
+
+                // AIP / Form4 special programs
+                $aipTotal = (float) \DB::table('dept_bp_form4_items')
+                    ->where('dept_budget_plan_id', $deptPlan->dept_budget_plan_id)
+                    ->sum('total_amount');
+
+                $deptExpenditure = $form2Total + $aipTotal;
             }
 
-            $amount = (float) $query->sum('proposed_amount');
+            // 5% Calamity Fund (same formula used elsewhere in this controller)
+            $calamityFund = $this->computeCalamityFundLep($budgetPlanId, $source);
+
+            $amount = $deptExpenditure + $calamityFund;
             $grandTotal += $amount;
 
             $totals[] = [
-                'dept_name' => $dept->dept_name,
-                'dept_abbr' => strtoupper($dept->dept_abbreviation ?? ''),
-                'source'    => $source,
-                'amount'    => $amount,
+                'dept_name'         => $dept->dept_name,
+                'dept_abbr'         => strtoupper($dept->dept_abbreviation ?? ''),
+                'source'            => $source,
+                'dept_expenditure'  => $deptExpenditure,
+                'calamity_fund'     => $calamityFund,
+                'amount'            => $amount,
             ];
         }
 
@@ -963,26 +1016,57 @@ class LEPReportController extends Controller
             }
         };
 
-        $compute70 = fn (?int $bpId): float => $bpId
-    ? (float) \DB::table('ldrrmfip_items')
-        ->where('budget_plan_id', $bpId)
-        ->where('source', $source)
-        ->where('description', '!=', '__QRF_30__')
-        ->selectRaw('COALESCE(SUM(total_amount), 0) as grand')
-        ->value('grand')
-    : 0.0;
+        // ── 70% totals use the field that actually holds that year's data:
+        //    past year   → obligation_amount (what was actually obligated)
+        //    current year→ total_amount       (sem1_amount + sem2_amount)
+        //    budget year → mooe + co          (this year's entered items)
+        //    __QRF_30__ sentinel is always excluded — it's the QRF row, not
+        //    a 70% preparedness item.
+        $sum70 = function (?int $bpId, string $field, bool $isMooeCoField = false) use ($source): float {
+            if (!$bpId) return 0.0;
+            $query = \DB::table('ldrrmfip_items')
+                ->where('budget_plan_id', $bpId)
+                ->where('source', $source)
+                ->where('description', '!=', '__QRF_30__');
+            if ($isMooeCoField) {
+                return (float) $query->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')->value('grand');
+            }
+            return (float) $query->selectRaw("COALESCE(SUM({$field}), 0) as grand")->value('grand');
+        };
 
         $past5  = $computeCalamityFund($pastBpId);
         $curr5  = $computeCalamityFund($currentBpId);
         $prop5  = $computeCalamityFund($proposedBpId);
 
-        $past70 = $compute70($pastBpId);
-        $curr70 = $compute70($currentBpId);
-        $prop70 = $compute70($proposedBpId);
+        $past70 = $sum70($pastBpId,    'obligation_amount');
+        $curr70 = $sum70($currentBpId, 'total_amount');
+        $prop70 = $sum70($proposedBpId, 'mooe', true);
 
-        $pastQrf = max(0, $past5 - $past70);
-        $currQrf = max(0, $curr5 - $curr70);
-        $propQrf = max(0, $prop5 - $prop70);
+        $currSem1_70 = $currentBpId ? (float) \DB::table('ldrrmfip_items')
+            ->where('budget_plan_id', $currentBpId)
+            ->where('source', $source)
+            ->where('description', '!=', '__QRF_30__')
+            ->selectRaw('COALESCE(SUM(sem1_amount), 0) as grand')->value('grand') : 0.0;
+        $currSem2_70 = max(0, $curr70 - $currSem1_70);
+
+        // ── QRF: read the actual saved __QRF_30__ snapshot (same field the
+        //    LDRRMF Plan page edits) for past obligation and current sem1,
+        //    falling back to the derived calamityFund − 70% split only when
+        //    no snapshot row exists for that plan.
+        $qrfPastItem    = $pastBpId
+            ? LdrrmfipItem::where('budget_plan_id', $pastBpId)->where('source', $source)
+                ->where('description', '__QRF_30__')->first()
+            : null;
+        $qrfCurrentItem = $currentBpId
+            ? LdrrmfipItem::where('budget_plan_id', $currentBpId)->where('source', $source)
+                ->where('description', '__QRF_30__')->first()
+            : null;
+
+        $pastQrf    = $qrfPastItem ? (float) $qrfPastItem->obligation_amount : max(0, $past5 - $past70);
+        $currQrf    = max(0, $curr5 - $curr70);
+        $propQrf    = max(0, $prop5 - $prop70);
+        $currQrfSem1 = $qrfCurrentItem ? (float) $qrfCurrentItem->sem1_amount : 0.0;
+        $currQrfSem2 = max(0, $currQrf - $currQrfSem1);
 
         if ($past5 == 0 && $curr5 == 0 && $prop5 == 0) {
             return [];
@@ -994,8 +1078,8 @@ class LEPReportController extends Controller
                 'name'          => '5% Local Disaster Risk Reduction & Mgmt. Fund (LDRRMF)',
                 'account_code'  => '5-02',
                 'past_total'    => $past5,
-                'current_sem1'  => 0.0,
-                'current_sem2'  => 0.0,
+                'current_sem1'  => $currSem1_70 + $currQrfSem1,
+                'current_sem2'  => $currSem2_70 + $currQrfSem2,
                 'current_total' => $curr5,
                 'proposed'      => $prop5,
             ],
@@ -1004,8 +1088,8 @@ class LEPReportController extends Controller
                 'name'          => '70% Pre-Disaster Preparedness Activities (JMC2013-1, RA 10121)',
                 'account_code'  => '5-02',
                 'past_total'    => $past70,
-                'current_sem1'  => 0.0,
-                'current_sem2'  => 0.0,
+                'current_sem1'  => $currSem1_70,
+                'current_sem2'  => $currSem2_70,
                 'current_total' => $curr70,
                 'proposed'      => $prop70,
             ],
@@ -1014,8 +1098,8 @@ class LEPReportController extends Controller
                 'name'          => 'Quick Response Fund, (QRF) — 30%',
                 'account_code'  => '5-02',
                 'past_total'    => $pastQrf,
-                'current_sem1'  => 0.0,
-                'current_sem2'  => 0.0,
+                'current_sem1'  => $currQrfSem1,
+                'current_sem2'  => $currQrfSem2,
                 'current_total' => $currQrf,
                 'proposed'      => $propQrf,
             ],
@@ -1613,8 +1697,8 @@ private function lepForm7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string
 
         // ── 5% LDRRMF lines ───────────────────────────────────────────────
         $calamity5 = $this->computeCalamityFundLep($budgetPlanId, 'general-fund');
-        $qrf30     = round($calamity5 * 0.30, 2);
-        $pda70     = round($calamity5 * 0.70, 2);
+        $qrf30 = round($calamity5 * 0.30, 2);
+        $pda70 = round($calamity5 - $qrf30, 2);
         if ($calamity5 > 0) {
             $rows[] = ['item_name' => '5% LDRRMF: Quick Response Fund (30% QRF)', 'account_code' => '5-02',
                 'general_public_services' => $qrf30, 'social_services' => 0.0,
@@ -1627,13 +1711,13 @@ private function lepForm7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string
         // ── Special Account: only 5% calamity split ───────────────────────
         if (!$source) return [];
         $calamity5 = $this->computeCalamityFundLep($budgetPlanId, $source);
-        $qrf30     = round($calamity5 * 0.30, 2);
-        $pda70     = round($calamity5 * 0.70, 2);
+        $qrf30 = round($calamity5 * 0.30, 2);
+        $pda70 = round($calamity5 - $qrf30, 2);
         if ($calamity5 > 0) {
-            $rows[] = ['item_name' => '5% Calamity Fund: Quick Response Fund (30% QRF)', 'account_code' => '9000-2-01-001',
+            $rows[] = ['item_name' => '5% Calamity Fund: Quick Response Fund (30% QRF)', 'account_code' => '',
                 'general_public_services' => 0.0, 'social_services' => 0.0,
                 'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $qrf30];
-            $rows[] = ['item_name' => '70% Pre-Disaster Preparedness Fund', 'account_code' => '9000-2-02-001',
+            $rows[] = ['item_name' => '70% Pre-Disaster Preparedness Fund', 'account_code' => '',
                 'general_public_services' => 0.0, 'social_services' => 0.0,
                 'economic_services' => 0.0, 'other_services' => 0.0, 'total' => $pda70];
         }
@@ -1946,6 +2030,9 @@ private function buildLepConsolidatedCalamity5Data(int $budgetPlanId): array
         ->filter(fn ($d) => strtolower(trim($d->category?->dept_category_name ?? '')) === 'special accounts')
         ->values();
 
+    // ── General Fund: itemized LDRRMFIP table (same design as the Unified/budget-plan calamity5 report) ──
+    $generalFund = $this->buildLepGfCalamity5Data($budgetPlanId, 'general-fund');
+
     $sections = [];
 
     foreach ($specialDepts as $dept) {
@@ -2052,7 +2139,58 @@ $items = $allDescriptions->map(function ($desc) use (
         'lgu'          => strtoupper($plan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
         'sources'      => $sections,
         'grand_total'  => $grandTotal,
+        'general_fund' => $generalFund,
         'signatories'  => $this->buildSignatories(),
+    ];
+}
+
+// ── General Fund: itemized categories + A/B/C summary (mirrors UnifiedReportController::buildOneCalamity5) ──
+private function buildLepGfCalamity5Data(int $budgetPlanId, string $source): array
+{
+    $categories = LdrrmfipCategory::where('is_active', true)
+        ->orderBy('sort_order')
+        ->with(['items' => function ($q) use ($budgetPlanId, $source) {
+            $q->where('budget_plan_id', $budgetPlanId)
+              ->where('source', $source)
+              ->orderBy('ldrrmfip_item_id');
+        }])
+        ->get()
+        ->map(fn ($cat) => [
+            'name'  => $cat->name,
+            'items' => $cat->items->map(fn ($i) => [
+                'description'         => $i->description,
+                'implementing_office' => $i->implementing_office ?? 'LDRRMO',
+                'starting_date'       => $i->starting_date,
+                'completion_date'     => $i->completion_date,
+                'expected_output'     => $i->expected_output,
+                'funding_source'      => $i->funding_source ?? 'LDRRMF',
+                'mooe'                => (float) $i->mooe,
+                'co'                  => (float) $i->co,
+                'total'               => (float) ($i->mooe + $i->co),
+            ])->toArray(),
+            'subtotal_mooe'  => (float) $cat->items->sum('mooe'),
+            'subtotal_co'    => (float) $cat->items->sum('co'),
+            'subtotal_total' => (float) $cat->items->sum(fn ($i) => $i->mooe + $i->co),
+        ])
+        ->filter(fn ($cat) => count($cat['items']) > 0)
+        ->values()
+        ->toArray();
+
+    $total70 = (float) LdrrmfipItem::where('budget_plan_id', $budgetPlanId)
+        ->where('source', $source)
+        ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
+        ->value('grand');
+
+    $calamityFund = $this->computeCalamityFundLep($budgetPlanId, $source);
+    $reserved30   = round($calamityFund - $total70, 2);
+
+    return [
+        'categories' => $categories,
+        'summary'    => [
+            'total_70pct'   => round($total70, 2),
+            'reserved_30'   => $reserved30,
+            'calamity_fund' => $calamityFund,
+        ],
     ];
 }
 

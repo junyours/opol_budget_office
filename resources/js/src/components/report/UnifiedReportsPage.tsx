@@ -74,7 +74,7 @@ const LEP_FORM_DEFS: ReadonlyArray<{
 }> = [
   {
     id:          'consolidated_plantilla',
-    label:       'PART I — Consolidated Plantilla of Personnel',
+    label:       'PART I: Consolidated Plantilla of Personnel',
     desc:        'All departments — General Fund + Special Accounts',
     orientation: 'portrait',
     endpoint:    '/reports/lep/consolidated-plantilla',
@@ -83,7 +83,7 @@ const LEP_FORM_DEFS: ReadonlyArray<{
   },
   {
     id:          'receipts_program',
-    label:       'Part II — Receipts Program',
+    label:       'Part II: Receipts Program',
     desc:        'General Fund & Special Accounts income',
     orientation: 'portrait',
     endpoint:    '/reports/lep/receipts-program',
@@ -92,7 +92,7 @@ const LEP_FORM_DEFS: ReadonlyArray<{
   },
   {
     id:          'lep_form2',
-    label:       'Part III — Appropriations by Office',
+    label:       'Part III: Appropriations by Office',
     desc:        'Programmed Appropriation & Obligation by Object of Expenditures',
     orientation: 'portrait',
     endpoint:    '/reports/lep/form2',
@@ -100,17 +100,8 @@ const LEP_FORM_DEFS: ReadonlyArray<{
     needsFilter: false,
   },
   {
-    id:          'lep_form6',
-    label:       'Statement of Statutory Obligations',
-    desc:        'Statutory & Contractual Obligations and Budgetary Requirements',
-    orientation: 'portrait',
-    endpoint:    '/reports/lep/form6',
-    needsDept:   false,
-    needsFilter: true,
-  },
-  {
     id:          'lep_form7',
-    label:       'Summary of Appropriations by Sector',
+    label:       'PART IV: Summary of Appropriations by Sector',
     desc:        'Part IV — New Appropriations by Object of Expenditures and by Sector',
     orientation: 'portrait',
     endpoint:    '/reports/lep/form7',
@@ -118,8 +109,18 @@ const LEP_FORM_DEFS: ReadonlyArray<{
     needsFilter: false,
   },
   {
+    id:          'lep_form6',
+    label:       'PART V: Statement of Statutory Obligations',
+    desc:        'Statutory & Contractual Obligations and Budgetary Requirements',
+    orientation: 'portrait',
+    endpoint:    '/reports/lep/form6',
+    needsDept:   false,
+    needsFilter: true,
+  },
+
+  {
     id:          'lep_consolidated_calamity5' as LepFormId,
-    label:       '5% Calamity Fund — SA Consolidated',
+    label:       'PART VI :5% Calamity Fund — SA Consolidated',
     desc:        'All Special Accounts LDRRMF plan, side-by-side',
     orientation: 'landscape' as const,
     endpoint:    '/reports/lep/consolidated-calamity5',

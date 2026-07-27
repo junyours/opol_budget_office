@@ -2,11 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #app {
+/* html, body, #app {
   height: 100dvh;
   overflow: hidden;
-  overscroll-behavior: none;
-}
+  overscroll-behavior-x: none;
+} */
 
 @layer base {
   :root {
@@ -323,10 +323,20 @@ html, body, #app {
 .text-cat-3 { color: hsl(var(--cat-3)); }
 .text-cat-4 { color: hsl(var(--cat-4)); }
 
+.bg-cat-1\/5 { background-color: hsl(var(--cat-1) / 0.05); }
+.bg-cat-2\/5 { background-color: hsl(var(--cat-2) / 0.05); }
+.bg-cat-3\/5 { background-color: hsl(var(--cat-3) / 0.05); }
+.bg-cat-4\/5 { background-color: hsl(var(--cat-4) / 0.05); }
+
 .bg-cat-1\/10 { background-color: hsl(var(--cat-1) / 0.10); }
 .bg-cat-2\/10 { background-color: hsl(var(--cat-2) / 0.10); }
 .bg-cat-3\/10 { background-color: hsl(var(--cat-3) / 0.10); }
 .bg-cat-4\/10 { background-color: hsl(var(--cat-4) / 0.10); }
+
+.bg-cat-1\/15 { background-color: hsl(var(--cat-1) / 0.15); }
+.bg-cat-2\/15 { background-color: hsl(var(--cat-2) / 0.15); }
+.bg-cat-3\/15 { background-color: hsl(var(--cat-3) / 0.15); }
+.bg-cat-4\/15 { background-color: hsl(var(--cat-4) / 0.15); }
 
 .bg-cat-1\/20 { background-color: hsl(var(--cat-1) / 0.20); }
 .bg-cat-2\/20 { background-color: hsl(var(--cat-2) / 0.20); }

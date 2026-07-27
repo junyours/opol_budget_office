@@ -26,6 +26,7 @@ class NotificationController extends BaseApiController
                 'dept_abbreviation'   => $n->data['dept_abbreviation']  ?? null,
                 'dept_budget_plan_id' => $n->data['dept_budget_plan_id'] ?? null,
                 'budget_year'         => $n->data['budget_year']        ?? null,
+                'reason'              => $n->data['reason']              ?? null,
                 'created_at'          => $n->created_at,
                 'read_at'             => $n->read_at,     // ← ADD THIS
             ]);

@@ -121,6 +121,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
 
     // ── Department Budget Plans ────────────────────────────────────────────────
     Route::get('/department-budget-plans/years',                      [DepartmentBudgetPlanController::class, 'years']);
+    Route::get('/department-budget-plans/totals',                     [DepartmentBudgetPlanController::class, 'totals']);
     Route::get('/department-budget-plans/by-dept-year/{dept}/{year}', [DepartmentBudgetPlanController::class, 'findByDeptAndYear']);
     Route::apiResource('department-budget-plans', DepartmentBudgetPlanController::class);
     Route::post('department-budget-plans/{department_budget_plan}/submit',  [DepartmentBudgetPlanController::class, 'submit']);

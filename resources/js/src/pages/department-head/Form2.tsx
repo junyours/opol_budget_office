@@ -52,9 +52,9 @@ const form2PendingDeleteKey = (planId: number, itemId: number) =>
     `${FORM2_PENDING_DELETE_PREFIX}${planId}_${itemId}`;
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
-const C_APP_SUB = "bg-green-50 border-green-200";
+const C_APP_SUB = "bg-green-100 border-green-300";
 const C_APP_GT = "bg-green-950/20 border-green-900/40 text-green-300";
-const C_PRO_SUB = "bg-orange-50 border-orange-200";
+const C_PRO_SUB = "bg-orange-100 border-orange-300";
 const C_PRO_GT = "bg-orange-950/20 border-orange-900/40 text-orange-300";
 
 // ─── Table class tokens ───────────────────────────────────────────────────────
@@ -63,11 +63,11 @@ const TH =
 const TD = "px-3 py-2.5 text-[12px]";
 const TD_M = "px-3 py-2.5 text-[12px] font-mono tabular-nums text-right";
 const TH_APP =
-    "border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 text-right";
+    "border-b border-green-300 bg-green-100 px-3 py-2 text-sm font-semibold text-green-800 text-right";
 const TH_PRO =
-    "border-b border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 text-center";
-const TD_APP = `${TD_M} bg-green-50/30`;
-const TD_PRO = `${TD_M} bg-orange-50/30`;
+    "border-b border-orange-300 bg-orange-100 px-3 py-2 text-sm font-semibold text-orange-800 text-center";
+const TD_APP = `${TD_M} bg-green-100/50`;
+const TD_PRO = `${TD_M} bg-orange-100/50`;
 
 const INPUT_BASE =
     "text-[12px] font-mono text-right h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none placeholder:text-gray-300 disabled:opacity-50";
@@ -77,9 +77,9 @@ const recCls =
     "text-[12px] h-7 px-2 rounded border border-gray-200 bg-white w-full focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-300 disabled:opacity-50";
 
 const TH_CUR =
-    "border-b border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 text-right";
-const TD_CUR = `${TD_M} bg-blue-50/30`;
-const C_CUR_SUB = "bg-blue-50 border-blue-200";
+    "border-b border-blue-300 bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-800 text-right";
+const TD_CUR = `${TD_M} bg-blue-100/50`;
+const C_CUR_SUB = "bg-blue-100 border-blue-300";
 const C_CUR_GT  = "bg-blue-950/20 border-blue-900/40 text-blue-300";
 const inputCurCls = `${INPUT_BASE} focus:ring-2 focus:ring-blue-300 focus:border-blue-300`;
 
@@ -116,6 +116,8 @@ const clr = (v: number) =>
     v < 0 ? "text-red-500" : v > 0 ? "text-emerald-600" : "";
 const comma = (n: number) =>
     n === 0 ? "" : Math.round(n).toLocaleString("en-US");
+const commaDec = (n: number) =>
+    n === 0 ? "" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const normRec = (v: string | null | undefined): string | null =>
     v === "" ? null : (v ?? null);
@@ -523,6 +525,12 @@ const Form2: React.FC<Form2Props> = ({
     }, []);
 
     const handleTableKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        // Don't hijack arrow/home/end keys when the user is typing/navigating
+        // inside an input, textarea, or select — let the browser handle
+        // cursor movement and text selection normally.
+        const target = e.target as HTMLElement;
+        if (target.closest('input, textarea, select')) return;
+
         const el = tableScrollRef.current;
         if (!el) return;
         const step = e.shiftKey ? 300 : 80;
@@ -625,9 +633,48 @@ const Form2: React.FC<Form2Props> = ({
 
     // QRF (30%) is always fixed/reserved regardless of allocation — use the theoretical split.
     // Only Pre-Disaster (70%) reflects what's actually been allocated to LDRRMFIP items.
+    // const calamityActualPre   = ldrrmfActual?.total70 ?? 0;
+    // const calamityActualQrf   = calamityData?.quick_response ?? 0;
+    // const calamityActualTotal = calamityActualPre + calamityActualQrf;
+
+    // const expenseItemMap = useMemo(
     const calamityActualPre   = ldrrmfActual?.total70 ?? 0;
     const calamityActualQrf   = calamityData?.quick_response ?? 0;
     const calamityActualTotal = calamityActualPre + calamityActualQrf;
+
+    // Past Year (obligation) / Appropriation (Sem1+Sem2) figures for the 5% Calamity
+    // Fund rows — pulled from the LDRRMF Plan report so these rows show Past Year and
+    // Appropriation columns the same way regular expense items and AIP programs do.
+    const { data: ldrrmfPlanReport } = useQuery<any>({
+        queryKey: ["ldrrmf-plan-report"],
+        queryFn: () => API.get("/ldrrmf-plan").then((r) => r.data?.data ?? null),
+        enabled: isSpecialAccount,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const ldrrmfSection = useMemo(() => {
+        if (!ldrrmfPlanReport || !incomeSource) return null;
+        return (
+            (ldrrmfPlanReport.special_accounts ?? []).find(
+                (sa: any) => sa.source === incomeSource,
+            ) ?? null
+        );
+    }, [ldrrmfPlanReport, incomeSource]);
+
+    const qrfPastObligation  = ldrrmfSection?.qrf_past_obligation ?? 0;
+    const qrfCurrentSem1     = ldrrmfSection?.qrf_current_sem1 ?? 0;
+    const qrfCurrentSem2     = ldrrmfSection?.qrf_current_sem2 ?? 0;
+    const qrfCurrentTotal    = ldrrmfSection?.qrf_current_total ?? 0;
+
+    const prepPastObligation = ldrrmfSection?.past?.preparedness_70 ?? 0;
+    const prepCurrentSem1    = ldrrmfSection?.current?.prep_70_sem1 ?? 0;
+    const prepCurrentSem2    = ldrrmfSection?.current?.prep_70_sem2 ?? 0;
+    const prepCurrentTotal   = ldrrmfSection?.current?.prep_70_total ?? 0;
+
+    const calamityPastObligation = isSpecialAccount ? qrfPastObligation + prepPastObligation : 0;
+    const calamityCurrentSem1    = isSpecialAccount ? qrfCurrentSem1 + prepCurrentSem1 : 0;
+    const calamityCurrentSem2    = isSpecialAccount ? qrfCurrentSem2 + prepCurrentSem2 : 0;
+    const calamityCurrentTotal   = isSpecialAccount ? qrfCurrentTotal + prepCurrentTotal : 0;
 
     const expenseItemMap = useMemo(
         () => new Map(expenseItems.map((i) => [i.expense_class_item_id, i])),
@@ -1968,14 +2015,29 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleCommaInput = useCallback(
         (id: number, field: DraftField, rawValue: string, el?: HTMLInputElement, cursorPos?: number) => {
+            // The displayed value may still contain commas (e.g. "150,000.00")
+            // while the caret position reported by the browser is an index
+            // into that comma-formatted string. Re-express the caret as a
+            // count of digit/dot characters BEFORE it, so it maps correctly
+            // onto the comma-free `digits` string below — otherwise deleting
+            // a digit lands the caret in the wrong place once commas are
+            // stripped out.
+            let digitPos = cursorPos;
+            if (cursorPos !== undefined) {
+                digitPos = 0;
+                for (let i = 0; i < cursorPos && i < rawValue.length; i++) {
+                    if (/[0-9.]/.test(rawValue[i])) digitPos++;
+                }
+            }
+
             const rawDigits = rawValue.replace(/[^0-9.]/g, "");
             const digits = clampAmountDigits(rawDigits);
             // If clamping shortened the string (user typed past the cap), pin the
             // cursor to the end so it doesn't end up past the visible text.
             const cappedPos =
-                cursorPos !== undefined
-                    ? Math.min(cursorPos, digits.length)
-                    : cursorPos;
+                digitPos !== undefined
+                    ? Math.min(digitPos, digits.length)
+                    : digitPos;
             setDraft(`${id}_${field}`, digits, el, cappedPos);
             const num = digits === "" ? 0 : parseFloat(digits);
             if (field === "proposed")
@@ -2010,10 +2072,9 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleAipCommaInput = useCallback(
         (id: number, field: "obligation" | "sem1", rawValue: string) => {
-            const rawDigits = rawValue.replace(/[^0-9]/g, "");
-            const clamped = clampAmountDigits(rawDigits).replace(/[^0-9]/g, "");
-            const digits = clamped;
-            const num = digits === "" ? 0 : parseInt(digits, 10);
+            const rawDigits = rawValue.replace(/[^0-9.]/g, "");
+            const digits = clampAmountDigits(rawDigits);
+            const num = digits === "" ? 0 : parseFloat(digits);
             setDraft(`aip_${id}_${field}`, digits);
             if (field === "obligation") {
                 aipOblEditsRef.current.set(id, num);
@@ -2118,18 +2179,43 @@ const Form2: React.FC<Form2Props> = ({
         [aipItems],
     );
 
+    // const grandFinal = useMemo(
+    //     () => ({
+    //         ...grandTotals,
+    //         // Add AIP appropriation-year amounts into the blue Appropriation columns
+    //         pastSem1:  grandTotals.pastSem1  + aipAppSem1,
+    //         pastSem2:  grandTotals.pastSem2  + aipAppSem2,
+    //         pastTotal: grandTotals.pastTotal + aipAppTotal,
+    //         proposed:
+    //             grandTotals.proposed +
+    //             aipTotal +
+    //             (isSpecialAccount ? calamityTotal : 0),
+    //         obligation: grandTotals.obligation + aipObligationTotal,
+    //     }),
+    //     [
+    //         grandTotals,
+    //         aipTotal,
+    //         aipAppSem1,
+    //         aipAppSem2,
+    //         aipAppTotal,
+    //         aipObligationTotal,
+    //         isSpecialAccount,
+    //         calamityTotal,
+    //     ],
+    // );
     const grandFinal = useMemo(
         () => ({
             ...grandTotals,
-            // Add AIP appropriation-year amounts into the blue Appropriation columns
-            pastSem1:  grandTotals.pastSem1  + aipAppSem1,
-            pastSem2:  grandTotals.pastSem2  + aipAppSem2,
-            pastTotal: grandTotals.pastTotal + aipAppTotal,
+            // Add AIP appropriation-year amounts + 5% Calamity Fund past/current amounts
+            // into the blue Appropriation columns
+            pastSem1:  grandTotals.pastSem1  + aipAppSem1  + calamityCurrentSem1,
+            pastSem2:  grandTotals.pastSem2  + aipAppSem2  + calamityCurrentSem2,
+            pastTotal: grandTotals.pastTotal + aipAppTotal + calamityCurrentTotal,
             proposed:
                 grandTotals.proposed +
                 aipTotal +
                 (isSpecialAccount ? calamityTotal : 0),
-            obligation: grandTotals.obligation + aipObligationTotal,
+            obligation: grandTotals.obligation + aipObligationTotal + calamityPastObligation,
         }),
         [
             grandTotals,
@@ -2140,6 +2226,10 @@ const Form2: React.FC<Form2Props> = ({
             aipObligationTotal,
             isSpecialAccount,
             calamityTotal,
+            calamityCurrentSem1,
+            calamityCurrentSem2,
+            calamityCurrentTotal,
+            calamityPastObligation,
         ],
     );
 
@@ -2517,11 +2607,11 @@ const Form2: React.FC<Form2Props> = ({
                         {isEditable ? (
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             value={
                               inputDraft.has(`aip_${id}_obligation`)
                                 ? inputDraft.get(`aip_${id}_obligation`)!
-                                : comma(aipOblEdits.has(id) ? aipOblEdits.get(id)! : ((item as any).obligation_amount ?? 0))
+                                : commaDec(aipOblEdits.has(id) ? aipOblEdits.get(id)! : ((item as any).obligation_amount ?? 0))
                             }
                             onChange={(e) => handleAipCommaInput(id, "obligation", e.target.value)}
                             onBlur={() => handleAipCommaBlur(id, "obligation")}
@@ -2544,11 +2634,11 @@ const Form2: React.FC<Form2Props> = ({
                         {isEditable && isAdmin ? (
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             value={
                               inputDraft.has(`aip_${id}_sem1`)
                                 ? inputDraft.get(`aip_${id}_sem1`)!
-                                : comma(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
+                                : commaDec(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
                             }
                             onChange={(e) => handleAipCommaInput(id, "sem1", e.target.value)}
                             onBlur={() => handleAipCommaBlur(id, "sem1")}
@@ -3172,8 +3262,7 @@ const Form2: React.FC<Form2Props> = ({
         <TooltipTrigger asChild>
             <Button
                 size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs h-7 border-gray-200 text-gray-600 hover:text-gray-900 bg-gray-50"
+                className="gap-1.5 text-xs h-7 bg-gray-900 hover:bg-gray-800 text-white"
                 onClick={() =>
                     setModalState({
                         isOpen: true,
@@ -3724,7 +3813,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                         oblDraftKey,
                                     )
                                         ? inputDraft.get(oblDraftKey)!
-                                        : comma(oblVal);
+                                        : commaDec(oblVal);
 
                                     return (
                                         <tr
@@ -3765,7 +3854,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 >
                                                     <input
                                                         type="text"
-                                                        inputMode="numeric"
+                                                        inputMode="decimal"
                                                         value={oblDisplay}
                                                         onChange={(e) =>
                                             handleAipCommaInput(
@@ -3795,11 +3884,11 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 {isEditable && isAdmin ? (
                                                     <input
                                                         type="text"
-                                                        inputMode="numeric"
+                                                        inputMode="decimal"
                                                         value={
                                                             inputDraft.has(`aip_${id}_sem1`)
                                                                 ? inputDraft.get(`aip_${id}_sem1`)!
-                                                                : comma(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
+                                                                : commaDec(aipSem1Edits.has(id) ? aipSem1Edits.get(id)! : ((item as any).app_sem1 ?? 0))
                                                         }
                                                         onChange={(e) =>
                                                             handleAipCommaInput(id, "sem1", e.target.value)
@@ -4004,7 +4093,7 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                     <td className="bg-gray-50" />
                                 </tr>
 
-                                {(
+                                {/* {(
                     [
                         {
                             code: "5% × 70%",
@@ -4110,6 +4199,130 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                 )}
                                             >
                                                 {row.value ? "100.00%" : "–"}
+                                            </td>
+                                            {isAdmin && <td />}
+                                        </tr>
+                                    );
+                                })} */}
+                                {(
+                    [
+                        {
+                            code: "5% × 70%",
+                            label: "Pre-Disaster Preparedness",
+                            note: "(70% of 5% Calamity Fund)",
+                            value: calamityActualPre,
+                            past: prepPastObligation,
+                            sem1: prepCurrentSem1,
+                            sem2: prepCurrentSem2,
+                            currentTotal: prepCurrentTotal,
+                        },
+                        {
+                            code: "5% × 30%",
+                            label: "Quick Response Fund (QRF)",
+                            note: "(30% of 5% Calamity Fund)",
+                            value: calamityActualQrf,
+                            past: qrfPastObligation,
+                            sem1: qrfCurrentSem1,
+                            sem2: qrfCurrentSem2,
+                            currentTotal: qrfCurrentTotal,
+                        },
+                    ] as const
+                ).map((row) => {
+                                    const delay = Math.min(gIdx++ * 18, 280);
+                                    const proposedVal = row.value || 0;
+                                    const d = proposedVal - row.past;
+                                    const p = pctOf(row.past, d);
+                                    return (
+                                        <tr
+                                            key={row.code}
+                                            className="_rowAnim bg-white hover:bg-gray-50/60 transition-colors"
+                                            style={{
+                                                animation: `_rowIn 220ms cubic-bezier(0.22,1,0.36,1) ${delay}ms both`,
+                                            }}
+                                        >
+                                            <td
+                                                className={cn(
+                                                    TD,
+                                                    "text-gray-400 font-mono text-[11px]",
+                                                    STICKY_1,
+                                                    "bg-white",
+                                                )}
+                                            >
+                                                {row.code}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD,
+                                                    "text-gray-800",
+                                                    STICKY_2,
+                                                    "bg-white",
+                                                )}
+                                            >
+                                                {row.label}
+                                                <span className="ml-2 text-[10px] text-gray-400">
+                                                    {row.note}
+                                                </span>
+                                            </td>
+                                            {isAdmin && (
+                                                <td className={cn(TD_APP, "border-l border-green-100")}>
+                                                    {row.past === 0 ? "–" : fmtP(row.past)}
+                                                </td>
+                                            )}
+                                            <td
+                                                className={cn(
+                                                    TD_CUR,
+                                                    "border-l border-blue-100 text-gray-600",
+                                                )}
+                                            >
+                                                {row.sem1 === 0 ? "–" : fmtP(row.sem1)}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD_CUR,
+                                                    "text-gray-500",
+                                                )}
+                                            >
+                                                {row.sem2 === 0 ? "–" : fmtP(row.sem2)}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD_CUR,
+                                                    "text-gray-600",
+                                                )}
+                                            >
+                                                {row.currentTotal === 0 ? "–" : fmtP(row.currentTotal)}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD_PRO,
+                                                    "border-l border-orange-100 text-orange-700 font-semibold",
+                                                )}
+                                            >
+                                                {calamityLoading ? (
+                                                    <span className="text-gray-300 animate-pulse">
+                                                        …
+                                                    </span>
+                                                ) : row.value ? (
+                                                    fmtP(row.value)
+                                                ) : (
+                                                    "–"
+                                                )}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD_M,
+                                                    clr(d),
+                                                )}
+                                            >
+                                                {d === 0 ? "–" : fmtP(d)}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    TD_M,
+                                                    clr(d),
+                                                )}
+                                            >
+                                                {row.past === 0 && d === 0 ? "–" : `${p.toFixed(2)}%`}
                                             </td>
                                             {isAdmin && <td />}
                                         </tr>

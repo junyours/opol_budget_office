@@ -1,5 +1,3 @@
-// import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-// import API from "@/src/services/api";
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import API from "@/src/services/api";
@@ -10,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/src/hooks/useAuth";
 import { cn } from "@/src/lib/utils";
 import { Card as ShadcnCard } from "@/src/components/ui/card";
-import { MAX_AMOUNT, sanitizeMoneyDigits } from "@/src/utils/moneyInput";
+import { sanitizeMoneyDigits } from "@/src/utils/moneyInput";
 import { useIsMobile } from "@/src/hooks/use-mobile";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,43 +91,18 @@ const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
   }
 };
 
-// // Strips everything except digits and a single decimal point (commas allowed as input but stripped first)
-// const sanitizeNumericInput = (raw: string): string => {
-//   let v = raw.replace(/,/g, "").replace(/[^0-9.]/g, "");
-//   const firstDot = v.indexOf(".");
-//   if (firstDot !== -1) {
-//     v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
-//   }
-//   return v;
-// };
-
-// // Hard ceiling for any peso amount field — matches the DB column's precision
-// // (e.g. DECIMAL(12,2)) so typed values can never overflow into a DB error.
-// const MAX_AMOUNT = 999999999.99;
-
-// // Clamps an already-sanitized digit string so its parsed value never exceeds
-// // MAX_AMOUNT. Returns the string unchanged if empty or still mid-typing
-// // (e.g. "12."), and formats down to the cap otherwise.
-// const clampAmountDigits = (digits: string): string => {
-//   if (digits === "" || digits === ".") return digits;
-//   const num = parseFloat(digits);
-//   if (isNaN(num)) return digits;
-//   if (num > MAX_AMOUNT) return MAX_AMOUNT.toFixed(2);
-//   return digits;
-// };
-
-// Sanitizing + clamping now lives in src/utils/money.ts so every money input
+// Sanitizing + clamping lives in src/utils/moneyInput.ts so every money input
 // in the app shares the exact same MAX_AMOUNT ceiling.
 const sanitizeNumericInput = sanitizeMoneyDigits;
 
 // ─── Column color tokens ──────────────────────────────────────────────────────
-const COL_PAST    = "bg-green-50/50  border-green-100";
-const COL_CURR    = "bg-blue-50/40   border-blue-100";
-const COL_BUDGET  = "bg-orange-50/40 border-orange-100";
+const COL_PAST    = "bg-green-100/50  border-green-200";
+const COL_CURR    = "bg-blue-100/50   border-blue-200";
+const COL_BUDGET  = "bg-orange-100/50 border-orange-200";
 
-const COL_PAST_SUB   = "bg-green-50   border-green-200";
-const COL_CURR_SUB   = "bg-blue-50    border-blue-200";
-const COL_BUDGET_SUB = "bg-orange-50  border-orange-200";
+const COL_PAST_SUB   = "bg-green-100   border-green-300";
+const COL_CURR_SUB   = "bg-blue-100    border-blue-300";
+const COL_BUDGET_SUB = "bg-orange-100  border-orange-300";
 
 const COL_PAST_GRAND   = "text-green-300  border-green-900/40  bg-green-950/20";
 const COL_CURR_GRAND   = "text-blue-300   border-blue-900/40   bg-blue-950/20";
@@ -141,7 +114,7 @@ function TableSkeleton() {
   return (
     <ShadcnCard className="rounded-xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] text-[12px] border-collapse">
+        <table className="w-full table-fixed text-[12px] border-collapse" style={{ minWidth: 1400 }}>
           <thead>
             {/* Row 1 — group headers */}
             <tr>
@@ -149,16 +122,16 @@ function TableSkeleton() {
                 <Skeleton className="h-3 w-32 rounded" />
               </th>
               {/* Past Year (Actual) — green */}
-              <th className="border-b border-r border-green-200 bg-green-50 px-3 py-2.5 w-32">
-                <Skeleton className="h-3 w-10 mx-auto rounded bg-green-200" />
+              <th className="border-b border-r border-green-300 bg-green-100 px-3 py-2.5 w-32">
+                <Skeleton className="h-3 w-10 mx-auto rounded bg-green-300" />
               </th>
               {/* Current — blue, spans 3 */}
-              <th colSpan={3} className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-2 text-center">
-                <Skeleton className="h-3 w-36 mx-auto rounded bg-blue-200" />
+              <th colSpan={3} className="border-b border-r border-l border-blue-300 bg-blue-100 px-3 py-2 text-center">
+                <Skeleton className="h-3 w-36 mx-auto rounded bg-blue-300" />
               </th>
               {/* Budget — orange */}
-              <th className="border-b border-r border-orange-200 bg-orange-50 px-3 py-2.5 w-52">
-                <Skeleton className="h-3 w-24 mx-auto rounded bg-orange-200" />
+              <th className="border-b border-r border-orange-300 bg-orange-100 px-3 py-2.5 w-52">
+                <Skeleton className="h-3 w-24 mx-auto rounded bg-orange-300" />
               </th>
               {/* Neutral */}
               <th className="border-b border-r border-border bg-card px-3 py-2.5 w-28">
@@ -171,28 +144,28 @@ function TableSkeleton() {
             {/* Row 2 — current year sub-headers */}
              <tr>
               <th className="border-b border-r border-border bg-card" />
-              <th className="border-b border-r border-green-200 bg-green-50" />
-              <th className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-1.5 w-32">
-                <Skeleton className="h-2.5 w-20 ml-auto rounded bg-blue-200" />
+              <th className="border-b border-r border-green-300 bg-green-100" />
+              <th className="border-b border-r border-l border-blue-300 bg-blue-100 px-3 py-1.5 w-32">
+                <Skeleton className="h-2.5 w-20 ml-auto rounded bg-blue-300" />
               </th>
-              <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 w-32">
-                <Skeleton className="h-2.5 w-20 ml-auto rounded bg-blue-200" />
+              <th className="border-b border-r border-blue-300 bg-blue-100 px-3 py-1.5 w-32">
+                <Skeleton className="h-2.5 w-20 ml-auto rounded bg-blue-300" />
               </th>
-              <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 w-32">
-                <Skeleton className="h-2.5 w-12 ml-auto rounded bg-blue-200" />
+              <th className="border-b border-r border-blue-300 bg-blue-100 px-3 py-1.5 w-32">
+                <Skeleton className="h-2.5 w-12 ml-auto rounded bg-blue-300" />
               </th>
-              <th className="border-b border-r border-orange-200 bg-orange-50" />
+              <th className="border-b border-r border-orange-300 bg-orange-100" />
               <th className="border-b border-r border-border bg-card" />
               <th className="border-b border-border bg-card" />
             </tr>
             {/* Row 3 — column numbers */}
             <tr className="border-b-2 border-border">
               <td className="border-r border-border bg-card sticky left-0" />
-              <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-300">(1)</td>
-                <td className="border-r border-l border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(2)</td>
-                <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(3)</td>
-                <td className="border-r         border-blue-200  bg-blue-50  px-3 py-1 text-center text-eyebrow text-blue-300">(4)</td>
-                <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-300">(5)</td>
+              <td className="border-r border-l border-green-300 bg-green-100 px-3 py-1 text-center text-eyebrow text-green-500">(1)</td>
+                <td className="border-r border-l border-blue-300  bg-blue-100  px-3 py-1 text-center text-eyebrow text-blue-500">(2)</td>
+                <td className="border-r         border-blue-300  bg-blue-100  px-3 py-1 text-center text-eyebrow text-blue-500">(3)</td>
+                <td className="border-r         border-blue-300  bg-blue-100  px-3 py-1 text-center text-eyebrow text-blue-500">(4)</td>
+                <td className="border-r border-l border-orange-300 bg-orange-100 px-3 py-1 text-center text-eyebrow text-orange-500">(5)</td>
                 <td className="border-r border-border bg-card px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(6)</td>
                 <td className="border-border bg-card px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(7)</td>
             </tr>
@@ -269,21 +242,6 @@ function TableSkeleton() {
   );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
-// export default function IncomeFundPage() {
-//   const { user } = useAuth();
-//   const [rows, setRows]             = useState<IncomeFundRow[]>([]);
-//   const [meta, setMeta]             = useState<Omit<IncomeFundResponse, "data"> | null>(null);
-//   const [loading, setLoading]       = useState(true);
-//   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
-//   const [currentSource, setCurrentSource] = useState<string>("general-fund");
-
-//   const savedValues = useRef<
-//     Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>
-//   >(new Map());
-//   const initialSaveDone = useRef(false);
-
 export default function IncomeFundPage() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -292,8 +250,6 @@ export default function IncomeFundPage() {
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
   const [currentSource, setCurrentSource] = useState<string>("general-fund");
 
-
-// const savedValues = useRef<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { sem1: number | null; sem2: number | null; proposed: number | null; past_obligation: number | null }>>;
 const savedValues = useRef<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>(new Map()) as React.MutableRefObject<Map<number, { current_sem1: number | null; proposed: number | null; past_obligation: number | null }>>;
   const seededSources = useRef<Set<string>>(new Set()) as React.MutableRefObject<Set<string>>;
 
@@ -346,77 +302,6 @@ const savedValues = useRef<Map<number, { current_sem1: number | null; proposed: 
     return src;
   }, [user]);
 
-//   useEffect(() => {
-//     const path = window.location.pathname;
-//     if      (path.includes("sh-fund"))  setCurrentSource("sh");
-//     else if (path.includes("occ-fund")) setCurrentSource("occ");
-//     else if (path.includes("pm-fund"))  setCurrentSource("pm");
-//     else                                setCurrentSource("general-fund");
-//   }, []);
-
-//   const sourceName = (id: string) =>
-//     ({ "general-fund": "General Fund", sh: "Slaughterhouse", occ: "Opol Community College", pm: "Public Market" }[id] ?? id);
-
-//   useEffect(() => {
-//     if (currentSource) load(currentSource);
-//   }, [currentSource]);
-
-//   const load = async (source: string) => {
-//     setLoading(true);
-//     try {
-//       const res = await API.get<IncomeFundResponse>(`/income-fund?source=${source}`);
-//       const data = res.data.data.map((row) => ({
-//         ...row,
-//         past:            row.past             !== null ? Number(row.past)             : null,
-//         past_obligation: row.past_obligation  !== null ? Number(row.past_obligation)  : null,
-//         current_sem1:    row.current_sem1     !== null ? Number(row.current_sem1)     : null,
-//         current_sem2:    row.current_sem2     !== null ? Number(row.current_sem2)     : null,
-//         current_total:   row.current_total    !== null ? Number(row.current_total)    : null,
-//         sem1:            row.sem1             !== null ? Number(row.sem1)             : null,
-//         sem2:            row.sem2             !== null ? Number(row.sem2)             : null,
-//         proposed:        row.proposed         !== null ? Number(row.proposed)         : null,
-//       }));
-//       setRows(data);
-//       setMeta({
-//   year: res.data.year, past_year: res.data.past_year,
-//   current_year: res.data.current_year, source: res.data.source,
-//   records_exist: res.data.records_exist,
-// });
-
-// if (res.data.past_plan_missing) {
-//   toast.warning(
-//     `Budget plan for ${res.data.past_year} does not exist. Create it first to enable past year obligation amount entries.`,
-//     { duration: 8000 }
-//   );
-// }
-//       data.forEach((r) =>
-//         savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-//         );
-//       if (!res.data.records_exist && !initialSaveDone.current) {
-//         initialSaveDone.current = true;
-//         try {
-//           await API.post("/income-fund/save", { rows: data, source });
-//           data.forEach((r) =>
-//             savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-//             );
-//           toast.success(`Initial data saved for ${sourceName(source)}`);
-//         } catch {
-//           toast.error(`Failed to save initial data for ${sourceName(source)}`);
-//         }
-//       }
-//     } catch {
-//       toast.error("Failed to load data");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleSourceChange = (id: string) => {
-//     setCurrentSource(id);
-//     initialSaveDone.current = false;
-//     savedValues.current.clear();
-//   };
-
 useEffect(() => {
     const path = window.location.pathname;
     if      (path.includes("sh-fund"))  setCurrentSource("sh");
@@ -452,17 +337,6 @@ useEffect(() => {
       );
     }
 
-    // const data = queryData.data.map((row) => ({
-    //   ...row,
-    //   past:            row.past            != null ? Number(row.past)            : null,
-    //   past_obligation: row.past_obligation != null ? Number(row.past_obligation) : null,
-    //   current_sem1:    row.current_sem1    != null ? Number(row.current_sem1)    : null,
-    //   current_sem2:    row.current_sem2    != null ? Number(row.current_sem2)    : null,
-    //   current_total:   row.current_total   != null ? Number(row.current_total)   : null,
-    //   sem1:            row.sem1            != null ? Number(row.sem1)            : null,
-    //   sem2:            row.sem2            != null ? Number(row.sem2)            : null,
-    //   proposed:        row.proposed        != null ? Number(row.proposed)        : null,
-    // }));
     const data = queryData.data.map((row) => ({
       ...row,
       past:            row.past            != null ? Number(row.past)            : null,
@@ -473,11 +347,6 @@ useEffect(() => {
       proposed:        row.proposed        != null ? Number(row.proposed)        : null,
     }));
 
-    // setRows(data);
-    // savedValues.current.clear();
-    // data.forEach((r) =>
-    //   savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-    // );
     setRows(data);
     savedValues.current.clear();
     data.forEach((r) =>
@@ -492,12 +361,6 @@ useEffect(() => {
     if (rows.length === 0) return;
 
     seededSources.current.add(currentSource);
-    // API.post('/income-fund/save', { rows, source: currentSource })
-    //   .then(() => {
-    //     rows.forEach((r) =>
-    //       savedValues.current.set(r.id, { sem1: r.sem1, sem2: r.sem2, proposed: r.proposed, past_obligation: r.past_obligation })
-    //     );
-
     API.post('/income-fund/save', { rows, source: currentSource })
       .then(() => {
         rows.forEach((r) =>
@@ -529,18 +392,6 @@ useEffect(() => {
     savedValues.current.clear();
   };
 
-//   const update = (rowId: number, field: "sem1" | "proposed", value: number | null) => {
-//     setRows((prev) => {
-//       const copy = [...prev];
-//       const i = copy.findIndex((r) => r.id === rowId);
-//       if (i === -1) return prev;
-//       const row = { ...copy[i], [field]: value };
-//       if (field === "sem1") row.sem2 = value !== null ? (row.current_total ?? 0) - value : null;
-//       copy[i] = row;
-//       return copy;
-//     });
-//   };
-
 const update = (rowId: number, field: "current_sem1" | "proposed", value: number | null) => {
     setRows((prev) => {
       const copy = [...prev];
@@ -558,39 +409,17 @@ const update = (rowId: number, field: "current_sem1" | "proposed", value: number
       if (savingRows.has(rowId)) return;
       const row = rows.find((r) => r.id === rowId);
       if (!row) return;
-    //   const last = savedValues.current.get(rowId);
-    //   if (
-    //     last &&
-    //     last.sem1 === row.sem1 &&
-    //     last.sem2 === row.sem2 &&
-    //     last.proposed === row.proposed &&
-    //     last.past_obligation === row.past_obligation   // ← add this
-    //     ) return;
-    const last = savedValues.current.get(rowId);
+
+      const last = savedValues.current.get(rowId);
       if (
         last &&
         last.current_sem1 === row.current_sem1 &&
         last.proposed === row.proposed &&
         last.past_obligation === row.past_obligation
       ) return;
-    //   setSavingRows((prev) => new Set(prev).add(rowId));
-    //   const promise = API.post("/income-fund/save", { rows, source: currentSource }).then(() =>
-    //     savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
-    //   );
-    //   toast.promise(promise, {
-    //     loading: "Saving…",
-    //     success: "Saved successfully",
-    //     error: (err: any) => `Save failed: ${err?.response?.data?.message ?? err?.message}`,
-    //   });
-    //   try { await promise; } finally {
-    //     setSavingRows((prev) => { const n = new Set(prev); n.delete(rowId); return n; });
-    //   }
 
-    setSavingRows((prev) => new Set(prev).add(rowId));
-    //   const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
-    //     savedValues.current.set(rowId, { sem1: row.sem1, sem2: row.sem2, proposed: row.proposed, past_obligation: row.past_obligation })
-    //   );
-    const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
+      setSavingRows((prev) => new Set(prev).add(rowId));
+      const promise = saveMutation.mutateAsync({ rows, source: currentSource }).then(() =>
         savedValues.current.set(rowId, { current_sem1: row.current_sem1, proposed: row.proposed, past_obligation: row.past_obligation })
       );
       toast.promise(promise, {
@@ -605,10 +434,6 @@ const update = (rowId: number, field: "current_sem1" | "proposed", value: number
     [rows, savingRows, currentSource]
   );
 
-//   const handleSem1Change = (rowId: number, raw: string) => {
-//     const n = raw.replace(/,/g, "");
-//     update(rowId, "sem1", n === "" ? null : Number(n));
-//   };
 const handleSem1Change = (rowId: number, raw: string, el?: HTMLInputElement, cursorPos?: number) => {
     const n = sanitizeNumericInput(raw);
     const cappedPos = cursorPos !== undefined ? Math.min(cursorPos, n.length) : cursorPos;
@@ -623,8 +448,7 @@ const handleSem1Change = (rowId: number, raw: string, el?: HTMLInputElement, cur
     update(rowId, "proposed", n === "" ? null : Number(n));
   };
 
-  // WITH THIS:
-const handlePastObligationChange = (
+  const handlePastObligationChange = (
   rowId: number,
   raw: string,
   el?: HTMLInputElement,
@@ -656,16 +480,11 @@ const savePastObligation = useCallback(
       r.id === rowId ? { ...r, past_obligation: value } : r
     );
 
-    // const promise = API.post("/income-fund/save", {
-    //   rows: updatedRows,
-    //   source: currentSource,
-    // }).then(() => {
     const promise = saveMutation.mutateAsync({
       rows: updatedRows,
       source: currentSource,
     }).then(() => {
       savedValues.current.set(rowId, {
-        // ...(savedValues.current.get(rowId) ?? { sem1: null, sem2: null, proposed: null, past_obligation: null }),
         ...(savedValues.current.get(rowId) ?? { current_sem1: null, proposed: null, past_obligation: null }),
         past_obligation: value,
       });
@@ -694,10 +513,6 @@ const savePastObligation = useCallback(
       }
     });
     const nameToId = new Map(rows.map((r) => [r.name, r.id]));
-    // const sumDesc = (
-    //   pid: number,
-    //   field: keyof Pick<IncomeFundRow, "past" | "current_total" | "sem1" | "sem2" | "proposed" | "past_obligation" | "current_sem1" | "current_sem2">
-    // ) => {
     const sumDesc = (
       pid: number,
       field: keyof Pick<IncomeFundRow, "past" | "current_total" | "proposed" | "past_obligation" | "current_sem1" | "current_sem2">
@@ -721,23 +536,6 @@ const savePastObligation = useCallback(
       if (cfg) {
         const pid = cfg.parentId ?? (cfg.parentName ? nameToId.get(cfg.parentName) : undefined);
         if (pid) {
-        //   const sub: DisplayRow = {
-        //     id: -Date.now() - Math.random(),
-        //     parent_id: null,
-        //     code: "",
-        //     name: cfg.name,
-        //     level: cfg.level,
-        //     past: sumDesc(pid, "past"),
-        //     past_obligation: sumDesc(pid, "past_obligation"),
-        //     current_total: sumDesc(pid, "current_total"),
-        //     current_sem1: sumDesc(pid, "current_sem1"),
-        //     current_sem2: sumDesc(pid, "current_sem2"),
-        //     sem1: sumDesc(pid, "sem1"),
-        //     sem2: sumDesc(pid, "sem2"),
-        //     proposed: sumDesc(pid, "proposed"),
-        //     isSubtotal: true,
-        //     isGrandTotal: false,
-        //   };
         const sub: DisplayRow = {
             id: -Date.now() - Math.random(),
             parent_id: null,
@@ -760,27 +558,9 @@ const savePastObligation = useCallback(
     }
     const beginningCash = rows.find((r) => r.name === "Beginning Cash Balance");
     const filteredSubs  = subtotals.filter((r) => r.name !== "Total Non-Income Receipts");
-    // const grand = (f: keyof Pick<IncomeFundRow, "past" | "past_obligation" | "current_total" | "sem1" | "sem2" | "proposed" | "current_sem1" | "current_sem2">) =>
     const grand = (f: keyof Pick<IncomeFundRow, "past" | "past_obligation" | "current_total" | "proposed" | "current_sem1" | "current_sem2">) =>
       (beginningCash?.[f] ?? 0) + filteredSubs.reduce((a, r) => a + (r[f] ?? 0), 0);
 
-    // result.push({
-    //   id: -999,
-    //   parent_id: null,
-    //   code: "",
-    //   name: "Total Available Resources for Appropriations",
-    //   level: 0,
-    //   past: grand("past"),
-    //   past_obligation: grand("past_obligation"),
-    //   current_total: grand("current_total"),
-    //   current_sem1: grand("current_sem1"),
-    //   current_sem2: grand("current_sem2"),
-    //   sem1: grand("sem1"),
-    //   sem2: grand("sem2"),
-    //   proposed: grand("proposed"),
-    //   isSubtotal: false,
-    //   isGrandTotal: true,
-    // });
     result.push({
       id: -999,
       parent_id: null,
@@ -805,10 +585,6 @@ const savePastObligation = useCallback(
   const isPastEditable = (row: DisplayRow) =>
     !row.isSubtotal && !row.isGrandTotal;
 
-//   const isViewer   = user?.role === "viewer";
-//   const isAdmin    = user?.role === "admin" || user?.role === "super-admin";
-//   const canEditPastAndSem1   = isAdmin;
-//   const canEditBudgetYear    = isAdmin || user?.role === "department-head";
 const isViewer   = user?.role === "viewer";
   const isAdmin    = user?.role === "admin" || user?.role === "super-admin";
   const canEditPastAndSem1   = isAdmin;
@@ -818,46 +594,56 @@ const isViewer   = user?.role === "viewer";
 
   const renderTable = () => (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1200px] text-[12px] border-collapse">
+      <table className="w-full table-fixed text-[12px] border-collapse" style={{ minWidth: 1400 }}>
+        <colgroup>
+          <col style={{ minWidth: 250 }} /> {/* Object of Expenditure — floor width, grows with remaining space */}
+          <col style={{ width: 190 }} /> {/* Past Year (Actual) */}
+          <col style={{ width: 190 }} /> {/* 1st Semester */}
+          <col style={{ width: 190 }} /> {/* 2nd Semester */}
+          <col style={{ width: 190 }} /> {/* Total */}
+          <col style={{ width: 190 }} /> {/* Budget Year */}
+          <col style={{ width: 140 }} />  {/* Increase / Decrease */}
+          <col style={{ width: 140 }} />  {/* % Change */}
+        </colgroup>
         <thead>
           <tr>
-            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-border bg-card px-4 py-2.5 text-left align-bottom text-table-header min-w-[260px]">
+            <th rowSpan={3} className="sticky left-0 z-30 border-b border-r border-border bg-card px-4 py-2.5 text-left align-bottom text-table-header shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]">
               Object of Expenditure
             </th>
-            <th rowSpan={2} className="border-b border-r border-green-200 bg-green-50 px-3 py-2.5 text-center align-bottom text-table-header text-green-700 w-40">
+            <th rowSpan={2} className="border-b border-r border-green-300 bg-green-100 px-3 py-2.5 text-center align-bottom text-table-header text-green-800 w-40">
               Past Year (Actual)<br />
-              <span className="text-meta font-normal normal-case text-green-500">{meta?.past_year}</span>
+              <span className="text-meta font-normal normal-case text-green-600">{meta?.past_year}</span>
             </th>
-            <th colSpan={3} className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-2 text-center text-eyebrow text-blue-700">
+            <th colSpan={3} className="border-b border-r border-l border-blue-300 bg-blue-100 px-3 py-2 text-center text-eyebrow text-blue-800">
               Current Year {meta?.current_year} (Estimate)
             </th>
-            <th rowSpan={2} className="border-b border-r border-orange-200 bg-orange-50 px-3 py-2.5 text-center align-bottom text-table-header text-orange-700 w-52">
+            <th rowSpan={2} className="border-b border-r border-orange-300 bg-orange-100 px-3 py-2.5 text-center align-bottom text-table-header text-orange-800 w-40">
               {meta?.year} Budget Year
             </th>
-             <th rowSpan={2} className="border-b border-r border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-28">
+             <th rowSpan={2} className="border-b border-r border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-20">
               Increase /<br />Decrease
             </th>
-            <th rowSpan={2} className="border-b border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-24">
+            <th rowSpan={2} className="border-b border-border bg-card px-3 py-2.5 text-right align-bottom text-table-header w-16">
               % Change
             </th>
           </tr>
           <tr>
-            <th className="border-b border-r border-l border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
+            <th className="border-b border-r border-l border-blue-300 bg-blue-100 px-3 py-1.5 text-right text-eyebrow text-blue-700 w-40">
               1st Semester<br />(Actual)
             </th>
-            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
+            <th className="border-b border-r border-blue-300 bg-blue-100 px-3 py-1.5 text-right text-eyebrow text-blue-700 w-40">
               2nd Semester<br />(Estimate)
             </th>
-            <th className="border-b border-r border-blue-200 bg-blue-50 px-3 py-1.5 text-right text-eyebrow text-blue-600 w-32">
+            <th className="border-b border-r border-blue-300 bg-blue-100 px-3 py-1.5 text-right text-eyebrow text-blue-700 w-40">
               Total
             </th>
           </tr>
           <tr className="border-b-2 border-border">
-            <td className="border-r border-l border-green-200 bg-green-50 px-3 py-1 text-center text-eyebrow text-green-400">(1)</td>
-            <td className="border-r border-l border-blue-200  bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(2)</td>
-            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(3)</td>
-            <td className="border-r         border-blue-200    bg-blue-50   px-3 py-1 text-center text-eyebrow text-blue-400">(4)</td>
-            <td className="border-r border-l border-orange-200 bg-orange-50 px-3 py-1 text-center text-eyebrow text-orange-400">(5)</td>
+            <td className="border-r border-l border-green-300 bg-green-100 px-3 py-1 text-center text-eyebrow text-green-500">(1)</td>
+            <td className="border-r border-l border-blue-300  bg-blue-100   px-3 py-1 text-center text-eyebrow text-blue-500">(2)</td>
+            <td className="border-r         border-blue-300    bg-blue-100   px-3 py-1 text-center text-eyebrow text-blue-500">(3)</td>
+            <td className="border-r         border-blue-300    bg-blue-100   px-3 py-1 text-center text-eyebrow text-blue-500">(4)</td>
+            <td className="border-r border-l border-orange-300 bg-orange-100 px-3 py-1 text-center text-eyebrow text-orange-500">(5)</td>
             <td className="border-r         border-border    bg-card     px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(6)</td>
             <td className="border-r         border-border    bg-card     px-3 py-1 text-center text-eyebrow text-muted-foreground/50">(7)</td>
           </tr>
@@ -884,12 +670,10 @@ const isViewer   = user?.role === "viewer";
             if (row.isGrandTotal) {
               return (
                 <tr key={row.id} className="bg-foreground text-background">
-                  <td className="sticky left-0 z-10 bg-foreground px-4 py-3 text-table-header text-background/70">
+                  <td className="sticky left-0 z-10 bg-foreground px-4 py-3 text-table-header text-background/70 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">
                     {row.name}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_PAST_GRAND)}>{fmtNum(row.past_obligation)}</td>
-                  {/* <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem1)}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.sem2)}</td> */}
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_sem1)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_sem2)}</td>
                   <td className={cn("px-3 py-3 text-right font-mono tabular-nums border-l", COL_CURR_GRAND)}>{fmtNum(row.current_total)}</td>
@@ -903,12 +687,10 @@ const isViewer   = user?.role === "viewer";
             if (row.isSubtotal) {
   return (
     <tr key={row.id} className="bg-muted/50">
-      <td className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-table-grand-total text-foreground border-r border-border" style={{ paddingLeft: indent + 16 }}>
+      <td className="sticky left-0 z-10 bg-muted px-4 py-2.5 text-table-grand-total text-foreground border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]" style={{ paddingLeft: indent + 16 }}>
         {row.name}
       </td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", "bg-green-50 border-green-200")}>{fmtNum(row.past_obligation)}</td>
-                  {/* <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem1)}</td>
-                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-gray-700 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.sem2)}</td> */}
+                  <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", "bg-green-100 border-green-300")}>{fmtNum(row.past_obligation)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem1)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_sem2)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-mono font-semibold text-foreground/80 tabular-nums border-l", COL_CURR_SUB)}>{fmtNum(row.current_total)}</td>
@@ -921,26 +703,10 @@ const isViewer   = user?.role === "viewer";
 
             return (
               <tr key={row.id} className="bg-card hover:bg-muted/40 transition-colors">
-                <td className="sticky left-0 z-10 bg-card border-r border-border px-4 py-2.5 text-foreground/90 max-w-[260px]" style={{ paddingLeft: indent + 16 }}>
+                <td className="sticky left-0 z-10 bg-card border-r border-border px-4 py-2.5 text-foreground/90 max-w-[260px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]" style={{ paddingLeft: indent + 16 }}>
                   <span className="line-clamp-2">{row.name}</span>
                 </td>
-                <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-r border-green-200", "bg-green-50")}>
-                  {/* {isPastEditable(row) ? (
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="w-full text-right text-[12px] font-mono h-7 px-2 rounded border bg-white border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300 tabular-nums placeholder:text-gray-300"
-                      value={fmtInput(row.past_obligation)}
-                      onChange={(e) => handlePastObligationChange(row.id, e.target.value)}
-                        onBlur={(e) => {
-                        const n = e.target.value.replace(/,/g, "");
-                        savePastObligation(row.id, n === "" ? null : Number(n));
-                        }}
-                      placeholder="0"
-                    />
-                  ) : (
-                    <div className="text-right font-mono text-gray-700 tabular-nums px-2">{fmtNum(row.past_obligation)}</div>
-                  )} */}
+                <td className={cn("px-3 py-2.5 text-right font-mono font-semibold tabular-nums border-l border-r border-green-300", "bg-green-100/50")}>
                   {isPastEditable(row) && canEditPastAndSem1 ? (
   <input
     type="text"
@@ -980,11 +746,6 @@ const isViewer   = user?.role === "viewer";
     disabled={isSaving}
     placeholder="0"
   />
-// ) : (
-//   <div className="text-right font-mono text-gray-500 tabular-nums px-2">{fmtNum(row.sem1)}</div>
-// )}
-//                 </td>
-//                 <td className={cn("border-r px-3 py-2.5 text-right font-mono text-gray-500 tabular-nums", COL_CURR)}>{fmtNum(row.sem2)}</td>
 ) : (
   <div className="text-right font-mono text-muted-foreground tabular-nums px-2">{fmtNum(row.current_sem1)}</div>
 )}
@@ -1204,7 +965,7 @@ const isViewer   = user?.role === "viewer";
           <h1 className="text-page-title">Income Fund</h1>
         </div>
         <Tabs value={currentSource} onValueChange={handleSourceChange} className="w-full">
-           <TabsList className="h-9 bg-muted border border-border rounded-lg p-1 mb-5 w-full overflow-x-auto flex-nowrap justify-start">
+           <TabsList className="h-9 bg-muted border border-border rounded-lg p-1 mb-5 w-fit max-w-full flex-wrap justify-start">
             {availableSources.map((s) => (
               <TabsTrigger key={s.id} value={s.id}
                 className="text-subtitle px-4 rounded-md data-[state=active]:bg-primary data-[state=active]:shadow-sm data-[state=active]:text-primary-foreground text-muted-foreground hover:text-foreground">

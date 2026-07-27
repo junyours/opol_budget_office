@@ -7,7 +7,10 @@ use Illuminate\Notifications\Notification;
 
 class BudgetProposalReturned extends Notification
 {
-    public function __construct(public DepartmentBudgetPlan $plan) {}
+    public function __construct(
+        public DepartmentBudgetPlan $plan,
+        public ?string $reason = null,
+    ) {}
 
     public function via(): array { return ['database']; }
 
@@ -18,6 +21,7 @@ class BudgetProposalReturned extends Notification
             'dept_budget_plan_id' => $this->plan->dept_budget_plan_id,
             'budget_year'         => $this->plan->budgetPlan?->year,
             'message'             => "Your budget proposal for FY {$this->plan->budgetPlan?->year} was returned for revision.",
+            'reason'              => $this->reason,
         ];
     }
 }

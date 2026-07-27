@@ -695,11 +695,17 @@ const { user } = useAuth();
         //     )}
 
         const calamityFund  = summary.calamity_fund;
-        const qrf30         = calamityFund * 0.30;
-        const predis70limit = calamityFund * 0.70;
+        // Compute 30% via integer cents to avoid float drift
+        // (calamityFund * 0.30 can land on x.034999999 instead of x.035,
+        // which toLocaleString then truncates down instead of rounding up —
+        // this is why it showed .03 instead of .04, matching the PHP report).
+        const calamityFundCents = Math.round(calamityFund * 100);
+const qrf30Cents    = Math.round(calamityFundCents * 0.30);
+const qrf30         = qrf30Cents / 100;
+const predis70limit = (calamityFundCents - qrf30Cents) / 100;
         const allocated     = summary.total_70pct;
         const overBudgetAmt = allocated - predis70limit;
-        const isOverBudget  = overBudgetAmt > 0.01; // tolerance for floating-point rounding
+const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rounding (half a centavo)
 
         return (
           <>

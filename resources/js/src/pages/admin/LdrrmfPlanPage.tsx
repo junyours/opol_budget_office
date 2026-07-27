@@ -326,6 +326,9 @@ try {
           {special_accounts.map((sa, saIdx) => {
             const itemsTotal    = sa.items.reduce((sum, i) => sum + i.total, 0);
             const total5pctCalc = sa.budget_year.qrf_30 + itemsTotal;
+            const pastItemsTotal    = sa.items.reduce((sum, i) => sum + i.obligation_amount, 0);
+            const pastTotal5pctCalc = sa.qrf_past_obligation + pastItemsTotal;
+            const pastTotal5pct     = sa.past.total_5pct > 0 ? sa.past.total_5pct : pastTotal5pctCalc;
 
             const qrfObligKey      = `qrf-oblig-${sa.source}`;
             const qrfSem1Key       = `qrf-sem1-${sa.source}`;
@@ -572,6 +575,10 @@ try {
                     <span className="text-[12px] font-bold text-gray-900">Total 5% Calamity Fund</span>
                     <MatchBadge derived={sa.budget_year.total_5pct} calculated={total5pctCalc} label="5% of Total Available Resources" />
                   </div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-gray-500">Past Year {past_year}</span>
+                    <span className="text-[13px] font-mono font-bold text-green-700">{fmtPeso(pastTotal5pct)}</span>
+                  </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-gray-500">Budget Year {year}</span>
                     <span className="text-[13px] font-mono font-bold text-blue-700">{fmtPeso(sa.budget_year.total_5pct)}</span>
@@ -671,6 +678,12 @@ try {
                 const prep70Matched   = isMatch(sa.budget_year.preparedness_70, itemsTotal);
                 const total5pctCalc   = sa.budget_year.qrf_30 + itemsTotal;
                 const total5pctMatched = isMatch(sa.budget_year.total_5pct, total5pctCalc);
+
+                // Past-year subtotal — falls back to items sum when the derived
+                // 5% calamity fund (from Income Fund) is 0 for that past plan.
+                const pastItemsTotal    = sa.items.reduce((sum, i) => sum + i.obligation_amount, 0);
+                const pastTotal5pctCalc = sa.qrf_past_obligation + pastItemsTotal;
+                const pastTotal5pct     = sa.past.total_5pct > 0 ? sa.past.total_5pct : pastTotal5pctCalc;
 
                 return (
                   <React.Fragment key={sa.source}>
@@ -1036,7 +1049,7 @@ onBlur={() => handleSem1Blur(sem1Key, item, sa.source, current_plan_id)}
                       <td className="px-3 py-3 border-r border-gray-200 text-center text-gray-300">—</td>
                       {/* Past */}
                       <td className="px-3 py-3 border-r border-l border-green-200 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-green-100/50">
-                        {fmtPeso(sa.past.total_5pct)}
+                        {fmtPeso(pastTotal5pct)}
                       </td>
                       {/* Current sem1 */}
                       <td className="px-3 py-3 border-r border-l border-blue-200 text-right font-mono tabular-nums text-[12px] font-bold text-blue-700 bg-blue-100/50">

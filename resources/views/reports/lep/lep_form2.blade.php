@@ -432,7 +432,7 @@ $lastIdx = count($flat) - 1;
     </table>
 
     {{-- ── SPECIAL PROVISION (flush, no top border) ── --}}
-    <div style="font-size:6pt; border-top:none; padding:4px 6px;">
+    <div style="font-size:6pt; border-top:none; padding:4px 6px; page-break-inside: avoid;">
         <div style="font-weight:bold; font-size:6.5pt; margin-bottom:2px;">Special Provision:</div>
         <div style="margin-bottom:1px; line-height:1.4;">Use and release of Municipal Government Funds:</div>
         <div style="margin-bottom:1px; line-height:1.4; text-align:justify;">1. To procure materials for infrastructure projects, goods and consulting services as well as commonly used items, not in conformity w/ the provision of RA 9184 &amp; its implementing rules &amp; regulations, as defined by the Government Procurement Policy Board (GPPB);</div>

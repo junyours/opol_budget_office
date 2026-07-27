@@ -1766,7 +1766,13 @@ const ApprovalProgressCard: React.FC<{
   draftDepts: Department[];
 }> = ({ style, completion, totalWithPlan, approvedDepts, submittedDepts, underReviewDepts, draftDepts }) => {
 
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(() => {
+    if (approvedDepts.length > 0) return 0;
+    if (underReviewDepts.length > 0) return 1;
+    if (submittedDepts.length > 0) return 2;
+    if (draftDepts.length > 0) return 3;
+    return 0;
+  });
   const [visible, setVisible] = useState(true);
 
   const statuses = [
@@ -1776,16 +1782,30 @@ const ApprovalProgressCard: React.FC<{
     { label: "Draft",        depts: draftDepts,        color: "hsl(var(--fin-mdf))", icon: <ClockIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(var(--fin-mdf))" }} /> },
   ];
 
+  // Only rotate through statuses that actually have departments in them.
+  // If everything is Approved (100%), there's nothing else to show, so stay put.
+  const nonEmptyCount = statuses.filter(s => s.depts.length > 0).length;
+
   useEffect(() => {
+    if (nonEmptyCount <= 1) return; // nothing to rotate to — stay on the one that has data
+
     const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => {
-        setActiveIdx(prev => (prev + 1) % statuses.length);
+        setActiveIdx(prev => {
+          // skip empty statuses when advancing
+          let next = prev;
+          for (let i = 0; i < statuses.length; i++) {
+            next = (next + 1) % statuses.length;
+            if (statuses[next].depts.length > 0) break;
+          }
+          return next;
+        });
         setVisible(true);
       }, 400);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [nonEmptyCount]);
 
   const s = statuses[activeIdx];
 
@@ -2032,9 +2052,30 @@ const gfLocalSource = gf?.localSource ?? 0;
   // const mdfRemaining      = Math.max(0, mdf - mdfActual);
   // const ldrrmf30Remaining = Math.max(0, qrf - ldrrmf30Actual);
   // const ldrrmf70Remaining = Math.max(0, predis - ldrrmf70Actual);
-  const ldrrmf = (gf?.total ?? 0) * 0.05;
-  const qrf    = ldrrmf * 0.30;
-  const predis = ldrrmf * 0.70;
+//   const ldrrmf = (gf?.total ?? 0) * 0.05;
+//   const qrf    = ldrrmf * 0.30;
+//   const predis = ldrrmf * 0.70;
+
+// const roundMoney = (value: number) =>
+//   Math.round((value + Number.EPSILON) * 100) / 100;
+
+// const ldrrmf = roundMoney((gf?.total ?? 0) * 0.05);
+// const qrf = roundMoney(ldrrmf * 0.30);
+// const predis = roundMoney(ldrrmf - qrf);
+const roundMoney = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
+const ldrrmf = roundMoney((gf?.total ?? 0) * 0.05);
+
+// Round 30% first (in integer cents to dodge float drift), then 70% is
+// whatever's left over — this is what financial systems do, and it's the
+// only way the two halves are guaranteed to sum back to the total.
+const ldrrmfCents = Math.round(ldrrmf * 100);
+const qrfCents = Math.round(ldrrmfCents * 0.30);
+const qrf = qrfCents / 100;
+const predis = (ldrrmfCents - qrfCents) / 100;
+
+
   const mdf    = (gf?.nta ?? 0) * 0.20;
 
   // QRF is reserved (not yet disbursed) — actual used = 0 until spending is recorded.
@@ -2042,10 +2083,11 @@ const gfLocalSource = gf?.localSource ?? 0;
   const ldrrmf30Actual    = 0;
   const ldrrmf30Remaining = qrf;  // entire QRF is still available
   const mdfRemaining      = Math.max(0, mdf - mdfActual);
-  const ldrrmf70Remaining = Math.max(0, predis - ldrrmf70Actual);
-
+//   const ldrrmf70Remaining = Math.max(0, predis - ldrrmf70Actual);
+const ldrrmf70Remaining = predis - ldrrmf70Actual;
   // const ldrrmfPieTotal = qrf + ldrrmf70Actual;
-  const ldrrmfPieTotal = qrf + ldrrmf70Actual; // qrf is always fully reserved
+//   const ldrrmfPieTotal = qrf + ldrrmf70Actual; // qrf is always fully reserved
+const ldrrmfPieTotal = roundMoney(qrf + ldrrmf70Actual);
   const mdfPieValue    = mdfActual;
   //const gfUnap         = Math.max(0, (gf?.total ?? 0) - exp.gfExpenditure - mdfPieValue - ldrrmfPieTotal);
 
@@ -2986,8 +3028,10 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                     //   ].map(({ label, abbr, data, expV, cal, accentColor }) => {
                     ].map(({ label, abbr, data, expV, cal, accentColor, allocated70 }) => {
                         const rev  = data?.total ?? 0;
-                        const qrfV = cal * 0.30;
-                        const preV = cal * 0.70;
+                        const calCents = Math.round(cal * 100);
+                        const qrfCentsV = Math.round(calCents * 0.30);
+                        const qrfV = qrfCentsV / 100;
+                        const preV = (calCents - qrfCentsV) / 100;
                         const calActual = qrfV + allocated70;
                         const unap = rev - expV - calActual;
                         const uPos = unap >= 0;
@@ -3080,8 +3124,10 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                                         <div className="h-full bg-fin-predisaster rounded-full transition-all duration-700" style={{ width: preV > 0 ? `${Math.min(100, (allocated70 / preV) * 100)}%` : "0%" }} />
                                       </div>
                                       <div className="flex items-center justify-between">
-                                        <span className="text-[10px] text-muted-foreground">Remaining</span>
-                                        <span className="text-[10px] font-medium">{peso(Math.max(0, preV - allocated70))}</span>
+                                        <span className="text-[10px] text-muted-foreground">{preV - allocated70 < 0 ? "Over" : "Remaining"}</span>
+<span className={cn("text-[10px] font-medium", preV - allocated70 < 0 && "text-red-600")}>
+  {peso(Math.abs(preV - allocated70))}
+</span>
                                       </div>
                                     </div>
                                   </div>

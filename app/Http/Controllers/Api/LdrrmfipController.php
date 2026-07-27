@@ -324,7 +324,9 @@ $ldrrmfip->update([
         // ── C. 5% of Total Available Resources ───────────────────────────
         $calamityFund = $this->computeCalamityFund($planId, $source);
 
-        $reserved30 = round($calamityFund - $total70, 2);
+        // $reserved30 = round($calamityFund - $total70, 2);
+        $calamityFundCents = (int) round($calamityFund * 100);
+        $reserved30 = round(($calamityFundCents * 3) / 10) / 100;
 
         return $this->success([
             'budget_plan_id' => $planId,

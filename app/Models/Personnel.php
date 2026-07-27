@@ -15,8 +15,7 @@ class Personnel extends Model
         'first_name',
         'middle_name',
         'last_name',
-        // 'step',
-        // 'employment_status' – add if column exists
+        'status',
     ];
 
     // protected $casts = ['step' => 'integer'];

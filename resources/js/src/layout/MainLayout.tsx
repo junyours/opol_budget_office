@@ -10,6 +10,14 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/src/components/ui/dialog";
+import { Button } from "@/src/components/ui/button";
 import { AppSidebar } from "./AppSidebar";
 import { BreadcrumbNav } from "./BreadcrumbNav";
 import { GlobalSearch } from "./GlobalSearch";
@@ -70,8 +78,11 @@ const HeaderNotifications: React.FC<{ role: string }> = ({ role }) => {
   const markAllRead    = useNotificationStore(s => s.markAllRead);
   const isAdmin        = role === "admin" || role === "super-admin";
 
-  const handleClick = (n: typeof notifications[number]) => {
-    if (!n.read_at) markRead(n.id);   // marks read, does NOT remove from the list
+  // Shown for department heads when a "returned" notification includes an
+  // optional reason from the admin — lets them read it before jumping to the plan.
+  const [reasonModalNotif, setReasonModalNotif] = useState<typeof notifications[number] | null>(null);
+
+  const goToPlan = (n: typeof notifications[number]) => {
     if (isAdmin) {
       navigate("/admin/lbp-forms", { state: { deptId: n.dept_id } });
     } else {
@@ -79,7 +90,17 @@ const HeaderNotifications: React.FC<{ role: string }> = ({ role }) => {
     }
   };
 
+  const handleClick = (n: typeof notifications[number]) => {
+    if (!n.read_at) markRead(n.id);   // marks read, does NOT remove from the list
+    if (!isAdmin && n.type === "budget_returned" && n.reason) {
+      setReasonModalNotif(n);
+      return;
+    }
+    goToPlan(n);
+  };
+
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors flex-shrink-0">
@@ -164,6 +185,49 @@ const HeaderNotifications: React.FC<{ role: string }> = ({ role }) => {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <Dialog open={!!reasonModalNotif} onOpenChange={o => { if (!o) setReasonModalNotif(null); }}>
+      <DialogContent className="max-w-md rounded-2xl border-amber-100 gap-0 p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-5 pb-4 border-b border-amber-100 bg-amber-50/50">
+          <DialogTitle className="text-[15px] font-semibold text-amber-700 flex items-center gap-2">
+            <ArrowUturnLeftIcon className="w-4 h-4" />
+            Proposal Returned
+          </DialogTitle>
+          <DialogDescription className="text-xs text-gray-500 mt-0.5">
+            {reasonModalNotif?.message}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="px-6 py-5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
+            Reason from Budget Office
+          </p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+            {reasonModalNotif?.reason}
+          </p>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs border-gray-200"
+            onClick={() => setReasonModalNotif(null)}
+          >
+            Close
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
+            onClick={() => {
+              if (reasonModalNotif) goToPlan(reasonModalNotif);
+              setReasonModalNotif(null);
+            }}
+          >
+            Go to Proposal
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
@@ -215,10 +279,10 @@ const MainLayout: React.FC = () => {
     <SidebarProvider>
       <AppSidebar />
 
-      <SidebarInset className="min-w-0 h-[100dvh] max-h-[100dvh] overflow-x-hidden overflow-y-hidden flex flex-col">
+      <SidebarInset className="min-w-0 overflow-x-hidden h-screen flex flex-col">
 
         {/* ── Top Header Bar ──────────────────────────────────────────── */}
-        <header className="sticky top-0 z-20 shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-3 h-12 border-b border-zinc-200 bg-white px-4">
+        <header className="sticky top-0 z-20 grid grid-cols-[1fr_auto_1fr] items-center gap-3 h-12 border-b border-zinc-200 bg-white px-4">
 
           {/* LEFT: sidebar toggle + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
@@ -270,7 +334,7 @@ const MainLayout: React.FC = () => {
         </header>
 
         {/* ── Page Content ────────────────────────────────────────────── */}
-        <main className="relative flex-1 min-w-0 min-h-0 overflow-hidden bg-gray-50 flex flex-col" style={{ overscrollBehavior: "contain" }}>
+        <main className="relative flex-1 min-w-0 overflow-x-auto overflow-y-auto bg-gray-50">
 
           {/* Watermark logo — behind content */}
           {/* <div
@@ -285,7 +349,7 @@ const MainLayout: React.FC = () => {
           </div> */}
 
           {/* Routed page */}
-          <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+          <div className="relative z-10">
             <Outlet />
           </div>
 

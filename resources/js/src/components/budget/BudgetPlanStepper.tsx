@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { cn } from '@/src/lib/utils';
-import { Pencil, Send, Inbox, Eye, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pencil, Send, Inbox, Eye, Check, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
 import { useIsMobile } from '../../hooks/use-mobile';
 
 interface StepperProps {
@@ -10,6 +10,8 @@ interface StepperProps {
   approvedAt?: string | null;
   createdAt?: string | null;   // used for the Preparation step (admin only)
   isAdmin?: boolean;
+  compact?: boolean;
+  onClick?: () => void;
   className?: string;
 }
 
@@ -101,12 +103,56 @@ const formatDateTime = (value?: string | null) => {
 };
 
 export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
-  const { status, isAdmin = false, className } = props;
+  const { status, isAdmin = false, className, compact = false, onClick } = props;
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
 
   const STEPS = isAdmin ? [PREP_STEP, ...BASE_STEPS] : BASE_STEPS;
   const DONE_INDEX_MAP = isAdmin ? ADMIN_DONE_INDEX : NON_ADMIN_DONE_INDEX;
+  const doneIndex = DONE_INDEX_MAP[status] ?? -1;
+  const activeIndex = status === 'approved' ? -1 : doneIndex + 1;
+
+  // ── Compact clickable pill (used e.g. in page headers) ───────────────────
+  if (compact) {
+    const currentLabel = status === 'approved' ? 'Approved' : (STEPS[activeIndex]?.label ?? STEPS[STEPS.length - 1].label);
+    return (
+     <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'flex items-center gap-2 group rounded-full px-2.5 py-1 -mx-2.5 -my-1 transition-colors',
+          onClick && 'cursor-pointer hover:bg-gray-100',
+          className,
+        )}
+      >
+        <div className="flex items-center">
+          {STEPS.map((step, i) => (
+            <React.Fragment key={step.key}>
+              {i > 0 && (
+                <div className={cn('h-0.5 w-3 sm:w-4', i <= doneIndex ? 'bg-emerald-500' : 'bg-gray-200')} />
+              )}
+              <div
+                className={cn(
+                  'w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors',
+                  i <= doneIndex
+                    ? 'bg-emerald-500'
+                    : i === activeIndex
+                    ? step.border.replace('border-', 'bg-')
+                    : 'bg-gray-200',
+                )}
+              />
+            </React.Fragment>
+          ))}
+        </div>
+        <span className="text-[11px] font-semibold text-gray-600 group-hover:text-gray-900 transition-colors whitespace-nowrap">
+          {currentLabel}
+        </span>
+        {onClick && (
+          <Maximize2 className="w-3 h-3 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+        )}
+      </button>
+    );
+  }
 
   // ── Collapsed "Approved" badge ──────────────────────────────────────────
   if (status === 'approved' && !expanded) {
@@ -137,9 +183,7 @@ export const BudgetPlanStepper: React.FC<StepperProps> = (props) => {
   }
 
   // ── Full stepper ─────────────────────────────────────────────────────────
-  const doneIndex = DONE_INDEX_MAP[status] ?? -1;
-  const activeIndex = status === 'approved' ? -1 : doneIndex + 1;
-
+  // ── Full stepper ─────────────────────────────────────────────────────────
   const n = STEPS.length;
   const insetPct = 100 / (n * 2);
   const progressPct = Math.max(doneIndex + 1, 0) / (n - 1);

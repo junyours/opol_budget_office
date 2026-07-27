@@ -260,9 +260,14 @@ public function approve(DepartmentBudgetPlan $department_budget_plan)
     return $this->success(['message' => 'Approved successfully.']);
 }
 
-public function reject(DepartmentBudgetPlan $department_budget_plan)
+public function reject(Request $request, DepartmentBudgetPlan $department_budget_plan)
 {
     $this->authorize('reject', $department_budget_plan);
+
+    $validated = $request->validate([
+        'reason' => ['nullable', 'string', 'max:1000'],
+    ]);
+    $reason = $validated['reason'] ?? null;
 
     $department_budget_plan->update([
         'status'          => 'draft',
@@ -278,7 +283,7 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
                     ->where('role', 'department-head')
                     ->first();
     if ($deptHead) {
-        $deptHead->notify(new BudgetProposalReturned($department_budget_plan));
+        $deptHead->notify(new BudgetProposalReturned($department_budget_plan, $reason));
     }
     // ─────────────────────────────────────────────────────────────────────
 
@@ -309,6 +314,81 @@ public function reject(DepartmentBudgetPlan $department_budget_plan)
     {
         $this->authorize('viewAny', DepartmentBudgetPlan::class);
         return $this->success(BudgetPlan::orderBy('year', 'desc')->pluck('year'));
+    }
+
+    /**
+     * GET /api/department-budget-plans/totals?budget_plan_id=X
+     *
+     * Returns, per department, the combined Form2 + Form4 total for the given
+     * budget plan year AND for the prior year — in ONE request instead of the
+     * ~4-per-department fan-out the list page used to make (past-year lookup,
+     * past AIP, current AIP, all repeated per department).
+     */
+    public function totals(Request $request)
+    {
+        $this->authorize('viewAny', DepartmentBudgetPlan::class);
+
+        $validated = $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+        ]);
+
+        $currentBp = BudgetPlan::findOrFail($validated['budget_plan_id']);
+        $pastBp    = BudgetPlan::where('year', $currentBp->year - 1)->first();
+
+        $currentDeptPlans = DepartmentBudgetPlan::where('budget_plan_id', $currentBp->budget_plan_id)
+            ->get(['dept_budget_plan_id', 'dept_id']);
+
+        $pastDeptPlans = $pastBp
+            ? DepartmentBudgetPlan::where('budget_plan_id', $pastBp->budget_plan_id)
+                ->get(['dept_budget_plan_id', 'dept_id'])
+            : collect();
+
+        $currentPlanIds = $currentDeptPlans->pluck('dept_budget_plan_id');
+        $pastPlanIds    = $pastDeptPlans->pluck('dept_budget_plan_id');
+
+        $currentForm2 = \App\Models\BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $currentPlanIds)
+            ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
+            ->groupBy('dept_budget_plan_id')
+            ->pluck('total', 'dept_budget_plan_id');
+
+        $currentForm4 = \App\Models\DeptBpForm4Item::whereIn('dept_budget_plan_id', $currentPlanIds)
+            ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
+            ->groupBy('dept_budget_plan_id')
+            ->pluck('total', 'dept_budget_plan_id');
+
+        $pastForm2 = \App\Models\BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $pastPlanIds)
+            ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
+            ->groupBy('dept_budget_plan_id')
+            ->pluck('total', 'dept_budget_plan_id');
+
+        $pastForm4 = \App\Models\DeptBpForm4Item::whereIn('dept_budget_plan_id', $pastPlanIds)
+            ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
+            ->groupBy('dept_budget_plan_id')
+            ->pluck('total', 'dept_budget_plan_id');
+
+        $pastByDeptId = $pastDeptPlans->keyBy('dept_id');
+
+        $result = $currentDeptPlans->map(function ($cp) use (
+            $currentForm2, $currentForm4, $pastByDeptId, $pastForm2, $pastForm4
+        ) {
+            $currentTotal = (float) ($currentForm2[$cp->dept_budget_plan_id] ?? 0)
+                          + (float) ($currentForm4[$cp->dept_budget_plan_id] ?? 0);
+
+            $pastPlan  = $pastByDeptId->get($cp->dept_id);
+            $pastTotal = $pastPlan
+                ? (float) ($pastForm2[$pastPlan->dept_budget_plan_id] ?? 0)
+                  + (float) ($pastForm4[$pastPlan->dept_budget_plan_id] ?? 0)
+                : 0.0;
+
+            return [
+                'dept_id'             => $cp->dept_id,
+                'dept_budget_plan_id' => $cp->dept_budget_plan_id,
+                'current_total'       => $currentTotal,
+                'past_total'          => $pastTotal,
+            ];
+        })->values();
+
+        return $this->success($result);
     }
 
     // ── plantillaAssignments ──────────────────────────────────────────────────

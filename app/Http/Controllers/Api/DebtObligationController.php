@@ -45,22 +45,20 @@ class DebtObligationController extends Controller
 
         $data = $obligations->map(function (DebtObligation $ob) use ($budgetPlanId, $currentPlan, $pastPlan) {
 
-            // ── Previous payments ─────────────────────────────────────────────────
-            $prevQuery = $ob->payments();
-            if ($budgetPlanId) {
-                $prevQuery = $prevQuery->where('budget_plan_id', '!=', $budgetPlanId);
-            }
-            $prevAgg = $prevQuery->selectRaw('SUM(principal_due) as prev_principal, SUM(interest_due) as prev_interest')
-                ->first();
-
-            $prevPrincipal = (float) ($prevAgg->prev_principal ?? 0);
-            $prevInterest  = (float) ($prevAgg->prev_interest  ?? 0);
-            $prevTotal     = $prevPrincipal + $prevInterest;
-
             // ── Current year payment ──────────────────────────────────────────────
             $currentPayment = $budgetPlanId
                 ? $ob->payments()->where('budget_plan_id', $budgetPlanId)->first()
                 : null;
+
+            // ── Previous payments ─────────────────────────────────────────────────
+            // Stored directly on THIS year's payment row (prev_payment_principal /
+            // prev_payment_interest) — typed in by the user for that specific
+            // budget year. No summing across other/prior plans, so activating a
+            // year with no earlier plan on record simply shows 0 until entered,
+            // never a stray total pulled in from an unrelated plan.
+            $prevPrincipal = (float) ($currentPayment->prev_payment_principal ?? 0);
+            $prevInterest  = (float) ($currentPayment->prev_payment_interest  ?? 0);
+            $prevTotal     = $prevPrincipal + $prevInterest;
 
             $curPrincipal     = (float) ($currentPayment->principal_due  ?? 0);
             $curInterest      = (float) ($currentPayment->interest_due   ?? 0);
@@ -228,9 +226,11 @@ class DebtObligationController extends Controller
         $ob = DebtObligation::findOrFail($id);
 
         $validated = $request->validate([
-            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
-            'principal_due'  => 'required|numeric|min:0',
-            'interest_due'   => 'required|numeric|min:0',
+            'budget_plan_id'         => 'required|integer|exists:budget_plans,budget_plan_id',
+            'principal_due'          => 'required|numeric|min:0',
+            'interest_due'           => 'required|numeric|min:0',
+            'prev_payment_principal' => 'sometimes|numeric|min:0',
+            'prev_payment_interest'  => 'sometimes|numeric|min:0',
         ]);
 
         $payment = DebtPayment::updateOrCreate(
@@ -239,8 +239,10 @@ class DebtObligationController extends Controller
                 'budget_plan_id' => $validated['budget_plan_id'],
             ],
             [
-                'principal_due' => $validated['principal_due'],
-                'interest_due'  => $validated['interest_due'],
+                'principal_due'          => $validated['principal_due'],
+                'interest_due'           => $validated['interest_due'],
+                'prev_payment_principal' => $validated['prev_payment_principal'] ?? 0,
+                'prev_payment_interest'  => $validated['prev_payment_interest']  ?? 0,
             ]
         );
 
@@ -256,11 +258,13 @@ class DebtObligationController extends Controller
     public function bulkUpsertPayments(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'budget_plan_id'              => 'required|integer|exists:budget_plans,budget_plan_id',
-            'items'                       => 'required|array|min:1',
-            'items.*.obligation_id'       => 'required|integer|exists:debt_obligations,obligation_id',
-            'items.*.principal_due'       => 'required|numeric|min:0',
-            'items.*.interest_due'        => 'required|numeric|min:0',
+            'budget_plan_id'                    => 'required|integer|exists:budget_plans,budget_plan_id',
+            'items'                              => 'required|array|min:1',
+            'items.*.obligation_id'              => 'required|integer|exists:debt_obligations,obligation_id',
+            'items.*.principal_due'              => 'required|numeric|min:0',
+            'items.*.interest_due'               => 'required|numeric|min:0',
+            'items.*.prev_payment_principal'     => 'required|numeric|min:0',
+            'items.*.prev_payment_interest'      => 'required|numeric|min:0',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -271,8 +275,10 @@ class DebtObligationController extends Controller
                         'budget_plan_id' => $validated['budget_plan_id'],
                     ],
                     [
-                        'principal_due' => $item['principal_due'],
-                        'interest_due'  => $item['interest_due'],
+                        'principal_due'          => $item['principal_due'],
+                        'interest_due'           => $item['interest_due'],
+                        'prev_payment_principal' => $item['prev_payment_principal'],
+                        'prev_payment_interest'  => $item['prev_payment_interest'],
                     ]
                 );
             }

@@ -1,18 +1,4 @@
-// import React from "react";
 
-// export const LoadingState: React.FC = () => {
-//   return (
-//     <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
-//       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-//         <img
-//           src="/images/opol.png"
-//           alt="Background Logo"
-//           className="max-w-[600px] max-h-[600px] object-contain opacity-30 animate-pulse"
-//         />
-//       </div>
-//     </div>
-//   );
-// };
 
 import React from "react";
 
@@ -31,7 +17,7 @@ export const LoadingState: React.FC = () => {
         <img
           src="/images/opol.png"
           alt="Background Logo"
-          className="max-w-[600px] max-h-[600px] object-contain"
+          className="w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] object-contain"
           style={{ animation: "breathe 3s ease-in-out infinite" }}
         />
       </div>

@@ -27,7 +27,7 @@ import { RememberedAccount } from "../../types/api";
 const MAX_LOGIN_ATTEMPTS = 50;
 const RATE_LIMIT_WINDOW  = 60000;
 const RATE_LIMIT_KEY     = "login_attempts";
-const BRAND_RED          = "#111";
+const BRAND_RED          = "#151515";
 
 interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; }
 
@@ -191,7 +191,7 @@ export default function Login() {
       .then(({ data }) => {
         if (data?.maintenance_mode) {
           setMaintenanceNotice(
-            data.maintenance_message ?? "We're currently performing scheduled maintenance. Some accounts may be temporarily unable to sign in — please check back shortly."
+            data.maintenance_message ?? "We're currently performing scheduled maintenance. Some accounts may be temporarily unable to sign in. Please check back shortly."
           );
         }
       })
@@ -398,8 +398,8 @@ export default function Login() {
 
                 {/* Logo */}
                 <div className={`flex items-center gap-3 ${sl("left","d1")}`} style={{ position:'relative', zIndex:2 }}>
-                  <div className="flex-shrink-0" style={{ background:'rgba(255,255,255,0.12)', borderRadius:8, padding:4 }}>
-                    <img src="/images/opol.png" alt="MBO" className="w-8 h-8 object-contain"
+                  <div className="flex-shrink-0" style={{ background:'rgba(255,255,255,0.12)', borderRadius:8, padding:6 }}>
+                    <img src="/images/opol.png" alt="MBO" className="w-10 h-10 object-contain"
                       onError={e => { e.currentTarget.style.display="none"; (e.currentTarget.parentElement as HTMLElement).innerHTML='<span class="login-mono" style="font-size:11px;font-weight:600;color:#fff">MBO</span>'; }} />
                   </div>
                   <div>
@@ -415,7 +415,7 @@ export default function Login() {
                     Budget Management
                   </div>
                   <div className={sl("left","d2")}>
-                    <h1 className="leading-snug tracking-tight font-bold" style={{ fontSize:26, color:'#fff' }}>Budget planning,<br />made simple.</h1>
+                    <h1 className="leading-snug tracking-tight font-bold" style={{ fontSize:26, color:'#fff' }}>Simplifying municipal<br />budget planning.</h1>
                     <p className="mt-3 text-sm leading-relaxed" style={{ color:'rgba(255,255,255,0.68)' }}>Annual Budget Plan and <br/>Local Expenditure Program Preparation</p>
                   </div>
                   <div className={sl("left","d3")} style={{ width:330, height:2, background:'rgba(255,255,255,0.3)', borderRadius:2, margin:'20px 0' }} />
@@ -436,7 +436,7 @@ export default function Login() {
                 {/* Footer */}
                 <div className={sl("left","d8")} style={{ position:'relative', zIndex:2 }}>
                   <div style={{ height:'0.5px', background:'rgba(255,255,255,0.15)', marginBottom:10 }} />
-                  <p className="login-mono text-[10px] uppercase tracking-widest" style={{ color:'rgba(255,255,255,0.35)' }}>Secure · Encrypted · Compliant</p>
+                  <p className="login-mono text-[10px] uppercase tracking-widest" style={{ color:'rgba(255,255,255,0.45)' }}>Secure · Centralized · Role-Based</p>
                 </div>
               </div>
 
@@ -887,7 +887,7 @@ export default function Login() {
           </div>
         </div>
 
-        <footer className="py-4 text-center login-mono text-[11px] text-zinc-400 tracking-wide">
+        <footer className="py-4 text-center login-mono text-[11px] text-zinc-500 tracking-wide">
           © {new Date().getFullYear()} Municipal Budget Office Management System
         </footer>
       </div>

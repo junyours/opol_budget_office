@@ -1330,6 +1330,10 @@ private function form7BuildForm2Rows(int $budgetPlanId, array $deptPlanCategoryM
 
     $result = [];
     foreach ($grouped as $abbr => $rows) {
+        // Sort by expense_class_item_id (the array key) so rows appear
+        // in expense-id order instead of arbitrary query-result order.
+        ksort($rows);
+
         $result[$abbr] = [];
         foreach ($rows as $row) {
             $row['total'] = $row['general_public_services']
@@ -1373,6 +1377,53 @@ private function form7BuildFeObligations(int $budgetPlanId): array
     return $obligations;
 }
 
+// private function form7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap): array
+// {
+//     $validIds = array_keys($deptPlanCategoryMap);
+//     if (empty($validIds)) return [];
+
+//     $items = \DB::table('dept_bp_form4_items as f4')
+//         ->join('aip_programs as ap', 'ap.aip_program_id', '=', 'f4.aip_program_id')
+//         ->whereIn('f4.dept_budget_plan_id', $validIds)
+//         ->where('f4.total_amount', '>', 0)
+//         ->select(
+//             'f4.dept_budget_plan_id',
+//             'ap.aip_program_id',
+//             'ap.aip_reference_code',
+//             'ap.program_description',
+//             'f4.total_amount'
+//         )
+//         ->get();
+
+//     $grouped = [];
+//     foreach ($items as $item) {
+//         $col    = $deptPlanCategoryMap[$item->dept_budget_plan_id] ?? null;
+//         if (!$col) continue;
+//         $progId = $item->aip_program_id;
+//         if (!isset($grouped[$progId])) {
+//             $grouped[$progId] = [
+//                 'item_name'               => $item->program_description,
+//                 'account_code'            => $item->aip_reference_code ?? '',
+//                 'general_public_services' => 0.0,
+//                 'social_services'         => 0.0,
+//                 'economic_services'       => 0.0,
+//                 'other_services'          => 0.0,
+//             ];
+//         }
+//         $grouped[$progId][$col] += (float) $item->total_amount;
+//     }
+
+//     $rows = [];
+//     foreach ($grouped as $row) {
+//         $row['total'] = $row['general_public_services']
+//                       + $row['social_services']
+//                       + $row['economic_services']
+//                       + $row['other_services'];
+//         $rows[] = $row;
+//     }
+//     return $rows;
+// }
+
 private function form7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap): array
 {
     $validIds = array_keys($deptPlanCategoryMap);
@@ -1391,6 +1442,14 @@ private function form7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap
         )
         ->get();
 
+    // Same left-to-right order as the sector columns on the printed form.
+    $categoryOrder = [
+        'general_public_services' => 0,
+        'social_services'         => 1,
+        'economic_services'       => 2,
+        'other_services'          => 3,
+    ];
+
     $grouped = [];
     foreach ($items as $item) {
         $col    = $deptPlanCategoryMap[$item->dept_budget_plan_id] ?? null;
@@ -1404,6 +1463,9 @@ private function form7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap
                 'social_services'         => 0.0,
                 'economic_services'       => 0.0,
                 'other_services'          => 0.0,
+                // Category of the program's originating department, used
+                // only for sorting — not rendered.
+                'category_rank'           => $categoryOrder[$col] ?? 99,
             ];
         }
         $grouped[$progId][$col] += (float) $item->total_amount;
@@ -1417,6 +1479,13 @@ private function form7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap
                       + $row['other_services'];
         $rows[] = $row;
     }
+
+    // Sort SPA rows by department category (same order as the sector columns).
+    usort($rows, fn ($a, $b) => ($a['category_rank'] ?? 99) <=> ($b['category_rank'] ?? 99));
+
+    foreach ($rows as &$r) unset($r['category_rank']);
+    unset($r);
+
     return $rows;
 }
 

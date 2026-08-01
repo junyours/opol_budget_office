@@ -286,10 +286,19 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
 
         Route::post('receipts-program', [LEPReportController::class, 'receiptsProgram']);
         Route::post('form2', [LEPReportController::class, 'lepForm2']);
+        Route::post('pscomputation', [LEPReportController::class, 'lepPsComputation']);
+        Route::post('mdf20', [LEPReportController::class, 'lepMdf20']);
         Route::post('form6', [LEPReportController::class, 'lepForm6']);
         Route::post('form7', [LEPReportController::class, 'lepForm7']);
 
         Route::post('consolidated-calamity5', [LEPReportController::class, 'lepConsolidatedCalamity5']);
+        Route::post('sp-calamity5', [LEPReportController::class, 'spCalamity5']);
+        Route::post('sp-appropriation', [LEPReportController::class, 'spAppropriation']);
+        Route::post('personnel-amelioration', [LEPReportController::class, 'personnelAmelioration']);
+        Route::post('administrative-procedures', [LEPReportController::class, 'administrativeProcedures']);
+        Route::post('sp-20mdf', [LEPReportController::class, 'sp20Mdf']);
+        Route::post('sp-calamity5', [LEPReportController::class, 'spCalamity5']);
+        Route::post('general-provisions', [LEPReportController::class, 'generalProvisions']);
     });
 
     // Unified plan read/write (non-bulk)

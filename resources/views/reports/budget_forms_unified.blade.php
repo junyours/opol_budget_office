@@ -92,6 +92,7 @@ table.data-table th {
 table.data-table td.r  { text-align: right; }
 table.data-table td.c  { text-align: center; }
 table.data-table td.l  { text-align: left; }
+table.data-table tr.col-num td { text-align: center; }
 
 tr.sec-hdr   td { font-weight: bold; }
 tr.subtotal  td { font-weight: bold; }
@@ -1010,9 +1011,9 @@ $showForm2A = in_array('form2a', $forms);
     @endif {{-- /mooeItems --}}
 
     {{-- ── Capital / PP&E ──────────────────────────────────────────────── --}}
-    @if(count($capItems) > 0)
     <tr class="sec-hdr"><td colspan="7">Prop/Plant/Equipt</td></tr>
 
+    @if(count($capItems) > 0)
     @foreach($capItems as $capRIdx => $item)
     @php
     $fmt2cap = ($capRIdx === 0)
@@ -1029,6 +1030,11 @@ $showForm2A = in_array('form2a', $forms);
         <td class="r">{!! $item['proposed']      > 0 ? $fmt2cap($item['proposed'])      : '' !!}</td>
     </tr>
     @endforeach
+    @else
+    <tr>
+        <td colspan="7" class="c" style="font-style:italic; color:#666;">None</td>
+    </tr>
+    @endif
 
     <tr class="subtotal">
         <td colspan="2" class="l">Total Prop/Plant/Eqpt</td>
@@ -1038,7 +1044,7 @@ $showForm2A = in_array('form2a', $forms);
         <td class="r">{!! $pesoA($sumCol($capItems, 'current_total')) !!}</td>
         <td class="r">{!! $pesoA($capProp) !!}</td>
     </tr>
-    @endif {{-- /capItems --}}
+    {{-- /capItems --}}
 
     {{-- ── Special Purpose Appropriations / AIP Programs (inline in Form 2) ── --}}
     @if(count($spItems) > 0)

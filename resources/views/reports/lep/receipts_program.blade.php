@@ -8,10 +8,10 @@
 
 @php
 $pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
-$peso  = fn($n) => (float)$n == 0 ? '' : ($pesoSign . number_format((float)$n, 0));
-$pesoA = fn($n) => $pesoSign . number_format((float)$n, 0);
-$num   = fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
-$numA  = fn($n) => number_format((float)$n, 0);
+$peso  = fn($n) => (float)$n == 0 ? '' : ($pesoSign . number_format((float)$n, 2));
+$pesoA = fn($n) => $pesoSign . number_format((float)$n, 2);
+$num   = fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
+$numA  = fn($n) => number_format((float)$n, 2);
 @endphp
 
 @foreach($receipt_forms as $form)

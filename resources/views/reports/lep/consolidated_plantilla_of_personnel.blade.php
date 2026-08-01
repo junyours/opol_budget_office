@@ -98,7 +98,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
 ══════════════════════════════════════════════════════════ --}}
 <div style="page-break-after: always;">
 
-  <div style="font-weight:bold; font-size:8.5pt; margin-top:20px; margin-bottom:4px; text-transform:uppercase;">
+  <div style="font-weight:bold; font-size:8.5pt; margin-top:10px; margin-bottom:4px; text-transform:uppercase;">
     PART I: CONSOLIDATED PLANTILLA OF PERSONNEL
   </div>
   <div style="font-weight:bold; font-size:7.5pt; text-align:left; margin-bottom:4px; text-transform:uppercase;">
@@ -129,7 +129,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
           $lepThisExt  = $row['extensionDeptId'] ?? null;
           $lepShowHdr  = ($lepThisExt !== $lepExtLastId) && ($lepThisExt !== null);
           $lepExtLastId= $lepThisExt;
-          $fmt         = $lepRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+          $fmt         = $lepRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
           $noCurrent   = ($row['current_amount'] <= 0);
           $lepRowIdx++;
         @endphp
@@ -271,7 +271,7 @@ $tableHeader = function() use ($lep_lbc_current, $lep_lbc_proposed, $lep_tranche
             $lepSaThisExt  = $row['extensionDeptId'] ?? null;
             $lepSaShowHdr  = ($lepSaThisExt !== $lepSaExtLastId) && ($lepSaThisExt !== null);
             $lepSaExtLastId= $lepSaThisExt;
-            $fmt           = $lepSaRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 0);
+            $fmt           = $lepSaRowIdx === 0 ? $pesoA : fn($n) => (float)$n == 0 ? '' : number_format((float)$n, 2);
             $noCurrent     = ($row['current_amount'] <= 0);
             $lepSaRowIdx++;
           @endphp

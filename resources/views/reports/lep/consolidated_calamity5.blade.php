@@ -26,13 +26,13 @@ $sources    = $d['sources'];
 $grandTotal = $d['grand_total'];
 
 $pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
-$pesoA    = fn(float $n) => $n == 0 ? '&nbsp;' : ($pesoSign . number_format(round(abs($n)), 0));
-$num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(round(abs($n)), 0);
+$pesoA    = fn(float $n) => $n == 0 ? '&nbsp;' : ($pesoSign . number_format(abs($n), 2));
+$num      = fn(float $n) => $n == 0 ? '&nbsp;' : number_format(abs($n), 2);
 @endphp
 
 {{-- Report title --}}
 <div style="text-align:center; font-weight:bold; font-size:7.5pt; margin-bottom:2px;">
-    PART VI: CY-{{ $year }} 5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) - JMC 2013-1, RA-10121
+    CY-{{ $year }} 5% Local Disaster Risk Reduction Management Fund Plan, (LDRRMF Plan) - JMC 2013-1, RA-10121
 </div>
 <div style="text-align:center; font-size:7pt; margin-bottom:2px;">
     Special Account:

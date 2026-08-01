@@ -286,7 +286,10 @@ class Form6SpecialController extends Form6Controller
         $codeToFragments = [
             '1.2' => ['terminal leave'],
             '1.3' => ['other personnel benefits', 'monetization'],
-            '1.5' => ['ecip', 'employees compensation', 'insurance premium'],
+            // Removed the generic 'insurance premium' fragment — it also
+            // matched "Retirement and Life Insurance Premiums" (code 1.8),
+            // causing that amount to be double-counted into ECIP (1.5).
+            '1.5' => ['ecip', 'employees compensation'],
             '1.6' => ['philhealth', 'phil health'],
             '1.7' => ['pag-ibig', 'pagibig'],
             '1.8' => ['retirement', 'life insurance'],

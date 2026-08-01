@@ -24,8 +24,8 @@
 
 @php
 $pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
-$pesoA    = fn($n) => $pesoSign . number_format((float)$n, 0);
-$num      = fn($n) => number_format((float)$n, 0);
+$pesoA    = fn($n) => $pesoSign . number_format((float)$n, 2);
+$num      = fn($n) => number_format((float)$n, 2);
 
 $sumCol = fn(array $rows, string $col): float =>
     array_reduce($rows, fn($c, $r) => $c + (float)($r[$col] ?? 0), 0.0);
@@ -122,22 +122,35 @@ $lastIdx = count($flat) - 1;
     $ldrrmf5Row    = collect($ldrrmfRows)->firstWhere('kind', 'ldrrmf-5pct');
     $ldrrmf70Row   = collect($ldrrmfRows)->firstWhere('kind', 'ldrrmf-70pct');
     $ldrrmfQrfRow  = collect($ldrrmfRows)->firstWhere('kind', 'ldrrmf-qrf');
-    $ldrrmfTotal   = [
-        'past_total'    => $sumCol($ldrrmfRows, 'past_total'),
-        'current_sem1'  => $sumCol($ldrrmfRows, 'current_sem1'),
-        'current_sem2'  => $sumCol($ldrrmfRows, 'current_sem2'),
-        'current_total' => $sumCol($ldrrmfRows, 'current_total'),
-        'proposed'      => $sumCol($ldrrmfRows, 'proposed'),
+
+    // The 5% LDRRMF figure IS the total (5% of that period's income); the
+    // 70%/30% rows are only its breakdown. Per column, use the 5% value
+    // when it's actually populated (>0); fall back to summing 70%+30%
+    // only when the 5% figure is 0/missing (e.g. past-year data where the
+    // calamity fund wasn't computed). Same fallback convention already
+    // used in LEPReportController::buildLepConsolidatedCalamity5Data().
+    $ldrrmfCol = function(string $col) use ($ldrrmf5Row, $ldrrmf70Row, $ldrrmfQrfRow): float {
+        $fivePct = (float) ($ldrrmf5Row[$col] ?? 0);
+        if ($fivePct > 0) return $fivePct;
+        return (float) ($ldrrmf70Row[$col] ?? 0) + (float) ($ldrrmfQrfRow[$col] ?? 0);
+    };
+
+    $ldrrmfTotal = [
+        'past_total'    => $ldrrmfCol('past_total'),
+        'current_sem1'  => $ldrrmfCol('current_sem1'),
+        'current_sem2'  => $ldrrmfCol('current_sem2'),
+        'current_total' => $ldrrmfCol('current_total'),
+        'proposed'      => $ldrrmfCol('proposed'),
     ];
 
     // ── Grand total ────────────────────────────────────────────────────────
-    $grandPast    = $sumCol($items,'past_total')    + $sumCol($spItems,'past_total')    + $sumCol($ldrrmfRows,'past_total');
-    $grandSem1    = $sumCol($items,'current_sem1')  + $sumCol($spItems,'current_sem1')  + $sumCol($ldrrmfRows,'current_sem1');
-    $grandSem2    = $sumCol($items,'current_sem2')  + $sumCol($spItems,'current_sem2')  + $sumCol($ldrrmfRows,'current_sem2');
-    $grandCurrent = $sumCol($items,'current_total') + $sumCol($spItems,'current_total') + $sumCol($ldrrmfRows,'current_total');
+    $grandPast    = $sumCol($items,'past_total')    + $sumCol($spItems,'past_total')    + $ldrrmfTotal['past_total'];
+    $grandSem1    = $sumCol($items,'current_sem1')  + $sumCol($spItems,'current_sem1')  + $ldrrmfTotal['current_sem1'];
+    $grandSem2    = $sumCol($items,'current_sem2')  + $sumCol($spItems,'current_sem2')  + $ldrrmfTotal['current_sem2'];
+    $grandCurrent = $sumCol($items,'current_total') + $sumCol($spItems,'current_total') + $ldrrmfTotal['current_total'];
     $grandProp    = $psProp + $mooeProp + $capProp + $spProp
                   + $sumCol($otherItems,'proposed')
-                  + $sumCol($ldrrmfRows,'proposed');
+                  + $ldrrmfTotal['proposed'];
 
     $hasAnyData = ($grandPast > 0 || $grandCurrent > 0 || $grandProp > 0);
 
@@ -238,10 +251,10 @@ $lastIdx = count($flat) - 1;
         {{-- ════════════════════════════════════════════════════════════════
              3. PROPERTY, PLANT & EQUIPMENT (Capital Outlay)
         ════════════════════════════════════════════════════════════════ --}}
-        @if(count($capItems) > 0)
         <tr style="background:#fff;">
             <td colspan="7" style="font-weight:bold; padding:2px 4px;">{!! $capLabel !!}</td>
         </tr>
+        @if(count($capItems) > 0)
         @foreach($capItems as $rIdx => $item)
         @php $fmt = $rIdx === 0 ? $pesoA : $num; @endphp
         <tr>
@@ -254,6 +267,11 @@ $lastIdx = count($flat) - 1;
             <td class="r">{!! $item['proposed']      > 0 ? $fmt($item['proposed'])      : '' !!}</td>
         </tr>
         @endforeach
+        @else
+        <tr>
+            <td colspan="7" class="c" style="padding:3px; font-style:italic; color:#666;">None</td>
+        </tr>
+        @endif
         <tr style="font-weight:bold;">
             <td colspan="2" class="l" style="padding-left:4px;">{{ $capTotLabel }}</td>
             <td class="r">{!! $pesoA($sumCol($capItems,'past_total')) !!}</td>
@@ -262,7 +280,6 @@ $lastIdx = count($flat) - 1;
             <td class="r">{!! $pesoA($sumCol($capItems,'current_total')) !!}</td>
             <td class="r">{!! $pesoA($capProp) !!}</td>
         </tr>
-        @endif
 
         {{-- ════════════════════════════════════════════════════════════════
              4. SPECIAL PURPOSE APPROPRIATIONS / PROGRAMS (SPA)

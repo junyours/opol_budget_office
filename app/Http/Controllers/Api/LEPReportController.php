@@ -900,15 +900,31 @@ class LEPReportController extends Controller
                     ->where('expense_item_id', $expenseItem->expense_class_item_id)->first()
                 : null;
 
+            $pastTotal    = (float) ($pastItem?->obligation_amount ?? 0);
+            $currentSem1  = (float) ($currentItem?->sem1_amount    ?? 0);
+            $currentSem2  = (float) ($currentItem?->sem2_amount    ?? 0);
+            $currentTotal = (float) ($currentItem?->total_amount   ?? 0);
+            $proposed     = (float) $proposedItem->total_amount;
+
+            $classificationName = $expenseItem->classification->expense_class_name ?? 'Uncategorized';
+            $isPersonalServices  = str_contains(strtolower(trim($classificationName)), 'personal services');
+
+            // Same skip rule as UnifiedReportController::buildForm2() —
+            // drop items with no data in any period, except Personal
+            // Services rows which are always kept.
+            if (!$isPersonalServices && $pastTotal == 0 && $currentTotal == 0 && $proposed == 0) {
+                continue;
+            }
+
             $items[] = [
-                'classification' => $expenseItem->classification->expense_class_name ?? 'Uncategorized',
+                'classification' => $classificationName,
                 'description'    => $expenseItem->expense_class_item_name,
                 'account_code'   => $expenseItem->expense_class_item_acc_code,
-                'past_total'     => (float) ($pastItem?->obligation_amount ?? 0),
-                'current_sem1'   => (float) ($currentItem?->sem1_amount    ?? 0),
-                'current_sem2'   => (float) ($currentItem?->sem2_amount    ?? 0),
-                'current_total'  => (float) ($currentItem?->total_amount   ?? 0),
-                'proposed'       => (float) $proposedItem->total_amount,
+                'past_total'     => $pastTotal,
+                'current_sem1'   => $currentSem1,
+                'current_sem2'   => $currentSem2,
+                'current_total'  => $currentTotal,
+                'proposed'       => $proposed,
             ];
         }
 
@@ -1034,13 +1050,16 @@ class LEPReportController extends Controller
             return (float) $query->selectRaw("COALESCE(SUM({$field}), 0) as grand")->value('grand');
         };
 
-        $past5  = $computeCalamityFund($pastBpId);
+       $past5  = $computeCalamityFund($pastBpId);
         $curr5  = $computeCalamityFund($currentBpId);
         $prop5  = $computeCalamityFund($proposedBpId);
 
         $past70 = $sum70($pastBpId,    'obligation_amount');
         $curr70 = $sum70($currentBpId, 'total_amount');
-        $prop70 = $sum70($proposedBpId, 'mooe', true);
+        // Budget year: 70% is a straight split of the 5% Calamity Fund
+        // ceiling, not a sum of entered mooe/co line items — entered
+        // items can (and did) exceed the ceiling, corrupting the split.
+        $prop70 = round($prop5 * 0.70, 2);
 
         $currSem1_70 = $currentBpId ? (float) \DB::table('ldrrmfip_items')
             ->where('budget_plan_id', $currentBpId)
@@ -1064,7 +1083,8 @@ class LEPReportController extends Controller
 
         $pastQrf    = $qrfPastItem ? (float) $qrfPastItem->obligation_amount : max(0, $past5 - $past70);
         $currQrf    = max(0, $curr5 - $curr70);
-        $propQrf    = max(0, $prop5 - $prop70);
+        // Budget year: same straight 30% split of the ceiling, matching $prop70 above.
+        $propQrf    = round($prop5 * 0.30, 2);
         $currQrfSem1 = $qrfCurrentItem ? (float) $qrfCurrentItem->sem1_amount : 0.0;
         $currQrfSem2 = max(0, $currQrf - $currQrfSem1);
 
@@ -1583,6 +1603,10 @@ private function lepForm7BuildForm2Rows(int $budgetPlanId, array $deptPlanCatego
 
     $result = [];
     foreach ($grouped as $abbr => $rows) {
+        // Sort by expense_class_item_id (the array key) so rows appear
+        // in expense-id order instead of arbitrary query-result order.
+        ksort($rows);
+
         $result[$abbr] = [];
         foreach ($rows as $row) {
             $row['total'] = $row['general_public_services']
@@ -1726,6 +1750,54 @@ private function lepForm7BuildFeRows(int $budgetPlanId, bool $isSpecial, ?string
     return $rows;
 }
 
+// // ── AIP / SPA rows ────────────────────────────────────────────────────────
+// private function lepForm7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap): array
+// {
+//     $validIds = array_keys($deptPlanCategoryMap);
+//     if (empty($validIds)) return [];
+
+//     $items = \DB::table('dept_bp_form4_items as f4')
+//         ->join('aip_programs as ap', 'ap.aip_program_id', '=', 'f4.aip_program_id')
+//         ->whereIn('f4.dept_budget_plan_id', $validIds)
+//         ->where('f4.total_amount', '>', 0)
+//         ->select(
+//             'f4.dept_budget_plan_id',
+//             'ap.aip_program_id',
+//             'ap.aip_reference_code',
+//             'ap.program_description',
+//             'f4.total_amount'
+//         )
+//         ->get();
+
+//     $grouped = [];
+//     foreach ($items as $item) {
+//         $col    = $deptPlanCategoryMap[$item->dept_budget_plan_id] ?? null;
+//         if (!$col) continue;
+//         $progId = $item->aip_program_id;
+//         if (!isset($grouped[$progId])) {
+//             $grouped[$progId] = [
+//                 'item_name'               => $item->program_description,
+//                 'account_code'            => $item->aip_reference_code ?? '',
+//                 'general_public_services' => 0.0,
+//                 'social_services'         => 0.0,
+//                 'economic_services'       => 0.0,
+//                 'other_services'          => 0.0,
+//             ];
+//         }
+//         $grouped[$progId][$col] += (float) $item->total_amount;
+//     }
+
+//     $rows = [];
+//     foreach ($grouped as $row) {
+//         $row['total'] = $row['general_public_services']
+//                       + $row['social_services']
+//                       + $row['economic_services']
+//                       + $row['other_services'];
+//         $rows[] = $row;
+//     }
+//     return $rows;
+// }
+
 // ── AIP / SPA rows ────────────────────────────────────────────────────────
 private function lepForm7BuildAipRows(int $budgetPlanId, array $deptPlanCategoryMap): array
 {
@@ -1745,6 +1817,14 @@ private function lepForm7BuildAipRows(int $budgetPlanId, array $deptPlanCategory
         )
         ->get();
 
+    // Same left-to-right order as the sector columns on the printed form.
+    $categoryOrder = [
+        'general_public_services' => 0,
+        'social_services'         => 1,
+        'economic_services'       => 2,
+        'other_services'          => 3,
+    ];
+
     $grouped = [];
     foreach ($items as $item) {
         $col    = $deptPlanCategoryMap[$item->dept_budget_plan_id] ?? null;
@@ -1758,6 +1838,9 @@ private function lepForm7BuildAipRows(int $budgetPlanId, array $deptPlanCategory
                 'social_services'         => 0.0,
                 'economic_services'       => 0.0,
                 'other_services'          => 0.0,
+                // Category of the program's originating department, used
+                // only for sorting — not rendered.
+                'category_rank'           => $categoryOrder[$col] ?? 99,
             ];
         }
         $grouped[$progId][$col] += (float) $item->total_amount;
@@ -1771,6 +1854,13 @@ private function lepForm7BuildAipRows(int $budgetPlanId, array $deptPlanCategory
                       + $row['other_services'];
         $rows[] = $row;
     }
+
+    // Sort SPA rows by department category (same order as the sector columns).
+    usort($rows, fn ($a, $b) => ($a['category_rank'] ?? 99) <=> ($b['category_rank'] ?? 99));
+
+    foreach ($rows as &$r) unset($r['category_rank']);
+    unset($r);
+
     return $rows;
 }
 
@@ -1989,6 +2079,368 @@ private function renderLepForm7(array $data): string
         ]))->render();
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/pscomputation
+    // ─────────────────────────────────────────────────────────────────────────
+    public function lepPsComputation(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $data = $this->buildLepPsComputationData((int) $request->budget_plan_id);
+            $html = $this->renderLepPsComputation($data);
+            $pdf  = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                "LEP_PS_Computation_FY{$data['year']}.pdf",
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ── Data builder (mirrors UnifiedReportController::buildPsComputationData) ──
+    private function buildLepPsComputationData(int $budgetPlanId): array
+    {
+        $activePlan   = BudgetPlan::findOrFail($budgetPlanId);
+        $proposedYear = (int) $activePlan->year;
+        $incomeYear   = $proposedYear - 2;
+        $lgu          = strtoupper($activePlan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL');
+
+        // ── Manual values ─────────────────────────────────────────────────────
+        $values = \App\Models\PsComputationValue::firstOrCreate(
+            ['budget_plan_id' => $budgetPlanId],
+            ['total_income' => 0, 'non_recurring_income' => 0, 'excess_amount' => 0]
+        );
+
+        // ── Aggregates from dept_bp_form2_items (GF only) ─────────────────────
+        $specialCatId = DepartmentCategory::where('dept_category_name', 'Special Accounts')
+            ->value('dept_category_id');
+
+        $aggregates = \DB::table('dept_bp_form2_items as f2')
+            ->join('department_budget_plans as dbp', 'dbp.dept_budget_plan_id', '=', 'f2.dept_budget_plan_id')
+            ->join('departments as d',               'd.dept_id',               '=', 'dbp.dept_id')
+            ->join('expense_class_items as ei',      'ei.expense_class_item_id','=', 'f2.expense_item_id')
+            ->where('dbp.budget_plan_id', $budgetPlanId)
+            ->when($specialCatId, fn ($q, $id) => $q->where('d.dept_category_id', '!=', $id))
+            ->groupBy('ei.expense_class_item_name', 'ei.expense_class_item_acc_code')
+            ->select(
+                'ei.expense_class_item_name     as item_name',
+                \DB::raw('SUM(f2.total_amount)  as total')
+            )
+            ->get()
+            ->pluck('total', 'item_name')
+            ->map(fn ($v) => (float) $v);
+
+        $agg = fn (string $name): float => (float) ($aggregates->get($name) ?? 0);
+
+        // Section A
+        $salariesWages = $agg('Salaries and Wages - Regular');
+
+        // Section B
+        $retirementInsurance = $agg('Retirement and Life Insurance Premiums');
+        $pagIbig             = $agg('Pag-IBIG Contributions');
+        $philhealth          = $agg('PhilHealth Contributions');
+        $ecInsurance         = $agg('Employees Compensation Insurance Premiums');
+        $subtotalB           = $retirementInsurance + $pagIbig + $philhealth + $ecInsurance;
+
+        // Section C
+        $pera               = $agg('Personal Economic Relief Allowance (PERA)');
+        $representation     = $agg('Representation Allowance (RA)');
+        $transportation     = $agg('Transportation Allowance (TA)');
+        $clothing           = $agg('Clothing/Uniform Allowance');
+        $magnaCarta         = $agg('Subsistence Allowance');
+        $hazardPay          = $agg('Hazard Pay');
+        $honoraria          = $agg('Honoraria');
+        $overtimePay        = $agg('Overtime and Night Pay');
+        $cashGift           = $agg('Cash Gift');
+        $midYearBonus       = $agg('Mid-Year Bonus');
+        $yearEndBonus       = $agg('Year End Bonus');
+        $terminalLeave      = $agg('Terminal Leave Benefits');
+        $productivityInc    = $agg('Productivity Incentive Allowance');
+        $monetization       = $agg('Other Personnel Benefits');
+        $subtotalC          = $pera + $representation + $transportation + $clothing
+                            + $magnaCarta + $hazardPay + $honoraria + $overtimePay
+                            + $cashGift + $midYearBonus + $yearEndBonus
+                            + $terminalLeave + $productivityInc + $monetization;
+
+        $totalPs = $salariesWages + $subtotalB + $subtotalC;
+
+        // Top section calculations
+        $totalIncome         = (float) $values->total_income;
+        $nonRecurring        = (float) $values->non_recurring_income;
+        $excessAmount        = (float) $values->excess_amount;
+        $totalRealizedIncome = $totalIncome - $nonRecurring;
+        $psLimitation        = $totalRealizedIncome * 0.45;
+        $totalWaived         = $terminalLeave + $monetization;
+        $amountAllowable     = $psLimitation - $totalPs - $excessAmount + $totalWaived;
+
+        return [
+            'year'              => $proposedYear,
+            'income_year'       => $incomeYear,
+            'lgu'               => $lgu,
+            'total_income'           => $totalIncome,
+            'non_recurring'          => $nonRecurring,
+            'total_realized'         => $totalRealizedIncome,
+            'ps_limitation'          => $psLimitation,
+            'total_ps_gf'            => $totalPs,
+            'excess_amount'          => $excessAmount,
+            'terminal_leave_gf'      => $terminalLeave,
+            'monetization_gf'        => $monetization,
+            'total_waived'           => $totalWaived,
+            'amount_allowable'       => $amountAllowable,
+            'salaries_wages'          => $salariesWages,
+            'retirement_insurance'    => $retirementInsurance,
+            'pag_ibig'                => $pagIbig,
+            'philhealth'              => $philhealth,
+            'ec_insurance'            => $ecInsurance,
+            'subtotal_b'              => $subtotalB,
+            'pera'                    => $pera,
+            'representation'          => $representation,
+            'transportation'          => $transportation,
+            'clothing'                => $clothing,
+            'magna_carta'             => $magnaCarta,
+            'hazard_pay'              => $hazardPay,
+            'honoraria'               => $honoraria,
+            'overtime_pay'            => $overtimePay,
+            'cash_gift'               => $cashGift,
+            'mid_year_bonus'          => $midYearBonus,
+            'year_end_bonus'          => $yearEndBonus,
+            'terminal_leave'          => $terminalLeave,
+            'productivity_incentive'  => $productivityInc,
+            'monetization'            => $monetization,
+            'subtotal_c'              => $subtotalC,
+            'total_ps'                => $totalPs,
+        ];
+    }
+
+    // ── Renderer ──────────────────────────────────────────────────────────────
+    private function renderLepPsComputation(array $data): string
+    {
+        $this->clearViewCache();
+        return view('reports.lep.lepreport', array_merge([
+            'report_type'            => 'lep_pscomputation',
+            'data'                   => $data,
+            'proposed_year'          => $data['year'],
+            'header'                 => [],
+            'signatories'            => [],
+            'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+            'grand_current_total'    => 0.0,
+            'grand_proposed_total'   => 0.0,
+        ]))->render();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/mdf20
+    // ─────────────────────────────────────────────────────────────────────────
+    public function lepMdf20(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $data = $this->buildLepMdf20Data((int) $request->budget_plan_id);
+            $html = $this->renderLepMdf20($data);
+            $pdf  = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                "LEP_20MDF_FY{$data['year']}.pdf",
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ── Data builder (mirrors UnifiedReportController::buildMdf20Data) ─────────
+    private function buildLepMdf20Data(int $budgetPlanId): array
+    {
+        $activePlan   = BudgetPlan::findOrFail($budgetPlanId);
+        $proposedYear = (int) $activePlan->year;
+        $currentYear  = $proposedYear - 1;
+        $pastYear     = $proposedYear - 2;
+
+        $currentPlan = BudgetPlan::where('year', $currentYear)->first();
+        $pastPlan    = BudgetPlan::where('year', $pastYear)->first();
+
+        $relevantPlanIds = array_values(array_filter([
+            $budgetPlanId,
+            $currentPlan?->budget_plan_id,
+            $pastPlan?->budget_plan_id,
+        ]));
+
+        $categories = \App\Models\MdfCategory::orderBy('sort_order')
+            ->with([
+                'items' => function ($q) use ($relevantPlanIds) {
+                    $q->where('is_active', true)
+                      ->orderBy('sort_order')
+                      ->with([
+                          'snapshots' => fn ($sq) => $sq->whereIn('budget_plan_id', $relevantPlanIds),
+                      ]);
+                },
+            ])
+            ->get();
+
+        $obligationIds = \App\Models\DebtObligation::where('is_active', true)
+            ->pluck('obligation_id')->all();
+
+        $debtPayments = collect();
+        if ($obligationIds && $relevantPlanIds) {
+            $debtPayments = \App\Models\DebtPayment::whereIn('obligation_id', $obligationIds)
+                ->whereIn('budget_plan_id', $relevantPlanIds)
+                ->get()
+                ->groupBy(fn ($p) => "{$p->obligation_id}_{$p->budget_plan_id}");
+        }
+
+        $pay = function (int $obligationId, ?int $planId, string $field) use ($debtPayments): float {
+            if (!$planId) return 0.0;
+            $row = $debtPayments->get("{$obligationId}_{$planId}")?->first();
+            return $row ? (float) $row->$field : 0.0;
+        };
+
+        $categoryRows = $categories->map(function (\App\Models\MdfCategory $cat) use (
+            $activePlan, $currentPlan, $pastPlan, $pay, $budgetPlanId
+        ) {
+            $items = $cat->items->map(function (\App\Models\MdfItem $item) use (
+                $activePlan, $currentPlan, $pastPlan, $pay, $budgetPlanId
+            ) {
+                if ($item->obligation_id && $item->debt_type) {
+                    $dueField = $item->debt_type === 'principal' ? 'principal_due'  : 'interest_due';
+                    $s1Field  = $item->debt_type === 'principal' ? 'principal_sem1' : 'interest_sem1';
+                    $oblField = $item->debt_type === 'principal'
+                        ? 'obligation_principal_amount'
+                        : 'obligation_interest_amount';
+
+                    $pastTotal = $pay($item->obligation_id, $pastPlan?->budget_plan_id,    $oblField);
+                    $curTotal  = $pay($item->obligation_id, $currentPlan?->budget_plan_id, $dueField);
+                    $curSem1   = $pay($item->obligation_id, $currentPlan?->budget_plan_id, $s1Field);
+                    $curSem2   = max(0, $curTotal - $curSem1);
+                    $proposed  = $pay($item->obligation_id, $budgetPlanId,                 $dueField);
+
+                    if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
+                        if ($item->debt_type === 'principal') {
+                            $obligation = \App\Models\DebtObligation::find($item->obligation_id);
+                            if ($obligation) {
+                                $totalPaid = \App\Models\DebtPayment::where('obligation_id', $item->obligation_id)
+                                    ->sum('principal_due');
+                                $balance = (float) $obligation->principal_amount - (float) $totalPaid;
+                                if ($balance <= 0) return null;
+                            } else {
+                                return null;
+                            }
+                        } else {
+                            return null;
+                        }
+                    }
+                    return [
+                        'item_id'      => $item->item_id,
+                        'name'         => $item->name,
+                        'account_code' => $item->account_code ?? '',
+                        'is_debt_row'  => true,
+                        'debt_type'    => $item->debt_type,
+                        'obligation_id'=> $item->obligation_id,
+                        'past_total'   => $pastTotal,
+                        'cur_sem1'     => $curSem1,
+                        'cur_sem2'     => $curSem2,
+                        'cur_total'    => $curTotal,
+                        'proposed'     => $proposed,
+                    ];
+                }
+
+                $byPlan      = $item->snapshots->keyBy('budget_plan_id');
+                $activeSnap  = $byPlan->get($budgetPlanId);
+                $currentSnap = $currentPlan ? $byPlan->get($currentPlan->budget_plan_id) : null;
+                $pastSnap    = $pastPlan    ? $byPlan->get($pastPlan->budget_plan_id)    : null;
+
+                $pastTotal = (float) ($pastSnap?->obligation_amount  ?? 0);
+                $curTotal  = (float) ($currentSnap?->total_amount ?? 0);
+                $curSem1   = (float) ($currentSnap?->sem1_actual  ?? 0);
+                $curSem2   = max(0, $curTotal - $curSem1);
+                $proposed  = (float) ($activeSnap?->total_amount  ?? 0);
+
+                if ($pastTotal == 0 && $curTotal == 0 && $proposed == 0) {
+                    return null;
+                }
+
+                return [
+                    'item_id'      => $item->item_id,
+                    'name'         => $item->name,
+                    'account_code' => $item->account_code ?? '',
+                    'is_debt_row'  => false,
+                    'debt_type'    => null,
+                    'obligation_id'=> null,
+                    'past_total'   => $pastTotal,
+                    'cur_sem1'     => $curSem1,
+                    'cur_sem2'     => $curSem2,
+                    'cur_total'    => $curTotal,
+                    'proposed'     => $proposed,
+                ];
+            })
+            ->filter()
+            ->values();
+
+            if ($items->isEmpty()) return null;
+
+            return [
+                'category_id'       => $cat->category_id,
+                'name'              => $cat->name,
+                'is_debt_servicing' => (bool) $cat->is_debt_servicing,
+                'sort_order'        => $cat->sort_order,
+                'items'             => $items->toArray(),
+                'totals' => [
+                    'past_total' => $items->sum('past_total'),
+                    'cur_sem1'   => $items->sum('cur_sem1'),
+                    'cur_sem2'   => $items->sum('cur_sem2'),
+                    'cur_total'  => $items->sum('cur_total'),
+                    'proposed'   => $items->sum('proposed'),
+                ],
+            ];
+        })
+        ->filter()
+        ->values()
+        ->toArray();
+
+        $grandTotals = [
+            'past_total' => array_sum(array_column(array_column($categoryRows, 'totals'), 'past_total')),
+            'cur_sem1'   => array_sum(array_column(array_column($categoryRows, 'totals'), 'cur_sem1')),
+            'cur_sem2'   => array_sum(array_column(array_column($categoryRows, 'totals'), 'cur_sem2')),
+            'cur_total'  => array_sum(array_column(array_column($categoryRows, 'totals'), 'cur_total')),
+            'proposed'   => array_sum(array_column(array_column($categoryRows, 'totals'), 'proposed')),
+        ];
+
+        return [
+            'year'          => $proposedYear,
+            'current_year'  => $currentYear,
+            'past_year'     => $pastYear,
+            'lgu'           => strtoupper($activePlan->lgu_name ?? 'OPOL, MISAMIS ORIENTAL'),
+            'category_rows' => $categoryRows,
+            'grand_totals'  => $grandTotals,
+        ];
+    }
+
+    // ── Renderer ──────────────────────────────────────────────────────────────
+    private function renderLepMdf20(array $data): string
+    {
+        $this->clearViewCache();
+        return view('reports.lep.lepreport', array_merge([
+            'report_type'            => 'lep_mdf20',
+            'data'                   => $data,
+            'proposed_year'          => $data['year'],
+            'header'                 => [],
+            'signatories'            => [],
+            'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+            'grand_current_total'    => 0.0,
+            'grand_proposed_total'   => 0.0,
+        ]))->render();
+    }
 
     // ── POST /api/reports/lep/consolidated-calamity5 ─────────────────────────
 public function lepConsolidatedCalamity5(Request $request)
@@ -2336,4 +2788,237 @@ private function renderLepConsolidatedCalamity5(array $data): string
         'grand_proposed_total'   => 0.0,
     ]))->render();
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// POST /api/reports/lep/personnel-amelioration
+//
+// Stateless: the edited HTML is sent from the browser (localStorage) on
+// every request and rendered straight into the PDF. Nothing is persisted
+// server-side — if 'content' is omitted, the blade's built-in default
+// text is used instead.
+// ─────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/personnel-amelioration
+    //
+    // Stateless: the edited HTML is sent from the browser (localStorage) on
+    // every request and rendered straight into the PDF. Nothing is persisted
+    // server-side — if 'content' is omitted, the blade's built-in default
+    // text is used instead.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function personnelAmelioration(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'personnel_amelioration',
+                'pa_content'             => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_PersonnelAmelioration.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/administrative-procedures
+    //
+    // Stateless, same pattern as personnelAmelioration() above.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function administrativeProcedures(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'administrative_procedures',
+                'ap_content'             => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_AdministrativeProcedures.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/sp-20mdf
+    //
+    // Stateless, same pattern as personnelAmelioration() above.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function sp20Mdf(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'sp_20mdf',
+                'sp20_content'           => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_SpecialProvisions_20MDF.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/sp-calamity5
+    //
+    // Stateless, same pattern as personnelAmelioration() above.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function spCalamity5(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'sp_calamity5',
+                'sp5_content'            => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_SpecialProvisions_Calamity5.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/sp-appropriation
+    //
+    // Stateless, same pattern as personnelAmelioration() above.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function spAppropriation(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'sp_appropriation',
+                'sp_appr_content'        => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_SpecialProvisions_Appropriation.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/reports/lep/general-provisions
+    //
+    // Stateless, same pattern as personnelAmelioration() above.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function generalProvisions(Request $request)
+    {
+        $request->validate([
+            'budget_plan_id' => 'nullable|integer|exists:budget_plans,budget_plan_id',
+            'content'        => 'nullable|string',
+        ]);
+
+        try {
+            $this->clearViewCache();
+            $html = view('reports.lep.lepreport', [
+                'report_type'            => 'general_provisions',
+                'gp_content'             => $request->input('content'),
+                'proposed_year'          => now()->year,
+                'header'                 => [],
+                'signatories'            => [],
+                'special_account_totals' => ['items' => [], 'grand_total' => 0.0],
+                'grand_current_total'    => 0.0,
+                'grand_proposed_total'   => 0.0,
+            ])->render();
+
+            $pdf = $this->makePdf($html, 'portrait');
+
+            return $this->pdfResponse(
+                $pdf,
+                'LEP_GeneralProvisions.pdf',
+                $request->boolean('download')
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e);
+        }
+    }
 }

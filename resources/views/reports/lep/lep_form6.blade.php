@@ -30,16 +30,16 @@ $forms6 = $data['forms'];
 $pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
 
 // Always show peso sign
-$pa = fn($n) => $pesoSign . number_format((float)$n, 0);
+$pa = fn($n) => $pesoSign . number_format((float)$n, 2);
 
 // Show peso sign only when non-zero; blank otherwise
 $pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 
 // Number only — blank when zero, '0' when explicitly zero-valued non-section row
-$nf = fn($n): string => (float)$n == 0 ? '0' : number_format((float)$n, 0);
+$nf = fn($n): string => (float)$n == 0 ? '0.00' : number_format((float)$n, 2);
 @endphp
 
 @foreach($forms6 as $form6)
@@ -82,7 +82,7 @@ foreach ($rows as $r) { $computeAmount($r); }
 <div class="page" style="page-break-after: always; break-after: page;">
 
     <div style="font-size:7.5pt; font-weight:bold; text-align:center; margin-bottom:1px;">
-        PART V: STATEMENT OF STATUTORY AND CONTRACTUAL OBLIGATIONS AND BUDGETARY REQUIREMENTS
+        PART VII: STATEMENT OF STATUTORY AND CONTRACTUAL OBLIGATIONS AND BUDGETARY REQUIREMENTS
     </div>
     <div style="font-size:7pt; text-align:center; margin-bottom:1px;">LGU : {{ $lgu }}</div>
     <div style="font-size:7pt; text-align:center; margin-bottom:6px; font-weight:bold;">

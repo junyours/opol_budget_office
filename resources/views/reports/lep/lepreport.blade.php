@@ -117,6 +117,7 @@ table.data-table th {
 table.data-table td.r  { text-align: right; }
 table.data-table td.c  { text-align: center; }
 table.data-table td.l  { text-align: left; }
+table.data-table tr.col-num td { text-align: center; }
 
 table.data-table tbody tr {
     line-height: 1.2;
@@ -135,9 +136,8 @@ tr.grand-total td { font-weight: bold; }
 
 @php
 /* ── Formatters ── */
-$pesoSign = '<span style="font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;</span>';
-$pesoA = fn($n) => $pesoSign . number_format((float)$n, 0);
-$peso  = fn($n) => (float)$n == 0 ? '' : ($pesoSign . number_format((float)$n, 0));
+$pesoA = fn($n) => '<span style="white-space:nowrap;font-family:\'DejaVu Sans\',sans-serif;">&#x20B1;&nbsp;' . number_format((float)$n, 2) . '</span>';
+$peso  = fn($n) => (float)$n == 0 ? '' : $pesoA($n);
 
 $hdr   = $header ?? [];
 $sigs  = $signatories ?? [];
@@ -246,18 +246,22 @@ $introBy         = $hdr['introduced_by']       ?? '';
 
   <table style="width:100%; border-collapse:collapse; font-size:7pt; margin:4px 0 4px 24pt;">
     <tr>
-      <td style="width:50%; vertical-align:top; padding:0; line-height:1.8; border:none;">
+      <td style="width:34%; vertical-align:top; padding:0; line-height:1.8; border:none;">
         1. Local Expenditure Program, (LEP)<br>
         2. Budget Expenditures and Sources of Financing, (BESF)<br>
         3. Annual Investment Program, (AIP)<br>
         4. Plantilla of Personnel<br>
         5. Receipts Program
       </td>
-      <td style="width:50%; vertical-align:top; padding:0; line-height:1.8; border:none;">
+      <td style="width:33%; vertical-align:top; padding:0; line-height:1.8; border:none;">
         6. Appropriation and Obligation by Office<br>
-        7. Summary of New Appropriations by Sector<br>
-        8. Statement of Statutory and Contractual Obligations<br>
-        9. 5% Calamity Fund General Fund & SA Consolidated
+        7. PS Computation<br>
+        8. 20% Municipal Development Fund<br>
+        9. Summary of New Appropriations by Sector<br>
+        10. Statement of Statutory and Contractual Obligations
+      </td>
+      <td style="width:33%; vertical-align:top; padding:0; line-height:1.8; border:none;">
+        11. 5% Calamity Fund General Fund & SA Consolidated
       </td>
     </tr>
   </table>
@@ -287,6 +291,16 @@ $introBy         = $hdr['introduced_by']       ?? '';
         'past_year'      => $past_year,
     ])
 
+    @elseif(($report_type ?? '') === 'lep_pscomputation')
+    @include('reports.lep.lep_pscomputation', [
+        'data' => $data ?? [],
+    ])
+
+    @elseif(($report_type ?? '') === 'lep_mdf20')
+    @include('reports.lep.lep_mdf20', [
+        'data' => $data ?? [],
+    ])
+
     @elseif(($report_type ?? '') === 'lep_form6')
       @include('reports.lep.lep_form6', [
           'data' => ['year' => $year ?? 0, 'lgu' => $lgu ?? '', 'forms' => $forms ?? []],
@@ -312,7 +326,46 @@ $introBy         = $hdr['introduced_by']       ?? '';
         'signatories'  => $signatories  ?? [],
     ]])
     @include('reports.lep.general_provisions', [
-        'proposed_year' => $proposed_year ?? ($year ?? null),
+        'content'   => $gp_content ?? null,
+        'editable'  => false,
+        'pageBreak' => true,
+    ])
+
+@elseif(($report_type ?? '') === 'general_provisions')
+    @include('reports.lep.general_provisions', [
+        'content'   => $gp_content ?? null,
+        'editable'  => false,
+        'pageBreak' => false,
+    ])
+
+@elseif(($report_type ?? '') === 'personnel_amelioration')
+    @include('reports.lep.personnel_amelioration', [
+        'content'  => $pa_content ?? null,
+        'editable' => false,
+    ])
+
+@elseif(($report_type ?? '') === 'administrative_procedures')
+    @include('reports.lep.administrative_procedures', [
+        'content'  => $ap_content ?? null,
+        'editable' => false,
+    ])
+
+@elseif(($report_type ?? '') === 'sp_20mdf')
+    @include('reports.lep.sp_20mdf', [
+        'content'  => $sp20_content ?? null,
+        'editable' => false,
+    ])
+
+@elseif(($report_type ?? '') === 'sp_calamity5')
+    @include('reports.lep.sp_calamity5', [
+        'content'  => $sp5_content ?? null,
+        'editable' => false,
+    ])
+
+@elseif(($report_type ?? '') === 'sp_appropriation')
+    @include('reports.lep.sp_appropriation', [
+        'content'  => $sp_appr_content ?? null,
+        'editable' => false,
     ])
 
 @else

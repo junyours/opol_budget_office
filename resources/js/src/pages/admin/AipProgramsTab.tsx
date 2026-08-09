@@ -87,7 +87,7 @@ function useBudgetPlans() {
   return useQuery<BudgetPlan[]>({
     queryKey: ["budget-plans"],
     queryFn: () => API.get("/budget-plans").then((r) => r.data?.data ?? []),
-    staleTime: 10 * 60 * 1000,
+
   });
 }
 
@@ -98,7 +98,7 @@ function useActiveBudgetPlan() {
       API.get("/budget-plans/active")
         .then((r) => r.data?.data ?? null)
         .catch(() => null),
-    staleTime: 10 * 60 * 1000,
+
   });
 }
 
@@ -106,32 +106,9 @@ function useDepartments() {
   return useQuery<Department[]>({
     queryKey: ["departments"],
     queryFn: () => API.get("/departments").then((r) => r.data?.data ?? []),
-    staleTime: 10 * 60 * 1000,
+
   });
 }
-
-// function useAipMasterList() {
-//   return useQuery<AipProgramRaw[]>({
-//     queryKey: ["aip-programs-master"],
-//     queryFn: async () => {
-//       const res = await API.get("/aip-programs");
-//       return res.data?.data ?? [];
-//     },
-//     staleTime: 5 * 60 * 1000,
-//   });
-// }
-
-// function useAipAmounts(planId: number | null) {
-//   return useQuery<AipProgram[]>({
-//     queryKey: ["aip-programs-amounts", planId],
-//     queryFn: () =>
-//       API.get("/aip-programs", { params: { budget_plan_id: planId } }).then(
-//         (r) => r.data?.data ?? []
-//       ),
-//     enabled: !!planId,
-//     staleTime: 5 * 60 * 1000,
-//   });
-// }
 
 function useAipMasterList() {
   return useQuery<AipProgramRaw[]>({

@@ -112,7 +112,7 @@ export interface ItemWithClassification extends ExpenseItem {
   classificationAbbr: string;
 }
 
-export const useExpenseData = (activePlanId?: number) => {
+export const useExpenseData = (activePlanId?: number, deptId?: number | null) => {
   const { data: rawItems = [], isLoading: itemsLoading } = useQuery<ExpenseItem[]>({
     queryKey: ['expense-class-items'],
     queryFn: () => API.get('/expense-class-items').then(r => r.data.data),
@@ -124,30 +124,35 @@ export const useExpenseData = (activePlanId?: number) => {
   });
 
   const { data: allPlans = [], isLoading: plansLoading } = useQuery<DepartmentBudgetPlan[]>({
-    queryKey: ['dept-budget-plans', activePlanId!],
+    queryKey: ['dept-budget-plans-full', activePlanId!, deptId ?? 'all'],
     queryFn: () =>
       API.get('/department-budget-plans', {
-        params: { budget_plan_id: activePlanId },
+        params: {
+          budget_plan_id: activePlanId,
+          ...(deptId ? { dept_id: deptId } : {}),
+        },
       }).then(r => r.data.data),
     enabled: !!activePlanId,
   });
 
   const loading = itemsLoading || classLoading || plansLoading || !activePlanId;
 
-  const { items, amountMap, classifications } = useMemo(() => {
+  const { items, amountMap, classifications, myPlan } = useMemo(() => {
     if (!activePlanId || !allPlans.length) {
       return {
         items: [] as ItemWithClassification[],
         amountMap: new Map<string, number>(),
         classifications: rawClassifications,
+        myPlan: null as DepartmentBudgetPlan | null,
       };
     }
 
+    const relevantPlans = allPlans.filter(p => Number(p.budget_plan_id) === Number(activePlanId));
+
     const newAmountMap = new Map<string, number>();
-    allPlans
-      .filter(p => p.budget_plan_id === activePlanId)
+    relevantPlans
       .forEach(plan => {
-        plan.items.forEach(item => {
+        (plan.items ?? []).forEach(item => {
           const key = `${plan.dept_id}-${item.expense_item_id}`;
           newAmountMap.set(key, Number(item.total_amount));
         });
@@ -176,8 +181,10 @@ export const useExpenseData = (activePlanId?: number) => {
         return { ...item, classificationName: cls.name, classificationAbbr: cls.abbr };
       });
 
-    return { items: enrichedItems, amountMap: newAmountMap, classifications: rawClassifications };
-  }, [rawItems, rawClassifications, allPlans, activePlanId]);
+    const myPlan = deptId != null ? relevantPlans.find(p => p.dept_id === deptId) ?? null : null;
 
-  return { classifications, items, amountMap, loading };
+    return { items: enrichedItems, amountMap: newAmountMap, classifications: rawClassifications, myPlan };
+  }, [rawItems, rawClassifications, allPlans, activePlanId, deptId]);
+
+  return { classifications, items, amountMap, myPlan, loading };
 };

@@ -72,20 +72,23 @@ const BudgetProposal: React.FC = () => {
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
+    if (!user?.dept_id) {
+      setLoading(false);
+      return;
+    }
     try {
       const [parentRes, deptRes] = await Promise.all([
-        API.get("/budget-plans"),
-        API.get("/department-budget-plans"),
+        API.get("/budget-plans", { params: { fields: "budget_plan_id,year,is_active,is_open" } }),
+        API.get("/department-budget-plans", {
+          params: { dept_id: user.dept_id, light: 1, include: "budget_plan" },
+        }),
       ]);
       const parentPlans: BudgetPlan[] = parentRes.data.data;
       setActivePlan(parentPlans.find(p => p.is_active) ?? null);
 
       const all: DepartmentBudgetPlan[] = deptRes.data.data;
-    //   setPlans(all.filter(p => p.dept_id === user?.dept_id));
-    setPlans(
-        all
-          .filter(p => p.dept_id === user?.dept_id)
-          .sort((a, b) => (b.budget_plan?.year ?? 0) - (a.budget_plan?.year ?? 0))
+      setPlans(
+        [...all].sort((a, b) => (b.budget_plan?.year ?? 0) - (a.budget_plan?.year ?? 0))
       );
     } catch {
       toast.error("Failed to load budget plans.");

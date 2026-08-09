@@ -91,6 +91,67 @@ class Form7Controller extends BaseApiController
     //     ]);
     // }
 
+    /**
+     * GET /form7/summary?budget_plan_id=X&filter=general-fund|sh|occ|pm
+     *
+     * Same computation as index(), but strips item-level `rows`/`obligations`
+     * before returning — only section_code/section_label/subtotal survive.
+     * For widgets like SectorAllocationCard that only chart section
+     * subtotals, this cuts the payload from ~120kB (every line item, name,
+     * account code) down to a handful of numbers.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+            'filter'         => 'nullable|string|in:general-fund,sh,occ,pm',
+        ]);
+
+        $budgetPlanId = $request->integer('budget_plan_id');
+        $filter       = $request->input('filter', 'general-fund');
+
+        $full = $filter !== 'general-fund'
+            ? $this->buildSpecialAccountSections($budgetPlanId, $filter)
+            : $this->buildGeneralFundSections($budgetPlanId);
+
+        $trimmedSections = array_map(fn ($s) => [
+            'section_code'  => $s['section_code'],
+            'section_label' => $s['section_label'],
+            'subtotal'      => $s['subtotal'],
+        ], $full['sections']);
+
+        return $this->success([
+            'budget_plan_id' => $budgetPlanId,
+            'filter'         => $filter,
+            'sections'       => [
+                'sections'    => $trimmedSections,
+                'grand_total' => $full['grand_total'],
+            ],
+        ]);
+    }
+
+    /**
+     * Extracted from index()'s general-fund branch so summary() can reuse it
+     * without duplicating the section-assembly logic.
+     */
+    private function buildGeneralFundSections(int $budgetPlanId): array
+    {
+        $categories        = DB::table('department_categories')->get();
+        $categoryColumnMap = [];
+        foreach ($categories as $cat) {
+            $col = $this->categoryToColumn($cat->dept_category_name);
+            if ($col) $categoryColumnMap[$cat->dept_category_id] = $col;
+        }
+
+        $deptPlanCategoryMap = $this->buildDeptPlanCategoryMap($budgetPlanId, $categoryColumnMap);
+        $form2Rows           = $this->buildForm2Rows($budgetPlanId, $deptPlanCategoryMap);
+        $feRows              = $this->buildFeRows($budgetPlanId);
+        $feSubtotal          = $this->sumRows($feRows);
+        $aipRows             = $this->buildAipRows($budgetPlanId, $categoryColumnMap);
+
+        return $this->assembleSections($form2Rows, $feRows, $feSubtotal, $aipRows);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $request->validate([
@@ -111,29 +172,7 @@ class Form7Controller extends BaseApiController
             ]);
         }
 
-        // ── Category → column map ─────────────────────────────────────────────
-        $categories        = DB::table('department_categories')->get();
-        $categoryColumnMap = [];
-        foreach ($categories as $cat) {
-            $col = $this->categoryToColumn($cat->dept_category_name);
-            if ($col) $categoryColumnMap[$cat->dept_category_id] = $col;
-        }
-
-        // ── dept_budget_plan_id → column (SA excluded) ────────────────────────
-        $deptPlanCategoryMap = $this->buildDeptPlanCategoryMap($budgetPlanId, $categoryColumnMap);
-
-        // ── PS / MOOE / CO from Form 2 ────────────────────────────────────────
-        $form2Rows = $this->buildForm2Rows($budgetPlanId, $deptPlanCategoryMap);
-
-        // ── FE — 20% MDF items + debt obligations + 5% LDRRMF (GF only) ───────
-        $feRows     = $this->buildFeRows($budgetPlanId);
-        $feSubtotal = $this->sumRows($feRows);
-
-        // ── AIP (Special Purpose Appropriations) ──────────────────────────────
-        $aipRows = $this->buildAipRows($budgetPlanId, $categoryColumnMap);
-
-        // ── Assemble ──────────────────────────────────────────────────────────
-        $sections = $this->assembleSections($form2Rows, $feRows, $feSubtotal, $aipRows);
+        $sections = $this->buildGeneralFundSections($budgetPlanId);
 
         return $this->success([
             'budget_plan_id' => $budgetPlanId,
@@ -184,8 +223,10 @@ class Form7Controller extends BaseApiController
         $feRows = [];
         $calamity5 = $this->computeCalamity5Fund($budgetPlanId, $source);
         if ($calamity5 > 0) {
+            // Round 30% first, then 70% = remainder — avoids the two halves
+            // being rounded independently and no longer summing to the total.
             $qrf30 = round($calamity5 * 0.30, 2);
-            $pda70 = round($calamity5 * 0.70, 2);
+            $pda70 = round($calamity5 - $qrf30, 2);
             $feRows[] = $this->makeFeRow('5% Calamity Fund: Quick Response Fund (30% QRF)', '', $qrf30);
             $feRows[] = $this->makeFeRow('70% Pre-Disaster Preparedness Fund', '', $pda70);
         }
@@ -468,8 +509,12 @@ class Form7Controller extends BaseApiController
             ->where('source', 'general-fund')
             ->selectRaw('COALESCE(SUM(mooe + co), 0) as grand')
             ->value('grand');
+        // Round 30% first, then 70% = remainder — same approach as
+        // UnifiedReportController::form7BuildFeRows(), so this always sums
+        // to the exact 5% calamity fund total instead of drifting by a
+        // centavo when both halves are rounded independently.
         $qrf30 = round($calamity5 * 0.30, 2);
-        $pda70 = round($calamity5 * 0.70, 2);
+        $pda70 = round($calamity5 - $qrf30, 2);
 
         if ($calamity5 > 0) {
             $rows[] = $this->makeFeRow('5% LDRRMF: Quick Response Fund (30% QRF)', '5-02', $qrf30);

@@ -50,8 +50,8 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useBudgetPlans, useDepartmentBudgetPlans, queryKeys } from "./useDashboardQueries";
-import { BudgetPlan, DepartmentBudgetPlan } from "../types/api";
+import { useBudgetPlans, useDepartmentBudgetPlans, queryKeys, DepartmentBudgetPlanLite } from "./useDashboardQueries";
+import { BudgetPlan } from "../types/api";
 
 const REFRESH_EVENT = "submitted-plan-count:refresh";
 
@@ -60,17 +60,18 @@ export function refreshSubmittedCount() {
   window.dispatchEvent(new Event(REFRESH_EVENT));
 }
 
-export function useSubmittedPlanCount(): number | null {
+export function useSubmittedPlanCount(options: { enabled?: boolean } = {}): number | null {
+  const { enabled = true } = options;
   const queryClient = useQueryClient();
 
   // ── Reuse shared budget-plans cache — /budget-plans/active call eliminated ─
-  const { data: plans = [] } = useBudgetPlans();
+  const { data: plans = [] } = useBudgetPlans(enabled);
   const activePlan = plans.find((p: BudgetPlan) => p.is_active);
   const planId = activePlan?.budget_plan_id;
 
   // ── Reuse shared dept-budget-plans cache — no extra network call ───────────
   // Same queryKey as useDashboardQueries: ['dept-budget-plans', planId]
-  const { data: deptPlans = [] } = useDepartmentBudgetPlans(planId);
+  const { data: deptPlans = [] } = useDepartmentBudgetPlans(planId, enabled);
 
   // ── On refresh event, invalidate the two upstream queries ─────────────────
   // React Query will refetch them if stale, and this hook re-renders automatically.
@@ -86,7 +87,7 @@ export function useSubmittedPlanCount(): number | null {
   }, [queryClient, planId]);
 
   const submitted = deptPlans.filter(
-    (p: DepartmentBudgetPlan) => p.status === "submitted"
+    (p: DepartmentBudgetPlanLite) => p.status === "submitted"
   ).length;
 
   return submitted > 0 ? submitted : null;

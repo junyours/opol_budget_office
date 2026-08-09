@@ -117,7 +117,7 @@ function useIncomeItems() {
     queryKey: ["income-fund-objects"],
     queryFn: () =>
       API.get("/income-fund-objects").then((r) => r.data?.data ?? []),
-    // staleTime: 5 * 60 * 1000,
+
   });
 }
 
@@ -126,7 +126,7 @@ function useSources() {
     queryKey: ["income-fund-object-sources"],
     queryFn: () =>
       API.get("/income-fund-objects/sources").then((r) => r.data?.data ?? []),
-    // staleTime: 10 * 60 * 1000,
+    
   });
 }
 

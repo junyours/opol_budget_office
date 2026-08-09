@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { DepartmentBudgetPlan } from '@/src/types/api';
 import { cn } from '@/src/lib/utils';
 import {
@@ -25,14 +25,40 @@ const GENERAL_FUND_CEILING_PCT = 0.1; // ← change this to e.g. 0.15 for 15%
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface BudgetComparisonSummary {
+  isOver: boolean;
+  excess: number;
+  remaining: number;
+  threshold: number;
+  diff: number;
+  isSpecialAccount: boolean;
+  ceilingLoading: boolean;
+  aipLoading: boolean;
+  currentInclCal: number;
+  currentExclCal: number;
+  pastTotal: number;
+}
+
 interface BudgetComparisonBannerProps {
   plan:         DepartmentBudgetPlan;
   pastYearPlan: DepartmentBudgetPlan | null;
+  // Called whenever this banner scrolls fully in/out of view — lets the parent
+  // show a condensed sticky summary in the header while this banner is hidden.
+  onVisibilityChange?: (visible: boolean) => void;
+  // Called whenever the computed comparison numbers change, so the parent's
+  // condensed sticky summary always mirrors the full banner.
+  onSummaryChange?: (summary: BudgetComparisonSummary) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ plan, pastYearPlan }) => {
+export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({
+  plan,
+  pastYearPlan,
+  onVisibilityChange,
+  onSummaryChange,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const { data: currentAipItems = [], isLoading: currentAipLoading } =
     useForm4Items(plan.dept_budget_plan_id);
@@ -76,7 +102,7 @@ export const BudgetComparisonBanner: React.FC<BudgetComparisonBannerProps> = ({ 
   const { data: ldrrmfActual } = useQuery<{ reserved30: number; total70: number }>({
     queryKey: ['ldrrmf-summary', plan.budget_plan?.budget_plan_id, incomeSource],
     queryFn: () =>
-      API.get('/ldrrmfip/summary', {
+      API.get('/ldrrmfip/calamity-summary', {
         params: { budget_plan_id: plan.budget_plan?.budget_plan_id, source: incomeSource },
       })
         .then(r => {
@@ -119,8 +145,48 @@ const excess    = isOver ? ceilingBasis - threshold : 0;
   const prevYear  = Number(plan.budget_plan?.year) - 1;
   const currYear  = plan.budget_plan?.year;
 
+  // ── Track this banner's own visibility so the parent can show a condensed
+  // sticky summary (in the header, next to the stepper) once it scrolls away.
+  useEffect(() => {
+    if (!onVisibilityChange) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => onVisibilityChange(entry.isIntersecting),
+      // Negative top margin roughly matches the sticky header's height, so the
+      // banner counts as "hidden" as soon as it passes under the header —
+      // not only once it's fully off the top of the viewport.
+      { threshold: 0, rootMargin: '-90px 0px 0px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onVisibilityChange]);
+
+  // Push the latest computed numbers up whenever they change.
+  useEffect(() => {
+    onSummaryChange?.({
+      isOver,
+      excess,
+      remaining,
+      threshold,
+      diff,
+      isSpecialAccount,
+      ceilingLoading,
+      aipLoading,
+      currentInclCal,
+      currentExclCal,
+      pastTotal,
+    });
+  }, [
+    isOver, excess, remaining, threshold, diff, isSpecialAccount,
+    ceilingLoading, aipLoading, currentInclCal, currentExclCal, pastTotal,
+    onSummaryChange,
+  ]);
+
   return (
-    <div className={cn(
+    <div
+      ref={containerRef}
+      className={cn(
       'rounded-xl border mb-4 px-5 py-4',
       isOver ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200',
     )}>

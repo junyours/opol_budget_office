@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/src/hooks/useAuth";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
 import { useAipProgramData } from "@/src/hooks/useAipProgramData";
-import { useExpenseData } from "@/src/hooks/useExpenseData";
+import { useExpenseTotals } from "@/src/hooks/useExpenseTotals";
 import { usePreviousYearDeptTotal } from "@/src/hooks/usePreviousYearDeptTotal";
 import { useQuery } from "@tanstack/react-query";
 import API from "@/src/services/api";
@@ -37,6 +37,7 @@ import {
     ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useIsMobile } from "@/src/hooks/use-mobile";
+import { AnnouncementsCarousel } from "@/src/components/cards/AnnouncementsCarousel";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,9 @@ const fmt = (n: number) =>
 
 const pct = (a: number, b: number) => (b === 0 ? 0 : Math.round((a / b) * 100));
 
+const fmtFull = (n: number) =>
+    `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 const CLASS_PS   = "Personal Services";
 const CLASS_MOOE = "Maintenance and Other Operating Expenses";
 const CLASS_CO   = "Capital Outlay";
@@ -56,12 +60,12 @@ const CLASS_CO   = "Capital Outlay";
 // ─── Skeleton pieces ─────────────────────────────────────────────────────────
 
 const Shimmer = ({ className }: { className?: string }) => (
-    <div className={cn("rounded-lg bg-zinc-100 animate-pulse", className)} />
+    <div className={cn("rounded-lg bg-muted animate-pulse", className)} />
 );
 
 const CardSkeleton = () => (
-    <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm space-y-3">
-        <Shimmer className="h-9 w-9 rounded-xl" />
+    <div className="bg-card border border-border rounded-lg p-4 shadow-sm space-y-3">
+        <Shimmer className="h-7 w-7 rounded-md" />
         <Shimmer className="h-3 w-20" />
         <Shimmer className="h-7 w-28" />
         <Shimmer className="h-2.5 w-full" />
@@ -69,12 +73,12 @@ const CardSkeleton = () => (
 );
 
 const ChartSkeleton = ({ h = "h-52" }: { title?: string; h?: string }) => (
-    <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
+    <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
         <div className="space-y-1 mb-4">
             <Shimmer className="h-2.5 w-24" />
             <Shimmer className="h-4 w-36" />
         </div>
-        <Shimmer className={cn(h, "w-full rounded-xl")} />
+        <Shimmer className={cn(h, "w-full rounded-lg")} />
     </div>
 );
 
@@ -103,6 +107,7 @@ interface StatCardProps {
     icon: React.ElementType;
     label: string;
     value: string;
+    rawValue: number;
     sub?: string;
     yoyChangePct?: number | null;
     previousValue?: number | null;
@@ -123,6 +128,7 @@ const StatCard: React.FC<StatCardProps> = ({
     icon: Icon,
     label,
     value,
+    rawValue,
     sub,
     yoyChangePct,
     previousValue,
@@ -134,15 +140,15 @@ const StatCard: React.FC<StatCardProps> = ({
     const isMobile = useIsMobile();
     return (
         <Reveal delay={delay}>
-            <div className={cn("bg-white border border-zinc-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow h-full", isMobile ? "p-3.5" : "p-5")}>
-                <div className={cn("rounded-xl flex items-center justify-center flex-shrink-0", a.tile, isMobile ? "w-7 h-7 mb-2" : "w-9 h-9 mb-3")}>
-                    <Icon className={cn(isMobile ? "w-3.5 h-3.5" : "w-[18px] h-[18px]", a.icon)} />
+            <div className={cn("bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow h-full", isMobile ? "p-3.5" : "p-4")}>
+                <div className={cn("rounded-md flex items-center justify-center flex-shrink-0", a.tile, isMobile ? "w-7 h-7 mb-2" : "w-7 h-7 mb-3")}>
+                    <Icon className={cn(isMobile ? "w-3.5 h-3.5" : "w-3.5 h-3.5", a.icon)} />
                 </div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
+                <p className="text-eyebrow mb-1">
                     {label}
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <p className={cn("font-bold text-zinc-900 tabular-nums leading-none", isMobile ? "text-[18px]" : "text-[22px]")}>
+                    <p className={cn("font-semibold text-foreground tabular-nums leading-none", isMobile ? "text-[18px]" : "text-[22px]")}>
                         {value}
                     </p>
                     {yoyChangePct != null && (
@@ -168,8 +174,9 @@ const StatCard: React.FC<StatCardProps> = ({
                         </span>
                     )}
                 </div>
+                <p className="text-[10px] font-mono text-muted-foreground mt-1.5">{fmtFull(rawValue)}</p>
                 {sub && (
-                    <p className={cn("text-[11px] text-zinc-400 leading-snug", isMobile ? "mt-1" : "mt-1.5")}>{sub}</p>
+                    <p className={cn("text-[11px] text-muted-foreground leading-snug", isMobile ? "mt-1" : "mt-1.5")}>{sub}</p>
                 )}
             </div>
         </Reveal>
@@ -182,20 +189,20 @@ const ChartTip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
     return (
-        <div className="bg-white border border-zinc-200 rounded-xl shadow-lg p-3 text-xs max-w-[220px]">
-            {label && <p className="font-semibold text-zinc-700 mb-2 truncate">{label}</p>}
+        <div className="bg-white border border-border rounded-xl shadow-lg p-3 text-xs max-w-[220px]">
+            {label && <p className="font-semibold text-foreground/80 mb-2 truncate">{label}</p>}
             {payload.map((p: any) => (
                 <div key={p.dataKey} className="flex items-center gap-2 mt-1">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                    <span className="text-zinc-500">{p.name}:</span>
-                    <span className="font-semibold text-zinc-800 tabular-nums">{fmt(p.value)}</span>
+                    <span className="text-muted-foreground">{p.name}:</span>
+                    <span className="font-semibold text-foreground tabular-nums">{fmt(p.value)}</span>
                 </div>
             ))}
             {payload.length > 1 && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-zinc-100">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0 bg-zinc-400" />
-                    <span className="text-zinc-500">Total:</span>
-                    <span className="font-bold text-zinc-900 tabular-nums">{fmt(total)}</span>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 bg-muted-foreground" />
+                    <span className="text-muted-foreground">Total:</span>
+                    <span className="font-bold text-foreground tabular-nums">{fmt(total)}</span>
                 </div>
             )}
         </div>
@@ -217,15 +224,15 @@ const SectionHead = ({
     iconBg: string;
     iconColor: string;
 }) => (
-    <div className="flex items-center gap-2.5 mb-4">
-        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0", iconBg)}>
-            <Icon className={cn("w-4 h-4", iconColor)} />
+    <div className="flex items-center gap-2 mb-4">
+        <div className={cn("w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0", iconBg)}>
+            <Icon className={cn("w-3.5 h-3.5", iconColor)} />
         </div>
         <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
+            <p className="text-eyebrow leading-none mb-0.5">
                 {eyebrow}
             </p>
-            <p className="text-[13px] font-bold text-zinc-800 leading-none">{title}</p>
+            <p className="text-section-title leading-none">{title}</p>
         </div>
     </div>
 );
@@ -238,8 +245,11 @@ const DepartmentHeadDashboard: React.FC = () => {
     const deptId = user?.dept_id;
 
     const { activePlan, loading: planLoading } = useActiveBudgetPlan();
-    const { programs, loading: aipLoading } = useAipProgramData(activePlan?.budget_plan_id);
-    const { items, amountMap, loading: expLoading } = useExpenseData(activePlan?.budget_plan_id);
+    const { programs, loading: aipLoading } = useAipProgramData(activePlan?.budget_plan_id, deptId);
+    const { data: expenseTotals, isLoading: expLoading } = useExpenseTotals(activePlan?.budget_plan_id, deptId);
+    const deptPlan = expenseTotals?.dept_budget_plan_id
+        ? { dept_budget_plan_id: expenseTotals.dept_budget_plan_id, status: expenseTotals.status }
+        : null;
     const {
         previousTotal,
         previousPS,
@@ -250,27 +260,9 @@ const DepartmentHeadDashboard: React.FC = () => {
 
     const [showDraftAlert, setShowDraftAlert] = useState(false);
 
-    const { data: deptPlan, isLoading: deptPlanLoading } = useQuery({
-        queryKey: ["my-dept-plan", activePlan?.budget_plan_id, deptId],
-        queryFn: () =>
-            API.get("/department-budget-plans", {
-                params: { budget_plan_id: activePlan?.budget_plan_id },
-            }).then(
-                (r) => (r.data?.data ?? []).find((p: any) => p.dept_id === deptId) ?? null,
-            ),
-        enabled: !!activePlan && !!deptId,
-    });
 
-    const { data: plantilla = [], isLoading: plantillaLoading } = useQuery({
-        queryKey: ["plantilla-my-dept", deptId],
-        queryFn: () =>
-            API.get("/plantilla-positions", {
-                params: { include: "assignments.personnel" },
-            }).then((r) =>
-                (r.data?.data ?? []).filter((p: any) => p.dept_id === deptId),
-            ),
-        enabled: !!deptId,
-    });
+
+
 
     const isSpecialAccountDept = useMemo(() => {
         if (!user || (user as any).role !== "department-head") return false;
@@ -346,7 +338,7 @@ const nonTaxNode = allItems.find(
         return { total, nonTaxRevenue };
     }, [specialFund]);
 
-    const isLoading = planLoading || aipLoading || expLoading || deptPlanLoading;
+    const isLoading = planLoading || aipLoading || expLoading;
 
     useEffect(() => {
         if (!isLoading && deptPlan && deptPlan.status === "draft" && activePlan) {
@@ -356,22 +348,13 @@ const nonTaxNode = allItems.find(
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
-    const myPrograms = useMemo(
-        () => programs.filter((p) => p.dept_id === deptId),
-        [programs, deptId],
-    );
+    // `programs` is already scoped server-side to this department (see useAipProgramData call above)
+    const myPrograms = programs;
 
-    const { totalExpensePS, totalExpenseMOOE, totalExpenseCO, totalExpense } = useMemo(() => {
-        let ps = 0, mooe = 0, co = 0;
-        items.forEach((item) => {
-            const amt = amountMap.get(`${deptId}-${item.expense_class_item_id}`) ?? 0;
-            const cls = item.classificationName;
-            if (cls === CLASS_PS) ps += amt;
-            else if (cls === CLASS_MOOE) mooe += amt;
-            else if (cls === CLASS_CO) co += amt;
-        });
-        return { totalExpensePS: ps, totalExpenseMOOE: mooe, totalExpenseCO: co, totalExpense: ps + mooe + co };
-    }, [items, amountMap, deptId]);
+    const totalExpensePS   = expenseTotals?.ps ?? 0;
+    const totalExpenseMOOE = expenseTotals?.mooe ?? 0;
+    const totalExpenseCO   = expenseTotals?.co ?? 0;
+    const totalExpense     = expenseTotals?.total ?? 0;
 
     const aipTotalPS   = useMemo(() => myPrograms.reduce((s, p) => s + p.total_ps, 0), [myPrograms]);
     const aipTotalMOOE = useMemo(() => myPrograms.reduce((s, p) => s + p.total_mooe, 0), [myPrograms]);
@@ -422,9 +405,9 @@ const nonTaxNode = allItems.find(
     const pieData = useMemo(
         () =>
             [
-                { name: "Personal Services", value: totalExpensePS,   color: "#6366f1" },
-                { name: "MOOE",              value: totalExpenseMOOE, color: "#22d3ee" },
-                { name: "Capital Outlay",    value: totalExpenseCO,   color: "#f59e0b" },
+                { name: "Personal Services", value: totalExpensePS,   color: "hsl(var(--cat-1))" },
+                { name: "MOOE",              value: totalExpenseMOOE, color: "hsl(var(--fin-income))" },
+                { name: "Capital Outlay",    value: totalExpenseCO,   color: "hsl(var(--fin-mdf))" },
             ].filter((d) => d.value > 0),
         [totalExpensePS, totalExpenseMOOE, totalExpenseCO],
     );
@@ -432,14 +415,13 @@ const nonTaxNode = allItems.find(
     const radialData = useMemo(() => {
         if (!aipTotal) return [];
         return [
-            { name: "PS",   value: pct(aipTotalPS,   aipTotal), fill: "#6366f1" },
-            { name: "MOOE", value: pct(aipTotalMOOE, aipTotal), fill: "#22d3ee" },
-            { name: "CO",   value: pct(aipTotalCO,   aipTotal), fill: "#f59e0b" },
+            { name: "PS",   value: pct(aipTotalPS,   aipTotal), fill: "hsl(var(--cat-1))" },
+            { name: "MOOE", value: pct(aipTotalMOOE, aipTotal), fill: "hsl(var(--fin-income))" },
+            { name: "CO",   value: pct(aipTotalCO,   aipTotal), fill: "hsl(var(--fin-mdf))" },
         ];
     }, [aipTotal, aipTotalPS, aipTotalMOOE, aipTotalCO]);
 
-    const filled   = (plantilla as any[]).filter((p) => p.assignments?.[0]?.personnel_id != null).length;
-    const fillRate = pct(filled, plantilla.length);
+    
 
     const dept     = (user as any)?.department;
     const deptName = dept?.dept_name ?? "Your Department";
@@ -457,9 +439,9 @@ const sfUnap   = sfTotal - sfExp;          // simplified: total - (items + cal)
 const sfPieData =
     sfTotal > 0
         ? [
-              { name: "Expenditures",           value: totalExpense,        color: "#a1a1aa" },
-              { name: "5% Calamity",            value: sfCal,               color: "#f43f5e" },
-              { name: "Unappropriated Balance", value: Math.max(0, sfUnap), color: "#10b981" },
+              { name: "Expenditures",           value: totalExpense,        color: "hsl(var(--muted-foreground))" },
+              { name: "5% Calamity",            value: sfCal,               color: "hsl(var(--fin-qrf))" },
+              { name: "Unappropriated Balance", value: Math.max(0, sfUnap), color: "hsl(var(--chart-2))" },
           ].filter((d) => d.value > 0)
         : [];
 
@@ -498,13 +480,13 @@ const sfPieData =
         }
       `}</style>
 
-            <div className="min-h-screen bg-zinc-50/50 p-6 pb-20">
+            <div className="min-h-screen bg-muted/30 p-3 sm:p-5 pb-20">
 
                 {/* ── Page header ───────────────────────────────────────────── */}
                 <Reveal delay={0}>
-                    <div className="flex items-start justify-between mb-7">
-                        <div>
-                            <p className="text-[10px] font-medium tracking-[0.12em] uppercase text-zinc-400">
+                    <div className="flex items-end justify-between gap-4 mb-4">
+                        <div className="flex-shrink-0">
+                            <p className="text-eyebrow">
                                 {new Date().toLocaleDateString("en-US", {
                                     weekday: "long",
                                     year: "numeric",
@@ -512,22 +494,24 @@ const sfPieData =
                                     day: "numeric",
                                 })}
                             </p>
-                            <h1 className="text-[32px] font-bold text-zinc-900 tracking-tight mt-0.5 leading-tight">
+                            <h1 className="text-page-title">
                                 Overview
                             </h1>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <AnnouncementsCarousel />
+                        </div>
                     </div>
                 </Reveal>
 
                 {/* ── No active plan notice ──────────────────────────────────── */}
                 {!planLoading && !activePlan && (
                     <Reveal delay={40}>
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 mb-6">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 mb-4">
                             <InformationCircleIcon className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-medium text-zinc-900">No active budget plan</p>
-                                <p className="text-[11px] text-zinc-500 mt-0.5">
+                                <p className="text-sm font-medium text-foreground">No active budget plan</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
                                     The admin hasn't activated a budget plan yet.
                                 </p>
                             </div>
@@ -537,59 +521,59 @@ const sfPieData =
 
                 {/* ── Row 1: Stat cards ─────────────────────────────────────── */}
                 {isLoading ? (
-                    <div className={cn(isMobile ? "grid grid-cols-2 gap-3" : "flex gap-4", "mb-6")}>
+                    <div className={cn(isMobile ? "grid grid-cols-2 gap-3" : "flex gap-3 sm:gap-4", "mb-4")}>
                         {[...Array(5)].map((_, i) => <CardSkeleton key={i} />)}
                     </div>
                 ) : (
                     <div className={cn(
-                        isMobile ? "grid grid-cols-2 gap-3" : "flex gap-4 items-stretch",
-                        "mb-6",
+                        isMobile ? "grid grid-cols-2 gap-3" : "flex gap-3 sm:gap-4 items-stretch",
+                        "mb-4",
                     )}>
 
                         {/* Budget plan year */}
                         <Reveal delay={40} className={isMobile ? "" : "flex-shrink-0 w-[190px]"}>
-                            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full relative overflow-hidden">
-                                <span className="absolute top-4 right-4 flex h-2 w-2">
+                            <div className="bg-card border border-border rounded-lg p-3.5 shadow-sm hover:shadow-md transition-shadow h-full relative overflow-hidden">
+                                <span className="absolute top-3.5 right-3.5 flex h-1.5 w-1.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                 </span>
-                                <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center mb-3 flex-shrink-0">
-                                    <DocumentTextIcon className="w-[18px] h-[18px] text-blue-500" />
+                                <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center mb-3 flex-shrink-0">
+                                    <DocumentTextIcon className="w-3.5 h-3.5 text-blue-500" />
                                 </div>
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
+                                <p className="text-eyebrow mb-1">
                                     Budget Plan Year
                                 </p>
-                                <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                                <p className="text-metric leading-none">
                                     {activePlan ? `${activePlan.year}` : "—"}
                                 </p>
-                                <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
+                                <p className="text-metric-support mt-1.5">
                                     {activePlan ? "Currently active" : "No active plan"}
                                 </p>
                             </div>
                         </Reveal>
 
-                        {!isMobile && <div className="w-px bg-zinc-200 my-2 flex-shrink-0" />}
+                        {!isMobile && <div className="w-px bg-border my-2 flex-shrink-0" />}
 
                         {/* Total proposed expenditure */}
                         <Reveal delay={60} className={cn(isMobile ? "col-span-2" : "flex-1")}>
                             {deptPlan ? (
                                 <Link
                                     to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
-                                    className="group bg-white border border-blue-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-300 hover:bg-blue-50/30 transition-all h-full flex flex-col cursor-pointer"
+                                    className="group bg-card border border-border rounded-lg p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all h-full flex flex-col cursor-pointer"
                                 >
                                     <div className="flex items-start justify-between mb-3">
-                                        <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-100 transition-colors flex items-center justify-center flex-shrink-0">
-                                            <CurrencyDollarIcon className="w-[18px] h-[18px] text-blue-600" />
+                                        <div className="w-7 h-7 rounded-md bg-blue-50 group-hover:bg-blue-100 transition-colors flex items-center justify-center flex-shrink-0">
+                                            <CurrencyDollarIcon className="w-3.5 h-3.5 text-blue-600" />
                                         </div>
                                         <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", sCfg.cls)}>
                                             {sCfg.label}
                                         </span>
                                     </div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
+                                    <p className="text-eyebrow mb-1">
                                         Total Proposed Expenditure
                                     </p>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                                        <p className="text-metric leading-none">
                                             {fmt(totalProposedExpenditure)}
                                         </p>
                                         {!prevYearLoading && yoyChangePct !== null && (
@@ -611,20 +595,21 @@ const sfPieData =
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug group-hover:text-blue-500 transition-colors">
+                                    <p className="text-[10px] font-mono text-muted-foreground mt-1.5">{fmtFull(totalProposedExpenditure)}</p>
+                                    <p className="text-metric-support mt-1 group-hover:text-blue-500 transition-colors">
                                         Expense items + Special programs →
                                     </p>
                                 </Link>
                             ) : (
-                                <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm h-full flex flex-col">
-                                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center mb-3 flex-shrink-0">
-                                        <CurrencyDollarIcon className="w-[18px] h-[18px] text-blue-600" />
+                                <div className="bg-card border border-border rounded-lg p-4 shadow-sm h-full flex flex-col">
+                                    <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center mb-3 flex-shrink-0">
+                                        <CurrencyDollarIcon className="w-3.5 h-3.5 text-blue-600" />
                                     </div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 mb-1">
+                                    <p className="text-eyebrow mb-1">
                                         Total Proposed Expenditure
                                     </p>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-[22px] font-bold text-zinc-900 tabular-nums leading-none">
+                                        <p className="text-metric leading-none">
                                             {fmt(totalProposedExpenditure)}
                                         </p>
                                         {!prevYearLoading && yoyChangePct !== null && (
@@ -646,7 +631,8 @@ const sfPieData =
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-snug">
+                                    <p className="text-[10px] font-mono text-muted-foreground mt-1.5">{fmtFull(totalProposedExpenditure)}</p>
+                                    <p className="text-metric-support mt-1">
                                         Expense items + Special programs
                                     </p>
                                 </div>
@@ -657,6 +643,7 @@ const sfPieData =
                             icon={ArrowTrendingUpIcon}
                             label="Personnel Services"
                             value={fmt(totalExpensePS)}
+                            rawValue={totalExpensePS}
                             sub={`${pct(totalExpensePS, totalExpense)}% of expense items`}
                             yoyChangePct={prevYearLoading ? undefined : yoyPSChangePct}
                             previousValue={previousPS}
@@ -668,6 +655,7 @@ const sfPieData =
                             icon={DocumentTextIcon}
                             label="MOOE"
                             value={fmt(totalExpenseMOOE)}
+                            rawValue={totalExpenseMOOE}
                             sub={`${pct(totalExpenseMOOE, totalExpense)}% of expense items`}
                             yoyChangePct={prevYearLoading ? undefined : yoyMOOEChangePct}
                             previousValue={previousMOOE}
@@ -680,6 +668,7 @@ const sfPieData =
                                 icon={BuildingOfficeIcon}
                                 label="Capital Outlay"
                                 value={fmt(totalExpenseCO)}
+                                rawValue={totalExpenseCO}
                                 sub={`${pct(totalExpenseCO, totalExpense)}% of expense items`}
                                 yoyChangePct={prevYearLoading ? undefined : yoyCOChangePct}
                                 previousValue={previousCO}
@@ -692,14 +681,14 @@ const sfPieData =
                 )}
 
                 {/* ── Row 2: AIP Radial + Bar ────────────────────────────────── */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
 
                     {/* Radial: AIP PS/MOOE/CO split */}
                     {isLoading ? (
                         <ChartSkeleton h="h-56" />
                     ) : (
                         <Reveal delay={260}>
-                            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
+                            <div className="bg-card border border-border rounded-lg p-4 shadow-sm h-full">
                                 <SectionHead
                                     eyebrow="Special Program Allocation"
                                     title="PS / MOOE / CO"
@@ -708,7 +697,7 @@ const sfPieData =
                                     iconColor="text-indigo-600"
                                 />
                                 {radialData.length === 0 ? (
-                                    <div className="h-48 flex items-center justify-center text-zinc-300 text-sm">
+                                    <div className="h-48 flex items-center justify-center text-muted-foreground/60 text-sm">
                                         No Special Program data yet
                                     </div>
                                 ) : (
@@ -726,7 +715,7 @@ const sfPieData =
                                                 <RadialBar
                                                     dataKey="value"
                                                     cornerRadius={5}
-                                                    background={{ fill: "#f4f4f5" }}
+                                                    background={{ fill: "hsl(var(--muted))" }}
                                                     label={{
                                                         position: "insideStart",
                                                         fill: "#fff",
@@ -738,14 +727,14 @@ const sfPieData =
                                                     iconType="circle"
                                                     iconSize={7}
                                                     formatter={(v) => (
-                                                        <span className="text-[11px] text-zinc-500">{v}</span>
+                                                        <span className="text-[11px] text-muted-foreground">{v}</span>
                                                     )}
                                                 />
                                                 <Tooltip
                                                     formatter={(v: number) => [`${v}%`]}
                                                     contentStyle={{
                                                         borderRadius: 12,
-                                                        border: "1px solid #e4e4e7",
+                                                        border: "1px solid hsl(var(--border))",
                                                         fontSize: 11,
                                                     }}
                                                 />
@@ -757,11 +746,11 @@ const sfPieData =
                                                 { label: "MOOE", val: fmt(aipTotalMOOE), color: "text-cyan-600",   bg: "bg-cyan-50"   },
                                                 { label: "CO",   val: fmt(aipTotalCO),   color: "text-amber-600", bg: "bg-amber-50"  },
                                             ].map((d) => (
-                                                <div key={d.label} className={cn("rounded-xl py-2 text-center", d.bg)}>
+                                                <div key={d.label} className={cn("rounded-lg py-2 text-center", d.bg)}>
                                                     <p className={cn("text-[13px] font-bold tabular-nums", d.color)}>
                                                         {d.val}
                                                     </p>
-                                                    <p className="text-[10px] text-zinc-400 font-semibold">{d.label}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-semibold">{d.label}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -778,35 +767,35 @@ const sfPieData =
                         </div>
                     ) : (
                         <Reveal delay={310} className="lg:col-span-2">
-                            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
+                            <div className="bg-card border border-border rounded-lg p-4 shadow-sm h-full">
                                 <div className={cn("flex mb-4", isMobile ? "flex-col gap-3" : "items-start justify-between")}>
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
-                                            <ClipboardDocumentListIcon className="w-4 h-4 text-violet-600" />
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-md bg-violet-50 flex items-center justify-center flex-shrink-0">
+                                            <ClipboardDocumentListIcon className="w-3.5 h-3.5 text-violet-600" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
+                                            <p className="text-eyebrow leading-none mb-0.5">
                                                 Special Programs
                                             </p>
-                                            <p className="text-[13px] font-bold text-zinc-800 leading-none">
+                                            <p className="text-section-title leading-none">
                                                 Programs by Expenditure
                                             </p>
                                         </div>
                                     </div>
                                     <div className={cn(isMobile ? "text-left" : "text-right flex-shrink-0 ml-3")}>
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400">
+                                        <p className="text-eyebrow">
                                             Total Special Program Expenditures
                                         </p>
-                                        <p className="text-[18px] font-bold text-violet-600 tabular-nums leading-none">
+                                        <p className="text-[18px] font-semibold text-violet-600 tabular-nums leading-none">
                                             {fmt(aipTotal)}
                                         </p>
-                                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                                        <p className="text-[10px] text-muted-foreground mt-0.5">
                                             {myPrograms.length} program{myPrograms.length !== 1 ? "s" : ""}
                                         </p>
                                     </div>
                                 </div>
                                 {barData.length === 0 ? (
-                                    <div className="h-52 flex items-center justify-center text-zinc-300 text-sm">
+                                    <div className="h-52 flex items-center justify-center text-muted-foreground/60 text-sm">
                                         No Special programs for this department
                                     </div>
                                 ) : (
@@ -819,12 +808,12 @@ const sfPieData =
                                         >
                                             <CartesianGrid
                                                 strokeDasharray="3 3"
-                                                stroke="#f4f4f5"
+                                                stroke="hsl(var(--border))"
                                                 vertical={false}
                                             />
                                             <XAxis
                                                 dataKey="name"
-                                                tick={{ fontSize: 9, fill: "#a1a1aa" }}
+                                                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                                                 angle={-30}
                                                 textAnchor="end"
                                                 interval={0}
@@ -832,16 +821,16 @@ const sfPieData =
                                                 axisLine={false}
                                             />
                                             <YAxis
-                                                tick={{ fontSize: 9, fill: "#a1a1aa" }}
+                                                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                                                 tickFormatter={fmt}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 width={54}
                                             />
                                             <Tooltip content={<ChartTip />} />
-                                            <Bar dataKey="PS"   name="PS"   fill="#6366f1" radius={[3, 3, 0, 0]} />
-                                            <Bar dataKey="MOOE" name="MOOE" fill="#22d3ee" radius={[3, 3, 0, 0]} />
-                                            <Bar dataKey="CO"   name="CO"   fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="PS"   name="PS"   fill="hsl(var(--cat-1))" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="MOOE" name="MOOE" fill="hsl(var(--fin-income))" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="CO"   name="CO"   fill="hsl(var(--fin-mdf))" radius={[3, 3, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 )}
@@ -853,40 +842,40 @@ const sfPieData =
                 {/* ── Row 4: Special Account Fund (conditional) ─────────────── */}
                 {isSpecialAccount && (
                     <Reveal delay={460}>
-                        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm overflow-hidden mb-4">
+                        <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden mb-4">
 
-                            <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                                        <BuildingStorefrontIcon className="w-5 h-5 text-violet-500" />
+                            <div className="px-4 pt-4 pb-3 border-b border-border flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-md bg-violet-50 flex items-center justify-center flex-shrink-0">
+                                        <BuildingStorefrontIcon className="w-3.5 h-3.5 text-violet-500" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 leading-none mb-0.5">
+                                        <p className="text-eyebrow leading-none mb-0.5">
                                             Estimated Revenue
                                         </p>
-                                        <p className="text-[13px] font-bold text-zinc-800 leading-none">
+                                        <p className="text-section-title leading-none">
                                             Special Account · {deptAbbr || deptName}
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-5 space-y-4">
+                            <div className="p-4 space-y-4">
                                 <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-12")}>
 
                                     {/* Estimated Revenue */}
-                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5")}>
-                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">
+                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-muted/40 rounded-lg border border-border p-3.5")}>
+                                        <p className="text-eyebrow mb-2">
                                             Estimated Revenue
                                         </p>
                                         {specialFundLoading ? (
-                                            <div className="h-7 w-24 rounded-lg bg-zinc-200 animate-pulse" />
+                                            <div className="h-7 w-24 rounded-lg bg-muted animate-pulse" />
                                         ) : (
                                             <>
-                                                <p className="text-2xl font-semibold text-zinc-900 tabular-nums leading-none">
+                                                <p className="text-2xl font-semibold text-foreground tabular-nums leading-none">
                                                     {fmt(sfTotal)}
                                                 </p>
-                                                <p className="text-[10px] font-mono text-zinc-400 mt-1.5">
+                                                <p className="text-[10px] font-mono text-muted-foreground mt-1.5">
                                                     ₱{Math.round(sfTotal).toLocaleString("en-PH")}
                                                 </p>
                                             </>
@@ -894,19 +883,19 @@ const sfPieData =
                                     </div>
 
                                     {/* Expenditures */}
-                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-zinc-50 rounded-2xl border border-zinc-100 p-3.5")}>
-                                        <p className="text-[10px] font-medium uppercase tracking-widests text-zinc-500 mb-2 flex items-center gap-1">
-                                            <ArrowTrendingDownIcon className="w-3 h-3 text-zinc-400" />
+                                    <div className={cn(isMobile ? "" : "col-span-3", "bg-muted/40 rounded-lg border border-border p-3.5")}>
+                                        <p className="text-eyebrow mb-2 flex items-center gap-1">
+                                            <ArrowTrendingDownIcon className="w-3 h-3 text-muted-foreground" />
                                             Expenditures
                                         </p>
                                         {expLoading ? (
-                                            <div className="h-7 w-24 rounded-lg bg-zinc-200 animate-pulse" />
+                                            <div className="h-7 w-24 rounded-lg bg-muted animate-pulse" />
                                         ) : (
                                             <>
-                                                <p className="text-2xl font-semibold text-zinc-900 tabular-nums leading-none">
+                                                <p className="text-2xl font-semibold text-foreground tabular-nums leading-none">
                                                     {fmt(sfExp)}
                                                 </p>
-                                                <p className="text-[10px] font-mono text-zinc-400 mt-1.5">
+                                                <p className="text-[10px] font-mono text-muted-foreground mt-1.5">
                                                     ₱{Math.round(sfExp).toLocaleString("en-PH")}
                                                 </p>
                                             </>
@@ -917,12 +906,12 @@ const sfPieData =
                                     <div className={cn(isMobile ? "" : "col-span-6", "flex items-center gap-3")}>
                                         {specialFundLoading || expLoading ? (
                                             <div className="flex-1 flex items-center justify-center">
-                                                <div className="w-24 h-24 rounded-full bg-zinc-100 animate-pulse" />
+                                                <div className="w-24 h-24 rounded-full bg-muted animate-pulse" />
                                             </div>
                                         ) : sfPieData.length > 0 ? (
                                             <>
                                                 <div className="w-[96px] flex-shrink-0">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 text-center mb-1">
+                                                    <p className="text-eyebrow text-center mb-1">
                                                         Allocation
                                                     </p>
                                                     <ResponsiveContainer width="100%" height={88}>
@@ -947,7 +936,7 @@ const sfPieData =
                                                                 ]}
                                                                 contentStyle={{
                                                                     borderRadius: 12,
-                                                                    border: "1px solid #e4e4e7",
+                                                                    border: "1px solid hsl(var(--border))",
                                                                     fontSize: 11,
                                                                 }}
                                                             />
@@ -958,75 +947,69 @@ const sfPieData =
                                                 <div className="flex-1 space-y-1.5 min-w-0">
                                                     <div className="flex items-center justify-between gap-1">
                                                         <div className="flex items-center gap-1.5 min-w-0">
-                                                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#a1a1aa" }} />
-                                                            <span className="text-xs text-zinc-500 font-medium truncate">Expenditures</span>
+                                                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-muted-foreground" />
+                                                            <span className="text-xs text-muted-foreground font-medium truncate">Expenditures</span>
                                                         </div>
-                                                        <span className="text-xs text-zinc-700 font-semibold font-mono flex-shrink-0">
+                                                        <span className="text-xs text-foreground/80 font-semibold font-mono flex-shrink-0">
                                                             {fmt(sfExp)}
                                                         </span>
                                                     </div>
 
-                                                    <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-2 py-1.5 space-y-1">
+                                                    <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5 space-y-1">
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
-                                                                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                                                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-fin-qrf" />
+                                                                <span className="text-eyebrow">
                                                                     5% Calamity
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[10px] font-semibold font-mono text-zinc-500">
+                                                            <span className="text-[10px] font-semibold font-mono text-muted-foreground">
                                                                 {fmt(sfCal)}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center justify-between pl-3">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#f43f5e" }} />
-                                                                <span className="text-[10px] text-zinc-400">30% QRF</span>
+                                                                <span className="w-1 h-1 rounded-full flex-shrink-0 bg-fin-qrf" />
+                                                                <span className="text-[10px] text-muted-foreground">30% QRF</span>
                                                             </div>
-                                                            <span className="text-[10px] font-mono text-zinc-500">{fmt(sfQrf)}</span>
+                                                            <span className="text-[10px] font-mono text-muted-foreground">{fmt(sfQrf)}</span>
                                                         </div>
                                                         <div className="flex items-center justify-between pl-3">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
-                                                                <span className="text-[10px] text-zinc-400">70% Pre-Disaster</span>
+                                                                <span className="w-1 h-1 rounded-full flex-shrink-0 bg-fin-predisaster" />
+                                                                <span className="text-[10px] text-muted-foreground">70% Pre-Disaster</span>
                                                             </div>
-                                                            <span className="text-[10px] font-mono text-zinc-500">{fmt(sfPredis)}</span>
+                                                            <span className="text-[10px] font-mono text-muted-foreground">{fmt(sfPredis)}</span>
                                                         </div>
                                                     </div>
 
-                                                    <div
-                                                        className={`rounded-lg border px-2 py-1.5 ${
-                                                            sfUPos
-                                                                ? "bg-emerald-50 border-emerald-200"
-                                                                : "bg-red-50 border-red-200"
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center gap-1 mb-0.5">
-                                                            <span
-                                                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                                                style={{ background: sfUPos ? "#10b981" : "#ef4444" }}
-                                                            />
-                                                            <p
-                                                                className={`text-[10px] font-semibold uppercase tracking-widest ${
-                                                                    sfUPos ? "text-emerald-700" : "text-red-600"
-                                                                }`}
-                                                            >
-                                                                Unappropriated Balance
-                                                            </p>
-                                                        </div>
-                                                        <p
-                                                            className={`text-sm font-semibold font-mono ${
-                                                                sfUPos ? "text-emerald-700" : "text-red-600"
-                                                            }`}
-                                                        >
-                                                            {sfUPos ? "+" : ""}₱{Math.round(sfUnap).toLocaleString("en-PH")}
-                                                        </p>
-                                                    </div>
+                                                    {(() => {
+                                                        const zero = Math.round(sfUnap * 100) === 0;
+                                                        const pos = zero || sfUnap > 0;
+                                                        return (
+                                                            <div className="rounded-lg border border-border bg-card px-2 py-1.5">
+                                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                                    <span className={cn(
+                                                                        "text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0",
+                                                                        pos ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700",
+                                                                    )}>
+                                                                        {zero ? "BALANCED" : pos ? "UNALLOCATED" : "OVER-APPROPRIATED"}
+                                                                    </span>
+                                                                </div>
+                                                                <p className={cn(
+                                                                    "text-sm font-semibold font-mono",
+                                                                    pos ? "text-emerald-700" : "text-red-600",
+                                                                )}>
+                                                                    {pos ? "+" : ""}₱{Math.round(Math.abs(sfUnap)).toLocaleString("en-PH")}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </>
                                         ) : (
                                             <div className="flex-1 flex items-center justify-center opacity-20">
-                                                <BuildingStorefrontIcon className="w-10 h-10 text-zinc-400" />
+                                                <BuildingStorefrontIcon className="w-10 h-10 text-muted-foreground" />
                                             </div>
                                         )}
                                     </div>
@@ -1034,54 +1017,54 @@ const sfPieData =
 
                                 {/* 5% Calamity Fund detail panel */}
                                 {sfNonTax > 0 && (
-                                    <div className="rounded-2xl border border-zinc-100 overflow-hidden">
-                                        <div className="bg-zinc-50 px-4 py-3 flex items-center justify-between border-b border-zinc-100">
+                                    <div className="rounded-lg border border-border overflow-hidden">
+                                        <div className="bg-muted/40 px-4 py-3 flex items-center justify-between border-b border-border">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                                                <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
                                                     <ExclamationTriangleIcon className="w-3.5 h-3.5 text-rose-500" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600">
+                                                    <p className="text-eyebrow">
                                                         5% Calamity Fund
                                                     </p>
-                                                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">
                                                         of Non-Tax Revenue · R.A. 10121
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-base font-semibold text-zinc-900">
+                                                <p className="text-base font-semibold text-foreground">
                                                     ₱{Math.round(sfCal).toLocaleString("en-PH")}
                                                 </p>
-                                                <p className="text-[10px] text-zinc-400 font-mono">budgeted</p>
+                                                <p className="text-[10px] text-muted-foreground font-mono">budgeted</p>
                                             </div>
                                         </div>
 
-                                        <div className={cn("grid bg-white", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                                            <div className={cn("px-4 py-3 space-y-1.5", isMobile ? "border-b border-zinc-100" : "border-r border-zinc-100")}>
+                                        <div className={cn("grid bg-card", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                                            <div className={cn("px-4 py-3 space-y-1.5", isMobile ? "border-b border-border" : "border-r border-border")}>
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                                    <p className="text-eyebrow">
                                                         30% QRF
                                                     </p>
-                                                    <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">
+                                                    <span className="text-[9px] text-muted-foreground">
                                                         reserved
                                                     </span>
                                                 </div>
                                                 <div className="flex items-baseline gap-1">
-                                                    <p className="text-sm font-semibold text-rose-700">
+                                                    <p className="text-sm font-semibold text-foreground">
                                                         ₱{Math.round(sfQrf).toLocaleString("en-PH")}
                                                     </p>
-                                                    <p className="text-[10px] text-zinc-400">
+                                                    <p className="text-[10px] text-muted-foreground">
                                                         / ₱{Math.round(sfQrf).toLocaleString("en-PH")}
                                                     </p>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-400">reserved · not yet disbursed</p>
-                                                <div className="h-1 bg-rose-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-rose-400 rounded-full" style={{ width: "100%" }} />
+                                                <p className="text-[10px] text-muted-foreground">reserved · not yet disbursed</p>
+                                                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                                    <div className="h-full bg-fin-qrf rounded-full" style={{ width: "100%" }} />
                                                 </div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] text-zinc-400">Available</span>
-                                                    <span className="text-[10px] font-semibold font-mono text-rose-500">
+                                                    <span className="text-[10px] text-muted-foreground">Available</span>
+                                                    <span className="text-[10px] font-medium font-mono">
                                                         ₱{Math.round(sfQrf).toLocaleString("en-PH")}
                                                     </span>
                                                 </div>
@@ -1089,33 +1072,33 @@ const sfPieData =
 
                                             <div className="px-4 py-3 space-y-1.5">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                                    <p className="text-eyebrow">
                                                         70% Pre-Disaster
                                                     </p>
-                                                    <span className="text-[9px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">
+                                                    <span className="text-[9px] text-muted-foreground">
                                                         {sfPredis > 0 ? `${Math.round((sfAllocated70 / sfPredis) * 100)}%` : "0%"}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-baseline gap-1">
-                                                    <p className="text-sm font-semibold text-orange-700">
+                                                    <p className="text-sm font-semibold text-foreground">
                                                         ₱{Math.round(sfAllocated70).toLocaleString("en-PH")}
                                                     </p>
-                                                    <p className="text-[10px] text-zinc-400">
+                                                    <p className="text-[10px] text-muted-foreground">
                                                         / ₱{Math.round(sfPredis).toLocaleString("en-PH")}
                                                     </p>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-400">allocated</p>
-                                                <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-orange-400 rounded-full transition-all duration-700"
+                                                <p className="text-[10px] text-muted-foreground">allocated</p>
+                                                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                                    <div className="h-full bg-fin-predisaster rounded-full transition-all duration-700"
                                                         style={{ width: sfPredis > 0 ? `${Math.min(100, (sfAllocated70 / sfPredis) * 100)}%` : "0%" }} />
                                                 </div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] text-zinc-400">Remaining</span>
-                                                    <span className="text-[10px] font-semibold font-mono text-orange-500">
+                                                    <span className="text-[10px] text-muted-foreground">Remaining</span>
+                                                    <span className="text-[10px] font-medium font-mono">
                                                         ₱{Math.round(Math.max(0, sfPredis - sfAllocated70)).toLocaleString("en-PH")}
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-300">JMC 2013-1 · R.A. 10121</p>
+                                                <p className="text-[10px] text-muted-foreground/60">JMC 2013-1 · R.A. 10121</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1125,186 +1108,33 @@ const sfPieData =
                     </Reveal>
                 )}
 
-                {/* ── Row 3: Expense Classification + Plantilla ─────────────── */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-                    {/* Pie: PS / MOOE / CO from expense items */}
-                    {isLoading ? (
-                        <ChartSkeleton h="h-44" />
-                    ) : (
-                        <Reveal delay={360}>
-                            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm">
-                                <SectionHead
-                                    eyebrow="Expense Classification"
-                                    title="Expense Classification Breakdown"
-                                    icon={DocumentTextIcon}
-                                    iconBg="bg-amber-50"
-                                    iconColor="text-amber-600"
-                                />
-                                {pieData.length === 0 ? (
-                                    <div className="h-44 flex items-center justify-center text-zinc-300 text-sm">
-                                        No expense data
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-4">
-                                        <ResponsiveContainer width={160} height={160}>
-                                            <PieChart>
-                                                <Pie
-                                                    data={pieData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={42}
-                                                    outerRadius={70}
-                                                    dataKey="value"
-                                                    stroke="none"
-                                                    paddingAngle={2}
-                                                >
-                                                    {pieData.map((d, i) => (
-                                                        <Cell key={i} fill={d.color} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip
-                                                    formatter={(v: number) => [fmt(v)]}
-                                                    contentStyle={{
-                                                        borderRadius: 12,
-                                                        border: "1px solid #e4e4e7",
-                                                        fontSize: 11,
-                                                    }}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                        <div className="flex-1 space-y-3 min-w-0">
-                                            {pieData.map((d) => (
-                                                <div key={d.name} className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span
-                                                            className="w-2 h-2 rounded-full flex-shrink-0"
-                                                            style={{ background: d.color }}
-                                                        />
-                                                        <span className="text-[11px] text-zinc-500 truncate flex-1">
-                                                            {d.name}
-                                                        </span>
-                                                        <span className="text-[11px] font-semibold text-zinc-700 tabular-nums">
-                                                            {fmt(d.value)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="ml-4 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full rounded-full transition-[width] duration-700"
-                                                            style={{
-                                                                width: `${pct(d.value, totalExpense)}%`,
-                                                                background: d.color,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <p className="ml-4 text-[10px] text-zinc-400">
-                                                        {pct(d.value, totalExpense)}% of total
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </Reveal>
-                    )}
-
-                    {/* Plantilla */}
-                    {/* {plantillaLoading ? (
-                        <ChartSkeleton h="h-44" />
-                    ) : (
-                        <Reveal delay={410}>
-                            <div className="bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm h-full">
-                                <SectionHead
-                                    eyebrow="Plantilla"
-                                    title="Staffing Status"
-                                    icon={UserGroupIcon}
-                                    iconBg="bg-emerald-50"
-                                    iconColor="text-emerald-600"
-                                />
-                                <div className="mb-3">
-                                    <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-emerald-500 rounded-full transition-[width] duration-700"
-                                            style={{ width: `${fillRate}%` }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-between text-[10px] mt-1.5">
-                                        <span className="text-zinc-400">{filled} filled</span>
-                                        <span className="font-bold text-emerald-600">{fillRate}%</span>
-                                        <span className="text-zinc-400">
-                                            {(plantilla as any[]).length - filled} vacant
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                                    {(plantilla as any[]).slice(0, 8).map((pos) => {
-                                        const assigned = pos.assignments?.[0]?.personnel_id != null;
-                                        return (
-                                            <div
-                                                key={pos.plantilla_position_id}
-                                                className="flex items-center gap-2 py-1"
-                                            >
-                                                <span
-                                                    className={cn(
-                                                        "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                                                        assigned ? "bg-emerald-400" : "bg-zinc-200",
-                                                    )}
-                                                />
-                                                <span className="text-[11px] text-zinc-600 truncate flex-1">
-                                                    {pos.position_title}
-                                                </span>
-                                                <span className="text-[10px] text-zinc-400 tabular-nums font-mono">
-                                                    SG {pos.salary_grade}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                    {(plantilla as any[]).length > 8 && (
-                                        <p className="text-center text-[10px] text-zinc-400 pt-1">
-                                            +{(plantilla as any[]).length - 8} more positions
-                                        </p>
-                                    )}
-                                    {(plantilla as any[]).length === 0 && (
-                                        <p className="text-center text-[11px] text-zinc-300 py-4">
-                                            No positions found
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </Reveal>
-                    )} */}
                 </div>
-
-
-
-            </div>
 
             {/* ── Draft Proposal Notification ────────────────────────────────── */}
             {showDraftAlert && deptPlan && deptPlan.status === "draft" && (
                 <div className="fixed bottom-5 right-5 z-50 w-80 animate-in fade-in slide-in-from-bottom-3 duration-300">
-                    <div className="bg-white border border-amber-200 rounded-2xl shadow-lg p-4 relative">
+                    <div className="bg-card border border-amber-200 rounded-lg shadow-lg p-4 relative">
                         <button
                             onClick={() => setShowDraftAlert(false)}
-                            className="absolute top-3 right-3 text-zinc-300 hover:text-zinc-600 transition-colors"
+                            className="absolute top-3 right-3 text-muted-foreground/50 hover:text-foreground transition-colors"
                         >
                             <X className="h-3.5 w-3.5" />
                         </button>
                         <div className="flex items-start gap-3 pr-4">
-                            <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <InformationCircleIcon className="w-4 h-4 text-amber-600" />
+                            <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <InformationCircleIcon className="w-3.5 h-3.5 text-amber-600" />
                             </div>
                             <div className="min-w-0">
-                                <p className="text-[13px] font-semibold text-zinc-900 leading-tight">
+                                <p className="text-[13px] font-semibold text-foreground leading-tight">
                                     Draft Proposal
                                 </p>
-                                <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
+                                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
                                     You have an unsubmitted proposal for{" "}
-                                    <span className="font-medium text-zinc-700">FY {activePlan?.year}</span>.
+                                    <span className="font-medium text-foreground/80">FY {activePlan?.year}</span>.
                                 </p>
                                 <Link
                                     to={`/department-budget-plans/${deptPlan.dept_budget_plan_id}`}
-                                    className="inline-block mt-2 text-[11px] font-semibold text-zinc-900 underline underline-offset-2 hover:text-zinc-600"
+                                    className="inline-block mt-2 text-[11px] font-semibold text-foreground underline underline-offset-2 hover:text-muted-foreground"
                                     onClick={() => setShowDraftAlert(false)}
                                 >
                                     Open draft →

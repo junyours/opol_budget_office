@@ -195,7 +195,7 @@ export const BreadcrumbNav: React.FC = () => {
     queryFn: () =>
       API.get(`/department-budget-plans/${lbpPlanId}`).then(r => r.data?.data ?? r.data),
     enabled: !!lbpPlanId,
-    staleTime: 5 * 60 * 1000,
+    
   });
 
   let breadcrumbItems: { to?: string; name: string }[];

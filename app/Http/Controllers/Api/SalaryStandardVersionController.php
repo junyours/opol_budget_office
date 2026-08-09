@@ -156,6 +156,23 @@ class SalaryStandardVersionController extends BaseMasterCrudController
         return $this->success($versions);
     }
 
+    /**
+     * GET /salary-standard-versions/active
+     *
+     * Lean single-row payload for widgets that only need to know which
+     * tranche is currently active (e.g. the dashboard's Salary Tranche
+     * card) — skips the full salary_grade_steps matrix (~50kB+) entirely
+     * and only selects the handful of columns actually displayed.
+     */
+    public function active()
+    {
+        $version = SalaryStandardVersion::where('is_active', true)
+            ->select(['salary_standard_version_id', 'lbc_reference', 'tranche', 'income_class', 'is_active'])
+            ->first();
+
+        return $this->success($version);
+    }
+
     public function storeWithSteps(Request $request)
     {
         $this->authorize('create', SalaryStandardVersion::class);

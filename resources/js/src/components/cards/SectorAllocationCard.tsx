@@ -2,6 +2,8 @@ import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import API from "@/src/services/api";
 import { cn } from "@/src/lib/utils";
+import { useDepartmentsLite } from "@/src/hooks/useDashboardQueries";
+import { useForm7GeneralFundSummary } from "@/src/hooks/useForm7Queries"; // adjust path to wherever that file lives
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip,
@@ -39,10 +41,19 @@ const peso = (v: number) =>
   `₱${v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const pesoC = (v: number): string => {
-  if (v >= 1_000_000_000) return `₱${(Math.floor(v / 1_000_000) / 1_000).toLocaleString("en-PH", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}B`;
-  if (v >= 1_000_000)     return `₱${(Math.floor(v / 1_000)     / 1_000).toLocaleString("en-PH", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}M`;
-  if (v >= 1_000)         return `₱${(Math.floor(v)              / 1_000).toLocaleString("en-PH", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}K`;
-  return `₱${Math.floor(v).toLocaleString("en-PH")}`;
+  if (v >= 1_000_000_000) {
+    const n = v / 1_000_000_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}B`;
+  }
+  if (v >= 1_000_000) {
+    const n = v / 1_000_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
+  }
+  if (v >= 1_000) {
+    const n = v / 1_000;
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}K`;
+  }
+  return `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 function Shimmer({ className }: { className?: string }) {
@@ -118,9 +129,9 @@ const SectorTotalsRow: React.FC<{ grandTotal: SectionSubtotal }> = ({ grandTotal
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+    <div className="rounded-lg border border-border mt-3 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x-0 sm:divide-x divide-border [&>*:nth-child(odd)]:border-r sm:[&>*:nth-child(odd)]:border-r-0">
       {sectors.map(s => (
-        <div key={s.key} className="rounded-lg border border-border p-2.5 min-w-0">
+        <div key={s.key} className="p-2.5 min-w-0 border-border">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
             <p className="text-[9px] font-medium text-muted-foreground leading-tight truncate">{s.label}</p>
@@ -135,21 +146,23 @@ const SectorTotalsRow: React.FC<{ grandTotal: SectionSubtotal }> = ({ grandTotal
 
 // ─── Section subtotal chips ───────────────────────────────────────────────────
 
-const SectionChips: React.FC<{ sections: Form7Section[] }> = ({ sections }) => (
-  <div className="flex flex-wrap gap-2 mt-3">
-    {sections.map(sec => {
-      const cfg = SECTION_DISPLAY[sec.section_code];
-      if (!cfg) return null;
-      return (
-        <div key={sec.section_code} className="rounded-full border border-border px-2.5 py-1 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
-          <span className="text-[10px] font-medium text-muted-foreground">{cfg.shortLabel}</span>
-          <span className="text-[11px] font-medium font-mono tabular-nums text-foreground">{pesoC(sec.subtotal.total)}</span>
-        </div>
-      );
-    })}
-  </div>
-);
+const SectionChips: React.FC<{ sections: Form7Section[] }> = ({ sections }) => {
+  const valid = sections.filter(sec => SECTION_DISPLAY[sec.section_code]);
+  return (
+    <div className="rounded-full border border-border mt-3 flex divide-x divide-border overflow-hidden">
+      {valid.map(sec => {
+        const cfg = SECTION_DISPLAY[sec.section_code];
+        return (
+          <div key={sec.section_code} className="px-2.5 py-1 flex items-center gap-1.5 flex-1 justify-center min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+            <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">{cfg.shortLabel}</span>
+            <span className="text-[11px] font-medium font-mono tabular-nums text-foreground whitespace-nowrap">{pesoC(sec.subtotal.total)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Chart config for shadcn ChartContainer ───────────────────────────────────
 
@@ -328,71 +341,208 @@ const AllocationPanel: React.FC<PanelProps> = ({ title, eyebrow, accentClass, da
 
 // ─── SA fetcher (reuses department-budget-plans, same as useForm7SpecialAccount) ──
 
-function useSaForm7Summary(planId: number | undefined) {
-  const { data: departments = [] } = useQuery<any[]>({
-    queryKey: ["departments"],
-    queryFn:  () => API.get("/departments").then(r => r.data?.data ?? []),
+// function useSaForm7Summary(planId: number | undefined, calamityFund: number = 0) {
+//   const { data: departments = [] } = useDepartmentsLite();
+
+//  // Build one synthetic Form7Response for all three SA combined.
+//   //
+//   // IMPORTANT: this needs the FULL (non-light) department-budget-plans payload
+//   // — item-level rows with expense_item.classification.abbreviation — to bucket
+//   // amounts into PS/MOOE/FE/CO/SPA. The dashboard's shared `['dept-budget-plans', planId]`
+//   // cache entry is the ?light=1 shape (items_total only, no items[]), so this MUST
+//   // use its own query key or it silently reads that cached light payload instead
+//   // (plan.items becomes undefined and the whole classification loop no-ops).
+//   const { data: deptPlans = [], isLoading: plansLoading } = useQuery<any[]>({
+//     queryKey: ["form7-sa-dept-budget-plans-full", planId],
+//     queryFn:  () =>
+//       API.get("/department-budget-plans", { params: { "filter[budget_plan_id]": planId } })
+//         .then(r => r.data?.data ?? []),
+//     enabled: !!planId,
+//   });
+
+//   // AIP program amounts (PS/MOOE/CO breakdown) — same source useDeptExpenditures
+//   // and useSpecialDeptExpenditures use. Without this, SA totals only reflect
+//   // Form2 line items and undercount by whatever's entered as AIP programs.
+//   //
+//   // Own query key for the same reason as above: the shared `['aip-programs', planId]`
+//   // cache entry is fetched elsewhere with `fields: 'dept_id,total_amount'`, which
+//   // omits total_ps/total_mooe/total_co that this component reads.
+//   const { data: aipPrograms = [], isLoading: aipLoading } = useQuery<any[]>({
+//     queryKey: ["form7-sa-aip-programs-full", planId],
+//     queryFn:  () =>
+//       API.get("/aip-programs", { params: { budget_plan_id: planId } })
+//         .then(r => r.data?.data ?? []),
+//     enabled: !!planId,
+//   });
+
+//   const result = useMemo<Form7Response | undefined>(() => {
+//     if (!deptPlans.length || !departments.length) return undefined;
+
+//     const saAbbrs = new Set(["SH","OCC","PM"]);
+//     const saDepts = departments.filter((d: any) => saAbbrs.has((d.dept_abbreviation ?? "").toUpperCase()));
+//     const saDeptIds = new Set(saDepts.map((d: any) => d.dept_id));
+
+//     const saPlans = deptPlans.filter((p: any) => saDeptIds.has(p.dept_id));
+
+//     // For SA, sector breakdown is not meaningful — all amounts go in "total" only
+//     // We still build the same shape so the panel renders consistently
+//     const ZERO_SUB: SectionSubtotal = { general_public_services:0, social_services:0, economic_services:0, other_services:0, total:0 };
+
+//     const sectionMap = new Map<string, SectionSubtotal>();
+
+//     saPlans.forEach((plan: any) => {
+//       const items: any[] = plan.items ?? [];
+//       items.forEach((item: any) => {
+//         const amt = parseFloat(String(item.total_amount)) || 0;
+//         if (amt === 0) return;
+//         // const classId = item.expense_item?.classification?.expense_class_id ?? item.expense_item?.expense_class_id ?? 2;
+//         // const codeMap: Record<number,string> = { 1:"PS", 2:"MOOE", 3:"FE", 4:"CO" };
+//         // const code = codeMap[classId] ?? "MOOE";
+
+//         const rawAbbr = String(item.expense_item?.classification?.abbreviation ?? "").toUpperCase();
+//         const code = ["PS","MOOE","FE","CO","SPA"].includes(rawAbbr) ? rawAbbr : "MOOE";
+
+//         if (!sectionMap.has(code)) sectionMap.set(code, { ...ZERO_SUB });
+//         sectionMap.get(code)!.total += amt;
+//       });
+//     });
+
+//     // AIP program amounts — same as useSpecialDeptExpenditures/useDeptExpenditures,
+//     // which add `aip.total_amount` on top of Form2 items. Here we fold the PS/MOOE/CO
+//     // breakdown in directly so it lands in the right section bars.
+//     aipPrograms
+//       .filter((p: any) => saDeptIds.has(p.dept_id))
+//       .forEach((p: any) => {
+//         const ps   = parseFloat(String(p.total_ps))   || 0;
+//         const mooe = parseFloat(String(p.total_mooe)) || 0;
+//         const co   = parseFloat(String(p.total_co))   || 0;
+
+//         if (ps > 0) {
+//           if (!sectionMap.has("PS")) sectionMap.set("PS", { ...ZERO_SUB });
+//           sectionMap.get("PS")!.total += ps;
+//         }
+//         if (mooe > 0) {
+//           if (!sectionMap.has("MOOE")) sectionMap.set("MOOE", { ...ZERO_SUB });
+//           sectionMap.get("MOOE")!.total += mooe;
+//         }
+//         if (co > 0) {
+//           if (!sectionMap.has("CO")) sectionMap.set("CO", { ...ZERO_SUB });
+//           sectionMap.get("CO")!.total += co;
+//         }
+//       });
+
+//     // Fold the 5% Calamity Fund (30% QRF + 70% Pre-Disaster) into FE —
+//     // it's computed separately (5% of non-tax revenue), not entered as a
+//     // dept plan line item, so it's added here to match the GF total.
+//     if (calamityFund > 0) {
+//       if (!sectionMap.has("FE")) sectionMap.set("FE", { ...ZERO_SUB });
+//       sectionMap.get("FE")!.total += calamityFund;
+//     }
+
+//     const sections: Form7Section[] = [];
+//     const ORDER = ["PS","MOOE","FE","CO","SPA"];
+//     ORDER.forEach(code => {
+//       const sub = sectionMap.get(code);
+//       if (!sub || sub.total === 0) return;
+//       sections.push({
+//         section_code:  code,
+//         section_label: code,
+//         subtotal:      sub,
+//       });
+//     });
+
+//     const grandTotal = sections.reduce((acc, s) => ({ ...acc, total: acc.total + s.subtotal.total }), { ...ZERO_SUB });
+
+//     return { sections: { sections, grand_total: grandTotal } };
+//   }, [deptPlans, aipPrograms, departments, calamityFund]);
+
+//   return { data: result, isLoading: plansLoading || aipLoading || !planId, isError: false };
+// }
+
+function useSaForm7Summary(planId: number | undefined, calamityFund: number = 0) {
+  const { data: departments = [] } = useDepartmentsLite();
+
+  // Lean: dept_id + classification code + total, aggregated in SQL.
+  // Replaces the previous full department-budget-plans fetch (every Form2
+  // item, with nested expense_item.classification, per department — ~900kB).
+  const { data: sectionTotals = [], isLoading: sectionsLoading } = useQuery<any[]>({
+    queryKey: ["form7-sa-section-totals", planId],
+    queryFn: () =>
+      API.get("/department-budget-plans/section-totals", { params: { budget_plan_id: planId } })
+        .then(r => r.data?.data ?? []),
+    enabled: !!planId,
   });
 
- // Build one synthetic Form7Response for all three SA combined
-  const { data: deptPlans = [], isLoading: plansLoading } = useQuery<any[]>({
-    queryKey: ["dept-budget-plans", planId],
-    queryFn:  () =>
-      API.get("/department-budget-plans", { params: { "filter[budget_plan_id]": planId } })
+  // Lean: dept_id + total_ps/total_mooe/total_co, aggregated in SQL.
+  // Replaces the previous full aip-programs fetch (descriptions, reference
+  // codes, every line item, for every department — ~83kB).
+  const { data: aipTotals = [], isLoading: aipLoading } = useQuery<any[]>({
+    queryKey: ["form7-sa-aip-section-totals", planId],
+    queryFn: () =>
+      API.get("/aip-programs", { params: { budget_plan_id: planId, fields: "dept_id,total_ps,total_mooe,total_co" } })
         .then(r => r.data?.data ?? []),
     enabled: !!planId,
   });
 
   const result = useMemo<Form7Response | undefined>(() => {
-    if (!deptPlans.length || !departments.length) return undefined;
+    if (!departments.length) return undefined;
+    if (!sectionTotals.length && !aipTotals.length) return undefined;
 
-    const saAbbrs = new Set(["SH","OCC","PM"]);
+    const saAbbrs = new Set(["SH", "OCC", "PM"]);
     const saDepts = departments.filter((d: any) => saAbbrs.has((d.dept_abbreviation ?? "").toUpperCase()));
     const saDeptIds = new Set(saDepts.map((d: any) => d.dept_id));
 
-    const saPlans = deptPlans.filter((p: any) => saDeptIds.has(p.dept_id));
-
-    // For SA, sector breakdown is not meaningful — all amounts go in "total" only
-    // We still build the same shape so the panel renders consistently
-    const ZERO_SUB: SectionSubtotal = { general_public_services:0, social_services:0, economic_services:0, other_services:0, total:0 };
-
+    const ZERO_SUB: SectionSubtotal = { general_public_services: 0, social_services: 0, economic_services: 0, other_services: 0, total: 0 };
     const sectionMap = new Map<string, SectionSubtotal>();
 
-    saPlans.forEach((plan: any) => {
-      const items: any[] = plan.items ?? [];
-      items.forEach((item: any) => {
-        const amt = parseFloat(String(item.total_amount)) || 0;
-        if (amt === 0) return;
-        // const classId = item.expense_item?.classification?.expense_class_id ?? item.expense_item?.expense_class_id ?? 2;
-        // const codeMap: Record<number,string> = { 1:"PS", 2:"MOOE", 3:"FE", 4:"CO" };
-        // const code = codeMap[classId] ?? "MOOE";
-
-        const rawAbbr = String(item.expense_item?.classification?.abbreviation ?? "").toUpperCase();
-        const code = ["PS","MOOE","FE","CO"].includes(rawAbbr) ? rawAbbr : "MOOE";
-
+    sectionTotals
+      .filter((row: any) => saDeptIds.has(row.dept_id))
+      .forEach((row: any) => {
+        const code = ["PS", "MOOE", "FE", "CO", "SPA"].includes(row.code) ? row.code : "MOOE";
         if (!sectionMap.has(code)) sectionMap.set(code, { ...ZERO_SUB });
-        sectionMap.get(code)!.total += amt;
+        sectionMap.get(code)!.total += row.total;
       });
-    });
+
+    // AIP program amounts (PS/MOOE/CO) — same treatment useSpecialDeptExpenditures
+    // and useDeptExpenditures give them, folded into the matching section bucket.
+    aipTotals
+      .filter((row: any) => saDeptIds.has(row.dept_id))
+      .forEach((row: any) => {
+        if (row.total_ps > 0) {
+          if (!sectionMap.has("PS")) sectionMap.set("PS", { ...ZERO_SUB });
+          sectionMap.get("PS")!.total += row.total_ps;
+        }
+        if (row.total_mooe > 0) {
+          if (!sectionMap.has("MOOE")) sectionMap.set("MOOE", { ...ZERO_SUB });
+          sectionMap.get("MOOE")!.total += row.total_mooe;
+        }
+        if (row.total_co > 0) {
+          if (!sectionMap.has("CO")) sectionMap.set("CO", { ...ZERO_SUB });
+          sectionMap.get("CO")!.total += row.total_co;
+        }
+      });
+
+    // Fold the 5% Calamity Fund into FE — computed separately (5% of non-tax
+    // revenue), not entered as a dept plan line item.
+    if (calamityFund > 0) {
+      if (!sectionMap.has("FE")) sectionMap.set("FE", { ...ZERO_SUB });
+      sectionMap.get("FE")!.total += calamityFund;
+    }
 
     const sections: Form7Section[] = [];
-    const ORDER = ["PS","MOOE","FE","CO","SPA"];
+    const ORDER = ["PS", "MOOE", "FE", "CO", "SPA"];
     ORDER.forEach(code => {
       const sub = sectionMap.get(code);
       if (!sub || sub.total === 0) return;
-      sections.push({
-        section_code:  code,
-        section_label: code,
-        subtotal:      sub,
-      });
+      sections.push({ section_code: code, section_label: code, subtotal: sub });
     });
 
     const grandTotal = sections.reduce((acc, s) => ({ ...acc, total: acc.total + s.subtotal.total }), { ...ZERO_SUB });
 
     return { sections: { sections, grand_total: grandTotal } };
-  }, [deptPlans, departments]);
+  }, [sectionTotals, aipTotals, departments, calamityFund]);
 
-  return { data: result, isLoading: plansLoading || !planId, isError: false };
+  return { data: result, isLoading: sectionsLoading || aipLoading || !planId, isError: false };
 }
 
 // ─── Main card ────────────────────────────────────────────────────────────────
@@ -400,23 +550,19 @@ function useSaForm7Summary(planId: number | undefined) {
 interface Props {
   planId: number | undefined;
   style?: React.CSSProperties;
+  calamityFund?: number;
 }
 
-export const SectorAllocationCard: React.FC<Props> = ({ planId, style }) => {
-  // GF — reuse the same endpoint as Form7 page
+export const SectorAllocationCard: React.FC<Props> = ({ planId, style, calamityFund = 0 }) => {
+  // GF — lean summary endpoint (section subtotals only, no item rows)
   const {
     data:      gfData,
     isLoading: gfLoading,
     isError:   gfError,
-  } = useQuery<Form7Response>({
-    queryKey: ["form7", "general-fund", planId!],
-    queryFn:  () =>
-      API.get("/form7", { params: { budget_plan_id: planId } }).then(r => r.data.data),
-    enabled: !!planId,
-  });
+  } = useForm7GeneralFundSummary(planId);
 
   // SA — synthetic from dept-budget-plans (same source as useForm7SpecialAccount)
-  const { data: saData, isLoading: saLoading, isError: saError } = useSaForm7Summary(planId);
+  const { data: saData, isLoading: saLoading, isError: saError } = useSaForm7Summary(planId, calamityFund);
 
   return (
     <ShadcnCard

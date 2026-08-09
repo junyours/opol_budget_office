@@ -245,6 +245,47 @@ class MDFFundController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // GET /api/mdf-funds/total-proposed?budget_plan_id=X
+    //
+    // Lean variant of index() for widgets (e.g. AdminDashboard) that only need
+    // the active plan's total proposed 20% MDF allocation — a single number.
+    // index() builds the full category → item → 3-years-of-snapshots tree
+    // (~7.6kB); this sums both halves (regular MDF snapshot totals + debt
+    // principal/interest) directly in SQL instead.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function totalProposed(Request $request): JsonResponse
+    {
+        $budgetPlanId = $request->query('budget_plan_id');
+
+        $activePlan = $budgetPlanId
+            ? BudgetPlan::find($budgetPlanId)
+            : BudgetPlan::where('is_active', true)->latest('budget_plan_id')->first();
+
+        if (! $activePlan) {
+            return response()->json(['proposed' => 0]);
+        }
+
+        $this->autoSyncDebtItems();
+
+        $regularTotal = (float) DB::table('mdf_snapshots as ms')
+            ->join('mdf_items as mi', 'mi.item_id', '=', 'ms.item_id')
+            ->where('ms.budget_plan_id', $activePlan->budget_plan_id)
+            ->where('mi.is_active', true)
+            ->whereNull('mi.obligation_id')
+            ->sum('ms.total_amount');
+
+        $debtTotal = (float) (DB::table('debt_payments as dp')
+            ->join('debt_obligations as dob', 'dob.obligation_id', '=', 'dp.obligation_id')
+            ->where('dp.budget_plan_id', $activePlan->budget_plan_id)
+            ->where('dob.is_active', true)
+            ->selectRaw('COALESCE(SUM(dp.principal_due + dp.interest_due), 0) as total')
+            ->value('total') ?? 0);
+
+        return response()->json(['proposed' => $regularTotal + $debtTotal]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // POST /api/mdf-funds/save-proposed
     // ══════════════════════════════════════════════════════════════════════════
 

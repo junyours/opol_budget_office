@@ -11,6 +11,16 @@ import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number; previousTotal: number; previousLocalSource: number }
 // export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
 export interface DeptExpenditure { dept_id: number; abbr: string; total: number; categoryId: number }
+
+/** Matches the ?light=1 shape of /department-budget-plans — no items[] array, just the pre-summed total. */
+export interface DepartmentBudgetPlanLite {
+  dept_budget_plan_id: number;
+  budget_plan_id: number;
+  dept_id: number;
+  status: string;
+  items_total: string | number | null;
+  department?: { dept_id: number; dept_name: string; dept_abbreviation?: string; logo?: string | null };
+}
 export interface SpecialAccountExpenditures {
   sh:       number;
   occ:      number;
@@ -61,74 +71,8 @@ const EMPTY_SPECIAL_EXP: SpecialAccountExpenditures = { sh: 0, occ: 0, pm: 0, co
 
 export async function fetchFund(source: string): Promise<FundData> {
   try {
-    const res = await API.get('/income-fund', { params: { source } });
-    const rows: any[] = res.data?.data ?? [];
-    if (rows.length === 0) return EMPTY_FUND;
-
-    const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
-    const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
-    const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
-    const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
-
-    // Non-Tax Revenue subtree
-    const ntrParent = rows.find((r: any) => /non[\s-]*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
-    let nonTaxRevenue = 0;
-    if (ntrParent) {
-      const stack = [ntrParent.id];
-      while (stack.length) {
-        const pid = stack.pop()!;
-        rows.forEach((r: any) => {
-          if (r.parent_id === pid) {
-            if (!parentIds.has(r.id)) nonTaxRevenue += parseFloat(r.proposed) || 0;
-            else stack.push(r.id);
-          }
-        });
-      }
-    }
-
-    // Tax Revenue subtree
-    const taxParent = rows.find((r: any) => /^(?!.*non).*tax[\s\S]*revenue/i.test(r.name ?? '') && parentIds.has(r.id));
-    let taxRevenue = 0;
-    let prevTaxRevenue = 0;
-    if (taxParent) {
-      const stack = [taxParent.id];
-      while (stack.length) {
-        const pid = stack.pop()!;
-        rows.forEach((r: any) => {
-          if (r.parent_id === pid) {
-            if (!parentIds.has(r.id)) {
-              taxRevenue += parseFloat(r.proposed) || 0;
-              prevTaxRevenue += parseFloat(r.current_total) || 0;
-            } else stack.push(r.id);
-          }
-        });
-      }
-    }
-
-    let prevNonTaxRevenue = 0;
-    if (ntrParent) {
-      const stack = [ntrParent.id];
-      while (stack.length) {
-        const pid = stack.pop()!;
-        rows.forEach((r: any) => {
-          if (r.parent_id === pid) {
-            if (!parentIds.has(r.id)) prevNonTaxRevenue += parseFloat(r.current_total) || 0;
-            else stack.push(r.id);
-          }
-        });
-      }
-    }
-
-    const previousTotal = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.current_total) || 0), 0);
-
-    return {
-      total,
-      nta: parseFloat(ntaRow?.proposed) || 0,
-      nonTaxRevenue,
-      localSource: taxRevenue + nonTaxRevenue,
-      previousTotal,
-      previousLocalSource: prevTaxRevenue + prevNonTaxRevenue,
-    };
+    const res = await API.get('/income-fund/income-summary', { params: { source } });
+    return res.data as FundData;
   } catch {
     return EMPTY_FUND;
   }
@@ -162,185 +106,92 @@ export interface AllFundsData {
   pm:  FundData;
 }
 
-// ─── Base Hooks ───────────────────────────────────────────────────────────────
-
-// export function useAllFunds() {
-//   return useQuery<AllFundsData>({
-//     queryKey: queryKeys.allFunds,
-//     queryFn:  async () => {
-//       const [gfRes, shRes, occRes, pmRes] = await Promise.allSettled([
-//         fetchFund('general-fund'),
-//         fetchFund('sh'),
-//         fetchFund('occ'),
-//         fetchFund('pm'),
-//       ]);
-//       return {
-//         gf:  gfRes.status  === 'fulfilled' ? gfRes.value  : EMPTY_FUND,
-//         sh:  shRes.status  === 'fulfilled' ? shRes.value  : EMPTY_FUND,
-//         occ: occRes.status === 'fulfilled' ? occRes.value : EMPTY_FUND,
-//         pm:  pmRes.status  === 'fulfilled' ? pmRes.value  : EMPTY_FUND,
-//       };
-//     },
-//     staleTime: 10 * 60 * 1000,
-//     retry: false,
-//   });
-// }
-
-// export function useAllFunds() {
-//   const gf  = useQuery<FundData>({ queryKey: ['income-fund', 'general-fund'], queryFn: () => fetchFund('general-fund') });
-//   const sh  = useQuery<FundData>({ queryKey: ['income-fund', 'sh'],           queryFn: () => fetchFund('sh') });
-//   const occ = useQuery<FundData>({ queryKey: ['income-fund', 'occ'],          queryFn: () => fetchFund('occ') });
-//   const pm  = useQuery<FundData>({ queryKey: ['income-fund', 'pm'],           queryFn: () => fetchFund('pm') });
-// export function useAllFunds() {
-//   const gf  = useQuery<FundData>({ queryKey: ['fund-summary', 'general-fund'], queryFn: () => fetchFund('general-fund') });
-//   const sh  = useQuery<FundData>({ queryKey: ['fund-summary', 'sh'],           queryFn: () => fetchFund('sh') });
-//   const occ = useQuery<FundData>({ queryKey: ['fund-summary', 'occ'],          queryFn: () => fetchFund('occ') });
-//   const pm  = useQuery<FundData>({ queryKey: ['fund-summary', 'pm'],           queryFn: () => fetchFund('pm') });
-
-//   return {
-//     data: (gf.data && sh.data && occ.data && pm.data)
-//       ? { gf: gf.data, sh: sh.data, occ: occ.data, pm: pm.data }
-//       : undefined,
-//     isLoading: gf.isLoading || sh.isLoading || occ.isLoading || pm.isLoading,
-//   };
-// }
-
-function deriveFundData(rows: any[]): FundData {
-  if (!rows?.length) return EMPTY_FUND;
-
-//   const parentIds = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
-//   const leafRows  = rows.filter((r: any) => !parentIds.has(r.id));
-//   const total     = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
-//   const ntaRow    = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
-
-const parentIds     = new Set(rows.filter((r: any) => r.parent_id !== null).map((r: any) => r.parent_id));
-  const leafRows      = rows.filter((r: any) => !parentIds.has(r.id));
-  const total         = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.proposed) || 0), 0);
-  const previousTotal = leafRows.reduce((s: number, r: any) => s + (parseFloat(r.current_total) || 0), 0);
-  const ntaRow        = rows.find((r: any) => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
-
-  const sumSubtree = (predicate: RegExp, field: 'proposed' | 'current_total' = 'proposed'): number => {
-    const parent = rows.find((r: any) => predicate.test(r.name ?? '') && parentIds.has(r.id));
-    if (!parent) return 0;
-    let result = 0;
-    const stack = [parent.id];
-    while (stack.length) {
-      const pid = stack.pop()!;
-      rows.forEach((r: any) => {
-        if (r.parent_id === pid) {
-          if (!parentIds.has(r.id)) result += parseFloat(r[field]) || 0;
-          else stack.push(r.id);
-        }
-      });
-    }
-    return result;
-  };
-
-  const nonTaxRevenue = sumSubtree(/non[\s-]*tax[\s\S]*revenue/i);
-  const taxRevenue    = sumSubtree(/^(?!.*non).*tax[\s\S]*revenue/i);
-  const prevNonTaxRevenue = sumSubtree(/non[\s-]*tax[\s\S]*revenue/i, 'current_total');
-  const prevTaxRevenue    = sumSubtree(/^(?!.*non).*tax[\s\S]*revenue/i, 'current_total');
-
-  return {
-    total,
-    nta:         parseFloat(ntaRow?.proposed) || 0,
-    nonTaxRevenue,
-    localSource:   taxRevenue + nonTaxRevenue,
-    previousTotal,
-    previousLocalSource: prevTaxRevenue + prevNonTaxRevenue,
-  };
-}
-
 export function useAllFunds() {
-  const gf  = useQuery({ queryKey: ['income-fund', 'general-fund'], queryFn: () => API.get('/income-fund?source=general-fund').then(r => r.data) });
-  const sh  = useQuery({ queryKey: ['income-fund', 'sh'],           queryFn: () => API.get('/income-fund?source=sh').then(r => r.data) });
-  const occ = useQuery({ queryKey: ['income-fund', 'occ'],          queryFn: () => API.get('/income-fund?source=occ').then(r => r.data) });
-  const pm  = useQuery({ queryKey: ['income-fund', 'pm'],           queryFn: () => API.get('/income-fund?source=pm').then(r => r.data) });
+  const gf  = useQuery<FundData>({ queryKey: ['income-fund-summary', 'general-fund'], queryFn: () => fetchFund('general-fund') });
+  const sh  = useQuery<FundData>({ queryKey: ['income-fund-summary', 'sh'],           queryFn: () => fetchFund('sh') });
+  const occ = useQuery<FundData>({ queryKey: ['income-fund-summary', 'occ'],          queryFn: () => fetchFund('occ') });
+  const pm  = useQuery<FundData>({ queryKey: ['income-fund-summary', 'pm'],           queryFn: () => fetchFund('pm') });
 
   return {
-    data: (gf.data && sh.data && occ.data && pm.data) ? {
-      gf:  deriveFundData(gf.data.data),
-      sh:  deriveFundData(sh.data.data),
-      occ: deriveFundData(occ.data.data),
-      pm:  deriveFundData(pm.data.data),
-    } : undefined,
+    data: (gf.data && sh.data && occ.data && pm.data)
+      ? { gf: gf.data, sh: sh.data, occ: occ.data, pm: pm.data }
+      : undefined,
     isLoading: gf.isLoading || sh.isLoading || occ.isLoading || pm.isLoading,
   };
 }
 
-export function useDepartments() {
-  return useQuery<Department[]>({
+export interface DepartmentLite {
+  dept_id: number;
+  dept_name: string;
+  dept_abbreviation?: string;
+  dept_category_id: number;
+  sort_order?: number;
+}
+
+const DEPARTMENT_LITE_FIELDS = 'dept_id,dept_name,dept_abbreviation,dept_category_id,sort_order';
+
+export function useDepartments<T = Department[]>(select?: (data: Department[]) => T) {
+  return useQuery<Department[], Error, T>({
     queryKey: queryKeys.departments,
     queryFn:  () => API.get('/departments').then(r => r.data?.data ?? []),
+    select,
   });
 }
 
-export function useBudgetPlans() {
+/** Trimmed variant — backend only selects the lite columns, so the network payload itself is smaller. */
+export function useDepartmentsLite() {
+  return useQuery<DepartmentLite[]>({
+    queryKey: [...queryKeys.departments, 'lite'],
+    queryFn:  () =>
+      API.get('/departments', { params: { fields: DEPARTMENT_LITE_FIELDS } })
+        .then(r => r.data?.data ?? []),
+  });
+}
+
+export function useBudgetPlans(enabled: boolean = true) {
   return useQuery<BudgetPlan[]>({
     queryKey: queryKeys.budgetPlans,
-    queryFn:  () => API.get('/budget-plans').then(r => r.data?.data ?? []),
+    queryFn:  () =>
+      API.get('/budget-plans', { params: { fields: 'budget_plan_id,year,is_active' } })
+        .then(r => r.data?.data ?? []),
+    enabled,
   });
 }
 
-// export function useDepartmentBudgetPlans(budgetPlanId: number | undefined) {
-//   return useQuery<DepartmentBudgetPlan[]>({
-//     queryKey: queryKeys.deptBudgetPlans(budgetPlanId!),
-//     queryFn:  () =>
-//       API.get('/department-budget-plans', {
-//         params: { 'filter[budget_plan_id]': budgetPlanId },
-//       }).then(r => r.data?.data ?? []),
-//     enabled:   !!budgetPlanId,
-//     staleTime: 5 * 60 * 1000,
-//   });
-// }
-export function useDepartmentBudgetPlans(budgetPlanId: number | undefined) {
-  return useQuery<DepartmentBudgetPlan[]>({
+export function useDepartmentBudgetPlans(budgetPlanId: number | undefined, enabled: boolean = true) {
+  return useQuery<DepartmentBudgetPlanLite[]>({
     queryKey: queryKeys.deptBudgetPlans(budgetPlanId!),
     queryFn:  () =>
       API.get('/department-budget-plans', {
-        params: { 'filter[budget_plan_id]': budgetPlanId },
+        params: { 'filter[budget_plan_id]': budgetPlanId, light: 1 },
       }).then(r => r.data?.data ?? []),
-    enabled: !!budgetPlanId,
+    enabled: !!budgetPlanId && enabled,
+
   });
 }
 
 /** Shared AIP programs — same key as useBudgetTotals & useAipProgramData */
-// export function useAipPrograms(budgetPlanId: number | undefined) {
-//   return useQuery<any[]>({
-//     queryKey: queryKeys.aipPrograms(budgetPlanId!),
-//     queryFn:  () =>
-//       API.get('/aip-programs', { params: { budget_plan_id: budgetPlanId } })
-//         .then(r => r.data?.data ?? []),
-//     enabled:   !!budgetPlanId,
-//     staleTime: 5 * 60 * 1000,
-//   });
-// }
 
-export function useAipPrograms(budgetPlanId: number | undefined) {
-  return useQuery<any[]>({
+export function useAipPrograms<T = any[]>(budgetPlanId: number | undefined, select?: (data: any[]) => T) {
+  return useQuery<any[], Error, T>({
     queryKey: queryKeys.aipPrograms(budgetPlanId!),
     queryFn:  () =>
-      API.get('/aip-programs', { params: { budget_plan_id: budgetPlanId } })
+      API.get('/aip-programs', { params: { budget_plan_id: budgetPlanId, fields: 'dept_id,total_amount' } })
         .then(r => r.data?.data ?? []),
     enabled: !!budgetPlanId,
+    select,
   });
 }
 
-// export function useFund(source: string) {
-//   return useQuery<FundData>({
-//     queryKey: queryKeys.fund(source),
-//     queryFn:  () => fetchFund(source),
-//     staleTime: 10 * 60 * 1000,
-//     retry: false,
-//   });
-// }
+const aipDeptTotalsSelect = (rows: any[]) =>
+  rows as { dept_id: number; total_amount: number }[];
 
 export function useMdfFund(budgetPlanId: number | undefined) {
   return useQuery<number>({
     queryKey: queryKeys.mdfFund(budgetPlanId!),
     queryFn:  () =>
-      API.get('/mdf-funds', { params: { budget_plan_id: budgetPlanId } })
-        .then(r => (r.data?.grand_totals?.proposed ?? 0) as number)
+      API.get('/mdf-funds/total-proposed', { params: { budget_plan_id: budgetPlanId } })
+        .then(r => (r.data?.proposed ?? 0) as number)
         .catch((err: any) => {
           if (err?.response?.status === 404) return 0;
           throw err;
@@ -352,9 +203,9 @@ export function useMdfFund(budgetPlanId: number | undefined) {
 
 export function useLdrrmfSummarySource(budgetPlanId: number | undefined, source: string) {
   return useQuery<{ reserved30: number; total70: number; calamityFund: number }>({
-    queryKey: ['ldrrmf-summary', budgetPlanId, source],
+    queryKey: ['ldrrmf-calamity-summary', budgetPlanId, source],
     queryFn: () =>
-      API.get('/ldrrmfip/summary', { params: { budget_plan_id: budgetPlanId, source } })
+      API.get('/ldrrmfip/calamity-summary', { params: { budget_plan_id: budgetPlanId, source } })
         .then(r => {
           const d = r.data?.data ?? r.data;
           return {
@@ -416,17 +267,17 @@ export function useLdrrmfSummary(budgetPlanId: number | undefined) {
 
 export function useDeptExpenditures(
   budgetPlanId: number | undefined,
-  departments: Department[],
+  departments: DepartmentLite[],
 ): { data: DeptExpenditure[]; isLoading: boolean } {
   const { data: deptPlans = [],   isLoading: plansLoading } = useDepartmentBudgetPlans(budgetPlanId);
-  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId);
+  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId, aipDeptTotalsSelect);
 
   const isLoading = !budgetPlanId || plansLoading || aipLoading || departments.length === 0;
 
   const data = useMemo<DeptExpenditure[]>(() => {
     if (!budgetPlanId || departments.length === 0 || deptPlans.length === 0) return [];
 
-    const deptMap = new Map<number, Department>(departments.map(d => [d.dept_id, d]));
+    const deptMap = new Map<number, DepartmentLite>(departments.map(d => [d.dept_id, d]));
 
     const aipByDept = new Map<number, number>();
     aipPrograms.forEach((p: any) => {
@@ -434,31 +285,16 @@ export function useDeptExpenditures(
     });
 
     return deptPlans
-      .filter((dp: DepartmentBudgetPlan) => {
+      .filter((dp: DepartmentBudgetPlanLite) => {
         const d = deptMap.get(dp.dept_id);
         return d && d.dept_category_id !== SPECIAL_CAT_ID;
       })
-      .map((dp: DepartmentBudgetPlan) => {
+      .map((dp: DepartmentBudgetPlanLite) => {
         const d     = deptMap.get(dp.dept_id)!;
-        const form2 = (dp.items ?? []).reduce(
-          (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
-        );
-        const aip = aipByDept.get(dp.dept_id) ?? 0;
-//         return {
-//           dept_id: dp.dept_id,
-//           abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
-//           total:   form2 + aip,
-//         };
-//       })
-//       .filter((r: DeptExpenditure) => r.total > 0)
-//       .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
-//   }, [deptPlans, aipPrograms, departments, budgetPlanId]);
+        const form2 = parseFloat(dp.items_total as any) || 0;
+        const aip   = aipByDept.get(dp.dept_id) ?? 0;
 
-//   return { data, isLoading };
-// }
-// export function useSpecialDeptExpenditures(
-
-return {
+        return {
           dept_id:    dp.dept_id,
           abbr:       d.dept_abbreviation ?? d.dept_name.slice(0, 6),
           total:      form2 + aip,
@@ -480,17 +316,17 @@ return {
 export function useSpecialDeptExpenditures(
 
   budgetPlanId: number | undefined,
-  departments: Department[],
+  departments: DepartmentLite[],
 ): { data: DeptExpenditure[]; isLoading: boolean } {
   const { data: deptPlans = [],   isLoading: plansLoading } = useDepartmentBudgetPlans(budgetPlanId);
-  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId);
+  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId, aipDeptTotalsSelect);
 
   const isLoading = !budgetPlanId || plansLoading || aipLoading || departments.length === 0;
 
   const data = useMemo<DeptExpenditure[]>(() => {
     if (!budgetPlanId || departments.length === 0 || deptPlans.length === 0) return [];
 
-    const deptMap = new Map<number, Department>(departments.map(d => [d.dept_id, d]));
+    const deptMap = new Map<number, DepartmentLite>(departments.map(d => [d.dept_id, d]));
 
     const aipByDept = new Map<number, number>();
     aipPrograms.forEach((p: any) => {
@@ -498,31 +334,16 @@ export function useSpecialDeptExpenditures(
     });
 
     return deptPlans
-      .filter((dp: DepartmentBudgetPlan) => {
+      .filter((dp: DepartmentBudgetPlanLite) => {
         const d = deptMap.get(dp.dept_id);
         return d && d.dept_category_id === SPECIAL_CAT_ID; // ← only special accounts
       })
-      .map((dp: DepartmentBudgetPlan) => {
+      .map((dp: DepartmentBudgetPlanLite) => {
         const d     = deptMap.get(dp.dept_id)!;
-        const form2 = (dp.items ?? []).reduce(
-          (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
-        );
-        const aip = aipByDept.get(dp.dept_id) ?? 0;
-//         return {
-//           dept_id: dp.dept_id,
-//           abbr:    d.dept_abbreviation ?? d.dept_name.slice(0, 6),
-//           total:   form2 + aip,
-//         };
-//       })
-//       .filter((r: DeptExpenditure) => r.total > 0)
-//       .sort((a: DeptExpenditure, b: DeptExpenditure) => a.dept_id - b.dept_id);
-//   }, [deptPlans, aipPrograms, departments, budgetPlanId]);
+        const form2 = parseFloat(dp.items_total as any) || 0;
+        const aip   = aipByDept.get(dp.dept_id) ?? 0;
 
-//   return { data, isLoading };
-// }
-// export function useSpecialAccountExpenditures(
-
-return {
+        return {
           dept_id:    dp.dept_id,
           abbr:       d.dept_abbreviation ?? d.dept_name.slice(0, 6),
           total:      form2 + aip,
@@ -538,10 +359,10 @@ return {
 export function useSpecialAccountExpenditures(
 
   budgetPlanId: number | undefined,
-  departments: Department[],
+  departments: DepartmentLite[],
 ): { data: SpecialAccountExpenditures; isLoading: boolean } {
   const { data: deptPlans = [],   isLoading: plansLoading } = useDepartmentBudgetPlans(budgetPlanId);
-  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId);
+  const { data: aipPrograms = [], isLoading: aipLoading }   = useAipPrograms(budgetPlanId, aipDeptTotalsSelect);
 
   const isLoading = !budgetPlanId || plansLoading || aipLoading || departments.length === 0;
 
@@ -551,7 +372,7 @@ export function useSpecialAccountExpenditures(
     const specialDepts = departments.filter(d => d.dept_category_id === SPECIAL_CAT_ID);
     if (specialDepts.length === 0) return EMPTY_SPECIAL_EXP;
 
-    const deptMap = new Map<number, Department>(specialDepts.map(d => [d.dept_id, d]));
+    const deptMap = new Map<number, DepartmentLite>(specialDepts.map(d => [d.dept_id, d]));
 
     const aipByDept = new Map<number, number>();
     aipPrograms.forEach((p: any) => {
@@ -561,16 +382,14 @@ export function useSpecialAccountExpenditures(
     const totals: Record<string, number> = { SH: 0, OCC: 0, PM: 0 };
 
     deptPlans
-      .filter((dp: DepartmentBudgetPlan) => deptMap.has(dp.dept_id))
-      .forEach((dp: DepartmentBudgetPlan) => {
+      .filter((dp: DepartmentBudgetPlanLite) => deptMap.has(dp.dept_id))
+      .forEach((dp: DepartmentBudgetPlanLite) => {
         const d    = deptMap.get(dp.dept_id)!;
         const abbr = (d.dept_abbreviation ?? '').toUpperCase();
         if (!(abbr in totals)) return;
 
-        const form2 = (dp.items ?? []).reduce(
-          (s: number, i: any) => s + (parseFloat(i.total_amount) || 0), 0
-        );
-        const aip = aipByDept.get(dp.dept_id) ?? 0;
+        const form2 = parseFloat(dp.items_total as any) || 0;
+        const aip   = aipByDept.get(dp.dept_id) ?? 0;
         totals[abbr] += form2 + aip;
       });
 
@@ -595,5 +414,26 @@ export function useCreateBudgetPlan() {
       queryClient.invalidateQueries({ queryKey: queryKeys.budgetPlans });
       queryClient.invalidateQueries({ queryKey: ['dept-budget-plans'] });
     },
+  });
+}
+
+// ─── Year totals (lean, multi-plan) ───────────────────────────────────────────
+// Powers BudgetAreaChart's 3-year comparison — one call instead of
+// 3x useDepartmentBudgetPlans + 3x useAipPrograms.
+
+export interface YearTotalRow { dept_id: number; total: number }
+export type YearTotalsMap = Record<string, YearTotalRow[]>;
+
+export function useYearTotals(planIds: (number | undefined)[]) {
+  const ids = planIds.filter((id): id is number => !!id);
+  const key = [...new Set(ids)].sort((a, b) => a - b).join(',');
+
+  return useQuery<YearTotalsMap>({
+    queryKey: ['department-budget-plans-year-totals', key],
+    queryFn:  () =>
+      API.get('/department-budget-plans/year-totals', { params: { plan_ids: key } })
+        .then(r => r.data?.data ?? {}),
+    enabled: ids.length > 0,
+    
   });
 }

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import API from '@/src/services/api';
 import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
@@ -34,6 +35,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/src/components/ui/ta
 import BudgetCallMemoAdminPage from './BudgetCallMemoAdminPage';
 
 const BudgetPlanList = React.lazy(() => import('./BudgetPlanList'));
+const AnnouncementsSettingsPage = React.lazy(() => import('./AnnouncementsSettingsPage'));
+const DepartmentReviewSchedulesPage = React.lazy(() => import('./DepartmentReviewSchedulesPage'));
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,24 +60,10 @@ interface MaintenanceSettings {
 // ── Environment info panel ─────────────────────────────────────────────────────
 
 const EnvInfoPanel: React.FC = () => {
-  const [info,    setInfo]    = useState<DbInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(false);
-
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await API.get<DbInfo>('/database/info');
-      setInfo(res.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetch(); }, [fetch]);
+  const { data: info, isLoading: loading, isError: error, refetch } = useQuery<DbInfo>({
+    queryKey: ['database-info'],
+    queryFn: () => API.get<DbInfo>('/database/info').then((r) => r.data),
+  });
 
   if (loading) {
     return (
@@ -89,7 +78,7 @@ const EnvInfoPanel: React.FC = () => {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between gap-2">
         <span className="text-[12px] text-red-600">Could not load environment info.</span>
-        <button onClick={fetch} className="text-[11px] text-red-500 underline">Retry</button>
+        <button onClick={() => refetch()} className="text-[11px] text-red-500 underline">Retry</button>
       </div>
     );
   }
@@ -122,7 +111,7 @@ const EnvInfoPanel: React.FC = () => {
           <span className="text-[12px] font-semibold text-gray-700">Detected Environment</span>
         </div>
         <button
-          onClick={fetch}
+          onClick={() => refetch()}
           className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1"
         >
           <ArrowPathIcon className="w-3 h-3" />
@@ -165,65 +154,58 @@ const EnvInfoPanel: React.FC = () => {
 // ── Maintenance mode panel ──────────────────────────────────────────────────────
 
 const MaintenancePanel: React.FC = () => {
-  const [settings, setSettings] = useState<MaintenanceSettings | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
-  const [message,  setMessage]  = useState('');
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingValue, setPendingValue] = useState(false);
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await API.get<MaintenanceSettings>('/maintenance/status');
-      setSettings(data);
-      setMessage(data.maintenance_message ?? '');
-    } catch {
-      toast.error('Failed to load maintenance settings.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: settings, isLoading: loading } = useQuery<MaintenanceSettings>({
+    queryKey: ['maintenance-status'],
+    queryFn: () => API.get<MaintenanceSettings>('/maintenance/status').then((r) => r.data),
+  });
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => { setMessage(settings?.maintenance_message ?? ''); }, [settings]);
+
+  const toggleMut = useMutation({
+    mutationFn: (payload: { maintenance_mode: boolean; maintenance_message: string | null }) =>
+      API.post('/maintenance/toggle', payload).then((r) => r.data.data as MaintenanceSettings),
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(['maintenance-status'], data);
+      toast.success(variables.maintenance_mode ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.');
+      setConfirmOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? 'Failed to update maintenance mode.');
+      setConfirmOpen(false);
+    },
+  });
+
+  const saveMessageMut = useMutation({
+    mutationFn: (payload: { maintenance_mode: boolean; maintenance_message: string | null }) =>
+      API.post('/maintenance/toggle', payload).then((r) => r.data.data as MaintenanceSettings),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['maintenance-status'], data);
+      toast.success('Maintenance message updated.');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? 'Failed to update message.');
+    },
+  });
+
+  const saving = toggleMut.isPending || saveMessageMut.isPending;
 
   const requestToggle = (next: boolean) => {
     setPendingValue(next);
     setConfirmOpen(true);
   };
 
-  const applyToggle = async () => {
-    setSaving(true);
-    try {
-      const { data } = await API.post('/maintenance/toggle', {
-        maintenance_mode: pendingValue,
-        maintenance_message: message.trim() || null,
-      });
-      setSettings(data.data);
-      toast.success(pendingValue ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to update maintenance mode.');
-    } finally {
-      setSaving(false);
-      setConfirmOpen(false);
-    }
+  const applyToggle = () => {
+    toggleMut.mutate({ maintenance_mode: pendingValue, maintenance_message: message.trim() || null });
   };
 
-  const saveMessageOnly = async () => {
+  const saveMessageOnly = () => {
     if (!settings) return;
-    setSaving(true);
-    try {
-      const { data } = await API.post('/maintenance/toggle', {
-        maintenance_mode: settings.maintenance_mode,
-        maintenance_message: message.trim() || null,
-      });
-      setSettings(data.data);
-      toast.success('Maintenance message updated.');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to update message.');
-    } finally {
-      setSaving(false);
-    }
+    saveMessageMut.mutate({ maintenance_mode: settings.maintenance_mode, maintenance_message: message.trim() || null });
   };
 
   const isOn = settings?.maintenance_mode ?? false;
@@ -554,6 +536,14 @@ const SystemPage: React.FC = () => {
             className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
             Budget Call Memo
           </TabsTrigger>
+          <TabsTrigger value="announcements"
+            className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+            Announcements
+          </TabsTrigger>
+          <TabsTrigger value="review-schedules"
+            className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
+            Review Schedules
+          </TabsTrigger>
           {isSuperAdmin && (
             <TabsTrigger value="system"
               className="text-[12.5px] px-4 rounded-md data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-white text-gray-500 hover:text-gray-700">
@@ -584,6 +574,30 @@ const SystemPage: React.FC = () => {
         {/* ══ BUDGET CALL MEMO — unchanged ══ */}
         <TabsContent value="budget-call-memo" className="mt-0">
           <BudgetCallMemoAdminPage />
+        </TabsContent>
+
+        {/* ══ DASHBOARD ANNOUNCEMENTS ══ */}
+        <TabsContent value="announcements" className="mt-0">
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">
+              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+              Loading…
+            </div>
+          }>
+            <AnnouncementsSettingsPage />
+          </React.Suspense>
+        </TabsContent>
+
+        {/* ══ DEPARTMENT REVIEW SCHEDULES ══ */}
+        <TabsContent value="review-schedules" className="mt-0">
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400 gap-2">
+              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+              Loading…
+            </div>
+          }>
+            <DepartmentReviewSchedulesPage />
+          </React.Suspense>
         </TabsContent>
 
         {/* ══ SYSTEM — database, notifications, tokens, maintenance ══ */}

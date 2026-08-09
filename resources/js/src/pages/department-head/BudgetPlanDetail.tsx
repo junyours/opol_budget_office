@@ -26,8 +26,9 @@ import {
 import { toast } from 'sonner';
 import { useNotificationStore } from '@/src/store/useNotificationStore';
 import { cn } from '@/src/lib/utils';
-import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
+import { BudgetComparisonBanner, type BudgetComparisonSummary } from '@/src/components/budget/BudgetComparisonBanner';
 import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { useIsMobile } from '../../hooks/use-mobile';
 import {
   CheckCircleIcon,
@@ -91,6 +92,12 @@ const BudgetPlanDetail: React.FC = () => {
   const fetchNotifications = useNotificationStore(s => s.fetch);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [submitting, setSubmitting]               = useState(false);
+
+  // Condensed sticky summary — shown in the header once the full
+  // BudgetComparisonBanner scrolls out of view below it.
+  const [bannerVisible, setBannerVisible] = useState(true);
+  const [bannerSummary, setBannerSummary] = useState<BudgetComparisonSummary | null>(null);
+  const [stepperModalOpen, setStepperModalOpen] = useState(false);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchData = async () => {
@@ -180,11 +187,11 @@ const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
   const statusCfg     = statusConfig[plan.status] ?? statusConfig.draft;
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col h-full">
 
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-6 py-4 flex items-center flex-wrap gap-y-2 gap-4">
+        <div className="flex-1 min-w-0">
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">
             Department Budget Plan
           </span>
@@ -192,65 +199,96 @@ const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
             FY {plan.budget_plan?.year ?? 'N/A'}
           </h1>
           <div className="flex items-center gap-2.5 mt-1.5">
-            <span className={cn(
-              'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border',
-              statusCfg.badge,
-            )}>
-              <span className={cn('w-1.5 h-1.5 rounded-full', statusCfg.dot)} />
-              {statusCfg.label}
-            </span>
+            {plan.status !== 'approved' && (
+              <span className={cn(
+                'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border',
+                statusCfg.badge,
+              )}>
+                <span className={cn('w-1.5 h-1.5 rounded-full', statusCfg.dot)} />
+                {statusCfg.label}
+              </span>
+            )}
 
             {!parentIsOpen && plan.status === 'draft' && (
               <span className="text-[11px] text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full font-medium">
                 Submissions closed
               </span>
             )}
+
+            {!bannerVisible && bannerSummary && (
+              <div
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-opacity duration-150',
+                  bannerSummary.isOver
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-700',
+                )}
+              >
+                {bannerSummary.isOver ? (
+                  <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
+                ) : (
+                  <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                )}
+                <span className="font-mono font-normal text-gray-400">
+                  {fmtP(bannerSummary.isSpecialAccount ? bannerSummary.currentInclCal : bannerSummary.currentExclCal)}
+                </span>
+                <span className="font-mono">
+                  {bannerSummary.isOver
+                    ? `+${fmtP(bannerSummary.excess)} over`
+                    : `${fmtP(bannerSummary.remaining)} left`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Submit button */}
-        {plan.status === 'draft' && parentIsOpen && (
-          <Button
-            size="sm"
-            onClick={() => setSubmitConfirmOpen(true)}
-            className="gap-1.5 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <CheckCircleIcon className="w-3.5 h-3.5" />
-            Submit for Review
-          </Button>
-        )}
-        {plan.status === 'submitted' && (
-          <span className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg font-medium">
-            Waiting for the Budget Officer to acknowledge
-          </span>
-        )}
-        {plan.status === 'under_review' && (
-          <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg font-medium">
-            Budget Officer is reviewing your proposal
-          </span>
-        )}
-        {/* {plan.status === 'approved' && (
-          <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5">
-            <CheckCircleIcon className="w-3.5 h-3.5" />
-            Approved
-          </span>
-        )} */}
-      </div>
-
-     {/* ── Progress stepper — hidden while still a draft ── */}
-      {plan.status !== 'draft' && (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 mb-4">
+        {/* Stepper — centered in header, click for full timeline */}
+        <div className="flex-shrink-0 order-3 sm:order-none mx-auto flex items-center gap-3">
           <BudgetPlanStepper
+            compact
             status={plan.status}
             submittedAt={plan.submitted_at}
             acknowledgedAt={plan.acknowledged_at}
             approvedAt={plan.approved_at}
+            onClick={() => setStepperModalOpen(true)}
           />
         </div>
-      )}
+
+        {/* Submit button / status message */}
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          {plan.status === 'draft' && parentIsOpen && (
+            <Button
+              size="sm"
+              onClick={() => setSubmitConfirmOpen(true)}
+              className="gap-1.5 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <CheckCircleIcon className="w-3.5 h-3.5" />
+              Submit for Review
+            </Button>
+          )}
+          {plan.status === 'submitted' && (
+            <span className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg font-medium">
+              Waiting for the Budget Officer to acknowledge
+            </span>
+          )}
+          {plan.status === 'under_review' && (
+            <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg font-medium">
+              Budget Officer is reviewing your proposal
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Scrollable content ── */}
+      <div className="flex-1 overflow-y-auto p-6">
 
       {/* ── Budget comparison banner (always visible, above tabs) ── */}
-      <BudgetComparisonBanner plan={plan} pastYearPlan={pastYearPlan} />
+      <BudgetComparisonBanner
+        plan={plan}
+        pastYearPlan={pastYearPlan}
+        onVisibilityChange={setBannerVisible}
+        onSummaryChange={setBannerSummary}
+      />
 
       {/* ── Forms Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -348,6 +386,27 @@ const parentIsOpen  = (plan.budget_plan as any)?.is_open !== false;
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      </div>
+
+      {/* ── Timeline Modal ── */}
+      <Dialog open={stepperModalOpen} onOpenChange={setStepperModalOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-[15px] font-semibold text-gray-900">
+              FY {plan.budget_plan?.year ?? 'N/A'} — Timeline
+            </DialogTitle>
+          </DialogHeader>
+          <div className="pt-2 pb-1">
+            <BudgetPlanStepper
+              status={plan.status}
+              submittedAt={plan.submitted_at}
+              acknowledgedAt={plan.acknowledged_at}
+              approvedAt={plan.approved_at}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

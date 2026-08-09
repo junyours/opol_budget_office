@@ -9,7 +9,7 @@ const BudgetCallMemoPage: React.FC = () => {
   const { data: files = [], isLoading } = useQuery<BudgetCallMemoFile[]>({
     queryKey: ['budget-call-memos-current'],
     queryFn: () => API.get('/budget-call-memos/current').then(r => r.data?.data ?? []),
-    staleTime: 5 * 60 * 1000,
+    
   });
 
   return (

@@ -29,6 +29,11 @@ class BudgetPlan extends Model
         return $this->hasMany(DepartmentBudgetPlan::class, 'budget_plan_id', 'budget_plan_id');
     }
 
+    public function reviewSchedules()
+    {
+        return $this->hasMany(DepartmentReviewSchedule::class, 'budget_plan_id', 'budget_plan_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

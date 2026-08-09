@@ -123,7 +123,6 @@ export function useSummaryCategories() {
   return useQuery<{ dept_category_id: number; dept_category_name: string }[]>({
     queryKey: summaryQueryKeys.categories,
     queryFn:  () => API.get('/department-categories').then(r => r.data?.data ?? r.data ?? []),
-    staleTime: 15 * 60 * 1000,
   });
 }
 
@@ -151,7 +150,7 @@ export function useExpenseClassifications() {
   return useQuery<{ expense_class_id: number; expense_class_name: string; abbreviation: string | null }[]>({
     queryKey: summaryQueryKeys.classifications,
     queryFn:  () => API.get('/expense-classifications').then(r => r.data?.data ?? r.data ?? []),
-    staleTime: 30 * 60 * 1000,
+
   });
 }
 
@@ -159,7 +158,7 @@ export function useExpenseClassItems() {
   return useQuery<{ expense_class_item_id: number; expense_class_id: number }[]>({
     queryKey: summaryQueryKeys.classItems,
     queryFn:  () => API.get('/expense-class-items').then(r => r.data?.data ?? r.data ?? []),
-    staleTime: 30 * 60 * 1000,
+
   });
 }
 
@@ -175,7 +174,7 @@ export function useSummaryGfFund() {
       const ntaRow      = rows.find(r => /national[\s\S]*tax[\s\S]*allotment/i.test(r.name ?? ''));
       return { total, nta: parseFloat(ntaRow?.proposed) || 0 };
     },
-    staleTime: 10 * 60 * 1000,
+    
   });
 }
 
@@ -198,7 +197,7 @@ export function useSpecialPlans(planId: number | undefined) {
         }
       },
       enabled:   !!planId,
-      staleTime: 5 * 60 * 1000,
+
     })),
   });
 

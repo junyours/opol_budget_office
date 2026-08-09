@@ -24,14 +24,14 @@ export function useDepartmentData(activePlanId?: number) {
 
   const { data: categories = [], isLoading: catsLoading } = useQuery<DepartmentCategory[]>({
     queryKey: ['department-categories'],
-    queryFn:  () => API.get('/department-categories').then(r => r.data?.data ?? []),
-    staleTime: 15 * 60 * 1000,  // categories almost never change
+    queryFn:  () => API.get('/department-categories', { params: { fields: 'dept_category_id,dept_category_name' } }).then(r => r.data?.data ?? []),
+
   });
 
   const { data: plans = [], isLoading: plansLoading } = useQuery<DepartmentBudgetPlan[]>({
     queryKey: ['dept-budget-plans-all', activePlanId],
     queryFn:  () =>
-      API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId } })
+      API.get('/department-budget-plans', { params: { budget_plan_id: activePlanId, fields: 'dept_id' } })
         .then(r => r.data?.data ?? []),
     enabled: !!activePlanId,
   });

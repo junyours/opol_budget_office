@@ -36,6 +36,7 @@ const AIPProgramsPage          = React.lazy(() => import('./AipProgramsTab'));
 const SystemPage                = React.lazy(() => import('./SystemPage'));
 const PersonnelServicesPage     = React.lazy(() => import('./PersonnelServices'));
 
+
 // ── Tab groups ────────────────────────────────────────────────────────────────
 
 type TabDef = {
@@ -146,7 +147,7 @@ const TAB_GROUPS: TabGroup[] = [
       },
     ],
   },
-];
+  ];
 
 const ALL_TABS = TAB_GROUPS.flatMap(g => g.tabs);
 type TabKey = typeof ALL_TABS[number]['key'];

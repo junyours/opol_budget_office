@@ -36,8 +36,10 @@
         import { useNotificationPoller } from '@/src/hooks/useNotificationPoller';
         import { SidebarNotifications } from '@/src/components/sidebar/SidebarNotifications';
         import { useReviewModeStore } from '@/src/store/useReviewModeStore';
-        import { usePwaInstall } from '@/src/hooks/usePwaInstall';
+         import { usePwaInstall } from '@/src/hooks/usePwaInstall';
         import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+        import { useMyReviewSchedule } from '@/src/hooks/useMyReviewSchedule';
+        import { SidebarReviewSchedule } from '@/src/components/sidebar/SidebarReviewSchedule';
         export interface User {
         user_id: number; username: string; fname: string; mname?: string; lname: string;
         role: string; dept_id?: number; department?: Department;
@@ -307,11 +309,14 @@
 
         // ── submitted plan count (only fetched for admin roles) ───────────────────
         const typedUser = user as User | null;
-        const isAdminRole =
+         const isAdminRole =
             typedUser?.role === "admin" || typedUser?.role === "super-admin";
-        const submittedCount = useSubmittedPlanCount();
-        // Only show badge for admin roles; hook still runs (it exits early if not needed)
+        const submittedCount = useSubmittedPlanCount({ enabled: isAdminRole });
         const showBadge = isAdminRole && submittedCount !== null && submittedCount > 0;
+
+        // ── review schedule (department heads only) ───────────────────────────────
+        const isDeptHeadRole = typedUser?.role === "department-head";
+        const { data: myReviewSchedule } = useMyReviewSchedule(isDeptHeadRole);
 
         const toggleGroup = (label: string) =>
             setOpenGroups(prev => ({ ...prev, [label]: prev[label] === false ? true : false }));
@@ -643,7 +648,16 @@
                             </div>
                         </button>
                     )}
-                     {/* ══ NOTIFICATIONS ══ */}
+                     {/* ══ REVIEW SCHEDULE (department head) ══ */}
+                {/* SidebarReviewSchedule internally returns null once the
+                    scheduled day has passed, so this naturally disappears
+                    without any extra date logic here. */}
+                {isDeptHeadRole && myReviewSchedule && (
+                    <div className="group-data-[collapsible=icon]:hidden">
+                        <SidebarReviewSchedule schedule={myReviewSchedule} />
+                    </div>
+                )}
+                    {/* ══ NOTIFICATIONS ══ */}
                 {notifications.length > 0 && (
                 <div className="group-data-[collapsible=icon]:hidden">
                     <SidebarNotifications

@@ -47,6 +47,8 @@ use App\Http\Controllers\Api\{
     PsSettingController,
     BudgetCallMemoController,
     TokenMaintenanceController,
+    DashboardAnnouncementController,
+    DepartmentReviewScheduleController,
 };
 
 // ── Public: Login (strict rate limit) ─────────────────────────────────────────
@@ -99,6 +101,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     Route::apiResource('plantilla-assignments', PlantillaAssignmentController::class);
 
     // ── Salary Standards ───────────────────────────────────────────────────────
+    Route::get('salary-standard-versions/active', [App\Http\Controllers\Api\SalaryStandardVersionController::class, 'active']);
     Route::apiResource('salary-standard-versions', SalaryStandardVersionController::class);
     Route::apiResource('salary-grade-steps',        SalaryGradeStepController::class);
     Route::post('salary-standard-versions/{version}/activate', [SalaryStandardVersionController::class, 'activate']);
@@ -106,6 +109,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
 
     // ── Budget Plans ───────────────────────────────────────────────────────────
     Route::get ('budget-plans/active',                          [BudgetPlanController::class, 'active']);
+    Route::get ('budget-plans/by-year/{year}',                  [BudgetPlanController::class, 'byYear']);
     Route::get ('budget-plans/{budget_plan}/draft-departments', [BudgetPlanController::class, 'draftDepartments']);
     Route::apiResource('budget-plans', BudgetPlanController::class);
     Route::post('budget-plans/{budget_plan}/activate', [BudgetPlanController::class, 'activate']);
@@ -122,6 +126,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     // ── Department Budget Plans ────────────────────────────────────────────────
     Route::get('/department-budget-plans/years',                      [DepartmentBudgetPlanController::class, 'years']);
     Route::get('/department-budget-plans/totals',                     [DepartmentBudgetPlanController::class, 'totals']);
+    Route::get('/department-budget-plans/section-totals',             [DepartmentBudgetPlanController::class, 'sectionTotals']);
+    Route::get('/department-budget-plans/year-totals',                [DepartmentBudgetPlanController::class, 'yearTotals']);
+    Route::get('/department-budget-plans/expense-totals',             [DepartmentBudgetPlanController::class, 'expenseTotals']);
     Route::get('/department-budget-plans/by-dept-year/{dept}/{year}', [DepartmentBudgetPlanController::class, 'findByDeptAndYear']);
     Route::apiResource('department-budget-plans', DepartmentBudgetPlanController::class);
     Route::post('department-budget-plans/{department_budget_plan}/submit',  [DepartmentBudgetPlanController::class, 'submit']);
@@ -132,9 +139,19 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     Route::get ('department-budget-plans/{budget_plan}/plantilla-assignments',      [DepartmentBudgetPlanController::class, 'plantillaAssignments']);
     Route::delete('department-budget-plans/{budget_plan}/plantilla-assignments/{assignment}', [DepartmentBudgetPlanController::class, 'destroyPlantillaAssignment']);
 
+    // ── Department Review Schedules ────────────────────────────────────────────
+    Route::get ('/department-review-schedules/my-schedule', [DepartmentReviewScheduleController::class, 'myCurrent']);
+    Route::get ('/department-review-schedules',              [DepartmentReviewScheduleController::class, 'index']);
+    Route::post('/department-review-schedules',              [DepartmentReviewScheduleController::class, 'store']);
+    Route::put ('/department-review-schedules/{department_review_schedule}', [DepartmentReviewScheduleController::class, 'update']);
+    Route::patch('/department-review-schedules/{department_review_schedule}/reschedule', [DepartmentReviewScheduleController::class, 'reschedule']);
+    Route::delete('/department-review-schedules/{department_review_schedule}', [DepartmentReviewScheduleController::class, 'destroy']);
+
+
     // ── Form 4 / AIP ──────────────────────────────────────────────────────────
     Route::apiResource('form4-items', BudgetPlanForm4ItemController::class);
     Route::get('/aip-programs', [AipProgramController::class, 'index']);
+    Route::get('/aip-programs/suggestions', [AipProgramController::class, 'suggestions']);
     Route::put('/aip-programs/{id}', [AipProgramController::class, 'update']);
 
     // ── Form 6 ────────────────────────────────────────────────────────────────
@@ -159,11 +176,14 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
 
     // ── Misc Read/Write ────────────────────────────────────────────────────────
     Route::get('/budget-summary/statutory/{year}', [BudgetSummaryController::class, 'statutoryAndContractualTotals']);
-    Route::get ('/income-fund',      [IncomeFundController::class, 'index']);
-    Route::post('/income-fund/save', [IncomeFundController::class, 'save']);
+    Route::get ('/income-fund',               [IncomeFundController::class, 'index']);
+    Route::get ('/income-fund/income-summary', [IncomeFundController::class, 'summary']);
+    Route::post('/income-fund/save',          [IncomeFundController::class, 'save']);
     Route::apiResource('debt-obligations', DebtObligationController::class);
     Route::get('/calamity-fund', [CalamityFundController::class, 'index']);
+    Route::get('form7/summary', [Form7Controller::class, 'summary']);
     Route::get('form7', [Form7Controller::class, 'index']);
+    Route::get('/mdf-funds/total-proposed', [MDFFundController::class, 'totalProposed']);
     Route::apiResource('mdf-funds',      MDFFundController::class)->only(['index']);
     Route::apiResource('mdf-categories', MdfCategoryController::class)->only(['store', 'update', 'destroy']);
     Route::apiResource('mdf-items',      MdfItemController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -173,10 +193,11 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     Route::get('/ps-settings',           [PsSettingController::class, 'show']);
     Route::put('/ps-settings',           [PsSettingController::class, 'update']);
 
-    Route::get  ('ldrrmfip/categories',     [LdrrmfipController::class, 'categories']);
-    Route::get  ('ldrrmfip/sources',        [LdrrmfipController::class, 'sources']);
-    Route::get  ('ldrrmfip/previous-items', [LdrrmfipController::class, 'previousItems']);
-    Route::get  ('ldrrmfip/summary',        [LdrrmfipController::class, 'summary']);
+    Route::get('ldrrmfip/item-suggestions',   [LdrrmfipController::class, 'itemSuggestions']);
+    Route::get  ('ldrrmfip/categories',       [LdrrmfipController::class, 'categories']);
+    Route::get  ('ldrrmfip/sources',          [LdrrmfipController::class, 'sources']);
+    Route::get  ('ldrrmfip/previous-items',   [LdrrmfipController::class, 'previousItems']);
+    Route::get  ('ldrrmfip/calamity-summary', [LdrrmfipController::class, 'summary']);
     Route::patch('ldrrmfip/upsert-year-amounts', [LdrrmfipController::class, 'upsertYearAmounts']);
     Route::apiResource('ldrrmfip', LdrrmfipController::class)
         ->parameters(['ldrrmfip' => 'ldrrmfip'])
@@ -189,6 +210,13 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     Route::apiResource('gad-entries', GADEntryController::class)
         ->parameters(['gad-entries' => 'gadEntry']);
     Route::get('/consolidated-special-income', [ConsolidatedSpecialIncomeController::class, 'index']);
+
+    // ── Dashboard Announcements (carousel ads) ────────────────────────────────
+    Route::get   ('/dashboard-announcements',                        [DashboardAnnouncementController::class, 'index']);
+    Route::post  ('/dashboard-announcements',                        [DashboardAnnouncementController::class, 'store']);
+    Route::put   ('/dashboard-announcements/{dashboardAnnouncement}', [DashboardAnnouncementController::class, 'update']);
+    Route::delete('/dashboard-announcements/{dashboardAnnouncement}', [DashboardAnnouncementController::class, 'destroy']);
+    Route::post  ('/dashboard-announcements/reorder',                [DashboardAnnouncementController::class, 'reorder']);
 
     // ── User Profile ───────────────────────────────────────────────────────────
     Route::get ('/profile',          [ProfileController::class, 'show']);

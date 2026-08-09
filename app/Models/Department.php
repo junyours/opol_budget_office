@@ -11,7 +11,7 @@ class Department extends Model
 
     protected $table      = 'departments';
     protected $primaryKey = 'dept_id';
-   
+
     protected $fillable   = [
         'dept_name',
         'dept_abbreviation',
@@ -48,5 +48,9 @@ class Department extends Model
         return $this->hasMany(DepartmentBudgetPlan::class, 'dept_id', 'dept_id');
     }
 
+    public function reviewSchedules()
+    {
+        return $this->hasMany(DepartmentReviewSchedule::class, 'dept_id', 'dept_id');
+    }
 
 }

@@ -21,6 +21,8 @@ use App\Notifications\BudgetProposalSubmitted;
 use App\Notifications\BudgetProposalAcknowledged;
 use App\Notifications\BudgetProposalApproved;
 use App\Notifications\BudgetProposalReturned;
+use App\Http\Controllers\Api\CalamityFundController;
+use App\Http\Controllers\Api\LdrrmfipController;
 
 class DepartmentBudgetPlanController extends BaseApiController
 {
@@ -28,12 +30,30 @@ class DepartmentBudgetPlanController extends BaseApiController
     {
         $this->authorize('viewAny', DepartmentBudgetPlan::class);
 
-        $query = DepartmentBudgetPlan::with(['department', 'items', 'items.expenseItem','items.expenseItem.classification','budgetPlan']);
+        $light = $request->boolean('light');
+
+        if ($light) {
+            $query = DepartmentBudgetPlan::query()
+                ->select(['dept_budget_plan_id', 'budget_plan_id', 'dept_id', 'status', 'created_at', 'updated_at'])
+                ->with(['department:dept_id,dept_name,dept_abbreviation,logo'])
+                ->withSum('items as items_total', 'total_amount');
+
+            if ($request->query('include') === 'budget_plan') {
+                $query->with(['budgetPlan:budget_plan_id,year']);
+            }
+        } else {
+            $query = DepartmentBudgetPlan::with(['department', 'items', 'items.expenseItem','items.expenseItem.classification','budgetPlan']);
+        }
 
         $budgetPlanId = $request->input('budget_plan_id')
                      ?? $request->input('filter.budget_plan_id');
         if ($budgetPlanId) {
             $query->where('budget_plan_id', $budgetPlanId);
+        }
+
+        $deptId = $request->input('dept_id');
+        if ($deptId) {
+            $query->where('dept_id', $deptId);
         }
 
         return $this->success($query->get());
@@ -44,6 +64,56 @@ class DepartmentBudgetPlanController extends BaseApiController
         $this->authorize('view', $department_budget_plan);
         $department_budget_plan->load(['department', 'items', 'budgetPlan']);
         return $this->success($department_budget_plan);
+    }
+
+    /**
+     * GET /api/department-budget-plans/expense-totals?budget_plan_id=X&dept_id=Y
+     *
+     * PS/MOOE/CO totals for one department's plan, computed here instead of
+     * shipping the full item catalog + classification list + line items to
+     * the frontend just to sum three numbers.
+     */
+    public function expenseTotals(Request $request)
+    {
+        $this->authorize('viewAny', DepartmentBudgetPlan::class);
+
+        $validated = $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+            'dept_id'        => 'required|integer|exists:departments,dept_id',
+        ]);
+
+        $plan = DepartmentBudgetPlan::where('budget_plan_id', $validated['budget_plan_id'])
+            ->where('dept_id', $validated['dept_id'])
+            ->with('items.expenseItem.classification')
+            ->first();
+
+        $totals = [
+            'Personal Services' => 0.0,
+            'Maintenance and Other Operating Expenses' => 0.0,
+            'Capital Outlay' => 0.0,
+        ];
+
+        if ($plan) {
+            foreach ($plan->items as $item) {
+                $className = $item->expenseItem->classification->expense_class_name ?? null;
+                if ($className && array_key_exists($className, $totals)) {
+                    $totals[$className] += (float) $item->total_amount;
+                }
+            }
+        }
+
+        $ps   = $totals['Personal Services'];
+        $mooe = $totals['Maintenance and Other Operating Expenses'];
+        $co   = $totals['Capital Outlay'];
+
+        return $this->success([
+            'ps'                  => $ps,
+            'mooe'                => $mooe,
+            'co'                  => $co,
+            'total'               => $ps + $mooe + $co,
+            'dept_budget_plan_id' => $plan->dept_budget_plan_id ?? null,
+            'status'              => $plan->status ?? null,
+        ]);
     }
 
     public function store(Request $request)
@@ -324,6 +394,98 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
      * ~4-per-department fan-out the list page used to make (past-year lookup,
      * past AIP, current AIP, all repeated per department).
      */
+    /**
+     * GET /department-budget-plans/section-totals?budget_plan_id=X
+     *
+     * Per-department Form2 totals grouped by expense classification
+     * (PS/MOOE/FE/CO/SPA), summed in SQL. Replaces SectorAllocationCard's
+     * previous full department-budget-plans fetch (every item, with the
+     * nested expense_item.classification relation, for every department) —
+     * that call alone was ~900kB; this returns a handful of aggregated rows.
+     */
+    /**
+     * GET /department-budget-plans/year-totals?plan_ids=1,2,5
+     *
+     * Per-department (dept_id + total) for a set of budget plans in one call —
+     * combines Form2 line items and AIP program amounts in SQL. Built for
+     * BudgetAreaChart's 3-year comparison, which previously fired 3x
+     * department-budget-plans (full department objects incl. logos, names)
+     * + 3x aip-programs just to sum two numbers per department per year.
+     */
+    public function yearTotals(Request $request)
+    {
+        $this->authorize('viewAny', DepartmentBudgetPlan::class);
+
+        $validated = $request->validate([
+            'plan_ids' => 'required|string',
+        ]);
+
+        $planIds = array_values(array_filter(array_map('intval', explode(',', $validated['plan_ids']))));
+        if (empty($planIds)) {
+            return $this->success([]);
+        }
+
+        $form2 = DB::table('department_budget_plans as dbp')
+            ->leftJoin('dept_bp_form2_items as f2', 'f2.dept_budget_plan_id', '=', 'dbp.dept_budget_plan_id')
+            ->whereIn('dbp.budget_plan_id', $planIds)
+            ->select('dbp.budget_plan_id', 'dbp.dept_id', DB::raw('COALESCE(SUM(f2.total_amount), 0) as form2_total'))
+            ->groupBy('dbp.budget_plan_id', 'dbp.dept_id')
+            ->get();
+
+        $aip = DB::table('dept_bp_form4_items as f4')
+            ->join('department_budget_plans as dbp2', 'dbp2.dept_budget_plan_id', '=', 'f4.dept_budget_plan_id')
+            ->whereIn('dbp2.budget_plan_id', $planIds)
+            ->select('dbp2.budget_plan_id', 'dbp2.dept_id', DB::raw('SUM(f4.total_amount) as aip_total'))
+            ->groupBy('dbp2.budget_plan_id', 'dbp2.dept_id')
+            ->get();
+
+        $aipMap = [];
+        foreach ($aip as $row) {
+            $aipMap["{$row->budget_plan_id}_{$row->dept_id}"] = (float) $row->aip_total;
+        }
+
+        $result = [];
+        foreach ($form2 as $row) {
+            $key = (string) $row->budget_plan_id;
+            $result[$key] ??= [];
+            $result[$key][] = [
+                'dept_id' => (int) $row->dept_id,
+                'total'   => (float) $row->form2_total + ($aipMap["{$row->budget_plan_id}_{$row->dept_id}"] ?? 0),
+            ];
+        }
+
+        return $this->success($result);
+    }
+
+    public function sectionTotals(Request $request)
+    {
+        $this->authorize('viewAny', DepartmentBudgetPlan::class);
+
+        $validated = $request->validate([
+            'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
+        ]);
+
+        $rows = \App\Models\BudgetPlanForm2Item::query()
+            ->join('department_budget_plans', 'department_budget_plans.dept_budget_plan_id', '=', 'dept_bp_form2_items.dept_budget_plan_id')
+            ->join('expense_class_items', 'expense_class_items.expense_class_item_id', '=', 'dept_bp_form2_items.expense_item_id')
+            ->join('expense_classifications', 'expense_classifications.expense_class_id', '=', 'expense_class_items.expense_class_id')
+            ->where('department_budget_plans.budget_plan_id', $validated['budget_plan_id'])
+            ->selectRaw('
+                department_budget_plans.dept_id as dept_id,
+                expense_classifications.abbreviation as code,
+                SUM(dept_bp_form2_items.total_amount) as total
+            ')
+            ->groupBy('department_budget_plans.dept_id', 'expense_classifications.abbreviation')
+            ->get()
+            ->map(fn ($row) => [
+                'dept_id' => (int) $row->dept_id,
+                'code'    => $row->code,
+                'total'   => (float) $row->total,
+            ]);
+
+        return $this->success($rows);
+    }
+
     public function totals(Request $request)
     {
         $this->authorize('viewAny', DepartmentBudgetPlan::class);
@@ -368,8 +530,24 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
 
         $pastByDeptId = $pastDeptPlans->keyBy('dept_id');
 
+        // ── Preload department abbreviations for the special-account check ─────
+        // (mirrors the frontend's getSourceForDepartment: sh / occ / pm only)
+        $deptIds = $currentDeptPlans->pluck('dept_id')->unique();
+        $deptSourceById = \App\Models\Department::whereIn('dept_id', $deptIds)
+            ->get(['dept_id', 'dept_abbreviation', 'dept_name'])
+            ->mapWithKeys(function ($d) {
+                $abbr = strtolower($d->dept_abbreviation ?? '');
+                $name = strtolower($d->dept_name ?? '');
+                $source = null;
+                if ($abbr === 'sh' || str_contains($name, 'slaughter')) $source = 'sh';
+                elseif ($abbr === 'occ' || str_contains($name, 'opol community')) $source = 'occ';
+                elseif ($abbr === 'pm' || str_contains($name, 'public market')) $source = 'pm';
+                return [$d->dept_id => $source];
+            });
+
         $result = $currentDeptPlans->map(function ($cp) use (
-            $currentForm2, $currentForm4, $pastByDeptId, $pastForm2, $pastForm4
+            $currentForm2, $currentForm4, $pastByDeptId, $pastForm2, $pastForm4,
+            $currentBp, $deptSourceById
         ) {
             $currentTotal = (float) ($currentForm2[$cp->dept_budget_plan_id] ?? 0)
                           + (float) ($currentForm4[$cp->dept_budget_plan_id] ?? 0);
@@ -379,6 +557,44 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
                 ? (float) ($pastForm2[$pastPlan->dept_budget_plan_id] ?? 0)
                   + (float) ($pastForm4[$pastPlan->dept_budget_plan_id] ?? 0)
                 : 0.0;
+
+            // ── 5% Calamity Fund add-on for special accounts (sh/occ/pm) ────────
+            // These amounts are never stored as Form2/Form4 rows — Form2's own
+            // grand total computes them live via /calamity-fund + /ldrrmfip/summary,
+            // so the list-page card must reproduce the same sum or it under-reports.
+            $source = $deptSourceById->get($cp->dept_id);
+            if ($source) {
+                try {
+                    $calamityReq = new \Illuminate\Http\Request([
+                        'budget_plan_id' => $currentBp->budget_plan_id,
+                        'source'         => $source,
+                    ]);
+                    $calamityResp = app(CalamityFundController::class)->index($calamityReq);
+                    $calamityData = json_decode($calamityResp->getContent(), true)['data'] ?? null;
+                    $quickResponse = (float) ($calamityData['quick_response'] ?? 0);
+
+                    $ldrrmfReq = new \Illuminate\Http\Request([
+                        'budget_plan_id' => $currentBp->budget_plan_id,
+                        'source'         => $source,
+                    ]);
+                    // NOTE: adjust the method name below if your LdrrmfipController's
+                    // summary action isn't literally named `summary` — check
+                    // routes/api.php for whatever maps to GET /ldrrmfip/summary.
+                    $ldrrmfResp = app(LdrrmfipController::class)->summary($ldrrmfReq);
+                    $ldrrmfData = json_decode($ldrrmfResp->getContent(), true)['data'] ?? null;
+                    $preDisasterActual = (float) ($ldrrmfData['total70'] ?? $ldrrmfData['total_70pct'] ?? 0);
+
+                    $currentTotal += $preDisasterActual + $quickResponse;
+                } catch (\Throwable $e) {
+                    // Fail soft — a card missing the calamity add-on for one
+                    // department shouldn't break the whole list endpoint.
+                    \Log::warning('Calamity fund totals lookup failed', [
+                        'dept_id' => $cp->dept_id,
+                        'source'  => $source,
+                        'error'   => $e->getMessage(),
+                    ]);
+                }
+            }
 
             return [
                 'dept_id'             => $cp->dept_id,

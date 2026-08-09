@@ -19,7 +19,7 @@ import {
 } from "@/src/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
-import { PlusIcon, TrashIcon, ShieldCheckIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, ShieldCheckIcon, PencilSquareIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/src/hooks/useAuth";
 import { LdrrmfipUpload } from "@/src/components/ldrrmfip/LdrrmfipUpload";
 import {
@@ -73,6 +73,20 @@ interface Summary {
   reserved_30:   number;
   calamity_fund: number;
   source:        string;
+}
+
+interface ItemSuggestion {
+  ldrrmfip_item_id:     number;
+  ldrrmfip_category_id: number;
+  description:          string;
+  implementing_office:  string;
+  starting_date:        string | null;
+  completion_date:      string | null;
+  expected_output:      string | null;
+  funding_source:       string;
+  year:                 number;
+  similarity:           number;
+  already_used:         boolean;
 }
 
 // const QUARTERS = ["1st Qrtr", "2nd Qrtr", "3rd Qrtr", "4th Qrtr"];
@@ -146,6 +160,10 @@ const [searchParams, setSearchParams] = useSearchParams();
   const [editItem,   setEditItem]   = useState<LdrrmfipItem | null>(null);
   const [form,       setForm]       = useState({ ...EMPTY_FORM });
   const [saving,     setSaving]     = useState(false);
+
+  const [suggestions,     setSuggestions]     = useState<ItemSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const descDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
  const [deleteItem, setDeleteItem] = useState<LdrrmfipItem | null>(null);
 
@@ -342,11 +360,63 @@ const { user } = useAuth();
     setCtxMenu({ x, y, item });
   };
 
+  // ── Item suggestions (autocomplete + near-duplicate warning) ───────────────
+
+  useEffect(() => {
+    if (!dialogOpen || !activePlanId) {
+      setSuggestions([]);
+      return;
+    }
+    // While editing, skip the check if the description hasn't changed from
+    // the original — no point warning a user their unedited item is "similar to itself".
+    if (editItem && form.description.trim() === editItem.description.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    if (descDebounceRef.current) clearTimeout(descDebounceRef.current);
+    descDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await API.get("/ldrrmfip/item-suggestions", {
+          params: {
+            budget_plan_id:   activePlanId,
+            source:           activeSource,
+            q:                form.description,
+            exclude_item_id:  editItem?.ldrrmfip_item_id, // never match itself
+          },
+        });
+        setSuggestions(res.data?.data ?? []);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 300);
+    return () => { if (descDebounceRef.current) clearTimeout(descDebounceRef.current); };
+  }, [form.description, dialogOpen, activeSource, activePlanId, editItem]);
+
+  const topSuggestionMatch = suggestions[0];
+
+  const applySuggestion = (s: ItemSuggestion) => {
+    if (s.already_used) return; // already reused this budget year — nothing to prefill
+    setForm(p => ({
+      ...p,
+      ldrrmfip_category_id: String(s.ldrrmfip_category_id),
+      description:          s.description,
+      implementing_office:  s.implementing_office || p.implementing_office,
+      starting_date:        s.starting_date   ?? p.starting_date,
+      completion_date:      s.completion_date ?? p.completion_date,
+      expected_output:      s.expected_output ?? p.expected_output,
+      funding_source:       s.funding_source || p.funding_source,
+      // mooe/co intentionally left untouched — amounts change year to year
+    }));
+    setSuggestionsOpen(false);
+  };
+
   // ── Dialog helpers ─────────────────────────────────────────────────────────
 
   const openAdd = (categoryId: number) => {
     setEditItem(null);
     setForm({ ...EMPTY_FORM, ldrrmfip_category_id: String(categoryId) });
+    setSuggestions([]);
+    setSuggestionsOpen(false);
     setDialogOpen(true);
   };
 
@@ -363,6 +433,8 @@ const { user } = useAuth();
       mooe:                 item.mooe > 0 ? String(item.mooe) : "",
       co:                   item.co   > 0 ? String(item.co)   : "",
     });
+    setSuggestions([]);
+    setSuggestionsOpen(false);
     setDialogOpen(true);
   };
 
@@ -905,7 +977,7 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
 
           <div className="grid grid-cols-2 gap-4 py-2">
             <div className="col-span-2 space-y-1">
-              <Label className="text-field-label">Thematic Area *</Label>
+              <Label className="text-field-label">Thematic Area <span className="text-red-500">*</span></Label>
               <Select
                 value={form.ldrrmfip_category_id}
                 onValueChange={v => setForm(p => ({ ...p, ldrrmfip_category_id: v }))}
@@ -923,14 +995,53 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
               </Select>
             </div>
 
-            <div className="col-span-2 space-y-1">
-              <Label className="text-xs">Program/Project/Activity Description *</Label>
+            <div className="col-span-2 space-y-1 relative">
+              <Label className="text-xs">Program/Project/Activity Description <span className="text-red-500">*</span></Label>
               <Input
                 value={form.description}
-                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setSuggestionsOpen(true); }}
+                onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
+                onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
                 className="h-8 text-sm"
                 placeholder="e.g. Procurement of Road Safety Equipment"
+                autoComplete="off"
               />
+
+              {suggestionsOpen && suggestions.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {suggestions.map(s => (
+                    <button
+                      type="button"
+                      key={s.ldrrmfip_item_id}
+                      disabled={s.already_used}
+                      onMouseDown={() => applySuggestion(s)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-xs border-b border-gray-100 last:border-b-0 flex items-center justify-between gap-2",
+                        s.already_used
+                          ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                          : "hover:bg-gray-50 text-gray-700"
+                      )}
+                    >
+                      <span className="truncate">{s.description}</span>
+                      <span className="flex-shrink-0 flex items-center gap-1.5">
+                        {s.already_used && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            Already added
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-400">FY {s.year}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {topSuggestionMatch && topSuggestionMatch.similarity >= 85 && form.description.trim().length > 2 && (
+                <p className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-1">
+                  <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  Similar item already exists from FY {topSuggestionMatch.year}: "{topSuggestionMatch.description}". Consider reusing it instead of creating a near-duplicate.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">

@@ -15,11 +15,31 @@ class BudgetPlanController extends BaseApiController
     /**
      * GET /api/budget-plans
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', BudgetPlan::class);
 
-        $plans = BudgetPlan::with('departmentPlans')->get();
+        $query = BudgetPlan::query();
+
+        // Lean payload for callers that only need a couple of columns (e.g.
+        // dashboard year pickers) — previously `fields` was silently ignored
+        // and every column (is_active, is_open, created_at, updated_at) was
+        // always returned regardless of what the caller asked for.
+        if ($request->filled('fields')) {
+            $fields = array_filter(array_map('trim', explode(',', $request->query('fields'))));
+            $allowed = ['budget_plan_id', 'year', 'is_active', 'is_open', 'created_at', 'updated_at'];
+            $fields  = array_values(array_intersect($fields, $allowed));
+
+            if (!empty($fields)) {
+                $query->select($fields);
+            }
+        }
+
+        if ($request->boolean('with_department_plans')) {
+            $query->with('departmentPlans');
+        }
+
+        $plans = $query->get();
 
         return $this->success($plans);
     }
@@ -154,6 +174,26 @@ class BudgetPlanController extends BaseApiController
         });
 
         return $this->success($budgetPlan->fresh());
+    }
+
+   /**
+     * GET /api/budget-plans/by-year/{year}
+     *
+     * Single-row lookup by year — for callers (like the department-head
+     * dashboard's prior-year comparison) that need one specific year's
+     * budget_plan_id and don't need the full plans list.
+     */
+    public function byYear(int $year)
+    {
+        $this->authorize('viewAny', BudgetPlan::class);
+
+        $plan = BudgetPlan::where('year', $year)->select(['budget_plan_id', 'year'])->first();
+
+        if (!$plan) {
+            return response()->json(['message' => 'No budget plan found for that year.'], 404);
+        }
+
+        return $this->success($plan);
     }
 
     /**

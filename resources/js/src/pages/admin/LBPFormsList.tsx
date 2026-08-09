@@ -5,7 +5,11 @@ import API from '../../services/api';
 import { useActiveBudgetPlan } from '../../hooks/useActiveBudgetPlan';
 import { DepartmentBudgetPlan } from '../../types/api';
 import { LoadingState } from '../../components/states/LoadingState';
+import { Skeleton } from '@/src/components/ui/skeleton';
 import { Input } from '@/src/components/ui/input';
+import { useLBPFormsListStore } from '../../store/lbpFormsListStore';
+import { CardContent } from '@/src/components/ui/card';
+import { Badge } from '@/src/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/src/components/ui/select';
@@ -37,31 +41,58 @@ const CATEGORY_DOT: Record<number, string> = {
 const getCategoryDot = (id: number | undefined) =>
   CATEGORY_DOT[id ?? 0] ?? 'bg-gray-300';
 
-const CATEGORY_BG: Record<number, string> = {
-  1: 'bg-cat-1/5',
-  2: 'bg-cat-2/5',
-  3: 'bg-cat-3/5',
-  4: 'bg-cat-4/5',
-};
-const getCategoryBg = (id: number | undefined) =>
-  CATEGORY_BG[id ?? 0] ?? 'bg-gray-50';
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700', 'bg-teal-100 text-teal-700',
-  'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700', 'bg-sky-100 text-sky-700',
-  'bg-orange-100 text-orange-700', 'bg-pink-100 text-pink-700', 'bg-emerald-100 text-emerald-700',
-  'bg-indigo-100 text-indigo-700',
+// Gradient palette inspired by the reference cards (Business/Festive/Health/Finance/Gaming).
+// Vivid, saturated top fading to near-white at the bottom. Cycles by category id.
+const CATEGORY_PALETTE = [
+  { bg: 'bg-gradient-to-b from-[#FFEBAF] to-[#FFF5D6]', hoverBorder: 'hover:border-[#F0D68A]', text: 'text-gray-900', sub: 'text-gray-700' }, // yellow
+  { bg: 'bg-gradient-to-b from-[#B1E8FD] to-[#D6F2FE]', hoverBorder: 'hover:border-[#96D6F2]', text: 'text-gray-900', sub: 'text-gray-700' }, // blue
+  { bg: 'bg-gradient-to-b from-[#FFCDFA] to-[#FFE6FD]', hoverBorder: 'hover:border-[#F2B4E2]', text: 'text-gray-900', sub: 'text-gray-700' }, // pink
+  { bg: 'bg-gradient-to-b from-[#C5E9C5] to-[#E0F4E0]', hoverBorder: 'hover:border-[#A6DDA4]', text: 'text-gray-900', sub: 'text-gray-700' }, // green
 ];
-const avatarColor = (deptId: number) => AVATAR_COLORS[deptId % AVATAR_COLORS.length];
+const getCategoryPalette = (id: number | undefined) =>
+  CATEGORY_PALETTE[(id ?? 0) % CATEGORY_PALETTE.length];
+
+// Colored pill per category — same order/hue family as CATEGORY_PALETTE above.
+const CATEGORY_BADGE = [
+  'bg-amber-50 text-amber-700 border-amber-200',     // yellow
+  'bg-sky-50 text-sky-700 border-sky-200',           // blue
+  'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200', // pink
+  'bg-emerald-50 text-emerald-700 border-emerald-200', // green
+];
+const getCategoryBadge = (id: number | undefined) =>
+  CATEGORY_BADGE[(id ?? 0) % CATEGORY_BADGE.length];
+
+// Logo/avatar background follows category, same hue family as CATEGORY_BADGE.
+const CATEGORY_AVATAR = [
+  'bg-amber-100 text-amber-700',    // yellow
+  'bg-sky-100 text-sky-700',        // blue
+  'bg-fuchsia-100 text-fuchsia-700',// pink
+  'bg-emerald-100 text-emerald-700',// green
+];
+const avatarColor = (categoryId: number | undefined) =>
+  CATEGORY_AVATAR[(categoryId ?? 0) % CATEGORY_AVATAR.length];
 
 // ─── Stagger animation (injected once) ─────────────────────────────────────
 const CARD_ANIM_CSS = `
 @keyframes _cardIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(10px) scale(0.97); filter: blur(2px); }
+  60%  { filter: blur(0); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes _headerIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+._cardAnim {
+  will-change: transform, opacity, filter;
+}
+._headerAnim {
+  will-change: transform, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
-  ._cardAnim { animation: none !important; opacity: 1 !important; transform: none !important; }
+  ._cardAnim, ._headerAnim {
+    animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important;
+  }
 }`;
 
 let _cardAnimInjected = false;
@@ -79,8 +110,8 @@ interface DeptPlanWithName extends DepartmentBudgetPlan {
   dept_logo: string | null;
 }
 
-function DeptLogo({ logo, abbreviation, name, deptId }: {
-  logo: string | null; abbreviation: string; name: string; deptId: number;
+function DeptLogo({ logo, abbreviation, name, categoryId }: {
+  logo: string | null; abbreviation: string; name: string; categoryId: number | undefined;
 }) {
   const label = abbreviation
     ? abbreviation.replace(/[()]/g, '').trim().slice(0, 4)
@@ -102,8 +133,32 @@ function DeptLogo({ logo, abbreviation, name, deptId }: {
     );
   }
   return (
-    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[12px] flex-shrink-0', avatarColor(deptId))}>
+    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[12px] flex-shrink-0', avatarColor(categoryId))}>
       {label}
+    </div>
+  );
+}
+
+// ─── Loading skeleton ───────────────────────────────────────────────────────
+function DeptCardSkeleton() {
+  return (
+    <div className="rounded-2xl border-2 border-gray-200 overflow-hidden flex flex-col bg-white">
+      <div className="flex flex-col gap-5 px-6 pt-6 pb-5">
+        <div className="flex items-start justify-between gap-2">
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <Skeleton className="w-20 h-5 rounded-full" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-3/4 rounded" />
+          <Skeleton className="h-5 w-1/2 rounded" />
+          <Skeleton className="h-5 w-24 rounded-full mt-1" />
+        </div>
+      </div>
+      <div className="px-6 py-5 border-t border-black/5 flex flex-col items-end gap-2">
+        <Skeleton className="h-3 w-20 rounded" />
+        <Skeleton className="h-6 w-32 rounded" />
+        <Skeleton className="h-3 w-28 rounded" />
+      </div>
     </div>
   );
 }
@@ -128,6 +183,18 @@ const LBPFormsList: React.FC = () => {
 
   useEffect(() => {
     ensureCardAnim();
+  }, []);
+
+  // Only play the staggered entrance once per browser session — otherwise
+  // every time you navigate back from a card's detail page, all cards
+  // replay the fade-in from scratch, which reads as janky rather than smooth.
+  const hasAnimatedRef = React.useRef(
+    typeof sessionStorage !== 'undefined' && sessionStorage.getItem('lbpFormsListAnimated') === '1',
+  );
+  useEffect(() => {
+    if (!hasAnimatedRef.current && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('lbpFormsListAnimated', '1');
+    }
   }, []);
 
   const { data: categoryList = [] } = useQuery<{ dept_category_id: number; dept_category_name: string }[]>({
@@ -192,11 +259,15 @@ const LBPFormsList: React.FC = () => {
     return map;
   }, [totalsData]);
 
-  // ── Search (debounced) + filters ────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('');
+  // ── Search (debounced) + filters — persisted in Zustand so they survive
+  //    navigating away to a card's detail page and back ─────────────────────
+  const searchInput = useLBPFormsListStore(s => s.search);
+  const setSearchInput = useLBPFormsListStore(s => s.setSearch);
+  const statusFilter = useLBPFormsListStore(s => s.statusFilter);
+  const setStatusFilter = useLBPFormsListStore(s => s.setStatusFilter);
+  const categoryFilter = useLBPFormsListStore(s => s.categoryFilter);
+  const setCategoryFilter = useLBPFormsListStore(s => s.setCategoryFilter);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const getCategoryName = useCallback(
     (p: DeptPlanWithName) =>
@@ -210,6 +281,26 @@ const LBPFormsList: React.FC = () => {
     const cats = deptPlans.map(getCategoryName).filter((c): c is string => !!c);
     return Array.from(new Set(cats)).sort();
   }, [deptPlans, getCategoryName]);
+
+  // Plans matching search + category but NOT status — used to compute the
+  // per-tab counts so switching status tabs doesn't make the counts shift.
+  const plansForCounting = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return deptPlans.filter(p => {
+      const matchSearch =
+        !q ||
+        p.dept_name.toLowerCase().includes(q) ||
+        p.dept_abbreviation.toLowerCase().includes(q);
+      const matchCategory = categoryFilter === 'all' || (getCategoryName(p) ?? '') === categoryFilter;
+      return matchSearch && matchCategory;
+    });
+  }, [deptPlans, debouncedSearch, categoryFilter, getCategoryName]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { draft: 0, submitted: 0, under_review: 0, approved: 0 };
+    plansForCounting.forEach(p => { counts[p.status] = (counts[p.status] ?? 0) + 1; });
+    return counts;
+  }, [plansForCounting]);
 
   const filteredPlans = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
@@ -245,7 +336,48 @@ const LBPFormsList: React.FC = () => {
     }
   }, [deptPlans, location.state, navigate]);
 
-  if (planLoading || deptPlansLoading) return <LoadingState />;
+  // Restore scroll position via a callback ref — fires the instant the
+  // scroll container is actually attached to the DOM, independent of which
+  // loading flag resolved last. A useEffect here was unreliable because its
+  // dependency array (deptPlansLoading, filteredPlans.length) could stay
+  // unchanged even when planLoading flipped later, so it never re-fired
+  // once the container existed.
+  //
+  // We read the stored value imperatively (getState()) instead of
+  // subscribing to it, so scrolling doesn't re-render this component on
+  // every pixel — only setScrollTop (a stable function reference) is
+  // subscribed to.
+  const setScrollTop = useLBPFormsListStore(s => s.setScrollTop);
+  const scrollRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      node.scrollTop = useLBPFormsListStore.getState().scrollTop;
+    }
+  }, []);
+
+  if (planLoading || deptPlansLoading) {
+    return (
+      <div className="h-full min-h-0 overflow-y-auto p-6">
+        <div className="mb-5">
+          <Skeleton className="h-3 w-40 mb-2 rounded" />
+          <Skeleton className="h-6 w-52 rounded" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5 mb-5">
+          <Skeleton className="h-9 flex-1 min-w-[220px] max-w-sm rounded-md" />
+          <Skeleton className="h-9 w-16 rounded-full" />
+          <Skeleton className="h-9 w-20 rounded-full" />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-9 w-[180px] rounded-md" />
+        </div>
+        <Skeleton className="h-3 w-40 mb-2.5 rounded" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <DeptCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (!activePlan) {
     return (
       <div className="p-6 flex items-center justify-center h-full">
@@ -257,7 +389,11 @@ const LBPFormsList: React.FC = () => {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto p-6">
+    <div
+      ref={scrollRef}
+      onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      className="h-full min-h-0 overflow-y-auto p-6"
+    >
       {/* ── Header ── */}
       <div className="mb-5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 mb-0.5">
@@ -280,22 +416,31 @@ const LBPFormsList: React.FC = () => {
           />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex items-center rounded-lg border border-gray-200 bg-white p-0.5">
           {(['all', 'draft', 'submitted', 'under_review', 'approved'] as const).map(s => {
             const labels: Record<string, string> = {
               all: 'All', draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review', approved: 'Approved',
             };
             const active = statusFilter === s;
+            const count = s === 'all' ? null : statusCounts[s] ?? 0;
             return (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={cn(
-                  'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
-                  active ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50',
+                  'text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5',
+                  active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50',
                 )}
               >
                 {labels[s]}
+                {count !== null && (
+                  <span className={cn(
+                    'text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none',
+                    active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500',
+                  )}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -322,14 +467,23 @@ const LBPFormsList: React.FC = () => {
       ) : (
         (() => {
           let cardIdx = 0;
-          return groupedPlans.map(group => (
+          let groupIdx = 0;
+          return groupedPlans.map(group => {
+            const headerDelay = Math.min(groupIdx++ * 60, 240);
+            return (
           <div key={group.categoryName} className="mb-7 last:mb-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">
+            <p
+              className={cn('text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5', !hasAnimatedRef.current && '_headerAnim')}
+              style={!hasAnimatedRef.current ? { opacity: 0, animation: `_headerIn 380ms cubic-bezier(0.16,1,0.3,1) ${headerDelay}ms both` } : undefined}
+            >
               {group.categoryName}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {group.plans.map(plan => {
-                const delay = Math.min(cardIdx++ * 45, 500);
+                // Tighter stagger step + lower cap: with many cards, a big
+                // per-card delay makes the tail end feel like a separate,
+                // late wave instead of one continuous reveal.
+                const delay = Math.min(cardIdx++ * 35, 380);
                 const cfg = getStatusCfg(plan.status);
                 const proposed = proposedTotalByPlan.get(plan.dept_budget_plan_id) ?? 0;
                 const past = pastTotalByDeptId.get(plan.dept_id) ?? 0;
@@ -337,53 +491,70 @@ const LBPFormsList: React.FC = () => {
                 const pct = pctOf(past, diff);
                 const hasComparison = past > 0;
 
-                const catBg = getCategoryBg(plan.department?.dept_category_id);
+                const palette = getCategoryPalette(plan.department?.dept_category_id);
 
                 return (
                   <button
                     key={plan.dept_budget_plan_id}
                     onClick={() => navigate(`/admin/lbp-forms/${plan.dept_budget_plan_id}`)}
-                    className="_cardAnim text-left bg-white rounded-2xl border border-gray-200/70 p-6 transition-all hover:border-gray-300 hover:shadow-[0_2px_20px_rgba(0,0,0,0.06)] flex flex-col gap-5"
-                    style={{
-                      opacity: 0,
-                      animation: `_cardIn 300ms cubic-bezier(0.22,1,0.36,1) ${delay}ms both`,
-                    }}
+                    className={cn(
+                      '_cardAnim appearance-none text-left rounded-2xl border-2 border-gray-200 outline-none shadow-none ring-0 transition-all duration-200 ease-out overflow-hidden',
+                      'hover:scale-[1.035]',
+                      palette.hoverBorder,
+                      'flex flex-col bg-white',
+                    )}
+                    style={
+                      hasAnimatedRef.current
+                        ? { boxShadow: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }
+                        : {
+                            opacity: 0,
+                            animation: `_cardIn 420ms cubic-bezier(0.16,1,0.3,1) ${delay}ms both`,
+                            boxShadow: 'none',
+                            WebkitAppearance: 'none',
+                            MozAppearance: 'none',
+                          }
+                    }
                   >
-                    {/* Top row — logo + status */}
-                    <div className="flex items-start justify-between gap-2">
-                      <DeptLogo
-                        logo={plan.dept_logo}
-                        abbreviation={plan.dept_abbreviation}
-                        name={plan.dept_name}
-                        deptId={plan.dept_id}
-                      />
-                      <span className="flex items-center gap-1.5 text-[12px] font-medium text-gray-400">
-                        <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
-                        {cfg.label}
-                      </span>
-                    </div>
+                    <div className="flex flex-col gap-5 px-6 pt-6 pb-5">
+                      {/* Top row — logo + status */}
+                      <div className="flex items-start justify-between gap-2">
+                        <DeptLogo
+                          logo={plan.dept_logo}
+                          abbreviation={plan.dept_abbreviation}
+                          name={plan.dept_name}
+                          categoryId={plan.department?.dept_category_id}
+                        />
+                        <Badge variant="outline" className={cn('gap-1.5 font-medium', cfg.badge)}>
+                          <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
+                          {cfg.label}
+                        </Badge>
+                      </div>
 
-                    {/* Title */}
-                    <div>
-                      <p className="text-[13px] text-gray-400 truncate mb-1 tracking-tight">
-                        {plan.dept_name}
-                      </p>
-                      <p className="text-[19px] font-semibold text-gray-900 leading-tight tracking-tight truncate">
-                        {plan.dept_abbreviation ? plan.dept_abbreviation.replace(/[()]/g, '').trim() : plan.dept_name}
-                      </p>
-                      {getCategoryName(plan) && (
-                        <p className="text-[12px] text-gray-400 mt-1 tracking-tight">
-                          {getCategoryName(plan)}
+                      {/* Title */}
+                      <div>
+                        <p className="text-[13px] truncate mb-1 tracking-tight text-gray-500">
+                          {plan.dept_name}
                         </p>
-                      )}
+                        <p className="text-[19px] font-semibold leading-tight tracking-tight truncate text-gray-900">
+                          {plan.dept_abbreviation ? plan.dept_abbreviation.replace(/[()]/g, '').trim() : plan.dept_name}
+                        </p>
+                        {getCategoryName(plan) && (
+                          <span className={cn(
+                            'inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-[11px] font-medium border',
+                            getCategoryBadge(plan.department?.dept_category_id),
+                          )}>
+                            {getCategoryName(plan)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Proposed amount — the single focal point */}
-                    <div className="pt-5 border-t border-gray-100">
-                      <p className="text-[12px] text-gray-400 mb-1 tracking-tight">
+                    {/* Proposed amount — white footer, amber accent */}
+                    <CardContent className="px-6 py-5 bg-white border-t border-black/5 text-right">
+                      <p className="text-[12px] mb-1 tracking-tight text-amber-600">
                         Proposed {activePlan.year}
                       </p>
-                      <p className="text-[26px] font-semibold text-gray-900 tracking-tight leading-tight truncate">
+                      <p className="text-[26px] font-semibold tracking-tight leading-tight truncate text-amber-600">
                         {proposed === 0 ? '–' : fmtP(proposed)}
                       </p>
                       {hasComparison && (
@@ -391,16 +562,17 @@ const LBPFormsList: React.FC = () => {
                           'text-[13px] mt-1 tracking-tight',
                           diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-400',
                         )}>
-                          {diff >= 0 ? '↑ ' : '↓ '}{fmtP(Math.abs(diff))} ({Math.abs(pct).toFixed(1)}%) vs. last year
+                          {diff >= 0 ? '↑ ' : '↓ '}{fmtP(Math.abs(diff))} ({Math.abs(pct).toFixed(1)}%) vs. current year
                         </p>
                       )}
-                    </div>
+                    </CardContent>
                   </button>
                 );
               })}
             </div>
           </div>
-        ));
+            );
+          });
         })()
       )}
     </div>

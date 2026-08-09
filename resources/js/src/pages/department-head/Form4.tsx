@@ -19,7 +19,7 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Badge } from '@/src/components/ui/badge';
-import { MagnifyingGlassIcon, PlusCircleIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PlusCircleIcon, PencilSquareIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/src/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -137,6 +137,16 @@ const Form4: React.FC<Form4Props> = ({ plan, isEditable }) => {
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 const cursorRef = useCaretRestore();
 
+  const [programSuggestions, setProgramSuggestions] = useState<Array<{
+    aip_program_id: number;
+    aip_reference_code: string | null;
+    program_description: string;
+    is_active: boolean;
+    similarity: number;
+  }>>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const descDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Context menu ────────────────────────────────────────────────────────────
 //   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
 //   const ctxRef = useRef<HTMLDivElement>(null);
@@ -168,7 +178,7 @@ const handleRowClick = (e: React.MouseEvent, item: DepartmentBudgetPlanForm4Item
     if ((e.target as HTMLElement).closest('[data-no-ctx]')) return;
     e.preventDefault();
     e.stopPropagation();
-    console.log('clientX:', e.clientX, 'clientY:', e.clientY);
+    // console.log('clientX:', e.clientX, 'clientY:', e.clientY);
     const MENU_W = 175, MENU_H = 110;
     const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
     const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
@@ -391,6 +401,51 @@ useEffect(() => {
     );
   }, [existingPrograms, programSearch]);
 
+  // ── Near-duplicate suggestions while creating a NEW program ────────────────
+  useEffect(() => {
+    if (!modalOpen || modalMode !== 'new' || editingItem || !deptId) {
+      setProgramSuggestions([]);
+      return;
+    }
+    if (descDebounceRef.current) clearTimeout(descDebounceRef.current);
+    descDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await API.get('/aip-programs/suggestions', {
+          params: { dept_id: deptId, q: formData.program_description },
+        });
+        setProgramSuggestions(res.data?.data ?? []);
+      } catch {
+        setProgramSuggestions([]);
+      }
+    }, 300);
+    return () => { if (descDebounceRef.current) clearTimeout(descDebounceRef.current); };
+  }, [formData.program_description, modalOpen, modalMode, editingItem, deptId]);
+
+  const topProgramMatch = programSuggestions[0];
+
+  const applyProgramSuggestion = (s: {
+    aip_program_id: number;
+    aip_reference_code: string | null;
+    program_description: string;
+    is_active: boolean;
+  }) => {
+    if (usedProgramIds.has(s.aip_program_id)) return; // already added to this plan
+    setSelectedProgram({
+      aip_program_id: s.aip_program_id,
+      aip_reference_code: s.aip_reference_code,
+      program_description: s.program_description,
+      dept_id: deptId,
+      is_active: s.is_active,
+    });
+    setFormData(prev => ({
+      ...prev,
+      aip_reference_code: s.aip_reference_code || '',
+      program_description: s.program_description,
+    }));
+    setModalMode('existing');
+    setSuggestionsOpen(false);
+  };
+
   // ── Modal openers ────────────────────────────────────────────────────────────
 
   const openAddModal = () => {
@@ -399,6 +454,8 @@ useEffect(() => {
     setSelectedProgram(null);
     setProgramSearch('');
     setAmountDrafts({});
+    setProgramSuggestions([]);
+    setSuggestionsOpen(false);
     const hasAvailable = existingPrograms.some(p => !usedProgramIds.has(p.aip_program_id));
     setModalMode(hasAvailable ? 'choose' : 'new');
     setModalOpen(true);
@@ -1036,11 +1093,14 @@ const handleDeleteRequest = async (itemId: number) => {
                     className={cn('h-9 text-sm border-gray-200', modalMode === 'existing' && 'bg-gray-50 text-gray-400 cursor-not-allowed')}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <Label className="text-xs font-semibold text-gray-600">Program / Project / Activity Description</Label>
                   <Textarea
                     name="program_description" value={formData.program_description}
-                    onChange={handleInputChange} rows={2} placeholder="e.g. IRR Crafting Improved Services"
+                    onChange={e => { handleInputChange(e); if (modalMode === 'new' && !editingItem) setSuggestionsOpen(true); }}
+                    onFocus={() => { if (modalMode === 'new' && !editingItem && programSuggestions.length > 0) setSuggestionsOpen(true); }}
+                    onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+                    rows={2} placeholder="e.g. IRR Crafting Improved Services"
                     readOnly={modalMode === 'existing'}
                     className={cn(
                       'text-sm resize-none border-gray-200',
@@ -1048,12 +1108,49 @@ const handleDeleteRequest = async (itemId: number) => {
                       newDescDuplicate && 'border-red-400 focus:ring-red-300'
                     )}
                   />
+                  {modalMode === 'new' && !editingItem && suggestionsOpen && programSuggestions.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {programSuggestions.map(s => {
+                        const used = usedProgramIds.has(s.aip_program_id);
+                        return (
+                          <button
+                            type="button"
+                            key={s.aip_program_id}
+                            disabled={used}
+                            onMouseDown={() => applyProgramSuggestion(s)}
+                            className={cn(
+                              'w-full text-left px-3 py-2 text-xs border-b border-gray-100 last:border-b-0 flex items-center justify-between gap-2',
+                              used ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50 text-gray-700'
+                            )}
+                          >
+                            <span className="truncate">{s.program_description}</span>
+                            <span className="flex-shrink-0 flex items-center gap-1.5">
+                              {used && (
+                                <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                                  Already added
+                                </span>
+                              )}
+                              {s.aip_reference_code && (
+                                <span className="text-[10px] text-gray-400 font-mono">{s.aip_reference_code}</span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {modalMode === 'existing' && (
                     <p className="text-[10px] text-gray-400">🔒 Program fields are locked to the selected record.</p>
                   )}
                   {newDescDuplicate && modalMode === 'new' && (
                     <p className="text-[11px] text-red-600 flex items-center gap-1">
                       ⚠ A program with this description already exists. Select it from the list instead.
+                    </p>
+                  )}
+                  {!newDescDuplicate && modalMode === 'new' && !editingItem && topProgramMatch && topProgramMatch.similarity >= 85 && formData.program_description.trim().length > 2 && (
+                    <p className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-1">
+                      <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      Similar program already exists: "{topProgramMatch.program_description}". Consider reusing it instead of creating a near-duplicate.
                     </p>
                   )}
                 </div>

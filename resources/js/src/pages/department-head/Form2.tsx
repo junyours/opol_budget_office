@@ -649,7 +649,7 @@ const Form2: React.FC<Form2Props> = ({
         queryKey: ["ldrrmf-plan-report"],
         queryFn: () => API.get("/ldrrmf-plan").then((r) => r.data?.data ?? null),
         enabled: isSpecialAccount,
-        staleTime: 5 * 60 * 1000,
+        
     });
 
     const ldrrmfSection = useMemo(() => {

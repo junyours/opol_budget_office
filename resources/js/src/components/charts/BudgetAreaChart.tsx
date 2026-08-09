@@ -8,8 +8,8 @@ import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from "../ui/select";
-import { useBudgetPlans, useDepartments, useDepartmentBudgetPlans, useAipPrograms } from "../../hooks/useDashboardQueries";
-import { BudgetPlan, Department, DepartmentBudgetPlan } from "../../types/api";
+import { useBudgetPlans, useDepartmentsLite, useYearTotals, DepartmentLite, YearTotalRow } from "../../hooks/useDashboardQueries";
+import { BudgetPlan } from "../../types/api";
 import { cn } from "@/src/lib/utils";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
 
@@ -41,37 +41,25 @@ const YEAR_COLORS: Record<string, string> = {
  * Compute per-dept expenditure map from already-fetched data.
  */
 function computeDeptExpForPlan(
-  plan: BudgetPlan,
-  allDeptPlans: DepartmentBudgetPlan[],
-  allAipPrograms: any[],
-  departments: Department[],
+  rows: YearTotalRow[],
+  departments: DepartmentLite[],
   filter: FundFilter
 ): Record<string, number> {
-  const deptMap = new Map<number, Department>(departments.map(d => [d.dept_id, d]));
-
-  const aipByDept = new Map<number, number>();
-  allAipPrograms.forEach((p: any) => {
-    aipByDept.set(p.dept_id, (aipByDept.get(p.dept_id) ?? 0) + (p.total_amount ?? 0));
-  });
+  const deptMap = new Map<number, DepartmentLite>(departments.map(d => [d.dept_id, d]));
 
   const result: Record<string, number> = {};
-  allDeptPlans
-    .filter((dp: DepartmentBudgetPlan) => {
-      const d = deptMap.get(dp.dept_id);
+  rows
+    .filter((row: YearTotalRow) => {
+      const d = deptMap.get(row.dept_id);
       if (!d) return false;
       if (filter === "general") return d.dept_category_id !== SPECIAL_CAT_ID;
       if (filter === "special") return d.dept_category_id === SPECIAL_CAT_ID;
       return true;
     })
-    .forEach((dp: DepartmentBudgetPlan) => {
-      const d = deptMap.get(dp.dept_id)!;
+    .forEach((row: YearTotalRow) => {
+      const d = deptMap.get(row.dept_id)!;
       const abbr = d.dept_abbreviation ?? d.dept_name.slice(0, 6);
-      const form2 = (dp.items ?? []).reduce(
-        (s: number, i: any) => s + (parseFloat(i.total_amount) || 0),
-        0
-      );
-      const aip = aipByDept.get(dp.dept_id) ?? 0;
-      result[abbr] = (result[abbr] ?? 0) + form2 + aip;
+      result[abbr] = (result[abbr] ?? 0) + row.total;
     });
 
   return result;
@@ -154,7 +142,7 @@ const useIsMobile = () => {
 
 export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) => {
   const { data: plans = [], isLoading: plansLoading } = useBudgetPlans();
-  const { data: departments = [], isLoading: deptsLoading } = useDepartments();
+  const { data: departments = [], isLoading: deptsLoading } = useDepartmentsLite();
   const isMobile = useIsMobile();
 
   const [fundFilter, setFundFilter] = useState<FundFilter>("all");
@@ -176,24 +164,14 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
   const planId1 = plansForYears[1]?.budget_plan_id;
   const planId2 = plansForYears[2]?.budget_plan_id;
 
-  const { data: deptPlans0 = [], isLoading: dp0Loading } = useDepartmentBudgetPlans(planId0);
-  const { data: deptPlans1 = [], isLoading: dp1Loading } = useDepartmentBudgetPlans(planId1);
-  const { data: deptPlans2 = [], isLoading: dp2Loading } = useDepartmentBudgetPlans(planId2);
+  const { data: yearTotals = {}, isLoading: expLoading } = useYearTotals([planId0, planId1, planId2]);
 
-  const { data: aipPrograms0 = [], isLoading: aip0Loading } = useAipPrograms(planId0);
-  const { data: aipPrograms1 = [], isLoading: aip1Loading } = useAipPrograms(planId1);
-  const { data: aipPrograms2 = [], isLoading: aip2Loading } = useAipPrograms(planId2);
-
-  const expLoading = dp0Loading || dp1Loading || dp2Loading || aip0Loading || aip1Loading || aip2Loading;
+  const rowsForPlan = (planId: number | undefined): YearTotalRow[] =>
+    planId ? (yearTotals[String(planId)] ?? []) : [];
 
   const allDepts = useMemo(() => {
-    const allDeptPlanSets = [deptPlans0, deptPlans1, deptPlans2];
-    const allAipSets      = [aipPrograms0, aipPrograms1, aipPrograms2];
-
-    const expData = plansForYears.map((plan, i) =>
-      plan
-        ? computeDeptExpForPlan(plan, allDeptPlanSets[i], allAipSets[i], departments, fundFilter)
-        : {}
+    const expData = [planId0, planId1, planId2].map(pid =>
+      computeDeptExpForPlan(rowsForPlan(pid), departments, fundFilter)
     );
 
     const withData = new Set<string>();
@@ -208,18 +186,13 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map(d => d.dept_abbreviation ?? d.dept_name.slice(0, 6))
       .filter(abbr => withData.has(abbr));
-  }, [deptPlans0, deptPlans1, deptPlans2, aipPrograms0, aipPrograms1, aipPrograms2, departments, fundFilter, plansForYears]);
+  }, [yearTotals, planId0, planId1, planId2, departments, fundFilter]);
 
   const expData = useMemo(() => {
-    const allDeptPlanSets = [deptPlans0, deptPlans1, deptPlans2];
-    const allAipSets      = [aipPrograms0, aipPrograms1, aipPrograms2];
-
-    return plansForYears.map((plan, i) =>
-      plan
-        ? computeDeptExpForPlan(plan, allDeptPlanSets[i], allAipSets[i], departments, fundFilter)
-        : {}
+    return [planId0, planId1, planId2].map(pid =>
+      computeDeptExpForPlan(rowsForPlan(pid), departments, fundFilter)
     );
-  }, [deptPlans0, deptPlans1, deptPlans2, aipPrograms0, aipPrograms1, aipPrograms2, departments, fundFilter, plansForYears]);
+  }, [yearTotals, planId0, planId1, planId2, departments, fundFilter]);
 
   const chartData = useMemo(() => {
     if (allDepts.length === 0) return [];
@@ -299,11 +272,11 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
         </div>
 
         {/* Year pills */}
-        <div className="mt-3 grid grid-cols-1 sm:flex sm:items-center gap-2">
+        <div className="mt-3 inline-flex flex-col sm:flex-row w-full sm:w-auto rounded-lg border border-border bg-muted/30 divide-y sm:divide-y-0 sm:divide-x divide-border overflow-hidden">
           {(["y0", "y1", "y2"] as const).map((key, i) => (
             <div
               key={key}
-              className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-muted/30 border-border min-w-0"
+              className="flex items-center gap-2 px-3 py-1.5 min-w-0"
             >
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: YEAR_COLORS[key] }} />
               <span className="text-[11px] font-semibold text-foreground flex-shrink-0">{targetYears[i]}</span>
@@ -389,7 +362,7 @@ export const BudgetAreaChart: React.FC<BudgetAreaChartProps> = ({ className }) =
       {/* Legend */}
       {!loading && chartData.length > 0 && (
         <div className="px-5 pb-4 flex items-center justify-center gap-5">
-          {(["y2", "y1", "y0"] as const).map(key => {
+          {(["y0", "y1", "y2"] as const).map(key => {
             const idx = key === "y2" ? 2 : key === "y1" ? 1 : 0;
             return (
               <div key={key} className="flex items-center gap-1.5">

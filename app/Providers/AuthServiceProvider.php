@@ -12,10 +12,13 @@ use App\Models\DepartmentBudgetPlan;
 use App\Policies\DepartmentBudgetPlanPolicy;
 use App\Models\BudgetCallMemo;
 use App\Policies\BudgetCallMemoPolicy;
+use App\Models\DepartmentReviewSchedule;
+use App\Policies\DepartmentReviewSchedulePolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
     protected $policies = [
+        DepartmentReviewSchedule::class          => DepartmentReviewSchedulePolicy::class,
         \App\Models\DepartmentCategory::class    => MasterDataPolicy::class,
         \App\Models\Department::class            => MasterDataPolicy::class,
         \App\Models\ExpenseClassification::class => MasterDataPolicy::class,

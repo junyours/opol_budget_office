@@ -293,6 +293,121 @@ $ldrrmfip->update([
         return $this->success($prevItems);
     }
 
+    // ── itemSuggestions ──────────────────────────────────────────────────────
+
+    /**
+     * GET /api/ldrrmfip/item-suggestions?budget_plan_id=X&source=sh&q=procurement
+     *
+     * Suggests items from ANY prior budget-plan year (same source, any category),
+     * so the user can reuse existing wording instead of creating near-duplicates
+     * like "Item A" vs "Items A". Ranked by fuzzy similarity against `q`.
+     */
+    public function itemSuggestions(Request $request): JsonResponse
+    {
+        $request->validate([
+            'budget_plan_id'   => 'required|integer|exists:budget_plans,budget_plan_id',
+            'source'           => 'required|string',
+            'q'                => 'nullable|string|max:255',
+            'exclude_item_id'  => 'nullable|integer', // the item being edited, so it never matches itself
+        ]);
+
+        $planId         = $request->integer('budget_plan_id');
+        $source         = $request->string('source')->toString();
+        $q              = trim((string) $request->query('q', ''));
+        $excludeItemId  = $request->integer('exclude_item_id') ?: null;
+
+        $currentPlan = BudgetPlan::findOrFail($planId);
+
+        // Descriptions already used in the ACTIVE plan for this source —
+        // flagged as "already added" rather than suggested fresh.
+        // Excludes the item currently being edited so it doesn't flag itself.
+        $alreadyUsed = LdrrmfipItem::where('budget_plan_id', $planId)
+            ->where('source', $source)
+            ->when($excludeItemId, fn ($q2) => $q2->where('ldrrmfip_item_id', '!=', $excludeItemId))
+            ->pluck('description')
+            ->map(fn ($d) => $this->normalizeDescription($d))
+            ->all();
+
+        $candidates = LdrrmfipItem::query()
+            ->join('budget_plans', 'budget_plans.budget_plan_id', '=', 'ldrrmfip_items.budget_plan_id')
+            ->where('ldrrmfip_items.source', $source)
+            ->where('budget_plans.year', '<=', $currentPlan->year)
+            ->when($excludeItemId, fn ($q2) => $q2->where('ldrrmfip_items.ldrrmfip_item_id', '!=', $excludeItemId))
+            ->orderByDesc('budget_plans.year')
+            ->get([
+                'ldrrmfip_items.ldrrmfip_item_id',
+                'ldrrmfip_items.ldrrmfip_category_id',
+                'ldrrmfip_items.description',
+                'ldrrmfip_items.implementing_office',
+                'ldrrmfip_items.starting_date',
+                'ldrrmfip_items.completion_date',
+                'ldrrmfip_items.expected_output',
+                'ldrrmfip_items.funding_source',
+                'budget_plans.year',
+            ]);
+
+        // Keep only the most recent row per unique (normalized) description,
+        // so if "Item A" exists in 2024 and 2025, only 2025's copy surfaces.
+        $seen   = [];
+        $unique = [];
+        foreach ($candidates as $row) {
+            $key = $this->normalizeDescription($row->description);
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $unique[]   = $row;
+        }
+
+        $qNorm  = $this->normalizeDescription($q);
+        $scored = collect($unique)->map(function ($row) use ($qNorm, $alreadyUsed) {
+            $rowNorm    = $this->normalizeDescription($row->description);
+            $similarity = $qNorm === '' ? 0 : $this->descriptionSimilarity($qNorm, $rowNorm);
+
+            return [
+                'ldrrmfip_item_id'     => $row->ldrrmfip_item_id,
+                'ldrrmfip_category_id' => $row->ldrrmfip_category_id,
+                'description'          => $row->description,
+                'implementing_office'  => $row->implementing_office,
+                'starting_date'        => $row->starting_date,
+                'completion_date'      => $row->completion_date,
+                'expected_output'      => $row->expected_output,
+                'funding_source'       => $row->funding_source,
+                'year'                 => $row->year,
+                'similarity'           => $similarity,
+                'already_used'         => in_array($rowNorm, $alreadyUsed, true),
+            ];
+        });
+        if ($qNorm !== '') {
+            $scored = $scored->filter(fn ($r) =>
+                $r['similarity'] >= 40
+                || str_contains($this->normalizeDescription($r['description']), $qNorm)
+            );
+        }
+
+        $result = $scored->sortByDesc('similarity')->take(8)->values();
+
+        return $this->success($result);
+    }
+
+    /** Lowercase, strip punctuation, collapse whitespace, crudely de-pluralize each word. */
+    private function normalizeDescription(string $s): string
+    {
+        $s = mb_strtolower(trim($s));
+        $s = preg_replace('/[^\p{L}\p{N}\s]/u', '', $s);
+        $s = preg_replace('/\s+/', ' ', $s);
+        $s = preg_replace('/\b(\w+?)s\b/', '$1', $s);
+        return trim($s);
+    }
+
+    /** 0–100 similarity blending similar_text() percent and Levenshtein ratio. */
+    private function descriptionSimilarity(string $a, string $b): float
+    {
+        if ($a === '' || $b === '') return 0;
+        similar_text($a, $b, $percent);
+        $maxLen = max(strlen($a), strlen($b));
+        $lev    = $maxLen > 0 ? (1 - levenshtein($a, $b) / $maxLen) * 100 : 0;
+        return round(($percent + $lev) / 2, 1);
+    }
+
     // ── summary ───────────────────────────────────────────────────────────────
 
     /**

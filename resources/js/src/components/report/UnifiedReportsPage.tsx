@@ -2518,36 +2518,39 @@ const LepPanel: React.FC<{
             </Select>
           </div>
 
-          {/* Generate / Header / Amelioration toggle */}
-          <div className="flex flex-wrap rounded-md border border-border overflow-hidden bg-card p-0.5 gap-0.5">
-            {(['generate', 'settings', 'amelioration', 'administrative', 'sp20mdf', 'spcalamity5', 'spappropriation', 'generalprovisions'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => { setInnerTab(tab); if (isMobile && tab === 'settings') setMobileView('preview'); }}
-                className={cn(
-                  'basis-[calc(33.333%-0.167rem)] flex-grow py-1.5 rounded-[5px] text-[9px] font-semibold flex items-center justify-center gap-1 transition-colors whitespace-nowrap',
-                  innerTab === tab
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-                )}
-              >
-                {tab === 'generate'
-                  ? <><ClipboardList className="h-3 w-3 shrink-0" />Generate</>
-                  : tab === 'settings'
-                    ? <><Settings2 className="h-3 w-3 shrink-0" />Header</>
-                    : tab === 'amelioration'
-                      ? <><FileText className="h-3 w-3 shrink-0" />Amelioration</>
-                      : tab === 'administrative'
-                        ? <><FileText className="h-3 w-3 shrink-0" />Admin. Proc.</>
-                        : tab === 'sp20mdf'
-                          ? <><FileText className="h-3 w-3 shrink-0" />20% MDF</>
-                          : tab === 'spcalamity5'
-                            ? <><FileText className="h-3 w-3 shrink-0" />5% Calamity</>
-                            : tab === 'spappropriation'
-                              ? <><FileText className="h-3 w-3 shrink-0" />Appropriation</>
-                              : <><FileText className="h-3 w-3 shrink-0" />Gen. Provisions</>}
-              </button>
-            ))}
+          {/* Generate / Header / Text-section navigation — vertical list */}
+          <div>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Section
+            </Label>
+            <nav className="flex flex-col gap-0.5 rounded-lg border border-border bg-card p-1">
+              {(
+                [
+                  { id: 'generate',           label: 'Generate',         icon: ClipboardList },
+                  { id: 'settings',           label: 'Header Settings',  icon: Settings2 },
+                  { id: 'amelioration',       label: 'Amelioration',     icon: FileText },
+                  { id: 'administrative',     label: 'Admin. Procedures',icon: FileText },
+                  { id: 'sp20mdf',            label: '20% MDF',          icon: FileText },
+                  { id: 'spcalamity5',        label: '5% Calamity Fund', icon: FileText },
+                  { id: 'spappropriation',    label: 'Appropriation',    icon: FileText },
+                  { id: 'generalprovisions',  label: 'Gen. Provisions',  icon: FileText },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => { setInnerTab(id); if (isMobile && id === 'settings') setMobileView('preview'); }}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-left transition-colors',
+                    innerTab === id
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                  )}
+                >
+                  <Icon className={cn('h-3.5 w-3.5 shrink-0', innerTab === id ? 'text-primary-foreground' : 'text-muted-foreground')} />
+                  <span className="truncate">{label}</span>
+                </button>
+              ))}
+            </nav>
           </div>
 
           {/* Generate sub-panel */}

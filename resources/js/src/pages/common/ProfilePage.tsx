@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Progress } from "@/src/components/ui/progress";
 import API from "@/src/services/api";
+import AvatarCropDialog from "@/src/components/dialog/AvatarCropDialog"; // adjust path to wherever you
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,8 @@ export default function ProfilePage() {
   // Track any active blob URL so we can revoke it after the upload completes,
   // preventing memory leaks.
   const blobUrlRef = useRef<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   const revokeBlobUrl = () => {
     if (blobUrlRef.current) {
@@ -244,14 +247,13 @@ export default function ProfilePage() {
     }
   };
 
-  // ── avatar upload ───────────────────────────────────────────────────────────
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── avatar file selection → opens the crop editor ─────────────────────────
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setAvatarError(null);
 
-    // Client-side validation before touching the server
     const allowed = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!allowed.includes(file.type)) {
       setAvatarError("Only JPEG, PNG, or WebP images are allowed.");
@@ -262,16 +264,25 @@ export default function ProfilePage() {
       return;
     }
 
+    setCropFile(file);
+    setCropOpen(true);
+  };
+
+  // ── crop confirmed → upload the cropped blob ───────────────────────────────
+  const handleCropped = async (blob: Blob) => {
+    setCropOpen(false);
+    setCropFile(null);
+
     // FIX: show an optimistic blob preview while the upload is in flight,
     // but keep a reference so we can revoke it afterward.
     revokeBlobUrl(); // clean up any previous blob
-    const blobUrl = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(blob);
     blobUrlRef.current = blobUrl;
     setAvatarPreview(blobUrl);
     setAvatarLoading(true);
 
     const formData = new FormData();
-    formData.append("avatar", file);
+    formData.append("avatar", blob, "avatar.jpg");
 
     try {
       const { data } = await API.post("/profile/avatar", formData);
@@ -730,6 +741,13 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
       )}
+
+      <AvatarCropDialog
+        file={cropFile}
+        open={cropOpen}
+        onClose={() => { setCropOpen(false); setCropFile(null); }}
+        onCropped={handleCropped}
+      />
     </div>
   );
 }

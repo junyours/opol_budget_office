@@ -39,6 +39,7 @@ class PsComputationController extends Controller
         'magna_carta'             => 'Subsistence Allowance',   // Magna Carta Benefits for Public Health Workers
         'hazard_pay'              => 'Hazard Pay',              // MC Health Benefits + MC PSW RA 9433
         'honoraria'               => 'Honoraria',
+        'honoraria_pleb'          => 'Honoraria-PLEB',
         'overtime_pay'            => 'Overtime and Night Pay',
         'cash_gift'               => 'Cash Gift',
         'mid_year_bonus'          => 'Mid-Year Bonus',          // same acc_code as Year End → name-only lookup
@@ -131,9 +132,10 @@ class PsComputationController extends Controller
         $representation  = $agg('representation');
         $transportation  = $agg('transportation');
         $clothing        = $agg('clothing');
-        $magnaCarta      = $agg('magna_carta');   // Subsistence Allowance
+       $magnaCarta      = $agg('magna_carta');   // Subsistence Allowance
         $hazardPay       = $agg('hazard_pay');    // Hazard Pay expense item
         $honoraria       = $agg('honoraria');
+        $honorariaPleb   = $agg('honoraria_pleb'); // Not a plantilla position — excluded from Section C / detail.total_ps
         $overtimePay     = $agg('overtime_pay');
         $cashGift        = $agg('cash_gift');
         $midYearBonus    = $agg('mid_year_bonus');
@@ -149,7 +151,8 @@ class PsComputationController extends Controller
                    + $cashGift + $midYearBonus + $yearEndBonus
                    + $terminalLeave + $productivityInc + $monetization;
 
-        $totalPs = $salariesWages + $subtotalB + $subtotalC;
+        $totalPs   = $salariesWages + $subtotalB + $subtotalC; // Plantilla total only — unchanged, feeds detail table & footer
+        $totalPsGf = $totalPs + $honorariaPleb;                 // + non-plantilla PLEB honoraria, for the 45% PS Limitation check only
 
         $totalIncome         = (float) $values->total_income;
         $nonRecurring        = (float) $values->non_recurring_income;
@@ -178,7 +181,7 @@ class PsComputationController extends Controller
             'top' => [
                 'total_realized_income' => $totalRealizedIncome,
                 'ps_limitation'         => $psLimitation,
-                'total_ps_gf'           => $totalPs,
+                'total_ps_gf'           => $totalPsGf,
                 'excess_amount'         => (float) $values->excess_amount,
                 'terminal_leave_gf'     => $terminalLeaveGF,
                 'monetization_gf'       => $monetizationGF,

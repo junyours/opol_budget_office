@@ -397,6 +397,7 @@ import {
   BuildingLibraryIcon,
 } from "@heroicons/react/24/outline";
 import { useActiveBudgetPlan } from "@/src/hooks/useActiveBudgetPlan";
+import { AnnouncementsCarousel } from "@/src/components/cards/AnnouncementsCarousel";
 import {
   useDepartments,
   useLdrrmfSummary,
@@ -664,20 +665,16 @@ const LdrrmoDashboard: React.FC = () => {
         <div className="space-y-4">
 
           {/* ── Header ── */}
-          <div className="flex items-end justify-between animate-in fade-in duration-500" style={st(0)}>
-            <div>
+          <div className="flex items-end justify-between gap-4 animate-in fade-in duration-500" style={st(0)}>
+            <div className="flex-shrink-0">
               <p className="text-eyebrow">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </p>
               <h1 className="text-page-title">LDRRMO Overview</h1>
             </div>
-            {/* {activePlan && (
-              <div className="flex items-center gap-1.5">
-                <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-medium text-emerald-500 tracking-wide ml-2">FY {activePlan.year}</span>
-              </div>
-            )} */}
+            <div className="flex-1 min-w-0">
+              <AnnouncementsCarousel />
+            </div>
           </div>
 
           {/* ── ROW 1: Budget Plan Year + Grand Total ── */}

@@ -90,7 +90,7 @@ function useClassifications() {
     queryKey: ["expense-classifications"],
     queryFn: () =>
       API.get("/expense-classifications").then((r) => r.data?.data ?? []),
-    staleTime: 10 * 60 * 1000,
+    
   });
 }
 

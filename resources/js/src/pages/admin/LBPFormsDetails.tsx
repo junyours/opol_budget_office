@@ -54,7 +54,7 @@ import { refreshSubmittedCount } from "@/src/hooks/useSubmittedPlanCount";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { Kbd, KbdGroup } from '@/src/components/ui/kbd';
-import { BudgetComparisonBanner } from '@/src/components/budget/BudgetComparisonBanner';
+import { BudgetComparisonBanner, type BudgetComparisonSummary } from '@/src/components/budget/BudgetComparisonBanner';
 import { BudgetPlanStepper } from '@/src/components/budget/BudgetPlanStepper';
 
 
@@ -992,6 +992,10 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
   const [acting,          setActing]         = useState(false);
   const [acknowledging,   setAcknowledging]  = useState(false);
   const [stepperModalOpen, setStepperModalOpen] = useState(false);
+  // Condensed sticky summary — shown in the header (next to the stepper) once
+  // the full BudgetComparisonBanner scrolls out of view below it.
+  const [bannerVisible, setBannerVisible] = useState(true);
+  const [bannerSummary, setBannerSummary] = useState<BudgetComparisonSummary | null>(null);
 //   const [statusFilter,   setStatusFilter]   = useState<string>('all');
 //   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { reviewMode: cardView, setReviewMode: setCardView } = useReviewModeStore();
@@ -1020,6 +1024,12 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
       setPanelKey(k => k + 1);
     }
   }, [planId]);
+
+  // Reset the condensed banner summary whenever the visible panel changes.
+  useEffect(() => {
+    setBannerVisible(true);
+    setBannerSummary(null);
+  }, [panelKey]);
 
   // ── Refresh the dept plans list (status badges, totals) after an action ───
   const refreshDeptPlans = useCallback(() => {
@@ -1294,7 +1304,7 @@ const handleAcknowledge = async () => {
               </div>
 
               {/* Timeline stepper — centered, click for details */}
-              <div className="flex-shrink-0 order-3 sm:order-none mx-auto">
+              <div className="flex-shrink-0 order-3 sm:order-none mx-auto flex items-center gap-3">
                 <BudgetPlanStepper
                   compact
                   status={selectedPlan.status}
@@ -1305,6 +1315,32 @@ const handleAcknowledge = async () => {
                   isAdmin={isAdmin}
                   onClick={() => setStepperModalOpen(true)}
                 />
+
+                {/* Condensed budget comparison — appears once the full banner scrolls out of view */}
+                {!bannerVisible && bannerSummary && (
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-opacity duration-150',
+                      bannerSummary.isOver
+                        ? 'bg-red-50 border-red-200 text-red-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-700',
+                    )}
+                  >
+                    {bannerSummary.isOver ? (
+                      <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    ) : (
+                      <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    )}
+                    <span className="font-mono font-normal text-gray-400">
+                      {fmtP(bannerSummary.isSpecialAccount ? bannerSummary.currentInclCal : bannerSummary.currentExclCal)}
+                    </span>
+                    <span className="font-mono">
+                      {bannerSummary.isOver
+                        ? `+${fmtP(bannerSummary.excess)} over`
+                        : `${fmtP(bannerSummary.remaining)} left`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Action buttons */}
@@ -1414,6 +1450,8 @@ const handleAcknowledge = async () => {
                     <BudgetComparisonBanner
                       plan={selectedPlan}
                       pastYearPlan={pastYearPlan}
+                      onVisibilityChange={setBannerVisible}
+                      onSummaryChange={setBannerSummary}
                     />
                   )}
 

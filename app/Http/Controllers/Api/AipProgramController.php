@@ -261,14 +261,41 @@ class AipProgramController extends BaseApiController
             return $this->success($programs);
         }
 
-        // ── Single-department path ────────────────────────────────────────────
+       // ── Single-department path ────────────────────────────────────────────
         if ($request->has('dept_id')) {
             $request->validate([
-                'dept_id' => 'required|integer|exists:departments,dept_id',
+                'dept_id'        => 'required|integer|exists:departments,dept_id',
+                'budget_plan_id' => 'sometimes|integer|exists:budget_plans,budget_plan_id',
             ]);
 
-            $deptBudgetPlanIds = DepartmentBudgetPlan::where('dept_id', $request->dept_id)
-                ->pluck('dept_budget_plan_id');
+            $deptBudgetPlanQuery = DepartmentBudgetPlan::where('dept_id', $request->dept_id);
+            if ($request->has('budget_plan_id')) {
+                $deptBudgetPlanQuery->where('budget_plan_id', $request->budget_plan_id);
+            }
+            $deptBudgetPlanIds = $deptBudgetPlanQuery->pluck('dept_budget_plan_id');
+
+            // Lean payload for dashboards that only chart amounts + label —
+            // drops aip_reference_code/dept_id/is_active which the full
+            // formatProgram() always includes but department-head dashboards
+            // never render.
+            if ($request->query('fields') === 'program_description,total_ps,total_mooe,total_co,total_amount') {
+                $programs = AIPProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
+                        $q->whereIn('dept_budget_plan_id', $deptBudgetPlanIds);
+                    }])
+                    ->where('dept_id', $request->dept_id)
+                    ->where('is_active', true)
+                    ->orderBy('aip_reference_code')
+                    ->get()
+                    ->map(fn ($p) => [
+                        'program_description' => $p->program_description,
+                        'total_ps'             => (float) $p->form4Items->sum('ps_amount'),
+                        'total_mooe'           => (float) $p->form4Items->sum('mooe_amount'),
+                        'total_co'             => (float) $p->form4Items->sum('co_amount'),
+                        'total_amount'         => (float) $p->form4Items->sum('total_amount'),
+                    ]);
+
+                return $this->success($programs);
+            }
 
             $programs = AIPProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
                     $q->whereIn('dept_budget_plan_id', $deptBudgetPlanIds);
@@ -293,6 +320,55 @@ class AipProgramController extends BaseApiController
         $deptBudgetPlanIds = $deptPlans->pluck('dept_budget_plan_id');
         $deptIds           = $deptPlans->pluck('dept_id');
 
+        // Lean payload for callers that only need dept_id + total_amount (the
+        // dashboard's per-department expenditure sums). Previously `fields`
+        // was accepted but never read here — every request always returned
+        // program_description (some are multi-paragraph), aip_reference_code,
+        // is_active, and the PS/MOOE/CO breakdown regardless, which is what
+        // made this response tens of KB larger than it needed to be.
+        if ($request->query('fields') === 'dept_id,total_amount') {
+            $programs = \App\Models\DeptBpForm4Item::query()
+                ->join('aip_programs', 'aip_programs.aip_program_id', '=', 'dept_bp_form4_items.aip_program_id')
+                ->whereIn('dept_bp_form4_items.dept_budget_plan_id', $deptBudgetPlanIds)
+                ->whereIn('aip_programs.dept_id', $deptIds)
+                ->selectRaw('aip_programs.dept_id as dept_id, SUM(dept_bp_form4_items.total_amount) as total_amount')
+                ->groupBy('aip_programs.dept_id')
+                ->get()
+                ->map(fn ($row) => [
+                    'dept_id'      => (int) $row->dept_id,
+                    'total_amount' => (float) $row->total_amount,
+                ]);
+
+            return $this->success($programs);
+        }
+
+        // Lean PS/MOOE/CO breakdown per department — used by SectorAllocationCard
+        // to fold AIP program amounts into the right expense-classification bucket.
+        // Previously this component fetched the FULL aip-programs list (program
+        // descriptions, reference codes, every line item) just to sum three columns.
+        if ($request->query('fields') === 'dept_id,total_ps,total_mooe,total_co') {
+            $programs = \App\Models\DeptBpForm4Item::query()
+                ->join('aip_programs', 'aip_programs.aip_program_id', '=', 'dept_bp_form4_items.aip_program_id')
+                ->whereIn('dept_bp_form4_items.dept_budget_plan_id', $deptBudgetPlanIds)
+                ->whereIn('aip_programs.dept_id', $deptIds)
+                ->selectRaw('
+                    aip_programs.dept_id as dept_id,
+                    SUM(dept_bp_form4_items.ps_amount) as total_ps,
+                    SUM(dept_bp_form4_items.mooe_amount) as total_mooe,
+                    SUM(dept_bp_form4_items.co_amount) as total_co
+                ')
+                ->groupBy('aip_programs.dept_id')
+                ->get()
+                ->map(fn ($row) => [
+                    'dept_id'    => (int) $row->dept_id,
+                    'total_ps'   => (float) $row->total_ps,
+                    'total_mooe' => (float) $row->total_mooe,
+                    'total_co'   => (float) $row->total_co,
+                ]);
+
+            return $this->success($programs);
+        }
+
         $programs = AIPProgram::with(['form4Items' => function ($q) use ($deptBudgetPlanIds) {
                 $q->whereIn('dept_budget_plan_id', $deptBudgetPlanIds);
             }])
@@ -313,6 +389,76 @@ class AipProgramController extends BaseApiController
     {
         $program = AIPProgram::with('form4Items')->findOrFail($id);
         return $this->success($this->formatProgram($program));
+    }
+
+    /**
+     * GET /api/aip-programs/suggestions?dept_id=X&q=aid+to+barangay
+     *
+     * Fuzzy-matches program descriptions within a department so the
+     * "Create New AIP Program" form can warn about / offer near-duplicates,
+     * same logic as LdrrmfipController::itemSuggestions().
+     */
+    public function suggestions(Request $request): JsonResponse
+    {
+        $request->validate([
+            'dept_id'            => 'required|integer|exists:departments,dept_id',
+            'q'                  => 'nullable|string|max:255',
+            'exclude_program_id' => 'nullable|integer',
+        ]);
+
+        $deptId    = $request->integer('dept_id');
+        $q         = trim((string) $request->query('q', ''));
+        $excludeId = $request->integer('exclude_program_id') ?: null;
+
+        $candidates = AIPProgram::where('dept_id', $deptId)
+            ->when($excludeId, fn ($q2) => $q2->where('aip_program_id', '!=', $excludeId))
+            ->get(['aip_program_id', 'aip_reference_code', 'program_description', 'is_active']);
+
+        $qNorm = $this->normalizeDescription($q);
+
+        $scored = $candidates->map(function ($p) use ($qNorm) {
+            $pNorm      = $this->normalizeDescription($p->program_description);
+            $similarity = $qNorm === '' ? 0 : $this->descriptionSimilarity($qNorm, $pNorm);
+
+            return [
+                'aip_program_id'      => $p->aip_program_id,
+                'aip_reference_code'  => $p->aip_reference_code,
+                'program_description' => $p->program_description,
+                'is_active'           => $p->is_active,
+                'similarity'          => $similarity,
+            ];
+        });
+
+        if ($qNorm !== '') {
+            $scored = $scored->filter(fn ($r) =>
+                $r['similarity'] >= 40
+                || str_contains($this->normalizeDescription($r['program_description']), $qNorm)
+            );
+        }
+
+        $result = $scored->sortByDesc('similarity')->take(8)->values();
+
+        return $this->success($result);
+    }
+
+    /** Lowercase, strip punctuation, collapse whitespace, crudely de-pluralize each word. */
+    private function normalizeDescription(string $s): string
+    {
+        $s = mb_strtolower(trim($s));
+        $s = preg_replace('/[^\p{L}\p{N}\s]/u', '', $s);
+        $s = preg_replace('/\s+/', ' ', $s);
+        $s = preg_replace('/\b(\w+?)s\b/', '$1', $s);
+        return trim($s);
+    }
+
+    /** 0–100 similarity blending similar_text() percent and Levenshtein ratio. */
+    private function descriptionSimilarity(string $a, string $b): float
+    {
+        if ($a === '' || $b === '') return 0;
+        similar_text($a, $b, $percent);
+        $maxLen = max(strlen($a), strlen($b));
+        $lev    = $maxLen > 0 ? (1 - levenshtein($a, $b) / $maxLen) * 100 : 0;
+        return round(($percent + $lev) / 2, 1);
     }
 
     /**

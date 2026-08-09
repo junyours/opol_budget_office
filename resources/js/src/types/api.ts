@@ -101,6 +101,30 @@ export interface DepartmentBudgetPlan {
 
 ///////////////////////////////////////////////////////////
 
+export type ReviewPeriod = 'morning' | 'afternoon';
+export type ReviewScheduleStatus = 'scheduled' | 'moved' | 'completed' | 'cancelled';
+
+export interface DepartmentReviewSchedule {
+  dept_review_schedule_id: number;
+  dept_id: number;
+  budget_plan_id: number;
+  review_date: string;
+  period: ReviewPeriod;
+  review_time: string | null;
+  location: string | null;
+  status: ReviewScheduleStatus;
+  reschedule_reason: string | null;
+  previous_date: string | null;
+  previous_period: ReviewPeriod | null;
+  previous_time: string | null;
+  rescheduled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  department?: Department;
+}
+
+///////////////////////////////////////////////////////////
+
 export interface DepartmentCategory {
   dept_category_id: number;
   dept_category_name: string;

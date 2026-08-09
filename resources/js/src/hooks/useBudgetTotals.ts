@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import API from '../services/api';
-import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
-import { AipProgramEntry } from './useAipProgramData';
-import { useAllFunds } from './useDashboardQueries';
+import { BudgetPlan } from '../types/api';
+import {
+  useAllFunds, useDepartmentsLite, DepartmentLite,
+  useDepartmentBudgetPlans, useAipPrograms,
+  DepartmentBudgetPlanLite,
+} from './useDashboardQueries';
 
 const SPECIAL_ACCOUNTS_CATEGORY_ID = 4;
 
@@ -27,16 +28,15 @@ const EMPTY: BudgetTotals = {
   shCalamity: 0, occCalamity: 0, pmCalamity: 0,
 };
 
-// REPLACE computeTotals signature + body
 function computeTotals(
-  plans:       DepartmentBudgetPlan[],
-  depts:       Department[],
-  aipPrograms: AipProgramEntry[],
+  plans:       DepartmentBudgetPlanLite[],
+  depts:       DepartmentLite[],
+  aipPrograms: { dept_id: number; total_amount: number }[],
   shNonTax:    number,
   occNonTax:   number,
   pmNonTax:    number,
 ): BudgetTotals {
-  const deptMap = new Map<number, Department>(depts.map(d => [d.dept_id, d]));
+  const deptMap = new Map<number, DepartmentLite>(depts.map(d => [d.dept_id, d]));
 
   const aipByDept = new Map<number, number>();
   aipPrograms.forEach(p => {
@@ -54,9 +54,7 @@ function computeTotals(
     const dept = deptMap.get(plan.dept_id);
     if (!dept) return;
 
-    const form2Total = (plan.items ?? []).reduce(
-      (sum, item) => sum + (parseFloat(String(item.total_amount)) || 0), 0
-    );
+    const form2Total = parseFloat(plan.items_total as any) || 0;
     const aipTotal = aipByDept.get(plan.dept_id) ?? 0;
     const deptTotal = form2Total + aipTotal;
     if (deptTotal === 0) return;
@@ -75,30 +73,18 @@ function computeTotals(
   return result;
 }
 
-// REPLACE useBudgetTotals — add useAllFunds and pass nonTaxRevenue values
+// Reads from the SAME cache entries as the rest of the dashboard (no
+// duplicate fetches, no colliding query keys, no items/items_total mismatch).
 export function useBudgetTotals(activePlan: BudgetPlan | null): UseBudgetTotalsResult {
   const planId = activePlan?.budget_plan_id;
 
-  const { data: plans = [], isLoading: plansLoading } = useQuery<DepartmentBudgetPlan[]>({
-    queryKey: ['dept-budget-plans', planId!],
-    queryFn:  () =>
-      API.get('/department-budget-plans', { params: { 'filter[budget_plan_id]': planId } })
-        .then(r => r.data?.data ?? []),
-    enabled: !!planId,
-  });
+  const { data: plans = [], isLoading: plansLoading } = useDepartmentBudgetPlans(planId);
+  const { data: depts = [], isLoading: deptsLoading } = useDepartmentsLite();
 
-  const { data: depts = [], isLoading: deptsLoading } = useQuery<Department[]>({
-    queryKey: ['departments'],
-    queryFn:  () => API.get('/departments').then(r => r.data?.data ?? []),
-  });
-
-  const { data: aipPrograms = [], isLoading: aipLoading } = useQuery<AipProgramEntry[]>({
-    queryKey: ['aip-programs', planId!],
-    queryFn:  () =>
-      API.get('/aip-programs', { params: { budget_plan_id: planId } })
-        .then(r => r.data?.data ?? []),
-    enabled: !!planId,
-  });
+  const { data: aipPrograms = [], isLoading: aipLoading } = useAipPrograms(
+    planId,
+    (rows: any[]) => rows.map(p => ({ dept_id: p.dept_id, total_amount: parseFloat(p.total_amount) || 0 })),
+  );
 
   // Need non-tax revenue for each special account to compute 5% calamity fund
   const { data: funds, isLoading: fundsLoading } = useAllFunds();

@@ -3391,16 +3391,38 @@ private function buildForm2($proposedPlan, $currentPlan, $pastPlan): array
 
         if ($past5 == 0 && $curr5 == 0 && $prop5 == 0) return [];
 
+        // return [
+        //     ['name' => '5% LDRRM Fund Prog./Proj. (net of 70%PdA)', 'account_code' => '5-02', 'kind' => 'ldrrmf',
+        //      'past_total' => max(0, $past5 - $past70), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+        //      'current_total' => max(0, $curr5 - $curr70), 'proposed' => max(0, $prop5 - $prop70)],
+        //     ['name' => '30% Quick Response Fund (QRF)', 'account_code' => '', 'kind' => 'ldrrmf-30',
+        //      'past_total' => round($past5 * 0.30, 2), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+        //      'current_total' => round($curr5 * 0.30, 2), 'proposed' => round($prop5 * 0.30, 2)],
+        //     ['name' => '70% Pre-Disaster Act. (JMC 2013-1, R.A. 10121)', 'account_code' => '5-02', 'kind' => 'ldrrmf-70',
+        //      'past_total' => $past70, 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+        //      'current_total' => $curr70, 'proposed' => $prop70],
+        // ];
+        // Round 30% first, then 70% = remainder — same approach as
+        // form7BuildFeRows(), so this row set always sums to the exact
+        // 5% calamity fund total instead of drifting by a centavo when
+        // the 30%/70% halves are rounded independently.
+        $pastQrf30    = round($past5 * 0.30, 2);
+        $pastPda70    = round($past5 - $pastQrf30, 2);
+        $currQrf30    = round($curr5 * 0.30, 2);
+        $currPda70    = round($curr5 - $currQrf30, 2);
+        $propQrf30    = round($prop5 * 0.30, 2);
+        $propPda70    = round($prop5 - $propQrf30, 2);
+
         return [
             ['name' => '5% LDRRM Fund Prog./Proj. (net of 70%PdA)', 'account_code' => '5-02', 'kind' => 'ldrrmf',
              'past_total' => max(0, $past5 - $past70), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
              'current_total' => max(0, $curr5 - $curr70), 'proposed' => max(0, $prop5 - $prop70)],
             ['name' => '30% Quick Response Fund (QRF)', 'account_code' => '', 'kind' => 'ldrrmf-30',
-             'past_total' => round($past5 * 0.30, 2), 'current_sem1' => 0.0, 'current_sem2' => 0.0,
-             'current_total' => round($curr5 * 0.30, 2), 'proposed' => round($prop5 * 0.30, 2)],
+             'past_total' => $pastQrf30, 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+             'current_total' => $currQrf30, 'proposed' => $propQrf30],
             ['name' => '70% Pre-Disaster Act. (JMC 2013-1, R.A. 10121)', 'account_code' => '5-02', 'kind' => 'ldrrmf-70',
-             'past_total' => $past70, 'current_sem1' => 0.0, 'current_sem2' => 0.0,
-             'current_total' => $curr70, 'proposed' => $prop70],
+             'past_total' => $pastPda70, 'current_sem1' => 0.0, 'current_sem2' => 0.0,
+             'current_total' => $currPda70, 'proposed' => $propPda70],
         ];
     }
 

@@ -155,9 +155,7 @@ interface DeptBudgetPlan {
 }
 
 interface RowEdit {
-  honoraria: number;
   overtime: number;
-  terminalLeave: number;
   // When true, this position is zeroed out for THIS budget year only — item
   // number, title, and incumbent still show, but no money is allocated to
   // Form2/Form3. Unlike deactivating in Plantilla Positions (permanent,
@@ -212,11 +210,11 @@ interface PersonnelServiceRow {
   annualRate: number;
   pera: number; ra: number; ta: number;
   clothing: number; subsistence: number; laundry: number; productivity: number;
-  honoraria: number; overtime: number;
+  overtime: number;
   cashGift: number; midYearBonus: number; yearEndBonus: number;
   magnaCarta1: number; magnaCarta2: number;
   retirementInsurance: number; pagIbig: number; philHealth: number;
-  ecip: number; otherBenefits: number; terminalLeave: number;
+ ecip: number; otherBenefits: number;
   rowSubTotal: number;
   incrementRow: StepIncrementRow | null;
   rowTotal: number;
@@ -269,6 +267,7 @@ const toNumber = (v: unknown): number => {
   return 0;
 };
 const fmt  = (v: unknown) => `₱${Math.round(toNumber(v)).toLocaleString()}`;
+const fmt2 = (v: unknown) => `₱${toNumber(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtD = (v: number) => {
   if (Math.round(v) === 0) return <span className="text-gray-300">—</span>;
   const positive = v > 0;
@@ -474,7 +473,7 @@ const handleSettingsChange = async (s: PsSettings) => {
 
 const handleToggleExcluded = (posId: number) => {
     setEdits(prev => {
-      const current = prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false };
+      const current = prev[posId] ?? { overtime: 0, excluded: false };
       const next = { ...prev, [posId]: { ...current, excluded: !current.excluded } };
       lsSet(LS_EDITS_KEY, next);
       return next;
@@ -484,7 +483,7 @@ const handleToggleExcluded = (posId: number) => {
   const handleEditChange = (posId: number, field: keyof RowEdit, value: number) => {
 
     setEdits(prev => {
-      const next = { ...prev, [posId]: { ...(prev[posId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false }), [field]: value } };
+      const next = { ...prev, [posId]: { ...(prev[posId] ?? { overtime: 0, excluded: false }), [field]: value } };
       lsSet(LS_EDITS_KEY, next);
       return next;
     });
@@ -632,11 +631,9 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
       const baseAnn = baseMon * baseMonths;
       const baseAllow = calcAllowances(baseMon, baseMonths, deptId, sg, s, mcRate);
 
-      const edit      = edits[pos.plantilla_position_id] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false };
+      const edit      = edits[pos.plantilla_position_id] ?? { overtime: 0, excluded: false };
       const isExcluded = !!edit.excluded;
-      const honoraria = isExcluded ? 0 : toNumber(edit.honoraria);
       const overtime  = isExcluded ? 0 : toNumber(edit.overtime);
-      const termLeave = isExcluded ? 0 : toNumber(edit.terminalLeave);
 
       // Excluded positions still occupy their row (item number, title,
       // incumbent stay visible) but contribute zero to every money column
@@ -655,7 +652,7 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
         ? zeroAllow
         : { ...baseAllow, otherBenefits: baseAllow.otherBenefits + otherBenefitsFlat };
 
-      const rowSubTotal = effBaseAnn + sumAllowances(effBaseAllow) + honoraria + overtime + termLeave;
+      const rowSubTotal = effBaseAnn + sumAllowances(effBaseAllow) + overtime;
 
       let incrementRow: StepIncrementRow | null = null;
 
@@ -736,7 +733,7 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
         salaryGrade: sg, baseStep,
         monthlyRate: effBaseMon, annualRate: effBaseAnn,
         ...effBaseAllow,
-        honoraria, overtime, terminalLeave: termLeave,
+        overtime,
         rowSubTotal, incrementRow, rowTotal,
         stepUpDate, baseMonths, incrementMonths,
         savedMonthly, savedAnnual,
@@ -778,9 +775,9 @@ const findExpenseItemId = (items: ExpenseClassItem[], key: string): number | nul
       rows.forEach(row => {
         const baseKeys: (keyof PersonnelServiceRow)[] = [
           'annualRate', 'pera', 'ra', 'ta', 'clothing', 'subsistence', 'laundry',
-          'productivity', 'honoraria', 'overtime', 'cashGift', 'midYearBonus',
+          'productivity', 'overtime', 'cashGift', 'midYearBonus',
           'yearEndBonus', 'magnaCarta1', 'magnaCarta2', 'retirementInsurance',
-          'pagIbig', 'philHealth', 'ecip', 'otherBenefits', 'terminalLeave',
+          'pagIbig', 'philHealth', 'ecip', 'otherBenefits',
           'rowSubTotal', 'rowTotal', 'monthlyRate', 'savedMonthly', 'savedAnnual',
         ];
         baseKeys.forEach(k => { acc[k] = (acc[k] || 0) + (row[k] as number); });
@@ -899,8 +896,28 @@ const handleSave = async () => {
         subsistence:         cb('subsistence',         'incr_subsistence'),
         laundry:             cb('laundry',             'incr_laundry'),
         productivity:        cb('productivity',        'incr_productivity'),
-        hazardPay:           combinedMC,
-        honoraria:           toNumber(totals.honoraria),
+    //     hazardPay:           combinedMC,
+    //     honoraria:           toNumber(totals.honoraria),
+    //     overtime:            toNumber(totals.overtime),
+    //     cashGift:            cb('cashGift',            'incr_cashGift'),
+    //     midYearBonus:        cb('midYearBonus',        'incr_midYearBonus'),
+    //     yearEndBonus:        cb('yearEndBonus',        'incr_yearEndBonus'),
+    //     retirementInsurance: cb('retirementInsurance', 'incr_retirementInsurance'),
+    //     pagIbig:             cb('pagIbig',             'incr_pagIbig'),
+    //     philHealth:          cb('philHealth',          'incr_philHealth'),
+    //     ecip:                cb('ecip',                'incr_ecip'),
+    //     otherBenefits:       cb('otherBenefits',       'incr_otherBenefits'),
+    //     terminalLeave:       toNumber(totals.terminalLeave),
+    //   };
+
+    //   const ALWAYS_SNAPSHOT_KEYS = new Set([
+    //     'wagesRegular',
+    //     'pera', 'ra', 'ta', 'clothing', 'productivity',
+    //     'midYearBonus', 'yearEndBonus', 'cashGift',
+    //     'retirementInsurance', 'pagIbig', 'philHealth',
+    //     'ecip', 'otherBenefits', 'terminalLeave',
+    //   ]);
+    hazardPay:           combinedMC,
         overtime:            toNumber(totals.overtime),
         cashGift:            cb('cashGift',            'incr_cashGift'),
         midYearBonus:        cb('midYearBonus',        'incr_midYearBonus'),
@@ -910,7 +927,6 @@ const handleSave = async () => {
         philHealth:          cb('philHealth',          'incr_philHealth'),
         ecip:                cb('ecip',                'incr_ecip'),
         otherBenefits:       cb('otherBenefits',       'incr_otherBenefits'),
-        terminalLeave:       toNumber(totals.terminalLeave),
       };
 
       const ALWAYS_SNAPSHOT_KEYS = new Set([
@@ -918,7 +934,7 @@ const handleSave = async () => {
         'pera', 'ra', 'ta', 'clothing', 'productivity',
         'midYearBonus', 'yearEndBonus', 'cashGift',
         'retirementInsurance', 'pagIbig', 'philHealth',
-        'ecip', 'otherBenefits', 'terminalLeave',
+        'ecip', 'otherBenefits',
       ]);
 
       const exRes = await API.get(`/department-budget-plans/${dbp.dept_budget_plan_id}/items`);
@@ -1022,7 +1038,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
       >
         {isSubmitted
           ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><strong>Read-only.</strong> This department's plan is <span className="font-medium">{planStatus ?? 'locked'}</span> and can no longer be edited.</div>
-          : <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"><strong>Save</strong> commits to <span className="font-medium">Form 3</span> and <span className="font-medium">Form 2</span>. When a step increase occurs, a <span className="text-green-700 font-medium">green</span> row shows new-step figures, a <span className="text-blue-700 font-medium">blue</span> row shows the increase, then an <span className="text-orange-600 font-medium">orange</span> row shows the combined total.</div>
+          : <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"><strong>Save</strong> commits to <span className="font-medium">Form 3</span> and <span className="font-medium">Form 2</span>. When a step increase occurs this year, the row shows the combined (base + step-up) totals automatically — click the <EyeIcon className="w-3.5 h-3.5 inline -mt-0.5" /> icon for the full base-vs-step breakdown.</div>
         }
       </div>
 
@@ -1197,10 +1213,8 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                 style={{ animationDelay: '80ms' }}
                 key={`legend-${tabAnimKey}-${tabKey}`}
               >
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-white border border-gray-200 inline-block" />Base step</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-50 border border-green-200 inline-block" />New step (green)</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-50 border border-blue-200 inline-block" />Increase (blue)</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-50 border border-orange-200 inline-block" />Combined total (orange)</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-white border border-gray-200 inline-block" />No step change</span>
+                <span className="flex items-center gap-1.5"><span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Step X→Y eff. date</span>Step increase this year — figures already combined; click <EyeIcon className="w-3 h-3 inline" /> for the breakdown</span>
               </div>
 
               {/* Table — scale in as a whole */}
@@ -1308,18 +1322,29 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                                 {row.stepUpDate && ir && (
                                   <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-fit">
                                     <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 10 10"><path d="M5 1.5v7M2 4l3-2.5L8 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                    Step {row.baseStep}→{ir.step} eff. {row.stepUpDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    Step-up eff. {row.stepUpDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                                   </span>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell className="text-center">{row.salaryGrade}</TableCell>
                             <TableCell className="text-center">
-                              {ir ? <span className="text-xs">{row.baseStep}<span className="text-muted-foreground"> ({row.baseMonths}mo)</span></span> : row.baseStep}
+                              {ir
+                                ? <span className="text-xs font-medium">{row.baseStep}<span className="text-muted-foreground mx-0.5">→</span>{ir.step}</span>
+                                : row.baseStep}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-sm">{fmt(row.monthlyRate)}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{fmt(row.annualRate)}</TableCell>
-                            <TableCell className="text-right font-bold font-mono bg-purple-50/50">{fmt(row.rowSubTotal)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {ir ? (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span>{fmt(row.monthlyRate)} <span className="text-muted-foreground text-[10px]">({row.baseMonths}mo)</span></span>
+                                  <span className="text-emerald-700">{fmt(ir.monthlyRate)} <span className="text-muted-foreground text-[10px]">({ir.incrementMonths}mo)</span></span>
+                                </div>
+                              ) : (
+                                fmt(row.monthlyRate)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">{fmt(ir ? row.savedAnnual : row.annualRate)}</TableCell>
+                            <TableCell className="text-right font-bold font-mono bg-purple-50/50">{fmt2(row.rowTotal)}</TableCell>
                             <TableCell className="text-center">
                               <button
                                 onClick={() => setDetailRow(row)}
@@ -1331,80 +1356,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                             </TableCell>
                           </TableRow>
 
-                          {/* ── Row 2: New-step (green) ── */}
-                          {ir && (
-                            <TableRow
-                              className="bg-green-50 hover:bg-green-100/60 border-l-4 border-l-green-500 ps-animate-step-row"
-                              style={{ animationDelay: `${Math.min(idx, 8) * 30 + 40}ms` }}
-                              key={`green-${tabAnimKey}-${row.positionId}`}
-                            >
-                              <TableCell className="py-1.5" /><TableCell className="py-1.5" /><TableCell className="py-1.5" />
-                              <TableCell className="py-1.5">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-800">
-                                  <svg className="w-3 h-3 text-green-500 shrink-0" fill="none" viewBox="0 0 12 12"><path d="M6 2v8M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Step {ir.step} · {ir.incrementMonths}mo from {ir.effectiveDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center text-[11px] text-green-700 py-1.5">{row.salaryGrade}</TableCell>
-                              <TableCell className="text-center text-[11px] text-green-700 font-semibold py-1.5">{ir.step}<span className="text-muted-foreground font-normal text-[10px]"> ({ir.incrementMonths}mo)</span></TableCell>
-                              <TableCell className="text-right font-mono text-[11px] text-green-700 py-1.5">{fmt(ir.monthlyRate)}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px] text-green-700 py-1.5">{fmt(ir.incrAnnual)}</TableCell>
-                              <TableCell className="text-right font-semibold font-mono text-[11px] bg-green-100 py-1.5 text-green-800">{fmt(ir.incrSubTotal)}</TableCell>
-                              <TableCell className="py-1.5" />
-                            </TableRow>
-                          )}
-
-                          {/* ── Row 3: Increment difference (blue) ── */}
-                          {ir && (
-                            <TableRow
-                              className="bg-blue-50 hover:bg-blue-100/60 border-l-4 border-l-blue-500 ps-animate-step-row"
-                              style={{ animationDelay: `${Math.min(idx, 8) * 30 + 70}ms` }}
-                              key={`blue-${tabAnimKey}-${row.positionId}`}
-                            >
-                              <TableCell className="py-1.5" /><TableCell className="py-1.5" /><TableCell className="py-1.5" />
-                              <TableCell className="py-1.5">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-800">
-                                  <svg className="w-3 h-3 text-blue-500 shrink-0" fill="none" viewBox="0 0 12 12">
-                                    <path d="M6 2l4 8H2l4-8z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                                  </svg>
-                                  Increase from step-up ({ir.incrementMonths}mo)
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center text-[11px] text-blue-600 py-1.5">{row.salaryGrade}</TableCell>
-                              <TableCell className="text-center text-[11px] text-blue-600 py-1.5">
-                                <span className="font-semibold">+1</span>
-                                <span className="text-muted-foreground font-normal text-[10px]"> step</span>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-[11px] py-1.5 text-blue-600">{fmtD(ir.annualDiff)}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px] py-1.5 text-blue-600">{fmtD(ir.annualRateDiff)}</TableCell>
-                              <TableCell className="text-right font-bold font-mono text-[11px] bg-blue-100 py-1.5">
-                                <span className="text-blue-800">+{fmt(ir.diffSubTotal)}</span>
-                              </TableCell>
-                              <TableCell className="py-1.5" />
-                            </TableRow>
-                          )}
-
-                          {/* ── Row 4: Combined total (orange) ── */}
-                          {/* ── Row 4: Combined total (orange) ── */}
-                            {ir && (
-                            <TableRow
-                                className="bg-orange-50 ps-animate-step-row [&>td]:border-t-2 [&>td]:border-b-2 [&>td]:border-orange-300"
-                                style={{ animationDelay: `${Math.min(idx, 8) * 30 + 100}ms` }}
-                                key={`orange-${tabAnimKey}-${row.positionId}`}
-                            >
-                                <TableCell colSpan={4} className="py-2 pl-4 text-sm text-orange-800 font-extrabold tracking-wide">
-                                ∑ Combined ({row.baseMonths}mo Step {row.baseStep} + {ir.incrementMonths}mo Step {ir.step})
-                                </TableCell>
-                                <TableCell className="text-center font-mono text-sm font-extrabold text-orange-800 py-2">{row.salaryGrade}</TableCell>
-                                <TableCell className="text-center font-mono text-sm font-extrabold text-orange-800 py-2">{ir.step}</TableCell>
-                                <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedMonthly)}</TableCell>
-                                <TableCell className="text-right font-mono text-sm font-extrabold text-orange-800 py-2">{fmt(row.savedAnnual)}</TableCell>
-                                <TableCell className="text-right font-extrabold font-mono text-sm bg-orange-200 text-orange-900 py-2">{fmt(row.rowTotal)}</TableCell>
-                                <TableCell className="py-2" />
-                            </TableRow>
-                            )}
-
-                        </React.Fragment>
+                          </React.Fragment>
                       );
                       }); // end items.map
                     })()}
@@ -1443,7 +1395,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
       </TableCell>
       {/* Total — orange tint (mirrors "budget year / proposed" in MDF) */}
       <TableCell className="text-right font-bold font-mono bg-orange-950/20 border-orange-900/40 text-orange-300">
-        {fmt(toNumber(totals.rowTotal))}
+        {fmt2(toNumber(totals.rowTotal))}
       </TableCell>
       {/* Eye button */}
       <TableCell className="bg-gray-900 text-center">
@@ -1529,7 +1481,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                       SG {row.salaryGrade} · Step {row.baseStep}
                     </span>
                     <span className="text-[11px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-0.5 font-mono font-semibold ps-animate-scale-in" style={{ animationDelay: '100ms' }}>
-                      {fmt(row.rowTotal)} total
+                      {fmt2(row.rowTotal)} total
                     </span>
                     {ir && (
                       <span className="text-[11px] bg-green-50 text-green-700 border border-green-200 rounded px-2 py-0.5 ps-animate-scale-in" style={{ animationDelay: '120ms' }}>
@@ -1572,10 +1524,8 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                     </button>
                   </div>
                   {([
-                    { label: 'Honoraria',     field: 'honoraria'     as const },
                     { label: 'Overtime Pay',  field: 'overtime'      as const },
-                    { label: 'Terminal Leave',field: 'terminalLeave' as const },
-                  ] satisfies { label: string; field: 'honoraria' | 'overtime' | 'terminalLeave' }[]).map(({ label, field }, fi) => (
+                  ] satisfies { label: string; field: 'overtime' }[]).map(({ label, field }, fi) => (
                     <div
                       key={field}
                       className="flex items-center justify-between gap-3 ps-animate-sheet-item"
@@ -1584,7 +1534,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                       <label className="text-xs text-gray-600 font-medium w-32 shrink-0">{label}</label>
                       <Input
                         type="number"
-                        value={(edits[row.positionId] ?? { honoraria: 0, overtime: 0, terminalLeave: 0, excluded: false })[field]}
+                        value={(edits[row.positionId] ?? { overtime: 0, excluded: false })[field]}
                         onChange={e => {
                           handleEditChange(row.positionId, field, parseFloat(e.target.value) || 0);
                           setDetailRow(prev => prev ? { ...prev, [field]: parseFloat(e.target.value) || 0 } : prev);
@@ -1660,13 +1610,13 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                             }}
                           >
                             <span className="text-xs text-gray-600 truncate pr-2">{label}</span>
-                            <span className="text-xs font-mono text-green-700 tabular-nums text-right">{fmt(base)}</span>
+                            <span className="text-xs font-mono text-green-700 tabular-nums text-right">{fmt2(base)}</span>
                             {ir && (
                               <span className="text-xs font-mono tabular-nums text-right text-blue-600">
-                                {incrVal > 0 ? `+${fmt(incrVal)}` : <span className="text-gray-300">—</span>}
+                                {incrVal > 0 ? `+${fmt2(incrVal)}` : <span className="text-gray-300">—</span>}
                               </span>
                             )}
-                            <span className="text-xs font-mono font-semibold text-orange-600 tabular-nums text-right">{fmt(combined)}</span>
+                            <span className="text-xs font-mono font-semibold text-orange-600 tabular-nums text-right">{fmt2(combined)}</span>
                           </div>
                         );
                       })}
@@ -1682,17 +1632,17 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-400 mb-2">Totals</p>
                   <div className="flex justify-between text-xs">
                     <span className="text-green-700 font-medium">Base sub-total</span>
-                    <span className="font-mono font-semibold text-green-700">{fmt(row.rowSubTotal)}</span>
+                    <span className="font-mono font-semibold text-green-700">{fmt2(row.rowSubTotal)}</span>
                   </div>
                   {ir && (
                     <div className="flex justify-between text-xs">
                       <span className="text-blue-600 font-medium">Step-up addition</span>
-                      <span className="font-mono font-semibold text-blue-700">+{fmt(ir.incrSubTotal)}</span>
+                      <span className="font-mono font-semibold text-blue-700">+{fmt2(ir.incrSubTotal)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm border-t border-orange-200 pt-1.5 mt-1">
                     <span className="font-semibold text-orange-800">Grand Total</span>
-                    <span className="font-mono font-bold text-orange-700">{fmt(row.rowTotal)}</span>
+                    <span className="font-mono font-bold text-orange-700">{fmt2(row.rowTotal)}</span>
                   </div>
                 </div>
               </>
@@ -1743,9 +1693,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
               {
                 section: 'Other Pay Items',
                 rows: [
-                  { label: 'Honoraria',        value: toNumber(totals.honoraria) },
                   { label: 'Overtime Pay',     value: toNumber(totals.overtime) },
-                  { label: 'Terminal Leave',   value: toNumber(totals.terminalLeave) },
                 ],
               },
               {
@@ -1769,7 +1717,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                   <p className="text-sm text-muted-foreground">{dept?.dept_name || dept?.dept_abbreviation}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-[11px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-0.5 font-mono font-semibold ps-animate-scale-in" style={{ animationDelay: '80ms' }}>
-                      {fmt(grandTotal)} grand total
+                      {fmt2(grandTotal)} grand total
                     </span>
                     <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5 ps-animate-scale-in" style={{ animationDelay: '100ms' }}>
                       {(departmentRows[deptDetailDept] || []).length} positions
@@ -1799,7 +1747,7 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                             'text-xs font-mono font-semibold tabular-nums',
                             value === 0 ? 'text-gray-300' : 'text-gray-800',
                           )}>
-                            {value === 0 ? '—' : fmt(value)}
+                            {value === 0 ? '—' : fmt2(value)}
                           </span>
                         </div>
                       ))}
@@ -1815,17 +1763,17 @@ if (!activePlan)    return <div className="p-8 text-center text-red-600">No acti
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-purple-400 mb-2">Summary</p>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600 font-medium">Sub-total (base)</span>
-                    <span className="font-mono font-semibold text-gray-700">{fmt(toNumber(totals.rowSubTotal))}</span>
+                    <span className="font-mono font-semibold text-gray-700">{fmt2(toNumber(totals.rowSubTotal))}</span>
                   </div>
                   {toNumber(totals.incr_subTotal) > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-blue-600 font-medium">Step-up additions</span>
-                      <span className="font-mono font-semibold text-blue-700">+{fmt(toNumber(totals.incr_subTotal))}</span>
+                      <span className="font-mono font-semibold text-blue-700">+{fmt2(toNumber(totals.incr_subTotal))}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm border-t border-purple-200 pt-1.5 mt-1">
                     <span className="font-semibold text-purple-800">Grand Total</span>
-                    <span className="font-mono font-bold text-purple-700">{fmt(grandTotal)}</span>
+                    <span className="font-mono font-bold text-purple-700">{fmt2(grandTotal)}</span>
                   </div>
                 </div>
               </>

@@ -334,7 +334,8 @@ const MainLayout: React.FC = () => {
         </header>
 
         {/* ── Page Content ────────────────────────────────────────────── */}
-        <main className="relative flex-1 min-w-0 overflow-x-auto overflow-y-auto bg-gray-50">
+        {/* <main className="relative flex-1 min-w-0 overflow-x-auto overflow-y-auto bg-gray-50"> */}
+        <main className="relative flex-1 min-h-0 min-w-0 overflow-x-auto bg-gray-50">
 
           {/* Watermark logo — behind content */}
           {/* <div
@@ -349,7 +350,11 @@ const MainLayout: React.FC = () => {
           </div> */}
 
           {/* Routed page */}
-          <div className="relative z-10">
+          {/* <div className="relative z-10">
+            <Outlet />
+          </div> */}
+          {/* Routed page */}
+          <div className="relative z-10 h-full min-h-0">
             <Outlet />
           </div>
 

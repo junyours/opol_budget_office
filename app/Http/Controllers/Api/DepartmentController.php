@@ -22,10 +22,25 @@ class DepartmentController extends BaseMasterCrudController
     public function index()
     {
         $this->authorize('viewAny', $this->modelClass);
-        $departments = $this->modelClass::with('category')
+
+        $fields = request()->query('fields');
+        $query  = $this->modelClass::query();
+
+        if ($fields) {
+            $columns = array_filter(array_map('trim', explode(',', $fields)));
+            if (!in_array('dept_id', $columns, true)) {
+                $columns[] = 'dept_id'; // PK always required
+            }
+            $query->select($columns);
+        } else {
+            $query->with('category');
+        }
+
+        $departments = $query
             ->orderBy('dept_category_id')
             ->orderBy('sort_order')
             ->get();
+
         return $this->success($departments);
     }
 

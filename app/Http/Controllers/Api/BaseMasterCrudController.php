@@ -8,7 +8,7 @@ abstract class BaseMasterCrudController extends BaseApiController
 {
     protected string $modelClass;
 
-        
+
     public function index()
     {
         $this->authorize('viewAny', $this->modelClass);
@@ -48,7 +48,7 @@ abstract class BaseMasterCrudController extends BaseApiController
      */
     public function update(Request $request, $id)
     {
-       
+
         $model = $this->modelClass::findOrFail($id);
 
         $this->authorize('update', $model);

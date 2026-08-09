@@ -7,7 +7,11 @@ import {
   Building2, BarChart3, FileText, ShieldCheck,
   X, Settings, ChevronRight,
 } from "lucide-react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Card } from "@/src/components/ui/card";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/src/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import API from "../../services/api";
 import LegalDialog, { type LegalTab } from "../../components/dialog/LegalDialog";
@@ -28,8 +32,10 @@ const MAX_LOGIN_ATTEMPTS = 50;
 const RATE_LIMIT_WINDOW  = 60000;
 const RATE_LIMIT_KEY     = "login_attempts";
 const BRAND_RED          = "#151515";
+const BRAND_BLUE          = "#1877F2";
 
-interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; }
+// interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; }
+interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; expiresAt?: number; }
 
 const ROLE_LABEL: Record<string, string> = {
   'admin':           'Admin',
@@ -93,7 +99,7 @@ function AvatarImg({ acct, size = 40 }: { acct: RememberedAccount; size?: number
 
   return (
     <Avatar style={{ width: size, height: size }} className="flex-shrink-0">
-      {src && <AvatarImage src={src} alt="" />}
+      {src && <AvatarImage src={src} alt="" className="object-cover" />}
       <AvatarFallback
         className="bg-zinc-100 text-zinc-500 font-semibold"
         style={{ fontSize: size * 0.34 }}
@@ -101,6 +107,34 @@ function AvatarImg({ acct, size = 40 }: { acct: RememberedAccount; size?: number
         {initials(acct.fname, acct.lname)}
       </AvatarFallback>
     </Avatar>
+  );
+}
+
+// ── Odometer digit-roll components ──────────────────────────────────────────────
+function OdometerDigit({ digit }: { digit: number }) {
+  return (
+    <span style={{ display: 'inline-block', overflow: 'hidden', height: '1em', width: '0.62em', verticalAlign: 'bottom' }}>
+      <span
+        className="odometer-digit-track"
+        style={{ display: 'block', transform: `translateY(-${digit * 10}%)` }}
+      >
+        {Array.from({ length: 10 }).map((_, i) => (
+          <span key={i} style={{ display: 'block', height: '1em', lineHeight: '1em', textAlign: 'center' }}>{i}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function OdometerNumber({ value }: { value: string }) {
+  return (
+    <span style={{ display: 'inline-flex', fontVariantNumeric: 'tabular-nums' }}>
+      {value.split('').map((ch, i) =>
+        /\d/.test(ch)
+          ? <OdometerDigit key={i} digit={parseInt(ch, 10)} />
+          : <span key={i} style={{ display: 'inline-block', verticalAlign: 'bottom', transform: 'translateY(-0.28em)' }}>{ch}</span>
+      )}
+    </span>
   );
 }
 
@@ -157,6 +191,7 @@ export default function Login() {
   // ── Saved accounts state ──────────────────────────────────────────────────────
   const [savedAccounts,  setSavedAccounts]  = useState<RememberedAccount[]>([]);
   const [showRemovePanel, setShowRemovePanel] = useState(false);
+  const [showRemoveInfo,  setShowRemoveInfo]  = useState(false);
  const [showManualLogin, setShowManualLogin] = useState(false);
 
   // ── Legal modal (Privacy Policy / Terms of Use) ───────────────────────────────
@@ -175,6 +210,31 @@ export default function Login() {
 
   // ── Maintenance mode notice ────────────────────────────────────────────────────
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+
+  // ── Floating budget card (decorative, column 2) ───────────────────────────────
+  const BUDGET_CURRENT_YEAR = 1170428.28;
+  const [budgetValue, setBudgetValue] = useState(1964225.05);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBudgetValue(prev => {
+        const delta = (Math.random() - 0.5) * 180000; // even chance up or down
+        const next = prev + delta;
+        const floor = BUDGET_CURRENT_YEAR * 1.05;
+        const ceiling = BUDGET_CURRENT_YEAR * 1.3;
+        if (next < floor) return floor;
+        if (next > ceiling) return ceiling;
+        return next;
+      });
+    }, 8000); // update every 8s
+    return () => clearInterval(id);
+  }, []);
+
+  const budgetDiff = budgetValue - BUDGET_CURRENT_YEAR;
+  const budgetPct  = (budgetDiff / BUDGET_CURRENT_YEAR) * 100;
+  const budgetUp   = budgetDiff >= 0;
+  const fmtPeso = (n: number) =>
+    `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // ── Init ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -212,10 +272,26 @@ export default function Login() {
 
 
   // ── Rate limit helpers ────────────────────────────────────────────────────────
-  const checkRateLimit = (): boolean => {
+ const checkRateLimit = (): boolean => {
     const raw = localStorage.getItem(RATE_LIMIT_KEY);
     if (!raw) return false;
     const a: LoginAttempt = JSON.parse(raw);
+
+    // Server-issued lockout has its own expiry — use it directly instead of
+    // re-deriving it from the 60s client window (that math breaks for any
+    // lockout longer than RATE_LIMIT_WINDOW and can push timestamps into
+    // the future, producing multi-day "remaining time" bugs).
+    if (a.expiresAt) {
+      const rem = a.expiresAt - Date.now();
+      if (rem > 0) {
+        setRemainingTime(rem); setIsRateLimited(true);
+        setRateLimitError("Too many attempts. Try again in ");
+        return true;
+      }
+      localStorage.removeItem(RATE_LIMIT_KEY); setIsRateLimited(false); setRateLimitError("");
+      return false;
+    }
+
     const elapsed = Date.now() - a.timestamp;
     if (elapsed < RATE_LIMIT_WINDOW && a.count >= MAX_LOGIN_ATTEMPTS) {
       const rem = RATE_LIMIT_WINDOW - elapsed;
@@ -289,7 +365,7 @@ export default function Login() {
         const retryAfterSec = err.response?.headers?.['retry-after'] ?? err.response?.data?.retry_after;
         const waitMs = retryAfterSec ? parseInt(retryAfterSec, 10) * 1000 : 0;
         if (waitMs > 0) {
-          localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify({ count: MAX_LOGIN_ATTEMPTS, timestamp: Date.now() - (RATE_LIMIT_WINDOW - waitMs) }));
+          localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify({ count: MAX_LOGIN_ATTEMPTS, timestamp: Date.now(), expiresAt: Date.now() + waitMs }));
           setRemainingTime(waitMs); setIsRateLimited(true); setRateLimitError("Too many attempts. Try again in ");
         } else {
           setHasLoginError(true); setLoginError(err.response?.data?.message ?? "Too many login attempts.");
@@ -347,6 +423,12 @@ export default function Login() {
   const isLoading = loading || isSubmitting;
   const hasSaved = savedAccounts.length > 0;
 
+  const MIN_PASSWORD_LEN = 8;
+  const MAX_FIELD_LEN = 32;
+  const isFormValid =
+    username.trim().length > 0 && username.trim().length <= MAX_FIELD_LEN &&
+    password.trim().length >= MIN_PASSWORD_LEN && password.trim().length <= MAX_FIELD_LEN;
+
   const sl = (dir: "left" | "right", delay: string) =>
     `login-anim login-slide-${dir} ${mounted ? "login-in" : ""} ${delay}`;
 
@@ -376,321 +458,205 @@ export default function Login() {
         .remove-row:hover { background: #fafafa; }
         .panel-fade { animation: panelFadeIn 0.22s cubic-bezier(.25,.8,.25,1) both; }
         @keyframes panelFadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
+        .budget-float { animation: budgetFloat 5s ease-in-out infinite; will-change: transform; }
+        @keyframes budgetFloat {
+          0%, 100% { transform: translateY(-10px); }
+          50% { transform: translateY(10px); }
+        }
+        .budget-float-2 { animation: budgetFloat2 6.5s ease-in-out infinite; animation-delay: 0.4s; will-change: transform; }
+        @keyframes budgetFloat2 {
+          0%, 100% { transform: translateY(8px); }
+          50% { transform: translateY(-9px); }
+        }
+        .budget-float-3 { animation: budgetFloat3 4.2s ease-in-out infinite; animation-delay: 0.9s; will-change: transform; }
+        @keyframes budgetFloat3 {
+          0%, 100% { transform: translateY(-6px); }
+          50% { transform: translateY(11px); }
+        }
+        .budget-float-4 { animation: budgetFloat4 7s ease-in-out infinite; animation-delay: 0.2s; will-change: transform; }
+        @keyframes budgetFloat4 {
+          0%, 100% { transform: translateY(9px); }
+          50% { transform: translateY(-7px); }
+        }
+        .odometer-digit-track { transition: transform 0.7s cubic-bezier(.22,1,.36,1); }
       `}</style>
 
-      <div className="login-wrap h-screen overflow-y-auto bg-zinc-50 flex flex-col">
-        <div className="flex-1 flex items-start lg:items-center justify-center p-4 lg:p-8 py-8">
-          <div className="w-full max-w-5xl bg-white border border-zinc-200 rounded-2xl shadow-md overflow-hidden">
-            <div className="flex flex-col lg:flex-row">
+      <div className="login-wrap h-screen bg-white flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
 
-              {/* ══ LEFT PANEL ══ */}
-              <div
-                className="w-full lg:w-[42%] border-b lg:border-b-0 lg:border-r border-zinc-800 p-9 lg:p-12 flex flex-col justify-between min-h-[300px] lg:min-h-[600px] relative overflow-hidden"
-                style={{ background: BRAND_RED }}
-              >
-                {/* Decorative circles */}
-                <div style={{ position:'absolute', top:-60, left:-60, width:220, height:220, borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', top:-30, left:-30, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', bottom:-70, right:-70, width:240, height:240, borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', bottom:-35, right:-35, width:155, height:155, borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', top:0, left:0, right:0, height:4, background:'rgba(255,255,255,0.2)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', bottom:0, left:0, right:0, height:4, background:'rgba(255,255,255,0.12)', pointerEvents:'none' }} />
+        {/* ══ COLUMN 1 — plain logo mark top, headline pinned to bottom, 20% width ══ */}
+        <div className="hidden lg:flex flex-col justify-between px-10 py-10" style={{ width: '22%' }}>
+          <div className={sl("left","d1")}>
+            <img src="/images/opol.png" alt="MBO" className="w-14 h-14 object-contain"
+              onError={e => { e.currentTarget.style.display="none"; (e.currentTarget.parentElement as HTMLElement).innerHTML='<span class="login-mono" style="font-size:11px;font-weight:600;color:#151515">MBO</span>'; }} />
+          </div>
 
-                {/* Logo */}
-                <div className={`flex items-center gap-3 ${sl("left","d1")}`} style={{ position:'relative', zIndex:2 }}>
-                  <div className="flex-shrink-0" style={{ background:'rgba(255,255,255,0.12)', borderRadius:8, padding:6 }}>
-                    <img src="/images/opol.png" alt="MBO" className="w-10 h-10 object-contain"
-                      onError={e => { e.currentTarget.style.display="none"; (e.currentTarget.parentElement as HTMLElement).innerHTML='<span class="login-mono" style="font-size:11px;font-weight:600;color:#fff">MBO</span>'; }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold leading-tight" style={{ color:'#fff' }}>Municipal Budget Office</p>
-                    <p className="login-mono text-[11px] leading-tight tracking-wide mt-0.5" style={{ color:'rgba(255,255,255,0.5)' }}>CY {new Date().getFullYear()} · MGMT SYSTEM</p>
-                  </div>
+          <h1 className={`font-bold tracking-tight text-zinc-900 ${sl("left","d2")}`} style={{ fontSize: 52, lineHeight: 1.15 }}>
+            Simplifying Municipal <span style={{ color: BRAND_BLUE }}>Budget Planning.</span>
+          </h1>
+        </div>
+
+        {/* ══ COLUMN 2 — Lottie animation, 45% width ══ */}
+        <div className="hidden lg:flex items-center justify-center px-8 py-10 relative" style={{ width: '43%' }}>
+          <div className={`relative ${sl("right","d2")}`} style={{ width: '100%', maxWidth:800, zIndex: 3 }}>
+            <DotLottieReact
+              src="/animations/login.lottie"
+              loop
+              autoplay
+              style={{ width: '100%', height: 'auto' }}
+            />
+          </div>
+
+          {/* Floating animated budget card */}
+          <div
+            className={sl("right","d4")}
+            style={{
+              position: 'absolute',
+              bottom: '8%',
+              right: '4%',
+              width: 260,
+              zIndex: 5,
+            }}
+          >
+            <div className="budget-float">
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #e4e4e7',
+                borderRadius: 16,
+                padding: 16,
+                boxShadow: '0 20px 40px -12px rgba(0,0,0,0.18)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div
+                  className="rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ width: 32, height: 32, background: '#f4f4f5', fontSize: 14 }}
+                >
+                  🏛️
                 </div>
-
-                {/* Headline */}
-                <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'28px 0' }}>
-                  <div className={`inline-block login-mono text-[9px] font-semibold tracking-widest uppercase mb-4 self-start px-2 py-1 rounded ${sl("left","d2")}`}
-                       style={{ color:'rgba(255,255,255,0.6)', border:'0.5px solid rgba(255,255,255,0.25)' }}>
-                    Budget Management
-                  </div>
-                  <div className={sl("left","d2")}>
-                    <h1 className="leading-snug tracking-tight font-bold" style={{ fontSize:26, color:'#fff' }}>Simplifying municipal<br />budget planning.</h1>
-                    <p className="mt-3 text-sm leading-relaxed" style={{ color:'rgba(255,255,255,0.68)' }}>Annual Budget Plan and <br/>Local Expenditure Program Preparation</p>
-                  </div>
-                  <div className={sl("left","d3")} style={{ width:330, height:2, background:'rgba(255,255,255,0.3)', borderRadius:2, margin:'20px 0' }} />
-                  <div className="hidden lg:block">
-                    <div className="space-y-1">
-                      {FEATURES.map(({ icon: Icon, label, iconBg, iconColor }, i) => (
-                        <div key={label} className={`feat-row flex items-center gap-3 px-3 py-2.5 cursor-default ${sl("left",`d${i+4}`)}`}>
-                          <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background:iconBg, border:'0.5px solid rgba(255,255,255,0.18)' }}>
-                            <Icon className="w-3.5 h-3.5" style={{ color:iconColor }} />
-                          </div>
-                          <span className="text-sm" style={{ color:'rgba(255,255,255,0.75)' }}>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className={sl("left","d8")} style={{ position:'relative', zIndex:2 }}>
-                  <div style={{ height:'0.5px', background:'rgba(255,255,255,0.15)', marginBottom:10 }} />
-                  <p className="login-mono text-[10px] uppercase tracking-widest" style={{ color:'rgba(255,255,255,0.45)' }}>Secure · Centralized · Role-Based</p>
-                </div>
+                <span
+                  className="flex items-center gap-1"
+                  style={{
+                    fontSize: 11, fontWeight: 600, color: '#71717a',
+                    background: '#f4f4f5', borderRadius: 999,
+                    padding: '3px 8px',
+                  }}
+                >
+                  <span style={{ width: 5, height: 5, borderRadius: 999, background: '#71717a', display: 'inline-block' }} />
+                  Draft
+                </span>
               </div>
 
-              {/* ══ RIGHT PANEL ══ */}
-              <div className="w-full lg:w-[58%] bg-white flex items-stretch">
+              <p style={{ fontSize: 11, color: '#a1a1aa', margin: 0 }}>Office of the Municipal Budget Office</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#18181b', margin: '2px 0 8px' }}>MBO</p>
 
-                {/* ── REMOVE ACCOUNTS PANEL ── */}
-                {showRemovePanel ? (
-                  <div className="w-full p-8 lg:p-14 flex items-center panel-fade">
-                    <div className="w-full max-w-sm mx-auto">
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <h2 className="text-base font-bold text-zinc-900">Remove saved accounts</h2>
-                          <p className="text-xs text-zinc-400 mt-0.5">Accounts are saved on this device only.</p>
-                        </div>
-                        <button onClick={() => setShowRemovePanel(false)} className="text-zinc-400 hover:text-zinc-700 transition-colors p-1 rounded">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+              <span
+                style={{
+                  display: 'inline-block', fontSize: 11, fontWeight: 500, color: '#2563eb',
+                  background: '#eff6ff', borderRadius: 999, padding: '3px 10px', marginBottom: 14,
+                }}
+              >
+                General Public Services
+              </span>
 
-                      <div
-                        style={{
-                          maxHeight: 'calc(3 * 64px + 2 * 4px)',
-                          overflowY: 'auto',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                          paddingRight: 2,
-                        }}
-                      >
-                        {savedAccounts.map(acct => (
-                          <div key={acct.user_id} className="remove-row flex items-center gap-3 p-3 rounded-lg border border-zinc-100">
-                            <AvatarImg acct={acct} size={36} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-zinc-800 truncate">{acct.fname} {acct.lname}</p>
-                              <p className="text-xs text-zinc-400 truncate">{acct.department_name ?? ROLE_LABEL[acct.role] ?? acct.role}</p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                forgetAccount(acct.user_id);
-                                const updated = getRememberedAccounts();
-                                setSavedAccounts(updated);
-                                if (updated.length === 0) setShowRemovePanel(false);
-                              }}
-                              className="text-xs font-medium px-3 py-1.5 rounded-md border border-zinc-200 text-zinc-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors flex-shrink-0"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 11, color: '#f59e0b', fontWeight: 500, margin: 0 }}>Proposed</p>
+                <p style={{ fontSize: 22, fontWeight: 800, color: budgetUp ? '#ea580c' : '#dc2626', margin: '2px 0' }}>
+                  <OdometerNumber value={fmtPeso(budgetValue)} />
+                </p>
+                <p
+                  style={{
+                    fontSize: 11, fontWeight: 600, margin: 0,
+                    color: budgetUp ? '#059669' : '#dc2626',
+                  }}
+                >
+                  {budgetUp ? '↑' : '↓'} {fmtPeso(Math.abs(budgetDiff))} ({Math.abs(budgetPct).toFixed(1)}%) vs. current year
+                </p>
+              </div>
+            </div>
+            </div>
+          </div>
 
-                      <p className="text-xs text-zinc-400 mt-5 text-center leading-relaxed">
-                        Removing an account only clears it from this device.
-                      </p>
-                    </div>
-                  </div>
-
-                /* ── PIN ENTRY PANEL (account selected) ── */
-                // ) : pinAccount ? (
-                //   <div className="w-full p-8 lg:p-14 flex items-center panel-fade">
-                //     <div className="w-full max-w-sm mx-auto">
-                //       {/* Back button */}
-                //       <button
-                //         onClick={closePinPanel}
-                //         className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-700 transition-colors mb-8"
-                //       >
-                //         <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-                //         Back
-                //       </button>
-
-                //       {/* Account info */}
-                //       <div className="flex flex-col items-center mb-6">
-                //         <AvatarImg acct={pinAccount} size={72} />
-                //         <p className="font-semibold text-zinc-900 text-base mt-3">{pinAccount.fname} {pinAccount.lname}</p>
-                //         <p className="text-xs text-zinc-500 mt-0.5">{pinAccount.department_name ?? ROLE_LABEL[pinAccount.role] ?? pinAccount.role}</p>
-                //       </div>
-
-                //       <p className="text-center text-sm font-medium text-zinc-700 mb-1">Enter your 6-digit PIN</p>
-                //       <p className="text-center text-xs text-zinc-400">to sign in to your account</p>
-
-                //       {pinError && (
-                //         <Alert variant="destructive" className="mt-4">
-                //           <AlertCircle className="h-4 w-4" />
-                //           <AlertDescription className="text-sm">{pinError}</AlertDescription>
-                //         </Alert>
-                //       )}
-
-                //       <PinInputRow
-                //         digits={pinDigits}
-                //         refs={pinRefs}
-                //         loading={pinLoading}
-                //         onChange={handlePinDigit}
-                //         onKeyDown={handlePinKey}
-                //       />
-
-                //       <Button
-                //         className="w-full h-10 text-sm font-semibold"
-                //         style={{ background: BRAND_RED }}
-                //         onClick={() => submitPin()}
-                //         disabled={pinLoading || pinDigits.join('').length < 6}
-                //       >
-                //         {pinLoading
-                //           ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Verifying…</>
-                //           : 'Sign in with PIN'}
-                //       </Button>
-
-                //       <Separator className="my-5" />
-                //       <p className="text-xs text-zinc-400 text-center">Restricted to authorized personnel only.</p>
-                //     </div>
-                //   </div>
-
-) : pinAccount ? (
-  <div className="w-full p-8 lg:p-12 flex items-center panel-fade">
-    <div className="w-full max-w-sm mx-auto">
-
-      {/* Back */}
-      <button
-        onClick={closePinPanel}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 12, color: '#a1a1aa', marginBottom: 28, padding: 0,
-        }}
-        className="hover:text-zinc-600 transition-colors"
-      >
-        <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-        Back
-      </button>
-
-      {/* Account card */}
-      <Card className="flex flex-col items-center py-5 px-4 mb-6 bg-zinc-50 border-zinc-200 shadow-none">
-        <AvatarImg acct={pinAccount} size={64} />
-        <p className="font-bold text-base text-zinc-900 mt-3 mb-0.5">
-          {pinAccount.fname} {pinAccount.lname}
-        </p>
-        <p className="text-xs text-zinc-500">
-          {pinAccount.department_name ?? ROLE_LABEL[pinAccount.role] ?? pinAccount.role}
-        </p>
-      </Card>
-
-      {pinError && (
-        <Alert variant="destructive" className="mt-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-sm">{pinError}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="mt-5 mb-4">
-        <div className="relative">
-          <Input
-            id="pin-password"
-            type={showPinPw ? 'text' : 'password'}
-            value={pinPassword}
-            onChange={e => { setPinPassword(e.target.value); setPinError(''); }}
-            onKeyDown={e => { if (e.key === 'Enter') submitPin(); }}
-            placeholder="Enter your password"
-            disabled={pinLoading}
-            className="h-10 text-sm pr-10 focus-visible:ring-0"
-            autoComplete="current-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPinPw(v => !v)}
-            disabled={pinLoading}
-            className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors disabled:opacity-40"
+          {/* Draft — behind Lottie, top-left, small */}
+          <div
+            className={sl("right","d3")}
+            style={{ position: 'absolute', top: '44%', left: '13%', width: 190, zIndex: 1 }}
           >
-            {showPinPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+            <div className="budget-float-2">
+              <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: 14, padding: 14, boxShadow: '0 14px 30px -10px rgba(0,0,0,0.14)', opacity: 0.92 }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 26, height: 26, background: '#f4f4f5', fontSize: 12 }}>📝</div>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#71717a', background: '#f4f4f5', borderRadius: 999, padding: '2px 7px' }}>Draft</span>
+                </div>
+                <p style={{ fontSize: 10, color: '#a1a1aa', margin: 0 }}>Office of the Municipal Accounting</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#18181b', margin: '2px 0 6px' }}>ACCOUNTING</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#52525b', margin: 0, filter: 'blur(4px)', userSelect: 'none' }}>₱1,340,000.00</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Submitted — behind Lottie, top-right, medium */}
+          <div
+            className={sl("right","d5")}
+            style={{ position: 'absolute', top: '25%', right: '16%', width: 215, zIndex: 2 }}
+          >
+            <div className="budget-float-3">
+              <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: 15, padding: 15, boxShadow: '0 16px 34px -10px rgba(0,0,0,0.15)', opacity: 0.95 }}>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: '#eff6ff', fontSize: 13 }}>📤</div>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 999, padding: '2px 8px' }}>Submitted</span>
+                </div>
+                <p style={{ fontSize: 10, color: '#a1a1aa', margin: 0 }}>Office of the Municipal Planning and Development Coordinator</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#18181b', margin: '2px 0 6px' }}>MPDC</p>
+                <p style={{ fontSize: 17, fontWeight: 800, color: '#2563eb', margin: 0, filter: 'blur(4px)', userSelect: 'none' }}>₱2,905,600.00</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Under Review — in front, bottom-left, large */}
+          <div
+            className={sl("right","d6")}
+            style={{ position: 'absolute', bottom: '20%', left: '10%', width: 235, zIndex: 6 }}
+          >
+            <div className="budget-float-4">
+              <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: 16, padding: 16, boxShadow: '0 18px 38px -12px rgba(0,0,0,0.17)' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 30, height: 30, background: '#fffbeb', fontSize: 14 }}>🔍</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fffbeb', borderRadius: 999, padding: '3px 9px' }}>Under Review</span>
+                </div>
+                <p style={{ fontSize: 10, color: '#a1a1aa', margin: 0 }}>Office of the Municipal Mayor</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#18181b', margin: '2px 0 6px' }}>M.O.</p>
+                <p style={{ fontSize: 19, fontWeight: 800, color: '#b45309', margin: 0, filter: 'blur(4px)', userSelect: 'none' }}>₱4,178,900.00</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <Button
-        className="w-full h-10 text-sm font-semibold"
-        style={{ background: BRAND_RED }}
-        onClick={() => submitPin()}
-        disabled={pinLoading || !pinPassword.trim()}
-      >
-        {pinLoading
-          ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Signing in…</>
-          : 'Sign in'}
-      </Button>
+        {/* ══ COLUMN 3 — login, 40% width ══ */}
+        <div className="w-full flex-shrink-0 lg:border-l border-zinc-200 flex flex-col overflow-y-auto" style={{ width: undefined }}
+             data-col="login">
+          <style>{`@media (min-width: 1024px) { [data-col="login"] { width: 35% !important; } }`}</style>
 
-      <Separator className="my-5" />
-      <p className="text-xs text-zinc-400 text-center">Restricted to authorized personnel only.</p>
-      <p className="text-[11px] text-zinc-400 text-center leading-relaxed mt-2">
-        By signing in, you agree to the{" "}
-        <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
-        {" "}and{" "}
-        <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
-      </p>
-    </div>
-  </div>
+          {/* Mobile-only logo (desktop shows it in the left zone instead) */}
+          <div className="lg:hidden flex items-center gap-3 p-6">
+            <div className="flex-shrink-0 bg-zinc-100 rounded-lg p-1.5">
+              <img src="/images/opol.png" alt="MBO" className="w-9 h-9 object-contain"
+                onError={e => { e.currentTarget.style.display="none"; (e.currentTarget.parentElement as HTMLElement).innerHTML='<span class="login-mono" style="font-size:11px;font-weight:600;color:#151515">MBO</span>'; }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold leading-tight text-zinc-900">Municipal Budget Office</p>
+              <p className="login-mono text-[10px] leading-tight tracking-wide mt-0.5 text-zinc-400">CY {new Date().getFullYear()} · MGMT SYSTEM</p>
+            </div>
+          </div>
 
-                /* ── SAVED ACCOUNTS LIST (Facebook-style) ── */
-                // ) : hasSaved ? (
-                //   <div className="w-full p-8 lg:p-14 flex items-center panel-fade">
-                //     <div className="w-full max-w-sm mx-auto">
+          <div className="flex-1 flex items-center justify-center px-6 py-6">
+            <div className="w-full max-w-lg">
 
-                //       {/* Header with settings gear */}
-                //       <div className={`flex items-start justify-between mb-6 ${sl("right","d1")}`}>
-                //         <div>
-                //           <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Welcome back</h2>
-                //           <p className="text-sm text-zinc-500 mt-1">Choose your account to continue.</p>
-                //         </div>
-                //         <button
-                //           onClick={() => setShowRemovePanel(true)}
-                //           title="Manage saved accounts"
-                //           className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors mt-0.5"
-                //         >
-                //           <Settings className="w-4 h-4" />
-                //         </button>
-                //       </div>
-
-                //       {/* Account rows */}
-                //       <div className={`space-y-1 ${sl("right","d2")}`}>
-                //         {savedAccounts.map(acct => (
-                //           <button
-                //             key={acct.user_id}
-                //             className="acct-row w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left"
-                //             onClick={() => openPinPanel(acct)}
-                //           >
-                //             <AvatarImg acct={acct} size={44} />
-                //             <div className="flex-1 min-w-0">
-                //               <p className="text-sm font-semibold text-zinc-900 truncate leading-tight">{acct.fname} {acct.lname}</p>
-                //               <p className="text-xs text-zinc-500 truncate mt-0.5">
-                //                 {acct.department_name
-                //                   ? `${acct.department_name} · ${ROLE_LABEL[acct.role] ?? acct.role}`
-                //                   : ROLE_LABEL[acct.role] ?? acct.role}
-                //               </p>
-                //             </div>
-                //             <ChevronRight className="w-4 h-4 text-zinc-300 flex-shrink-0" />
-                //           </button>
-                //         ))}
-                //       </div>
-
-                //       <div className={`mt-5 ${sl("right","d3")}`}>
-                //         <Separator className="mb-4" />
-                //         <button
-                //           onClick={() => setSavedAccounts([])}
-                //           className="w-full text-sm text-zinc-500 hover:text-zinc-800 transition-colors py-2 rounded-lg hover:bg-zinc-50 font-medium"
-                //         >
-                //           Use a different account
-                //         </button>
-                //       </div>
-
-                //       <p className={`text-xs text-zinc-400 text-center mt-4 ${sl("right","d4")}`}>
-                //         Restricted to authorized personnel only.
-                //       </p>
-                //     </div>
-                //   </div>
-                ) : hasSaved && !showManualLogin ? (
-  <div className="w-full p-8 lg:p-12 flex items-center panel-fade">
-    <div className="w-full max-w-sm mx-auto">
+                {/* ── SAVED ACCOUNTS LIST (Facebook-style) ── */}
+                {hasSaved && !showManualLogin ? (
+  <div className="w-full py-8 flex items-center panel-fade">
+    <div className="w-full max-w-lg mx-auto">
 
       {/* Header */}
       <div className={`flex items-start justify-between mb-5 ${sl("right","d1")}`}>
@@ -703,13 +669,13 @@ export default function Login() {
           </p>
         </div>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={() => setShowRemovePanel(true)}
           title="Manage saved accounts"
-          className="h-8 w-8 text-zinc-500"
+          className="h-9 w-9 text-zinc-700 hover:bg-zinc-100 rounded-full"
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings className="w-4 h-4" />
         </Button>
       </div>
 
@@ -727,25 +693,21 @@ export default function Login() {
       <div
         className={sl("right","d2")}
         style={{
-  maxHeight: 'calc(3 * 72px + 2 * 8px + 4px)',
-  overflowY: 'auto',
+  maxHeight: savedAccounts.length > 3 ? 'calc(3 * 80px + 2 * 4px)' : 'none',
+  overflowY: savedAccounts.length > 3 ? 'auto' : 'visible',
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
-  paddingRight: 2,
-  paddingTop: 4,
-  paddingBottom: 4,
-  marginTop: -4,
-  marginBottom: -4,
+  gap: 4,
+  paddingRight: savedAccounts.length > 3 ? 6 : 0,
 }}
       >
         {savedAccounts.map((acct) => (
           <button
             key={acct.user_id}
             onClick={() => openPinPanel(acct)}
-            className="group w-full flex items-center gap-3 px-3.5 py-3 bg-white border border-zinc-200 rounded-xl text-left transition-colors duration-150 hover:border-zinc-300 hover:shadow-sm"
+            className="group w-full flex items-center gap-4 px-2 py-4 bg-white rounded-lg text-left transition-colors duration-150 hover:bg-zinc-100"
           >
-            <AvatarImg acct={acct} size={44} />
+            <AvatarImg acct={acct} size={48} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-zinc-900 truncate">
                 {acct.fname} {acct.lname}
@@ -761,33 +723,26 @@ export default function Login() {
         ))}
       </div>
 
-      <div className={`mt-4 ${sl("right","d3")}`}>
-        <Separator className="mb-4" />
+      <div className={`mt-6 ${sl("right","d3")}`}>
         <Button
-          variant="ghost"
+          variant="outline"
           onClick={() => setShowManualLogin(true)}
-          className="w-full text-sm font-medium text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+          className="w-full h-10 text-sm font-semibold text-zinc-900 border-zinc-300 hover:bg-zinc-50"
         >
           Use a different account
         </Button>
       </div>
 
-      <p className={`text-xs text-zinc-400 text-center mt-3 ${sl("right","d4")}`}>
+      <p className={`text-xs text-zinc-400 text-center mt-8 ${sl("right","d4")}`}>
         Restricted to authorized personnel only.
-      </p>
-      <p className={`text-[11px] text-zinc-400 text-center leading-relaxed mt-1 ${sl("right","d4")}`}>
-        By signing in, you agree to the{" "}
-        <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
-        {" "}and{" "}
-        <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
       </p>
     </div>
   </div>
 
                 /* ── NORMAL LOGIN FORM ── */
                 ) : (
-                  <div className="w-full p-8 lg:p-14 flex items-center">
-                    <div className="w-full max-w-sm mx-auto">
+                  <div className="w-full py-8 flex items-center">
+                    <div className="w-full max-w-lg mx-auto">
 
                       {hasSaved && showManualLogin && (
                         <button
@@ -815,9 +770,9 @@ export default function Login() {
                       )}
 
                       {(rateLimitError || loginError) && (
-                        <Alert variant="destructive" className="mb-5" role="alert" aria-live="assertive" id="login-error">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription className="text-sm">
+                        <Alert variant="destructive" className="mb-5 flex items-center gap-2" role="alert" aria-live="assertive" id="login-error">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <AlertDescription className="text-sm !mt-0 !translate-y-0">
                             {rateLimitError ? `${rateLimitError}${remainingTime > 0 ? fmt(remainingTime) : ""}` : loginError}
                           </AlertDescription>
                         </Alert>
@@ -826,7 +781,7 @@ export default function Login() {
                       <form onSubmit={handleSubmit} className="space-y-5">
                         <div className={sl("right","d2")}>
                           <Label htmlFor="username" className="text-xs font-medium text-zinc-700 mb-1.5 block">Username</Label>
-                          <Input id="username" type="text" value={username}
+                          <Input id="username" type="text" value={username} maxLength={MAX_FIELD_LEN}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); clearErr(); if (rateLimitError) setRateLimitError(""); }}
                             placeholder="e.g. mbo.office" disabled={isLoading || isRateLimited}
                             className={`login-input h-10 text-sm focus-visible:ring-0 ${hasLoginError ? "err" : ""}`}
@@ -836,7 +791,7 @@ export default function Login() {
                         <div className={sl("right","d3")}>
                           <Label htmlFor="password" className="text-xs font-medium text-zinc-700 mb-1.5 block">Password</Label>
                           <div className="relative">
-                            <Input id="password" type={showPassword ? "text" : "password"} value={password}
+                            <Input id="password" type={showPassword ? "text" : "password"} value={password} maxLength={MAX_FIELD_LEN}
                               onChange={(e: ChangeEvent<HTMLInputElement>) => { setPassword(e.target.value); clearErr(); if (rateLimitError) setRateLimitError(""); }}
                               placeholder="Enter your password" disabled={isLoading || isRateLimited}
                               className={`login-input h-10 text-sm pr-10 focus-visible:ring-0 ${hasLoginError ? "err" : ""}`}
@@ -859,8 +814,8 @@ export default function Login() {
                         </div>
 
                         <div className={sl("right","d5")}>
-                          <Button type="submit" disabled={isLoading || isRateLimited} className="w-full h-10 text-sm font-semibold"
-                            style={{ background: isLoading || isRateLimited ? undefined : BRAND_RED, borderColor: BRAND_RED }}>
+                          <Button type="submit" disabled={isLoading || isRateLimited || !isFormValid} className="w-full h-10 text-sm font-semibold"
+                            style={{ background: (isLoading || isRateLimited || !isFormValid) ? undefined : BRAND_RED, borderColor: BRAND_RED }}>
                             {isLoading
                               ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Signing in…</span></>
                               : isRateLimited ? "Please wait…" : "Sign in"}
@@ -871,28 +826,160 @@ export default function Login() {
                       <div className={`mt-8 ${sl("right","d6")}`}>
                         <Separator className="mb-5" />
                         <p className="text-xs text-zinc-400 text-center leading-relaxed">Restricted to authorized personnel only.</p>
-                        <p className="text-[11px] text-zinc-400 text-center leading-relaxed mt-2">
-                          By signing in, you agree to the{" "}
-                          <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
-                          {" "}and{" "}
-                          <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
-                        </p>
                       </div>
                     </div>
                   </div>
                 )}
 
-              </div>{/* end RIGHT PANEL */}
-            </div>
-          </div>
-        </div>
+              </div>{/* end max-w-xs */}
+          </div>{/* end centered login content */}
+        </div>{/* end right zone */}
+        </div>{/* end content row */}
 
-        <footer className="py-4 text-center login-mono text-[11px] text-zinc-500 tracking-wide">
-          © {new Date().getFullYear()} Municipal Budget Office Management System
+        <footer className="border-t border-zinc-200 py-4 text-center">
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            {" "}
+            <button type="button" onClick={() => setLegalModal('terms')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Terms of Use</button>
+            {" "}and{" "}
+            <button type="button" onClick={() => setLegalModal('privacy')} className="text-blue-500 hover:underline underline-offset-2 font-medium">Privacy Policy</button>.
+          </p>
+          <p className="login-mono text-[11px] text-zinc-500 tracking-wide mt-2">
+            © {new Date().getFullYear()} Municipal Budget Office Management System
+          </p>
         </footer>
       </div>
 
       <LegalDialog open={legalModal} onOpenChange={setLegalModal} />
+
+      {/* ── PIN / Password login modal (Facebook-style) ── */}
+      <Dialog open={!!pinAccount} onOpenChange={(open) => { if (!open) closePinPanel(); }}>
+        <DialogContent className="max-w-[550px] rounded-2xl p-8 text-center">
+          {pinAccount && (
+            <>
+              <DialogHeader className="sr-only">
+                <DialogTitle>Sign in as {pinAccount.fname} {pinAccount.lname}</DialogTitle>
+                <DialogDescription>Enter your password to continue.</DialogDescription>
+              </DialogHeader>
+
+              <div className="flex flex-col items-center mt-10 mb-0">
+                <AvatarImg acct={pinAccount} size={160} />
+                <p className="font-bold text-xl text-zinc-900 mt-10 mb-0">
+                  {pinAccount.fname} {pinAccount.lname}
+                </p>
+              </div>
+
+              {pinError && (
+                <Alert variant="destructive" className="mb-4 text-left">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">{pinError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="relative mb-0">
+                <Input
+                  id="pin-password"
+                  type={showPinPw ? 'text' : 'password'}
+                  value={pinPassword}
+                  onChange={e => { setPinPassword(e.target.value); setPinError(''); }}
+                  onKeyDown={e => { if (e.key === 'Enter') submitPin(); }}
+                  placeholder="Password"
+                  disabled={pinLoading}
+                  className="h-11 text-sm pr-10 focus-visible:ring-0"
+                  autoComplete="current-password"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPinPw(v => !v)}
+                  disabled={pinLoading}
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-zinc-400 hover:text-zinc-700 transition-colors disabled:opacity-40"
+                >
+                  {showPinPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <Button
+                className="w-full h-11 text-sm font-semibold"
+                style={{ background: BRAND_RED }}
+                onClick={() => submitPin()}
+                disabled={pinLoading || pinPassword.trim().length < MIN_PASSWORD_LEN}
+              >
+                {pinLoading
+                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Signing in…</>
+                  : 'Log in'}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => toast("Password assistance", { description: "Please contact your Budget Officer to reset your password.", icon: <ShieldCheck className="w-4 h-4 text-gray-900" />, duration: 5000 })}
+                className="text-sm text-blue-500 hover:text-blue-700 hover:underline underline-offset-4 transition-colors mt-4"
+              >
+                Forgot password?
+              </button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Remove saved accounts modal ── */}
+      <Dialog open={showRemovePanel} onOpenChange={(open) => { setShowRemovePanel(open); if (!open) setShowRemoveInfo(false); }}>
+        <DialogContent className="sm:max-w-lg rounded-2xl p-6">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-lg font-bold text-zinc-900">Remove saved accounts</DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Accounts are saved on this device only.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            className="mt-2 rounded-lg border border-zinc-100 overflow-y-auto"
+            style={{ maxHeight: 'calc(3 * 64px)' }}
+          >
+            {savedAccounts.map((acct, idx) => (
+              <div
+                key={acct.user_id}
+                className={`remove-row flex items-center gap-3 p-3 ${idx > 0 ? 'border-t border-zinc-100' : ''}`}
+              >
+                <AvatarImg acct={acct} size={36} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-800 truncate">{acct.fname} {acct.lname}</p>
+                  <p className="text-xs text-zinc-400 truncate">{acct.department_name ?? ROLE_LABEL[acct.role] ?? acct.role}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    forgetAccount(acct.user_id);
+                    const updated = getRememberedAccounts();
+                    setSavedAccounts(updated);
+                    if (updated.length === 0) setShowRemovePanel(false);
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full border border-zinc-200 text-zinc-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors flex-shrink-0"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              <button
+                type="button"
+                onClick={() => setShowRemoveInfo(v => !v)}
+                className="text-blue-500 hover:underline underline-offset-2 font-medium"
+              >
+                Learn more
+              </button>
+              {" "}about why you see accounts here and what removing them means.
+            </p>
+
+            {showRemoveInfo && (
+              <p className="text-xs text-zinc-500 leading-relaxed mt-2 panel-fade">
+                Signing in saves your name, avatar, and role in this browser's local storage so you can sign back in faster next time — no password is stored. Removing an account here only deletes that shortcut from this device; it doesn't deactivate, log out, or affect the account itself. You can always sign back in manually using "Use a different account."
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

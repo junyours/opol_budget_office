@@ -438,10 +438,10 @@ export default function Login() {
         .login-wrap * { box-sizing: border-box; }
 .login-wrap { font-family: inherit; }
 .login-mono  { font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Menlo, monospace; }
-        .login-anim { transition: opacity 0.48s cubic-bezier(.25,.8,.25,1), transform 0.48s cubic-bezier(.25,.8,.25,1); }
-        .login-slide-left  { opacity: 0; transform: translateX(-22px); }
-        .login-slide-right { opacity: 0; transform: translateX(22px);  }
-        .login-in          { opacity: 1 !important; transform: translate(0,0) !important; }
+        .login-anim { transition: opacity 0.65s cubic-bezier(.16,1,.3,1), transform 0.65s cubic-bezier(.16,1,.3,1); }
+        .login-slide-left  { opacity: 0; transform: translateX(-22px) scale(0.9); }
+        .login-slide-right { opacity: 0; transform: translateX(22px) scale(0.88);  }
+        .login-in          { opacity: 1 !important; transform: translate(0,0) scale(1) !important; }
         .d1 { transition-delay: 0.04s; } .d2 { transition-delay: 0.10s; }
         .d3 { transition-delay: 0.16s; } .d4 { transition-delay: 0.22s; }
         .d5 { transition-delay: 0.28s; } .d6 { transition-delay: 0.34s; }
@@ -458,26 +458,28 @@ export default function Login() {
         .remove-row:hover { background: #fafafa; }
         .panel-fade { animation: panelFadeIn 0.22s cubic-bezier(.25,.8,.25,1) both; }
         @keyframes panelFadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
-        .budget-float { animation: budgetFloat 5s ease-in-out infinite; will-change: transform; }
+        .budget-float { animation: budgetFloat 5s ease-in-out infinite; animation-delay: 0s; will-change: transform; }
         @keyframes budgetFloat {
           0%, 100% { transform: translateY(-10px); }
           50% { transform: translateY(10px); }
         }
-        .budget-float-2 { animation: budgetFloat2 6.5s ease-in-out infinite; animation-delay: 0.4s; will-change: transform; }
+        .budget-float-2 { animation: budgetFloat2 6.5s ease-in-out infinite; animation-delay: 0s; will-change: transform; }
         @keyframes budgetFloat2 {
           0%, 100% { transform: translateY(8px); }
           50% { transform: translateY(-9px); }
         }
-        .budget-float-3 { animation: budgetFloat3 4.2s ease-in-out infinite; animation-delay: 0.9s; will-change: transform; }
+        .budget-float-3 { animation: budgetFloat3 4.2s ease-in-out infinite; animation-delay: 0s; will-change: transform; }
         @keyframes budgetFloat3 {
           0%, 100% { transform: translateY(-6px); }
           50% { transform: translateY(11px); }
         }
-        .budget-float-4 { animation: budgetFloat4 7s ease-in-out infinite; animation-delay: 0.2s; will-change: transform; }
+        .budget-float-4 { animation: budgetFloat4 7s ease-in-out infinite; animation-delay: 0s; will-change: transform; }
         @keyframes budgetFloat4 {
           0%, 100% { transform: translateY(9px); }
           50% { transform: translateY(-7px); }
         }
+        .login-fade { transition: opacity 0.65s cubic-bezier(.16,1,.3,1); opacity: 0; }
+        .login-fade.login-in { opacity: 1 !important; }
         .odometer-digit-track { transition: transform 0.7s cubic-bezier(.22,1,.36,1); }
       `}</style>
 

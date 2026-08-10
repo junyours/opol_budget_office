@@ -502,7 +502,7 @@ export default function Login() {
         <div className="hidden lg:flex items-center justify-center px-8 py-10 relative" style={{ width: '43%' }}>
           <div className={`relative ${sl("right","d2")}`} style={{ width: '100%', maxWidth:800, zIndex: 3 }}>
             <DotLottieReact
-              src="/animations/login.lottie"
+              src="/animations/login1.lottie"
               loop
               autoplay
               style={{ width: '100%', height: 'auto' }}

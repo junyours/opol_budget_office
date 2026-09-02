@@ -132,10 +132,11 @@ class PsComputationController extends Controller
         $representation  = $agg('representation');
         $transportation  = $agg('transportation');
         $clothing        = $agg('clothing');
-       $magnaCarta      = $agg('magna_carta');   // Subsistence Allowance
+        $magnaCarta      = $agg('magna_carta');   // Subsistence Allowance
         $hazardPay       = $agg('hazard_pay');    // Hazard Pay expense item
-        $honoraria       = $agg('honoraria');
-        $honorariaPleb   = $agg('honoraria_pleb'); // Not a plantilla position — excluded from Section C / detail.total_ps
+        // $honoraria       = $agg('honoraria');
+        $honoraria       = $agg('honoraria') + $agg('honoraria_pleb');
+        // $honorariaPleb   = $agg('honoraria_pleb');
         $overtimePay     = $agg('overtime_pay');
         $cashGift        = $agg('cash_gift');
         $midYearBonus    = $agg('mid_year_bonus');
@@ -152,7 +153,8 @@ class PsComputationController extends Controller
                    + $terminalLeave + $productivityInc + $monetization;
 
         $totalPs   = $salariesWages + $subtotalB + $subtotalC; // Plantilla total only — unchanged, feeds detail table & footer
-        $totalPsGf = $totalPs + $honorariaPleb;                 // + non-plantilla PLEB honoraria, for the 45% PS Limitation check only
+        // $totalPsGf = $totalPs + $honorariaPleb;                 // + non-plantilla PLEB honoraria, for the 45% PS Limitation check only
+        $totalPsGf = $totalPs;                                  // PLEB honoraria now included in Total PS via Section C
 
         $totalIncome         = (float) $values->total_income;
         $nonRecurring        = (float) $values->non_recurring_income;

@@ -2573,17 +2573,17 @@ $lgu         = $data['lgu'];
 
 $pf = function($n) use ($pesoSign): string {
     if ((float)$n == 0) return '';
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $pa = function($n) use ($pesoSign): string {
-    return $pesoSign . number_format((float)$n, 0);
+    return $pesoSign . number_format((float)$n, 2);
 };
 $nf = function($n): string {
     if ((float)$n == 0) return ' - ';
-    return number_format((float)$n, 0);
+    return number_format((float)$n, 2);
 };
 $nfA = function($n): string {
-    return number_format((float)$n, 0);
+    return number_format((float)$n, 2);
 };
 @endphp
 

@@ -641,7 +641,8 @@ private function buildPsComputationData(int $budgetPlanId): array
     $clothing           = $agg('Clothing/Uniform Allowance');
     $magnaCarta         = $agg('Subsistence Allowance');
     $hazardPay          = $agg('Hazard Pay');
-    $honoraria          = $agg('Honoraria');
+    // $honoraria          = $agg('Honoraria');
+    $honoraria          = $agg('Honoraria') + $agg('Honoraria-PLEB');
     $overtimePay        = $agg('Overtime and Night Pay');
     $cashGift           = $agg('Cash Gift');
     $midYearBonus       = $agg('Mid-Year Bonus');

@@ -34,7 +34,6 @@ const RATE_LIMIT_KEY     = "login_attempts";
 const BRAND_RED          = "#151515";
 const BRAND_BLUE          = "#1877F2";
 
-// interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; }
 interface LoginAttempt { count: number; timestamp: number; lastUsername?: string; expiresAt?: number; }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -50,7 +49,6 @@ const FEATURES = [
   { icon: FileText,    label: "Automated reporting",        iconBg: "rgba(237,233,254,0.18)", iconColor: "rgba(196,181,253,1)" },
   { icon: ShieldCheck, label: "Role-based access control",  iconBg: "rgba(254,226,226,0.18)", iconColor: "rgba(252,165,165,1)" },
 ];
-
 
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
 // We cache a base64 copy of the avatar in localStorage so it renders on the
@@ -139,46 +137,45 @@ function OdometerNumber({ value }: { value: string }) {
 }
 
 // ── PIN digits component ───────────────────────────────────────────────────────
-function PinInputRow({
-  digits, refs, loading, onChange, onKeyDown,
-}: {
-  digits: string[];
-  refs: React.MutableRefObject<(HTMLInputElement | null)[]>;
-  loading: boolean;
-  onChange: (idx: number, val: string) => void;
-  onKeyDown: (idx: number, e: KeyboardEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="flex gap-2 justify-center my-4">
-      {digits.map((d, i) => (
-        <input
-          key={i}
-          ref={el => { refs.current[i] = el; }}
-          type="password"
-          inputMode="numeric"
-          maxLength={1}
-          value={d}
-          onChange={e => onChange(i, e.target.value)}
-          onKeyDown={e => onKeyDown(i, e)}
-          disabled={loading}
-          className="text-center font-bold border-2 rounded-lg focus:outline-none transition-colors disabled:opacity-50"
-          style={{
-            width: 44, height: 44,
-            fontSize: 20,
-            borderColor: d ? '#111' : '#d4d4d8',
-            boxShadow: 'none',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+// function PinInputRow({
+//   digits, refs, loading, onChange, onKeyDown,
+// }: {
+//   digits: string[];
+//   refs: React.MutableRefObject<(HTMLInputElement | null)[]>;
+//   loading: boolean;
+//   onChange: (idx: number, val: string) => void;
+//   onKeyDown: (idx: number, e: KeyboardEvent<HTMLInputElement>) => void;
+// }) {
+//   return (
+//     <div className="flex gap-2 justify-center my-4">
+//       {digits.map((d, i) => (
+//         <input
+//           key={i}
+//           ref={el => { refs.current[i] = el; }}
+//           type="password"
+//           inputMode="numeric"
+//           maxLength={1}
+//           value={d}
+//           onChange={e => onChange(i, e.target.value)}
+//           onKeyDown={e => onKeyDown(i, e)}
+//           disabled={loading}
+//           className="text-center font-bold border-2 rounded-lg focus:outline-none transition-colors disabled:opacity-50"
+//           style={{
+//             width: 44, height: 44,
+//             fontSize: 20,
+//             borderColor: d ? '#111' : '#d4d4d8',
+//             boxShadow: 'none',
+//           }}
+//         />
+//       ))}
+//     </div>
+//   );
+// }
 
 export default function Login() {
   // ── Form state ───────────────────────────────────────────────────────────────
   const [username,       setUsername]       = useState("");
   const [password,       setPassword]       = useState("");
-//   const [rememberMe,     setRememberMe]     = useState(false);
   const [showPassword,   setShowPassword]   = useState(false);
   const [loginError,     setLoginError]     = useState("");
   const [rateLimitError, setRateLimitError] = useState("");
@@ -192,7 +189,7 @@ export default function Login() {
   const [savedAccounts,  setSavedAccounts]  = useState<RememberedAccount[]>([]);
   const [showRemovePanel, setShowRemovePanel] = useState(false);
   const [showRemoveInfo,  setShowRemoveInfo]  = useState(false);
- const [showManualLogin, setShowManualLogin] = useState(false);
+  const [showManualLogin, setShowManualLogin] = useState(false);
 
   // ── Legal modal (Privacy Policy / Terms of Use) ───────────────────────────────
   const [legalModal, setLegalModal] = useState<LegalTab | null>(null);
@@ -268,8 +265,6 @@ export default function Login() {
     }, 1000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [remainingTime]);
-
-
 
   // ── Rate limit helpers ────────────────────────────────────────────────────────
  const checkRateLimit = (): boolean => {

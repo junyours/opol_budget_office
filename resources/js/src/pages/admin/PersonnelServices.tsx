@@ -822,20 +822,10 @@ const handleSave = async () => {
     if (!dbp) { toast.error('No department budget plan found.'); return; }
     const expenseClassItems = await fetchExpenseClassItems();
     const rows = departmentRows[cDeptId] || [];
-    // const rows = departmentRows[cDeptId] || [];
-    //if (rows.length === 0) { toast.warning('No personnel data to save.'); return; }
 
     setSaving(true);
     const savePromise = (async () => {
-      // ── Clean up stale Form3 snapshots ────────────────────────────────────
-      // `rows` only contains positions that are still active (departmentRows
-      // skips inactive ones). If a position was deactivated after being
-      // saved here previously, its old snapshot row is still sitting in this
-      // budget plan's plantilla-assignments and Form3 keeps showing it.
-      // Diff against what's currently saved and delete anything no longer
-      // represented by an active position.
-      // ⚠️ Verify this DELETE route against your backend — it mirrors the
-      // GET Form3.tsx already uses (`/department-budget-plans/{id}/plantilla-assignments`).
+
       const existingRes = await API.get(
         `/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments`
       );
@@ -854,19 +844,6 @@ const handleSave = async () => {
         );
       }
 
-      // await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
-      //   assignments: rows.map(row => ({
-      //     plantilla_position_id:      row.plantillaPositionId,
-      //     personnel_id:               row.personnelId,
-      //     salary_grade:               row.salaryGrade,
-      //     step:                       row.incrementRow ? row.incrementRow.step : row.baseStep,
-      //     monthly_rate:               row.savedMonthly,
-      //     annual_rate:                row.savedAnnual,
-      //     annual_increment:           row.incrementRow ? row.incrementRow.annualRateDiff : null,
-      //     step_effective_date:        row.incrementRow ? toLocalDateString(row.incrementRow.effectiveDate) : null,
-      //     salary_standard_version_id: activeVersion?.salary_standard_version_id ?? null,
-      //   })),
-      // });
       if (rows.length > 0) {
       await API.post(`/department-budget-plans/${dbp.dept_budget_plan_id}/plantilla-assignments/bulk`, {
         assignments: rows.map(row => ({
@@ -896,27 +873,7 @@ const handleSave = async () => {
         subsistence:         cb('subsistence',         'incr_subsistence'),
         laundry:             cb('laundry',             'incr_laundry'),
         productivity:        cb('productivity',        'incr_productivity'),
-    //     hazardPay:           combinedMC,
-    //     honoraria:           toNumber(totals.honoraria),
-    //     overtime:            toNumber(totals.overtime),
-    //     cashGift:            cb('cashGift',            'incr_cashGift'),
-    //     midYearBonus:        cb('midYearBonus',        'incr_midYearBonus'),
-    //     yearEndBonus:        cb('yearEndBonus',        'incr_yearEndBonus'),
-    //     retirementInsurance: cb('retirementInsurance', 'incr_retirementInsurance'),
-    //     pagIbig:             cb('pagIbig',             'incr_pagIbig'),
-    //     philHealth:          cb('philHealth',          'incr_philHealth'),
-    //     ecip:                cb('ecip',                'incr_ecip'),
-    //     otherBenefits:       cb('otherBenefits',       'incr_otherBenefits'),
-    //     terminalLeave:       toNumber(totals.terminalLeave),
-    //   };
 
-    //   const ALWAYS_SNAPSHOT_KEYS = new Set([
-    //     'wagesRegular',
-    //     'pera', 'ra', 'ta', 'clothing', 'productivity',
-    //     'midYearBonus', 'yearEndBonus', 'cashGift',
-    //     'retirementInsurance', 'pagIbig', 'philHealth',
-    //     'ecip', 'otherBenefits', 'terminalLeave',
-    //   ]);
     hazardPay:           combinedMC,
         overtime:            toNumber(totals.overtime),
         cashGift:            cb('cashGift',            'incr_cashGift'),
@@ -939,9 +896,6 @@ const handleSave = async () => {
 
       const exRes = await API.get(`/department-budget-plans/${dbp.dept_budget_plan_id}/items`);
       const exMap = new Map((exRes.data?.data || []).map((i: any) => [i.expense_item_id, i]));
-
-    //   await Promise.all(Object.entries(sums).map(async ([key, amount]) => {
-    //     const id = findExpenseItemId(key);
     await Promise.all(Object.entries(sums).map(async ([key, amount]) => {
         const id = findExpenseItemId(expenseClassItems, key);
         if (!id) return;
@@ -962,10 +916,8 @@ const handleSave = async () => {
       error: err => `Save failed: ${err?.response?.data?.message || err?.message || 'Unknown error'}`,
     });
     try { await savePromise; } catch (e) { console.error(e); } finally { setSaving(false); }
-  };
+};
 
-//   if (planLoading || matrixLoading || loading) return <LoadingState />;
-// if (planLoading || matrixLoading || loading || settingsLoading) return <LoadingState />;
 if (planLoading || matrixLoading || deptsLoading || assignLoading || deptPlansLoading || settingsLoading || positionsLoading) return <LoadingState />;
 if (!activePlan)    return <div className="p-8 text-center text-red-600">No active budget plan found.</div>;
   if (!activeVersion) return <div className="p-8 text-center text-yellow-600">No active salary version found.</div>;

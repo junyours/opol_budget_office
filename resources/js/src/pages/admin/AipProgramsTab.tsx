@@ -646,7 +646,7 @@ const AipProgramsTab: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <span className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-400">Expenditure</span>
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">AIP Programs</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight mt-0.5">Special Programs</h1>
           <p className="text-xs text-gray-400 mt-1">
             Master list of Annual Investment Program entries with budget allocations.
           </p>

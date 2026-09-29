@@ -77,7 +77,7 @@ const TAB_GROUPS: TabGroup[] = [
     group: 'Planning & Programs',
     tabs: [
       {
-        key: 'aip-programs', label: 'AIP Programs', short: 'AIP Programs',
+        key: 'aip-programs', label: 'Special Programs', short: 'SP',
         description: 'Annual Investment Programs',
         icon: CalendarDaysIcon, iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600',
         component: AIPProgramsPage,

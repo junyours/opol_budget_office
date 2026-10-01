@@ -31,6 +31,16 @@ class DepartmentBudgetPlan extends Model
         'returned_at'     => 'datetime',
     ];
 
+    /**
+     * Form 2 and Form 4 are frozen once the plan is approved.
+     * Only a super-admin may still modify them.
+     */
+    public function isFormsLockedFor($user): bool
+    {
+        return $this->status === 'approved'
+            && (!$user || $user->role !== 'super-admin');
+    }
+
     public function department()
     {
         return $this->belongsTo(Department::class, 'dept_id', 'dept_id');

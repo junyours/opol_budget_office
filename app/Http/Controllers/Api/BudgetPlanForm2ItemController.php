@@ -19,6 +19,9 @@ class BudgetPlanForm2ItemController extends BaseApiController
 
     public function store(Request $request, DepartmentBudgetPlan $department_budget_plan)
     {
+        if ($department_budget_plan->isFormsLockedFor($request->user())) {
+            return $this->error('Form 2 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
         // Admins can add items to any plan regardless of status.
         // Non-admins are restricted to their own draft plans via policy.
         $isAdmin = in_array($request->user()->role, ['admin', 'super-admin']);
@@ -76,6 +79,10 @@ class BudgetPlanForm2ItemController extends BaseApiController
         DepartmentBudgetPlan $department_budget_plan,
         BudgetPlanForm2Item $item
     ) {
+        if ($department_budget_plan->isFormsLockedFor($request->user())) {
+            return $this->error('Form 2 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
+
         // Admins can update items on any plan regardless of status.
         $isAdmin = in_array($request->user()->role, ['admin', 'super-admin']);
         if (!$isAdmin) {
@@ -128,9 +135,24 @@ class BudgetPlanForm2ItemController extends BaseApiController
         return $this->success($item);
     }
 
-    public function destroy(DepartmentBudgetPlan $department_budget_plan, BudgetPlanForm2Item $item)
-    {
-        $this->authorize('delete', $item);
+    public function destroy(
+        Request $request,
+        DepartmentBudgetPlan $department_budget_plan,
+        BudgetPlanForm2Item $item
+    ) {
+        if ($department_budget_plan->isFormsLockedFor($request->user())) {
+            return $this->error('Form 2 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
+
+        $isAdmin = in_array($request->user()->role, ['admin', 'super-admin']);
+
+        if (!$isAdmin) {
+            $this->authorize('delete', $item);
+
+            if ($department_budget_plan->status !== 'draft') {
+                return $this->error('Plan locked', 422);
+            }
+        }
 
         $item->delete();
 

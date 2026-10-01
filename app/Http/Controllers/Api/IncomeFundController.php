@@ -480,6 +480,7 @@ public function summary(Request $request)
         'localSource'          => $taxRevenue + $nonTaxRevenue,
         'previousTotal'        => $previousTotal,
         'previousLocalSource'  => $prevTax + $prevNonTax,
+        'previousNonTaxRevenue' => $prevNonTax,
     ]);
 }
 }

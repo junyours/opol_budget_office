@@ -70,8 +70,14 @@ const BudgetPlanList: React.FC = () => {
 //   const [plans, setPlans]     = useState<BudgetPlanWithOpen[]>([]);
 //   const [loading, setLoading] = useState(true);
 const { data: plans = [], isLoading: loading, refetch: refetchPlans } = useQuery<BudgetPlanWithOpen[]>({
-  queryKey: ['budget-plans'],
-  queryFn: () => API.get('/budget-plans').then(r => r.data.data as BudgetPlanWithOpen[]),
+  // Distinct key: ['budget-plans'] is shared with lean consumers (Dashboard, charts)
+  // that cache only budget_plan_id/year/is_active — reusing it here dropped
+  // created_at / is_open / department_plans. The prefix is unchanged, so existing
+  // invalidateQueries({ queryKey: ['budget-plans'] }) calls still refresh this query.
+  queryKey: ['budget-plans', 'admin-list'],
+  queryFn: () =>
+    API.get('/budget-plans', { params: { with_department_plans: 1 } })
+      .then(r => r.data.data as BudgetPlanWithOpen[]),
   select: (data) => [...data].sort((a, b) => {
     if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
     return b.year - a.year;
@@ -461,9 +467,11 @@ const invalidateActivePlanDependents = () => {
 
                     {/* Created */}
                     <td className="px-4 py-3 text-table-secondary">
-                      {new Date(plan.created_at).toLocaleDateString("en-PH", {
-                        year: "numeric", month: "short", day: "numeric",
-                      })}
+                      {plan.created_at && !isNaN(new Date(plan.created_at).getTime())
+                        ? new Date(plan.created_at).toLocaleDateString("en-PH", {
+                            year: "numeric", month: "short", day: "numeric",
+                          })
+                        : "–"}
                     </td>
                   </tr>
                 );

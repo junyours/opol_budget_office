@@ -400,6 +400,18 @@
   animation: stagger-fade-in 0.28s ease-out forwards;
 }
 
+/* ── Activity log rows: staggered entrance (delay is set per row from React) ── */
+@keyframes log-row-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.animate-log-row {
+  animation: log-row-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-log-row { animation: none; }
+}
+
 /* ── Goo blob pulse — behind the cloud icon on PdfGenerationLoader ── */
 @keyframes goo-blob {
   0%, 100% { transform: scale(1) translate(0, 0); border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }

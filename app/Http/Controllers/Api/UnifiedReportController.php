@@ -6015,7 +6015,21 @@ return response()->stream(function () use ($zipPath) {
     ): string {
         // $signatories = $this->buildSignatories();
         $signatories = $this->buildSignatories($mode);
-        return view('reports.budget_forms_unified', compact('mode', 'data', 'forms', 'reportData', 'signatories'))->render();
+        // Form 3 confidentiality: only admin / super-admin get full amounts.
+        $hideAmounts = $this->shouldHideAmounts();
+        return view('reports.budget_forms_unified', compact('mode', 'data', 'forms', 'reportData', 'signatories', 'hideAmounts'))->render();
+    }
+
+    /**
+     * Amounts are shown in full ONLY to admin / super-admin.
+     * Everyone else (department-head, viewer, hrmo, ldrrmo, or no user) is masked.
+     * request()->user() is used on purpose: generateAll() feeds buildDeptData()
+     * a synthetic Request with no user, but the real request is still current.
+     */
+    private function shouldHideAmounts(): bool
+    {
+        $role = request()->user()?->role;
+        return ! in_array($role, ['admin', 'super-admin'], true);
     }
 
     // ═══════════════════════════════════════════════════════

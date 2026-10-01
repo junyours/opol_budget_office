@@ -8,7 +8,7 @@ import { BudgetPlan, Department, DepartmentBudgetPlan } from '../types/api';
 
 // export interface FundData { total: number; nta: number; nonTaxRevenue: number }
 // export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number }
-export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number; previousTotal: number; previousLocalSource: number }
+export interface FundData { total: number; nta: number; nonTaxRevenue: number; localSource: number; previousTotal: number; previousLocalSource: number; previousNonTaxRevenue: number }
 // export interface DeptExpenditure { dept_id: number; abbr: string; total: number }
 export interface DeptExpenditure { dept_id: number; abbr: string; total: number; categoryId: number }
 
@@ -31,7 +31,7 @@ export interface SpecialAccountExpenditures {
 const SPECIAL_CAT_ID = 4;
 // const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0 };
 // const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0 }
-const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0, previousTotal: 0, previousLocalSource: 0 }
+const EMPTY_FUND: FundData = { total: 0, nta: 0, nonTaxRevenue: 0, localSource: 0, previousTotal: 0, previousLocalSource: 0, previousNonTaxRevenue: 0 }
 const EMPTY_SPECIAL_EXP: SpecialAccountExpenditures = { sh: 0, occ: 0, pm: 0, combined: 0 };
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
@@ -434,6 +434,6 @@ export function useYearTotals(planIds: (number | undefined)[]) {
       API.get('/department-budget-plans/year-totals', { params: { plan_ids: key } })
         .then(r => r.data?.data ?? {}),
     enabled: ids.length > 0,
-    
+
   });
 }

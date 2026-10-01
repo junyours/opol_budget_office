@@ -896,6 +896,10 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
     {
         $this->authorize('update', $department_budget_plan);
 
+        if ($department_budget_plan->isFormsLockedFor($request->user())) {
+            return response()->json(['message' => 'Forms 2 and 4 are locked because this plan is approved. Only a super-admin can modify them.'], 403);
+        }
+
         $validated = $request->validate([
             'items'                       => 'sometimes|array',
             'items.*.expense_item_name'   => 'required_with:items|string',

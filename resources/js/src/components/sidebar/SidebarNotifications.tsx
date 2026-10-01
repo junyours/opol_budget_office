@@ -58,6 +58,7 @@ const unread = notifications.filter(n => !n.read_at);
   const Icon   = cfg.icon;
 
   const handleOpen = () => {
+    markRead(latest.id); // clicking the card dismisses it
     if (isAdmin) {
       navigate('/admin/lbp-forms', { state: { deptId: latest.dept_id } });
     } else {

@@ -7,6 +7,7 @@ use App\Models\BudgetPlan;
 use App\Models\IncomeFundAmount;
 use App\Models\IncomeFundObject;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class IncomeFundObjectController extends Controller
 {
@@ -49,13 +50,72 @@ class IncomeFundObjectController extends Controller
             'sort_order' => 'nullable|integer',
         ]);
 
-        // Auto sort_order: place at end of its source group
-        if (!isset($validated['sort_order'])) {
-            $max = IncomeFundObject::where('source', $validated['source'])->max('sort_order') ?? 0;
-            $validated['sort_order'] = $max + 1;
-        }
+        // // Auto sort_order: place at end of its source group
+        // if (!isset($validated['sort_order'])) {
+        //     $max = IncomeFundObject::where('source', $validated['source'])->max('sort_order') ?? 0;
+        //     $validated['sort_order'] = $max + 1;
+        // }
 
-        $obj = IncomeFundObject::create(array_merge($validated, ['is_active' => true]));
+        // $obj = IncomeFundObject::create(array_merge($validated, ['is_active' => true]));
+                $obj = DB::transaction(function () use ($validated) {
+            $source = $validated['source'];
+
+            // Current on-screen order. Ties (seeded rows are all 0) fall back to id.
+            $ordered = IncomeFundObject::where('source', $source)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(['id', 'parent_id', 'sort_order'])
+                ->values();
+
+            $total = $ordered->count();
+
+            if (isset($validated['sort_order'])) {
+                // Typed value = 1-based position in the list
+                $pos = max(0, min((int) $validated['sort_order'] - 1, $total));
+            } elseif (!empty($validated['parent_id'])) {
+                // Directly after the LAST descendant of the chosen parent
+                $childrenOf = [];
+                foreach ($ordered as $row) {
+                    if ($row->parent_id !== null) {
+                        $childrenOf[$row->parent_id][] = $row->id;
+                    }
+                }
+
+                $subtree = [];
+                $stack   = [(int) $validated['parent_id']];
+                while ($stack) {
+                    $id = array_pop($stack);
+                    $subtree[$id] = true;
+                    foreach ($childrenOf[$id] ?? [] as $childId) {
+                        $stack[] = $childId;
+                    }
+                }
+
+                $last = null;
+                foreach ($ordered as $i => $row) {
+                    if (isset($subtree[$row->id])) {
+                        $last = $i;
+                    }
+                }
+                $pos = $last === null ? $total : $last + 1;
+            } else {
+                // Top-level with no parent: end of the list
+                $pos = $total;
+            }
+
+            // Make every row's sort_order unique and gapless, leaving a slot at $pos
+            foreach ($ordered as $i => $row) {
+                $target = $i < $pos ? $i + 1 : $i + 2;
+                if ((int) $row->sort_order !== $target) {
+                    IncomeFundObject::where('id', $row->id)->update(['sort_order' => $target]);
+                }
+            }
+
+            return IncomeFundObject::create(array_merge($validated, [
+                'sort_order' => $pos + 1,
+                'is_active'  => true,
+            ]));
+        });
 
         return response()->json(['data' => $obj], 201);
     }
@@ -129,5 +189,5 @@ class IncomeFundObjectController extends Controller
         return response()->json(['data' => $sources]);
     }
 
-   
+
 }

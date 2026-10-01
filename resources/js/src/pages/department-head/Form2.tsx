@@ -33,7 +33,7 @@ import { useCalamityFund } from "../../hooks/useCalamityFund";
 import { useAuth } from "../../hooks/useAuth";
 import { useIsMobile } from "../../hooks/use-mobile";
 
-import { MAX_AMOUNT, clampMoneyDigits as clampAmountDigits } from "@/src/utils/moneyInput";
+import { MAX_AMOUNT, clampMoneyDigits as clampAmountDigits, formatMoneyLive } from "@/src/utils/moneyInput";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PS_CLASS_ID = 1;
@@ -82,6 +82,8 @@ const TD_CUR = `${TD_M} bg-blue-100/50`;
 const C_CUR_SUB = "bg-blue-100 border-blue-300";
 const C_CUR_GT  = "bg-blue-950/20 border-blue-900/40 text-blue-300";
 const inputCurCls = `${INPUT_BASE} focus:ring-2 focus:ring-blue-300 focus:border-blue-300`;
+const inputFlatCls =
+    "text-[12px] font-mono text-right h-7 px-2 w-full bg-transparent border-0 shadow-none text-gray-600 cursor-default pointer-events-none focus:outline-none focus:ring-0 disabled:opacity-100";
 
 // ─── Animation (injected once) ────────────────────────────────────────────────
 
@@ -107,7 +109,8 @@ function ensureAnim() {
 
 const fmt = (n: number) =>
     Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
-const fmtP = (n: number) => `₱${fmt(n)}`;
+const fmtP = (n: number) =>
+    `₱${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtP2 = (n: number) =>
     `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pctOf = (past: number, d: number) =>
@@ -145,6 +148,27 @@ const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
         e.preventDefault();
         e.currentTarget.blur();
     }
+};
+
+// Returns the Proposed-column inputs of the table in on-screen order (top → bottom).
+const getProposedInputs = (): HTMLInputElement[] =>
+    Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+            'input[data-amount-col="proposed"]:not(:disabled)',
+        ),
+    );
+
+// Moves focus to the next (dir = 1) or previous (dir = -1) Proposed input.
+// Returns true if an input was focused. Leaving the old input fires its
+// onBlur, so the amount is saved exactly like clicking away.
+const focusSiblingProposed = (current: HTMLInputElement, dir: 1 | -1): boolean => {
+    const all = getProposedInputs();
+    const idx = all.indexOf(current);
+    const target = idx === -1 ? undefined : all[idx + dir];
+    if (!target) return false;
+    target.focus();
+    target.select();
+    return true;
 };
 
 const getSourceForDepartment = (dept?: {
@@ -328,6 +352,9 @@ const Form2: React.FC<Form2Props> = ({
 
    const { user } = useAuth();
     const isViewer = user?.role === 'viewer';
+    const isLocked = plan.status === 'approved' && user?.role !== 'super-admin';
+    const isOblLocked = isLocked || (obligationYearPlan?.status === 'approved' && user?.role !== 'super-admin');
+    const isPastLocked = isLocked || (pastYearPlan?.status === 'approved' && user?.role !== 'super-admin');
     const isMobile = useIsMobile();
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -418,6 +445,7 @@ const Form2: React.FC<Form2Props> = ({
     const [newlyAddedItemId, setNewlyAddedItemId] = useState<number | null>(null);
     const preAddItemIdsRef = useRef<Set<number>>(new Set());
     const pendingNewItemDetectionRef = useRef(false);
+    const autoFocusedNewItemIdRef = useRef<number | null>(null);
     const proposedInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
     // ── Move-to / context menu (card review mode) ─────────────────────────────
@@ -649,7 +677,7 @@ const Form2: React.FC<Form2Props> = ({
         queryKey: ["ldrrmf-plan-report"],
         queryFn: () => API.get("/ldrrmf-plan").then((r) => r.data?.data ?? null),
         enabled: isSpecialAccount,
-        
+
     });
 
     const ldrrmfSection = useMemo(() => {
@@ -981,11 +1009,16 @@ const Form2: React.FC<Form2Props> = ({
     // Autofocus + select the proposed-amount input for the newly added item,
     // once it's actually mounted in the table.
     useEffect(() => {
-        if (newlyAddedItemId == null) return;
+        if (newlyAddedItemId == null) {
+            autoFocusedNewItemIdRef.current = null;
+            return;
+        }
+        if (autoFocusedNewItemIdRef.current === newlyAddedItemId) return;
         const el = proposedInputRefs.current.get(newlyAddedItemId);
         if (el) {
             el.focus();
             el.select();
+            autoFocusedNewItemIdRef.current = newlyAddedItemId;
         }
     }, [newlyAddedItemId, items]);
 
@@ -1457,7 +1490,7 @@ const Form2: React.FC<Form2Props> = ({
     // ── Card click → context menu (admin + review/card mode only) ─────────────
     const handleCardContextClick = useCallback(
         (e: React.MouseEvent, item: ItemWithMeta) => {
-            if (!isAdmin || !cardView) return;
+            if (!isAdmin || !cardView || isLocked) return;
             const target = e.target as HTMLElement;
             if (target.closest('input, button, textarea, select')) return; // don't hijack existing inputs/trash icon
             e.preventDefault();
@@ -1468,7 +1501,7 @@ const Form2: React.FC<Form2Props> = ({
             setCtxMenuItem(item);
             setCtxMenuPos({ x, y });
         },
-        [isAdmin, cardView],
+        [isAdmin, cardView, isLocked],
     );
 
     const openMoveModal = useCallback(() => {
@@ -2015,30 +2048,21 @@ const Form2: React.FC<Form2Props> = ({
 
     const handleCommaInput = useCallback(
         (id: number, field: DraftField, rawValue: string, el?: HTMLInputElement, cursorPos?: number) => {
-            // The displayed value may still contain commas (e.g. "150,000.00")
-            // while the caret position reported by the browser is an index
-            // into that comma-formatted string. Re-express the caret as a
-            // count of digit/dot characters BEFORE it, so it maps correctly
-            // onto the comma-free `digits` string below — otherwise deleting
-            // a digit lands the caret in the wrong place once commas are
-            // stripped out.
-            let digitPos = cursorPos;
-            if (cursorPos !== undefined) {
-                digitPos = 0;
-                for (let i = 0; i < cursorPos && i < rawValue.length; i++) {
-                    if (/[0-9.]/.test(rawValue[i])) digitPos++;
-                }
-            }
-
-            const rawDigits = rawValue.replace(/[^0-9.]/g, "");
-            const digits = clampAmountDigits(rawDigits);
-            // If clamping shortened the string (user typed past the cap), pin the
-            // cursor to the end so it doesn't end up past the visible text.
-            const cappedPos =
-                digitPos !== undefined
-                    ? Math.min(digitPos, digits.length)
-                    : digitPos;
-            setDraft(`${id}_${field}`, digits, el, cappedPos);
+            // Format live with commas while typing (1124.5 → "1,124.5") and
+            // keep the caret where the user is typing. formatMoneyLive maps
+            // the caret by counting digits/dots to its left, so the commas
+            // that get added/removed never make it jump.
+            const { value, caret } = formatMoneyLive(
+                rawValue,
+                cursorPos ?? rawValue.length,
+            );
+            const digits = clampAmountDigits(value.replace(/,/g, ""));
+            setDraft(
+                `${id}_${field}`,
+                value,
+                el,
+                cursorPos !== undefined ? caret : undefined,
+            );
             const num = digits === "" ? 0 : parseFloat(digits);
             if (field === "proposed")
                 setItems((prev) =>
@@ -2070,12 +2094,71 @@ const Form2: React.FC<Form2Props> = ({
         ],
     );
 
+    // Keyboard handling for the Proposed input in the main table:
+    //  • Tab on an EMPTY field that has an Appropriation total → copies that
+    //    total into Proposed ("status quo"), saves it, and moves focus to the
+    //    next Proposed input. Clicking away / Enter does NOT copy it.
+    //  • ArrowDown / ArrowUp → focus the next / previous Proposed input.
+    //  • Enter → blur (unchanged behaviour).
+    const handleProposedKeyDown = useCallback(
+        (
+            e: React.KeyboardEvent<HTMLInputElement>,
+            id: number,
+            statusQuo: number,
+            current: number,
+        ) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                focusSiblingProposed(e.currentTarget, e.key === "ArrowDown" ? 1 : -1);
+                return;
+            }
+
+            if (
+                e.key === "Tab" &&
+                !e.shiftKey &&
+                current === 0 &&
+                statusQuo > 0 &&
+                e.currentTarget.value.trim() === ""
+            ) {
+                e.preventDefault();
+                const el = e.currentTarget;
+                const all = getProposedInputs();
+                const idx = all.indexOf(el);
+                const next = idx === -1 ? undefined : all[idx + 1];
+
+                // 1) put the status-quo amount into state
+                handleProposedChange(id, statusQuo);
+
+                // 2) move focus AFTER React has re-rendered, so the blur
+                //    handler sees the new amount and saves it.
+                setTimeout(() => {
+                    if (next && document.contains(next)) {
+                        next.focus();
+                        next.select();
+                    } else {
+                        el.blur();
+                    }
+                }, 0);
+                return;
+            }
+
+            blurOnEnter(e);
+        },
+        [handleProposedChange],
+    );
+
     const handleAipCommaInput = useCallback(
         (id: number, field: "obligation" | "sem1", rawValue: string) => {
-            const rawDigits = rawValue.replace(/[^0-9.]/g, "");
-            const digits = clampAmountDigits(rawDigits);
+            // Live comma-format while typing (same behaviour as handleCommaInput).
+            const active = document.activeElement;
+            const el = active instanceof HTMLInputElement ? active : undefined;
+            const { value, caret } = formatMoneyLive(
+                rawValue,
+                el?.selectionStart ?? rawValue.length,
+            );
+            const digits = clampAmountDigits(value.replace(/,/g, ""));
             const num = digits === "" ? 0 : parseFloat(digits);
-            setDraft(`aip_${id}_${field}`, digits);
+            setDraft(`aip_${id}_${field}`, value, el, el ? caret : undefined);
             if (field === "obligation") {
                 aipOblEditsRef.current.set(id, num);
                 setAipOblEdits((prev) => new Map(prev).set(id, num));
@@ -2348,7 +2431,7 @@ const Form2: React.FC<Form2Props> = ({
                 : item.pastSem1;
               const sem2Cap = past > 0 ? past : 0;
               const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
-              const sem1Editable = isAdmin && isEditable && past > 0 && !!pastYearPlan;
+              const sem1Editable = isAdmin && isEditable && !isPastLocked && past > 0 && !!pastYearPlan;
               const isExpanded = expandedMobileItems.has(item.expense_item_id);
               return (
                 <div key={item.expense_item_id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
@@ -2386,7 +2469,7 @@ const Form2: React.FC<Form2Props> = ({
                       <input
                         type="text"
                         inputMode="numeric"
-                        maxLength={13}
+                        maxLength={14}
                         value={getDraftValue(item.expense_item_id, "proposed", proposed)}
                         onChange={(e) => {
                           const pos = e.target.selectionStart ?? e.target.value.length;
@@ -2441,7 +2524,7 @@ const Form2: React.FC<Form2Props> = ({
                                 handleCommaInput(item.expense_item_id, "obligation", e.target.value, e.target, pos);
                               }}
                               onBlur={() => handleCommaBlur(item.expense_item_id, "obligation")}
-                              disabled={savingObligations.has(item.expense_item_id)}
+                              disabled={isOblLocked || savingObligations.has(item.expense_item_id)}
                               className="text-[13px] font-mono font-semibold text-emerald-700 w-28 bg-white border border-emerald-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-emerald-300"
                             />
                           ) : (
@@ -2615,7 +2698,7 @@ const Form2: React.FC<Form2Props> = ({
                             }
                             onChange={(e) => handleAipCommaInput(id, "obligation", e.target.value)}
                             onBlur={() => handleAipCommaBlur(id, "obligation")}
-                            disabled={savingAipObligations.has(id)}
+                            disabled={isOblLocked || savingAipObligations.has(id)}
                             placeholder="0"
                             className="text-[13px] font-mono font-semibold text-emerald-700 w-28 bg-white border border-emerald-200 rounded-md px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-emerald-300"
                           />
@@ -2631,7 +2714,7 @@ const Form2: React.FC<Form2Props> = ({
                     <div className="bg-blue-50/70 divide-y divide-blue-100/60">
                       <div className="px-4 py-2.5 flex items-center justify-between">
                         <span className="text-[11px] font-medium text-blue-500">1st Sem</span>
-                        {isEditable && isAdmin ? (
+                        {isEditable && isAdmin && !isPastLocked ? (
                           <input
                             type="text"
                             inputMode="decimal"
@@ -2770,10 +2853,10 @@ const Form2: React.FC<Form2Props> = ({
                 <div
                   key={item.expense_item_id}
                   onClick={(e) => handleCardContextClick(e, item)}
-                  onContextMenu={(e) => { if (isAdmin && cardView) handleCardContextClick(e, item); }}
+                  onContextMenu={(e) => { if (isAdmin && cardView && !isLocked) handleCardContextClick(e, item); }}
                   className={cn(
                     "bg-white border-2 border-gray-200 rounded-2xl px-6 py-5 flex flex-wrap items-center gap-x-8 gap-y-3 select-none transition-colors",
-                    isAdmin && cardView && "cursor-pointer hover:border-gray-400 hover:shadow-sm",
+                    isAdmin && cardView && !isLocked && "cursor-pointer hover:border-gray-400 hover:shadow-sm",
                   )}
                   style={{
                     opacity: 0,
@@ -2805,7 +2888,7 @@ const Form2: React.FC<Form2Props> = ({
                         <input
                           type="text"
                           inputMode="numeric"
-                          maxLength={13}
+                          maxLength={14}
                           value={getDraftValue(item.expense_item_id, "proposed", proposed)}
                           onChange={(e) => {
                             const pos = e.target.selectionStart ?? e.target.value.length;
@@ -3336,7 +3419,8 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                     isAdmin &&
                                                     isEditable &&
                                                     past > 0 &&
-                                                    !!pastYearPlan;
+                                                    !!pastYearPlan &&
+                                                    !isPastLocked;
 
                                                 const isNewlyAdded =
                                                     newlyAddedItemId === item.expense_item_id;
@@ -3446,12 +3530,12 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                                         )
                                                                     }
                                                                     onKeyDown={blurOnEnter}
-                                                                    disabled={savingObligations.has(
+                                                                    disabled={isOblLocked || savingObligations.has(
                                                                         item.expense_item_id,
                                                                     )}
                                                                     tabIndex={1000 + rowIdx}
                                                                     className={
-                                                                        inputAppCls
+                                                                        isOblLocked ? inputFlatCls : inputAppCls
                                                                     }
                                                                 />
                                                             </td>
@@ -3533,44 +3617,66 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                                             )}
                                                         >
                                                             {canEdit && isEditable ? (
-                                                                <input
-                                                                    ref={(el) => {
-                                                                        if (el) proposedInputRefs.current.set(item.expense_item_id, el);
-                                                                        else proposedInputRefs.current.delete(item.expense_item_id);
-                                                                    }}
-                                                                    type="text"
-                                                                    inputMode="numeric"
-                                                                    maxLength={13}
-                                                                    value={getDraftValue(
-                                                                        item.expense_item_id,
-                                                                        "proposed",
-                                                                        proposed,
-                                                                    )}
-                                                                    onChange={(e) => {
-                                                                        const pos = e.target.selectionStart ?? e.target.value.length;
-                                                                        handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
-                                                                    }}
-                                                                    onBlur={() => {
-                                                                        // Blurring the amount field is the signal that the
-                                                                        // user is done with the newly added item — drop
-                                                                        // the badge/highlight, independent of save success.
-                                                                        if (newlyAddedItemId === item.expense_item_id) {
-                                                                            setNewlyAddedItemId(null);
+                                                                                                                                <div className="relative">
+                                                                    <input
+                                                                        ref={(el) => {
+                                                                            if (el) proposedInputRefs.current.set(item.expense_item_id, el);
+                                                                            else proposedInputRefs.current.delete(item.expense_item_id);
+                                                                        }}
+                                                                        type="text"
+                                                                        inputMode="numeric"
+                                                                        maxLength={14}
+                                                                        data-amount-col="proposed"
+                                                                        placeholder={
+                                                                            past > 0 && proposed === 0
+                                                                                ? commaDec(past)
+                                                                                : undefined
                                                                         }
-                                                                        handleCommaBlur(
+                                                                        value={getDraftValue(
                                                                             item.expense_item_id,
                                                                             "proposed",
-                                                                        );
-                                                                    }}
-                                                                    onKeyDown={blurOnEnter}
-                                                                    disabled={
-                                                                        !isEditable || isSaving
-                                                                    }
-                                                                    tabIndex={isEditable ? 3000 + rowIdx : -1}
-                                                                    className={
-                                                                        inputCls
-                                                                    }
-                                                                />
+                                                                            proposed,
+                                                                        )}
+                                                                        onChange={(e) => {
+                                                                            const pos = e.target.selectionStart ?? e.target.value.length;
+                                                                            handleCommaInput(item.expense_item_id, "proposed", e.target.value, e.target, pos);
+                                                                        }}
+                                                                        onBlur={() => {
+                                                                            // Blurring the amount field is the signal that the
+                                                                            // user is done with the newly added item — drop
+                                                                            // the badge/highlight, independent of save success.
+                                                                            if (newlyAddedItemId === item.expense_item_id) {
+                                                                                setNewlyAddedItemId(null);
+                                                                            }
+                                                                            handleCommaBlur(
+                                                                                item.expense_item_id,
+                                                                                "proposed",
+                                                                            );
+                                                                        }}
+                                                                        onKeyDown={(e) =>
+                                                                            handleProposedKeyDown(
+                                                                                e,
+                                                                                item.expense_item_id,
+                                                                                past,
+                                                                                proposed,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            !isEditable || isSaving
+                                                                        }
+                                                                        tabIndex={isEditable ? 3000 + rowIdx : -1}
+                                                                        className={cn(
+                                                                            inputCls,
+                                                                            "peer placeholder:text-transparent focus:placeholder:italic focus:placeholder:text-orange-400/60",
+
+                                                                        )}
+                                                                    />
+                                                                    {past > 0 && proposed === 0 && (
+                                                                        <span className="pointer-events-none absolute -top-2.5 right-2 z-10 hidden items-center rounded bg-orange-500 px-1.5 text-[9px] font-bold uppercase leading-[14px] tracking-wide text-white shadow-sm peer-focus:peer-placeholder-shown:inline-flex">
+                                                                            Tab
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             ) : (
                                                                 <span
                                                                     className={cn(
@@ -3870,18 +3976,18 @@ const dispSem2 = Math.max(sem2Cap - dispSem1, 0);
                                             )
                                         }
                                                         onKeyDown={blurOnEnter}
-                                                        disabled={savingAipObligations.has(
+                                                        disabled={isOblLocked || savingAipObligations.has(
                                                             id,
                                                         )}
                                                         placeholder="0"
                                                         tabIndex={1000 + rowIdx}
-                                                        className={inputAppCls}
+                                                        className={isOblLocked ? inputFlatCls : inputAppCls}
                                                     />
                                                 </td>
                                             )}
 
                                             <td className={cn(TD_CUR, "border-l border-blue-100")}>
-                                                {isEditable && isAdmin ? (
+                                                {isEditable && isAdmin && !isPastLocked ? (
                                                     <input
                                                         type="text"
                                                         inputMode="decimal"

@@ -15,8 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'must-change-password' => \App\Http\Middleware\EnsurePasswordChanged::class,
-            'maintenance-check' => \App\Http\Middleware\CheckMaintenanceMode::class,
-        ]);
+            'maintenance-check' => \App\Http\Middleware\CheckMaintenanceMode::class, 
+            ]);
+            // Activity log: logs logout + flushes audit entries AFTER the response is sent.
+        $middleware->appendToGroup('api', \App\Http\Middleware\AuditRequest::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

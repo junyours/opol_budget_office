@@ -47,5 +47,12 @@ class AuthServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::define('manage-database', function (\App\Models\User $user) {
             return $user->role === 'super-admin';
         });
+        // Activity log: admin + system admin can view; only system admin can clear.
+        \Illuminate\Support\Facades\Gate::define('view-audit-logs', function (\App\Models\User $user) {
+            return in_array($user->role, ['admin', 'super-admin'], true);
+        });
+        \Illuminate\Support\Facades\Gate::define('clear-audit-logs', function (\App\Models\User $user) {
+            return $user->role === 'super-admin';
+        });
     }
 }

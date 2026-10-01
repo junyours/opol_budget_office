@@ -4,6 +4,7 @@ import API from '../../services/api';
 import { Department } from '../../types/api';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useIsMobile } from '../../hooks/use-mobile';
+import { useAuth } from '../../hooks/useAuth';
 import { LoadingState } from '../../components/states/LoadingState';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -119,6 +120,21 @@ interface ContextMenuState {
 const getInitials = (u: UserRecord) =>
   `${u.fname.charAt(0)}${u.lname.charAt(0)}`.toUpperCase();
 
+// Must match DEFAULT_PASSWORD in UserController.php
+const DEFAULT_PASSWORD = 'password123';
+
+// super-admin = 3, admin = 2, everyone else = 1. Only a HIGHER rank may manage a LOWER rank.
+const roleRank = (role?: string) => (role === 'super-admin' ? 3 : role === 'admin' ? 2 : 1);
+const canManageUser = (
+  actor: { role?: string; user_id?: number } | null | undefined,
+  target: UserRecord,
+) => {
+  const isAdminLevel = actor?.role === 'admin' || actor?.role === 'super-admin';
+  if (!isAdminLevel) return false;
+  if (actor?.user_id === target.user_id) return true; // own account
+  return roleRank(actor?.role) > roleRank(target.role);
+};
+
 // ─── Department Logo ──────────────────────────────────────────────────────────
 
 const DeptLogo = ({ dept }: { dept: Department }) => {
@@ -178,15 +194,11 @@ const emptyUserForm = () => ({
   is_active: true,
 });
 
-const emptyPwForm = () => ({
-  password:              '',
-  password_confirmation: '',
-});
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UserAccountPage: React.FC = () => {
   const isMobile = useIsMobile();
+  const { user: currentUser } = useAuth();
   const [users,       setUsers]       = useState<UserRecord[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -215,12 +227,9 @@ const UserAccountPage: React.FC = () => {
   const [formErrors,  setFormErrors]  = useState<Record<string, string>>({});
   const [submitting,  setSubmitting]  = useState(false);
 
-  // ── Change password modal ─────────────────────────────────────────────────
-  const [pwModalOpen,  setPwModalOpen]  = useState(false);
-  const [pwTarget,     setPwTarget]     = useState<UserRecord | null>(null);
-  const [pwForm,       setPwForm]       = useState(emptyPwForm());
-  const [pwErrors,     setPwErrors]     = useState<Record<string, string>>({});
-  const [pwSubmitting, setPwSubmitting] = useState(false);
+  // ── Set default password confirm ──────────────────────────────────────────
+  const [resetTarget,     setResetTarget]     = useState<UserRecord | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   // ── Toggle active confirm ─────────────────────────────────────────────────
   const [toggleTarget, setToggleTarget] = useState<UserRecord | null>(null);
@@ -322,6 +331,10 @@ const UserAccountPage: React.FC = () => {
 
   const handleRowClick = (e: React.MouseEvent, user: UserRecord) => {
     e.preventDefault();
+    if (!canManageUser(currentUser, user)) {
+      toast.info('You are not allowed to modify this account.');
+      return;
+    }
     const MENU_W = 180, MENU_H = 160;
     const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
     const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
@@ -330,6 +343,10 @@ const UserAccountPage: React.FC = () => {
 
   // Mobile card tap → open the bottom action sheet (x/y unused there)
   const openMobileActions = (user: UserRecord) => {
+    if (!canManageUser(currentUser, user)) {
+      toast.info('You are not allowed to modify this account.');
+      return;
+    }
     setCtxMenu({ x: 0, y: 0, user });
   };
 
@@ -360,12 +377,9 @@ const UserAccountPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  const openPasswordModal = (u: UserRecord) => {
+  const openResetPassword = (u: UserRecord) => {
     setCtxMenu(null);
-    setPwTarget(u);
-    setPwForm(emptyPwForm());
-    setPwErrors({});
-    setPwModalOpen(true);
+    setResetTarget(u);
   };
 
   const openToggle = (u: UserRecord) => {
@@ -432,27 +446,20 @@ const UserAccountPage: React.FC = () => {
     }
   };
 
-  // ── Change password ───────────────────────────────────────────────────────
+  // ── Set default password ──────────────────────────────────────────────────
 
-  const handlePasswordChange = async () => {
-    setPwErrors({});
-    const errs: Record<string, string> = {};
-    if (!pwForm.password)              errs.password              = 'New password is required.';
-    if (pwForm.password.length < 6)    errs.password              = 'Password must be at least 6 characters.';
-    if (!pwForm.password_confirmation) errs.password_confirmation = 'Please confirm the password.';
-    if (pwForm.password && pwForm.password !== pwForm.password_confirmation)
-      errs.password_confirmation = 'Passwords do not match.';
-    if (Object.keys(errs).length) { setPwErrors(errs); return; }
-
-    setPwSubmitting(true);
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    setResetSubmitting(true);
     try {
-      await API.put(`/users/${pwTarget!.user_id}`, { password: pwForm.password });
-      toast.success(`Password updated for ${pwTarget!.fname}.`);
-      setPwModalOpen(false);
+      await API.post(`/users/${resetTarget.user_id}/reset-password`);
+      toast.success(`${resetTarget.fname}'s password was reset to the default and all their devices were logged out.`);
+      setResetTarget(null);
+      fetchAll();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to update password.');
+      toast.error(err?.response?.data?.message ?? 'Failed to set default password.');
     } finally {
-      setPwSubmitting(false);
+      setResetSubmitting(false);
     }
   };
 
@@ -501,6 +508,8 @@ const UserAccountPage: React.FC = () => {
 
   const isSearching = debouncedSearch.trim().length > 0;
   const isFiltered  = statusFilter !== 'all' || roleFilter !== 'all';
+  const isSelfCtx   = !!ctxMenu && ctxMenu.user.user_id === currentUser?.user_id;
+  const editingSelf = !!editingUser && editingUser.user_id === currentUser?.user_id;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -876,26 +885,30 @@ const UserAccountPage: React.FC = () => {
               Edit User
             </button>
 
-            <button
-              onClick={() => openPasswordModal(ctxMenu.user)}
-              className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors border-t border-gray-100"
-            >
-              <KeyIcon className="w-4 h-4 text-gray-400 shrink-0" />
-              Change Password
-            </button>
+            {!isSelfCtx && (
+              <>
+                <button
+                  onClick={() => openResetPassword(ctxMenu.user)}
+                  className="flex items-center gap-3 w-full px-4 py-3.5 text-[14px] text-gray-700 active:bg-gray-50 transition-colors border-t border-gray-100"
+                >
+                  <KeyIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                  Set Default Password
+                </button>
 
-            <button
-              onClick={() => openToggle(ctxMenu.user)}
-              className={cn(
-                'flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100',
-                ctxMenu.user.is_active ? 'text-amber-700 active:bg-amber-50' : 'text-emerald-700 active:bg-emerald-50'
-              )}
-            >
-              {ctxMenu.user.is_active
-                ? <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
-                : <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
-              }
-            </button>
+                <button
+                  onClick={() => openToggle(ctxMenu.user)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-4 py-3.5 text-[14px] transition-colors border-t border-gray-100',
+                    ctxMenu.user.is_active ? 'text-amber-700 active:bg-amber-50' : 'text-emerald-700 active:bg-emerald-50'
+                  )}
+                >
+                  {ctxMenu.user.is_active
+                    ? <><NoSymbolIcon className="w-4 h-4 text-amber-400 shrink-0" /> Deactivate</>
+                    : <><CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" /> Activate</>
+                  }
+                </button>
+              </>
+            )}
 
             <button
               onClick={() => setCtxMenu(null)}
@@ -927,28 +940,32 @@ const UserAccountPage: React.FC = () => {
             Edit User
           </button>
 
-          <button
-            onClick={() => openPasswordModal(ctxMenu.user)}
-            className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <KeyIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            Change Password
-          </button>
+          {!isSelfCtx && (
+            <>
+              <button
+                onClick={() => openResetPassword(ctxMenu.user)}
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <KeyIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                Set Default Password
+              </button>
 
-          <button
-            onClick={() => openToggle(ctxMenu.user)}
-            className={cn(
-              'flex items-center gap-2.5 w-full px-3 py-2 text-[12px] transition-colors',
-              ctxMenu.user.is_active
-                ? 'text-amber-700 hover:bg-amber-50'
-                : 'text-emerald-700 hover:bg-emerald-50'
-            )}
-          >
-            {ctxMenu.user.is_active
-              ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
-              : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
-            }
-          </button>
+              <button
+                onClick={() => openToggle(ctxMenu.user)}
+                className={cn(
+                  'flex items-center gap-2.5 w-full px-3 py-2 text-[12px] transition-colors',
+                  ctxMenu.user.is_active
+                    ? 'text-amber-700 hover:bg-amber-50'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                )}
+              >
+                {ctxMenu.user.is_active
+                  ? <><NoSymbolIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Deactivate</>
+                  : <><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Activate</>
+                }
+              </button>
+            </>
+          )}
         </div>
       ))}
 
@@ -991,7 +1008,7 @@ const UserAccountPage: React.FC = () => {
                       {form.is_active ? 'User can log in.' : 'User cannot log in.'}
                     </p>
                   </div>
-                  <Switch checked={form.is_active} onCheckedChange={v => setForm(p => ({ ...p, is_active: v }))} />
+                  <Switch checked={form.is_active} disabled={editingSelf} onCheckedChange={v => setForm(p => ({ ...p, is_active: v }))} />
                 </div>
               </div>
 
@@ -1003,6 +1020,7 @@ const UserAccountPage: React.FC = () => {
                   </Label>
                   <Select
                     value={form.role}
+                    disabled={editingSelf}
                     onValueChange={v => setForm(p => ({ ...p, role: v, dept_id: v !== 'department-head' ? 'none' : p.dept_id }))}
                   >
                     <SelectTrigger className={cn('h-9 text-sm', formErrors.role && 'border-red-400')}>
@@ -1012,6 +1030,9 @@ const UserAccountPage: React.FC = () => {
                       {ROLE_OPTIONS.map(r => (
                         <SelectItem key={r.value} value={r.value} className="text-sm">{r.label}</SelectItem>
                       ))}
+                      {form.role === 'super-admin' && (
+                        <SelectItem value="super-admin" className="text-sm">Super Admin</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   {formErrors.role && <p className="text-[11px] text-red-500">{formErrors.role}</p>}
@@ -1088,49 +1109,38 @@ const UserAccountPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ════════ Change Password Dialog ════════ */}
-      <Dialog open={pwModalOpen} onOpenChange={open => { if (!open) setPwModalOpen(false); }}>
-        <DialogContent className="max-w-sm rounded-2xl border-gray-200 gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-gray-100">
-            <DialogTitle className="text-[15px] font-semibold text-gray-900 flex items-center gap-2">
-              <KeyIcon className="w-4 h-4 text-gray-500" />
-              Change Password
-            </DialogTitle>
-            <DialogDescription className="text-xs text-gray-400 mt-0.5">
-              Set a new password for{' '}
-              <span className="font-medium text-gray-700">{pwTarget?.fname} {pwTarget?.lname}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-600">New Password <span className="text-red-400">*</span></Label>
-              <Input type="password" value={pwForm.password}
-                onChange={e => setPwForm(p => ({ ...p, password: e.target.value }))}
-                placeholder="Min. 6 characters"
-                className={cn('h-9 text-sm', pwErrors.password && 'border-red-400')} />
-              {pwErrors.password && <p className="text-[11px] text-red-500">{pwErrors.password}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-600">Confirm Password <span className="text-red-400">*</span></Label>
-              <Input type="password" value={pwForm.password_confirmation}
-                onChange={e => setPwForm(p => ({ ...p, password_confirmation: e.target.value }))}
-                placeholder="Re-enter password"
-                className={cn('h-9 text-sm', pwErrors.password_confirmation && 'border-red-400')} />
-              {pwErrors.password_confirmation && <p className="text-[11px] text-red-500">{pwErrors.password_confirmation}</p>}
-            </div>
-          </div>
-          <DialogFooter className="px-6 py-4 border-t border-gray-100 gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200"
-              onClick={() => setPwModalOpen(false)} disabled={pwSubmitting}>Cancel</Button>
-            <Button size="sm" className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
-              onClick={handlePasswordChange} disabled={pwSubmitting}>
-              {pwSubmitting
-                ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
-                : 'Update Password'}
+            {/* ════════ Set Default Password Confirm ════════ */}
+      <AlertDialog open={!!resetTarget} onOpenChange={o => { if (!o && !resetSubmitting) setResetTarget(null); }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm border-gray-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] font-semibold">
+              Set default password?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-500">
+              The password of{' '}
+              <span className="font-medium text-gray-700">{resetTarget?.fname} {resetTarget?.lname}</span>{' '}
+              will be set to:
+              <span className="block mt-2 mb-2 text-center font-mono text-base font-bold tracking-wider text-gray-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 select-all">
+                {DEFAULT_PASSWORD}
+              </span>
+              .
+              They will be <span className="font-medium text-gray-700">logged out of all devices</span> and
+              must change their password the next time they log in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs border-gray-200" disabled={resetSubmitting}>Cancel</Button>
+            </AlertDialogCancel>
+            <Button size="sm" className="h-8 text-xs bg-gray-900 hover:bg-gray-800 text-white"
+              onClick={handleResetPassword} disabled={resetSubmitting}>
+              {resetSubmitting
+                ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Working…</>
+                : 'Set Default Password'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ════════ Toggle Active Confirm ════════ */}
       <AlertDialog open={!!toggleTarget} onOpenChange={o => { if (!o) setToggleTarget(null); }}>

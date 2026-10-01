@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
-import { MAX_AMOUNT, sanitizeMoneyDigits, useCaretRestore } from "@/src/utils/moneyInput";
+import { MAX_AMOUNT, formatMoneyLive, useCaretRestore } from "@/src/utils/moneyInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,14 +65,16 @@ const EMPTY_FORM = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const PESO_2DP = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
+
 const fmtCurrency = (v: number) => {
-  if (typeof v !== 'number' || isNaN(v)) return '₱0';
-  return `₱${Math.round(v).toLocaleString('en-PH')}`;
+  if (typeof v !== 'number' || isNaN(v)) return '₱0.00';
+  return `₱${v.toLocaleString('en-PH', PESO_2DP)}`;
 };
 
 const fmtAmount = (v: number) => {
   if (!v || v === 0) return '–';
-  return `₱${Math.round(v).toLocaleString('en-PH')}`;
+  return `₱${v.toLocaleString('en-PH', PESO_2DP)}`;
 };
 
 // Hard ceiling for any peso amount field — matches the DB column's precision
@@ -492,10 +494,11 @@ useEffect(() => {
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const { name, value } = e.target;
   const pos = e.target.selectionStart ?? value.length;
-  const sanitized = sanitizeMoneyDigits(value);
-  cursorRef.current = { el: e.target, pos: Math.min(pos, sanitized.length) };
-  setAmountDrafts(prev => ({ ...prev, [name]: sanitized }));
-  const num = sanitized === '' ? 0 : parseFloat(sanitized);
+  // Live comma-format while typing (1124.5 -> "1,124.5"), caret kept in place.
+  const { value: formatted, caret } = formatMoneyLive(value, pos);
+  cursorRef.current = { el: e.target, pos: caret };
+  setAmountDrafts(prev => ({ ...prev, [name]: formatted }));
+  const num = parseFloat(formatted.replace(/,/g, '')) || 0;
   setFormData(prev => ({ ...prev, [name]: num }));
 };
 
@@ -504,12 +507,20 @@ useEffect(() => {
 const getAmountDisplay = (field: string, val: number): string => {
   if (amountDrafts[field] !== undefined) return amountDrafts[field];
   if (val === 0) return '';
-  return Math.round(val).toLocaleString('en-PH');
+  return val.toLocaleString('en-PH', { maximumFractionDigits: 2 });
 };
 
   // ── Save / Delete ────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
+    if (!formData.program_description.trim()) {
+      toast.error('Program description is required.');
+      return;
+    }
+    if (!editingItem && !(formData.ps_amount > 0 || formData.mooe_amount > 0 || formData.co_amount > 0)) {
+      toast.error('Enter an amount in at least one of PS, MOOE, or CO.');
+      return;
+    }
     if (modalMode === 'new' && !editingItem) {
       const desc = formData.program_description.trim().toLowerCase();
       if (!desc) { toast.error('Program description is required.'); return; }
@@ -527,7 +538,13 @@ const getAmountDisplay = (field: string, val: number): string => {
     }
     setSaving(true);
     try {
-      const payload: any = { ...formData, budget_plan_id: plan.dept_budget_plan_id };
+      const payload: any = {
+        ...formData,
+        // Empty Major Final Output falls back to the default on save only —
+        // the input itself stays empty (the default is just its placeholder).
+        major_final_output: formData.major_final_output.trim() || 'Improved Quality of Services',
+        budget_plan_id: plan.dept_budget_plan_id,
+      };
       if (modalMode === 'existing' && selectedProgram) payload.aip_program_id = selectedProgram.aip_program_id;
       if (editingItem) {
         await API.put(`/form4-items/${editingItem.dept_bp_form4_item_id}`, payload);
@@ -693,6 +710,8 @@ const handleDeleteRequest = async (itemId: number) => {
   );
 
   const modalTotal = formData.ps_amount + formData.mooe_amount + formData.co_amount;
+  const hasDescription = formData.program_description.trim().length > 0;
+  const hasAmount = formData.ps_amount > 0 || formData.mooe_amount > 0 || formData.co_amount > 0;
 
   const newDescDuplicate = useMemo(() => {
     if (modalMode !== 'new' || editingItem) return false;
@@ -1084,7 +1103,7 @@ const handleDeleteRequest = async (itemId: number) => {
                   />
                 </div>
                 <div className="space-y-1.5 relative">
-                  <Label className="text-xs font-semibold text-gray-600">Program / Project / Activity Description</Label>
+                  <Label className="text-xs font-semibold text-gray-600">Program / Project / Activity Description <span className="text-red-500 font-bold">*</span></Label>
                   <Textarea
                     name="program_description" value={formData.program_description}
                     onChange={e => { handleInputChange(e); if (modalMode === 'new' && !editingItem) setSuggestionsOpen(true); }}
@@ -1147,7 +1166,7 @@ const handleDeleteRequest = async (itemId: number) => {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-gray-600">Major Final Output</Label>
                   <Textarea name="major_final_output" value={formData.major_final_output}
-                    onChange={handleInputChange} rows={2} placeholder="e.g. IRR Crafted"
+                    onChange={handleInputChange} rows={2} placeholder="Improved Quality of Services"
                     className="text-sm resize-none border-gray-200" />
                 </div>
                 <div className="space-y-1.5">
@@ -1176,6 +1195,11 @@ const handleDeleteRequest = async (itemId: number) => {
                     </div>
                   ))}
                 </div>
+                {!hasAmount && !editingItem && (
+                  <p className="text-[11px] text-amber-600 -mt-2">
+                    <span className="font-bold">*</span> Enter an amount in at least one of PS, MOOE, or CO.
+                  </p>
+                )}
                 <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
                   <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wide">Total</span>
                   <span className="text-[14px] font-semibold font-mono text-gray-900">{fmtCurrency(modalTotal)}</span>
@@ -1187,7 +1211,7 @@ const handleDeleteRequest = async (itemId: number) => {
                 <Button
                   size="sm" className="h-8 text-xs bg-gray-900 hover:bg-gray-800"
                   onClick={handleSave}
-                  disabled={saving || (modalMode === 'new' && !editingItem && newDescDuplicate)}
+                  disabled={saving || !hasDescription || (!editingItem && !hasAmount) || (modalMode === 'new' && !editingItem && newDescDuplicate)}
                 >
                   {saving
                     ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>

@@ -1854,3 +1854,50 @@ const isViewer = user?.role === "viewer";
     </div>
   );
 }
+
+
+
+
+
+
+
+const handleSem1Blur = useCallback((item: MdfItem) => {
+  const y = yearsRef.current;
+  if (!y?.current_plan_id) return;               // no current-year plan → nothing to save to
+
+  // Rule: Sem 1 must stay within 0 … current-year total
+  const rawSem1 = parseNum(sem1Ref.current[item.item_id] ?? "");
+  const clamped = Math.min(Math.max(rawSem1, 0), item.cur_total);
+  if (clamped !== rawSem1) { /* write the clamped value back into the input */ }
+
+  // Skip the API call if nothing changed since the last save
+  if (savedSem1.current.get(item.item_id) === clamped) return;
+
+  let promise: Promise<void>;
+
+  if (item.is_debt_row && item.obligation_id && item.debt_type) {
+    // Debt rows → dedicated endpoint (principal / interest)
+    promise = API.post(`/debt-obligations/${item.obligation_id}/save-sem1`, {
+      budget_plan_id: y.current_plan_id,
+      type:           item.debt_type,
+      sem1_amount:    clamped,
+    }).then(res => {
+      // Sem 2 = server value, or fallback: cur_total − sem1
+      const sem2 = res.data?.data?.sem2_amount ?? Math.max(0, item.cur_total - clamped);
+      /* update the item's cur_sem1 / cur_sem2 in state */
+    });
+  } else {
+    // Regular rows → snapshot endpoint
+    promise = API.post("/mdf-funds/save-sem1", {
+      item_id:        item.item_id,
+      budget_plan_id: y.current_plan_id,
+      sem1_actual:    clamped,
+    }).then(res => {
+      const sem2 = res.data?.data?.sem2_actual ?? Math.max(0, item.cur_total - clamped);
+      /* update the item's cur_sem1 / cur_sem2 in state */
+    });
+  }
+
+  // Shows "Saving…" → "Saved" / "Save failed: …"
+  toast.promise(promise, { /* loading, success, error messages */ });
+}, []);

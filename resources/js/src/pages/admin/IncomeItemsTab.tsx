@@ -126,7 +126,7 @@ function useSources() {
     queryKey: ["income-fund-object-sources"],
     queryFn: () =>
       API.get("/income-fund-objects/sources").then((r) => r.data?.data ?? []),
-    
+
   });
 }
 
@@ -321,7 +321,7 @@ const FormModal: React.FC<FormModalProps> = ({
               placeholder="Auto"
               className="h-9 text-sm"
             />
-            <p className="text-[11px] text-gray-400">Leave blank to append at the end.</p>
+            <p className="text-[11px] text-gray-400">Leave blank to place right after the parent's last child (or at the end if no parent).</p>
           </div>
         </div>
 

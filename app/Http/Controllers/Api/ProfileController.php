@@ -78,6 +78,12 @@ class ProfileController extends BaseApiController
             ]);
         }
 
+        if (Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['New password must be different from your current password.'],
+            ]);
+        }
+
         $user->update(['password' => Hash::make($request->password)]);
 
         return $this->success(['message' => 'Password changed successfully.']);

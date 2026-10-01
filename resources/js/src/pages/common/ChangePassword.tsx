@@ -63,7 +63,8 @@ export default function ChangePassword() {
   const strengthColor = score <= 1 ? "#ef4444" : score <= 3 ? "#f59e0b" : "#10b981";
 
   const passwordsMatch = password.length > 0 && password === confirm;
-  const canSubmit = currentPassword.length > 0 && allPassed && passwordsMatch && !loading;
+  const sameAsCurrent = password.length > 0 && currentPassword.length > 0 && password === currentPassword;
+  const canSubmit = currentPassword.length > 0 && allPassed && passwordsMatch && !sameAsCurrent && !loading;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +74,7 @@ export default function ChangePassword() {
     if (!currentPassword) { setFieldErrors({ current_password: "Current password is required." }); return; }
     if (!allPassed) { setError("Your new password doesn't meet all requirements yet."); return; }
     if (!passwordsMatch) { setFieldErrors({ password_confirmation: "Passwords do not match." }); return; }
+    if (password === currentPassword) { setFieldErrors({ password: "New password must be different from your current password." }); return; }
 
     setLoading(true);
     try {
@@ -227,7 +229,7 @@ export default function ChangePassword() {
                           type={showNew ? "text" : "password"}
                           value={password}
                           onChange={e => { setPassword(e.target.value); setFieldErrors(f => ({ ...f, password: "" })); }}
-                          className={cn("h-10 text-sm pr-10", fieldErrors.password && "border-red-400 focus-visible:ring-red-300")}
+                          className={cn("h-10 text-sm pr-10", (fieldErrors.password || sameAsCurrent) && "border-red-400 focus-visible:ring-red-300")}
                           autoComplete="new-password"
                           disabled={loading}
                         />
@@ -236,7 +238,11 @@ export default function ChangePassword() {
                           {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                      {fieldErrors.password && <p className="text-[11px] text-red-500">{fieldErrors.password}</p>}
+                      {fieldErrors.password ? (
+                        <p className="text-[11px] text-red-500">{fieldErrors.password}</p>
+                      ) : sameAsCurrent ? (
+                        <p className="text-[11px] text-red-500">New password must be different from your current password.</p>
+                      ) : null}
 
                       <div className="mt-2 p-3 rounded-lg bg-zinc-50 border border-zinc-100 space-y-2">
                         <div className="flex items-center justify-between mb-1">

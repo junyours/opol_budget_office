@@ -14,11 +14,14 @@ class AppServiceProvider extends ServiceProvider
     protected const LOGIN_RATE_LIMIT = 5;      // attempts
     protected const LOGIN_RATE_WINDOW = 1;      // minutes
 
-    public function register(): void {}
+    // public function register(): void {}
+
+    public function register(): void { $this->app->singleton(\App\Services\AuditLogger::class); }
 
     public function boot(): void
     {
-        $this->configureRateLimiting();
+        // $this->configureRateLimiting();
+        $this->configureRateLimiting(); \App\Services\AuditLogger::register(); // activity log listeners
     }
 
     protected function configureRateLimiting(): void

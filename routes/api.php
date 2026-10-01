@@ -428,7 +428,16 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'maintenance-check', 'must-ch
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
     // ── Core Resources ─────────────────────────────────────────────────────────
+    // Route::apiResource('users',                     UserController::class);
     Route::apiResource('users',                     UserController::class);
+    Route::post('users/{id}/reset-password',        [UserController::class, 'resetPassword']);
+    // ── Activity / Audit log (admin + system admin view; system admin clears) ──
+    Route::middleware('can:view-audit-logs')->group(function () {
+        Route::get('audit-logs/filters', [\App\Http\Controllers\Api\AuditLogController::class, 'filters']);
+        Route::get('audit-logs',         [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
+    });
+    Route::delete('audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'clear'])
+        ->middleware('can:clear-audit-logs');
     Route::apiResource('department-categories',     DepartmentCategoryController::class);
     // Route::apiResource('departments',               DepartmentController::class);
     // Route::post('departments/{department}/upload',  [DepartmentController::class, 'update']);

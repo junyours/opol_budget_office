@@ -971,7 +971,7 @@ export default function Login() {
 
             {showRemoveInfo && (
               <p className="text-xs text-zinc-500 leading-relaxed mt-2 panel-fade">
-                Signing in saves your name, avatar, and role in this browser's local storage so you can sign back in faster next time — no password is stored. Removing an account here only deletes that shortcut from this device; it doesn't deactivate, log out, or affect the account itself. You can always sign back in manually using "Use a different account."
+                Signing in saves your name, avatar, and role in this browser's local storage so you can sign back in faster next time, no password is stored. Removing an account here only deletes that shortcut from this device; it doesn't deactivate, log out, or affect the account itself. You can always sign back in manually using "Use a different account."
               </p>
             )}
           </div>

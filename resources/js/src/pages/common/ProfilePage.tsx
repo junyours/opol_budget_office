@@ -128,6 +128,18 @@ export default function ProfilePage() {
     pwStrengthScore <= 3 ? "bg-amber-400" : "bg-emerald-500";
   const pwStrengthValue = (pwStrengthScore / PASSWORD_RULES.length) * 100;
 
+  const pwSameAsCurrent =
+    pwForm.password.length > 0 &&
+    pwForm.current_password.length > 0 &&
+    pwForm.password === pwForm.current_password;
+
+  const canSubmitPw =
+    pwForm.current_password.length > 0 &&
+    pwForm.password.length > 0 &&
+    pwStrengthScore === PASSWORD_RULES.length &&
+    pwForm.password === pwForm.password_confirmation &&
+    !pwSameAsCurrent;
+
   // ── avatar ──────────────────────────────────────────────────────────────────
   const fileRef                           = useRef<HTMLInputElement>(null);
   // FIX: avatarPreview tracks what to display. We only set it to a blob URL
@@ -227,6 +239,11 @@ export default function ProfilePage() {
       pwForm.password_confirmation &&
       pwForm.password !== pwForm.password_confirmation
     ) errs.password_confirmation = "Passwords do not match.";
+    if (
+      pwForm.current_password &&
+      pwForm.password &&
+      pwForm.current_password === pwForm.password
+    ) errs.password = "New password must be different from your current password.";
     if (Object.keys(errs).length) { setPwErrors(errs); return; }
 
     const failedRules = PASSWORD_RULES.filter(r => !r.test(pwForm.password));
@@ -614,7 +631,7 @@ export default function ProfilePage() {
                 type={showNewPw ? "text" : "password"}
                 value={pwForm.password}
                 onChange={e => setPwForm(p => ({ ...p, password: e.target.value }))}
-                className={cn("h-9 text-sm pr-10", pwErrors.password && "border-red-400 focus-visible:ring-red-300")}
+                className={cn("h-9 text-sm pr-10", (pwErrors.password || pwSameAsCurrent) && "border-red-400 focus-visible:ring-red-300")}
               />
               <button
                 type="button"
@@ -625,7 +642,11 @@ export default function ProfilePage() {
                 {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {pwErrors.password && <p className="text-[11px] text-red-500">{pwErrors.password}</p>}
+            {pwErrors.password ? (
+              <p className="text-[11px] text-red-500">{pwErrors.password}</p>
+            ) : pwSameAsCurrent ? (
+              <p className="text-[11px] text-red-500">New password must be different from your current password.</p>
+            ) : null}
 
             {pwForm.password.length > 0 && (
               <div className="mt-2 p-3 rounded-lg bg-zinc-50 border border-zinc-100 space-y-2">
@@ -652,26 +673,33 @@ export default function ProfilePage() {
                     }}
                   />
                 </div>
-                <div className="pt-1 space-y-1.5">
-                  {PASSWORD_RULES.map(rule => {
-                    const ok = rule.test(pwForm.password);
-                    return (
-                      <div
-                        key={rule.label}
-                        className={cn(
-                          "flex items-center gap-2 text-[12px] font-medium transition-colors",
-                          ok ? "text-emerald-600" : "text-zinc-400"
-                        )}
-                      >
-                        {ok
-                          ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                          : <XCircle     className="w-3.5 h-3.5 text-zinc-300 flex-shrink-0" />
-                        }
-                        {rule.label}
-                      </div>
-                    );
-                  })}
-                </div>
+                {pwStrengthScore === PASSWORD_RULES.length ? (
+                  <div className="pt-1 flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                    Valid password — all requirements met
+                  </div>
+                ) : (
+                  <div className="pt-1 space-y-1.5">
+                    {PASSWORD_RULES.map(rule => {
+                      const ok = rule.test(pwForm.password);
+                      return (
+                        <div
+                          key={rule.label}
+                          className={cn(
+                            "flex items-center gap-2 text-[12px] font-medium transition-colors",
+                            ok ? "text-emerald-600" : "text-zinc-400"
+                          )}
+                        >
+                          {ok
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                            : <XCircle     className="w-3.5 h-3.5 text-zinc-300 flex-shrink-0" />
+                          }
+                          {rule.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -714,6 +742,11 @@ export default function ProfilePage() {
                 <CheckCircle className="w-3.5 h-3.5" /> Passwords match
               </p>
             )}
+            {!pwErrors.password_confirmation &&
+              pwForm.password_confirmation &&
+              pwForm.password !== pwForm.password_confirmation && (
+              <p className="text-[11px] text-red-500">Passwords do not match.</p>
+            )}
           </div>
 
           {pwErrors.general && (
@@ -730,9 +763,9 @@ export default function ProfilePage() {
             )}
             <Button
               onClick={handlePasswordSave}
-              disabled={pwLoading}
+              disabled={pwLoading || !canSubmitPw}
               size="sm"
-              className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg h-8 px-4 text-xs font-semibold"
+              className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg h-8 px-4 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {pwLoading ? "Updating…" : "Update Password"}
             </Button>

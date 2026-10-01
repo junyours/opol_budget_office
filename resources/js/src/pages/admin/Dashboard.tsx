@@ -490,6 +490,20 @@ const { data: ldrrmfPm  = { reserved30: 0, total70: 0 } } = useLdrrmfSummarySour
 const { data: deptExp = [], isLoading: deptExpLoading } = useDeptExpenditures(planId, departments);
   const { totals: exp, loading: expLoading } = useBudgetTotals(activePlan);
 
+  // ── Previous fiscal year (active year − 1) — powers the Expenditures % badge ──
+  // Same plan-matching rule the backend uses for previousTotal / previousLocalSource.
+  const prevPlan = useMemo(
+    () => (activePlan ? plans.find(p => Number(p.year) === Number(activePlan.year) - 1) ?? null : null),
+    [plans, activePlan]
+  );
+  const prevPlanId = prevPlan?.budget_plan_id;
+  const { totals: prevExp, loading: prevExpLoading } = useBudgetTotals(prevPlan);
+  const { data: prevMdfAllocated = 0, isLoading: prevMdfLoading } = useMdfFund(prevPlanId);
+  const { data: prevLdrrmfData, isLoading: prevLdrLoading } = useLdrrmfSummary(prevPlanId);
+  const { data: prevLdrrmfSh  = { reserved30: 0, total70: 0 }, isLoading: prevLdrShLoading  } = useLdrrmfSummarySource(prevPlanId, 'sh');
+  const { data: prevLdrrmfOcc = { reserved30: 0, total70: 0 }, isLoading: prevLdrOccLoading } = useLdrrmfSummarySource(prevPlanId, 'occ');
+  const { data: prevLdrrmfPm  = { reserved30: 0, total70: 0 }, isLoading: prevLdrPmLoading  } = useLdrrmfSummarySource(prevPlanId, 'pm');
+
 //   const shExpTotal  = exp.shExpenditure  + exp.shCalamity;
 // const occExpTotal = exp.occExpenditure + exp.occCalamity;
 // const pmExpTotal  = exp.pmExpenditure  + exp.pmCalamity;
@@ -648,6 +662,33 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
   const specialUnap = specialTotal - specialExp - combinedCalamity;
 
   const overallExpenditure = (exp.gfExpenditure + mdfActual + ldrrmfPieTotal) + (specialExp + combinedCalamity);
+
+  // ── Previous-year Overall Expenditure ─────────────────────────────────────
+  // SAME formula as overallExpenditure above, evaluated on the (active year − 1)
+  // plan, so the % change is like-for-like.
+  const prevGfLdrrmfCents  = Math.round(roundMoney((gf?.previousTotal ?? 0) * 0.05) * 100);
+  const prevQrf            = Math.round(prevGfLdrrmfCents * 0.30) / 100;
+  const prevLdrrmfPieTotal = roundMoney(prevQrf + (prevLdrrmfData?.total70 ?? 0));
+
+  const prevSpecialExp = prevExp.shExpenditure + prevExp.occExpenditure + prevExp.pmExpenditure;
+  const prevShQrf  = (sh?.previousNonTaxRevenue  ?? 0) * 0.05 * 0.30;
+  const prevOccQrf = (occ?.previousNonTaxRevenue ?? 0) * 0.05 * 0.30;
+  const prevPmQrf  = (pm?.previousNonTaxRevenue  ?? 0) * 0.05 * 0.30;
+  const prevCombinedCalamity =
+    (prevShQrf + prevOccQrf + prevPmQrf) + (prevLdrrmfSh.total70 + prevLdrrmfOcc.total70 + prevLdrrmfPm.total70);
+
+  const overallPrevExpenditure =
+    (prevExp.gfExpenditure + prevMdfAllocated + prevLdrrmfPieTotal) + (prevSpecialExp + prevCombinedCalamity);
+
+  const prevExpReady =
+    !!prevPlan && !prevExpLoading && !prevMdfLoading && !prevLdrLoading &&
+    !prevLdrShLoading && !prevLdrOccLoading && !prevLdrPmLoading;
+
+  const overallExpenditureChangePercent =
+    fundsReady && !expLoading && !allocLoading && !specialExpLoading &&
+    prevExpReady && !isZeroAmount(overallPrevExpenditure)
+      ? ((overallExpenditure - overallPrevExpenditure) / overallPrevExpenditure) * 100
+      : null;
 
 
 
@@ -1158,7 +1199,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                   {/* Overall Income */}
                   <div className="p-4 min-w-0">
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <p className="text-eyebrow text-muted-foreground">Overall Income</p>
+                      <p className="text-eyebrow text-muted-foreground">Income Revenue</p>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {overallChangePercent !== null && (
                           <TooltipProvider delayDuration={200}>
@@ -1196,7 +1237,25 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                   {/* Overall Expenditures */}
                   <div className="p-4 min-w-0">
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <p className="text-eyebrow text-muted-foreground">Overall Expenditures</p>
+                      <p className="text-eyebrow text-muted-foreground">Expenditures</p>
+                      {overallExpenditureChangePercent !== null && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                "text-[9px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 cursor-default",
+                                overallExpenditureChangePercent >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                              )}>
+                                {overallExpenditureChangePercent >= 0 ? "+" : ""}{overallExpenditureChangePercent.toFixed(2)}%
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p className="font-medium">vs Current Year {gfPrevYear}</p>
+                              <p className="text-muted-foreground mt-0.5">{peso(overallPrevExpenditure)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                     {expLoading || allocLoading || specialExpLoading ? (
                       <Shimmer className="h-8 w-32 rounded-lg" />
@@ -1214,7 +1273,7 @@ const combinedCalamity   = combinedQrf + combinedPreDisaster;
                   {/* Overall Local Source */}
                   <div className="p-4 min-w-0">
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <p className="text-eyebrow text-muted-foreground">Overall Local Source</p>
+                      <p className="text-eyebrow text-muted-foreground">Local Source</p>
                       {overallLocalSourceChangePercent !== null && (
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>

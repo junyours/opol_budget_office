@@ -41,7 +41,7 @@ const SETTINGS_TABS = [
   { group: "Settings · Position & Staffing", name: "Plantilla of Personnel", tabKey: "plantilla-of-personnel", iconBg: "bg-purple-100", iconColor: "text-purple-600", icon: Square3Stack3DIcon },
   { group: "Settings · Org Management", name: "Departments", tabKey: "departments", iconBg: "bg-slate-100", iconColor: "text-slate-600", icon: BuildingOffice2Icon },
   { group: "Settings · Org Management", name: "User Accounts", tabKey: "users", iconBg: "bg-blue-100", iconColor: "text-blue-600", icon: UsersIcon },
-  { group: "Settings · System", name: "System Management", tabKey: "system", iconBg: "bg-red-100", iconColor: "text-red-600", icon: WrenchScrewdriverIcon },
+   { group: "Settings · System", name: "Activity Log", tabKey: "activity-log", iconBg: "bg-slate-100", iconColor: "text-slate-600", icon: ClipboardDocumentListIcon },
 ] as const;
 
 // Mirrors PlansPage.tsx's TABS — kept in sync manually since the tabs live

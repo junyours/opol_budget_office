@@ -48,6 +48,10 @@ class BudgetPlanForm4ItemController extends BaseApiController
 
         $plan = DepartmentBudgetPlan::findOrFail($validated['budget_plan_id']);
 
+        if ($plan->isFormsLockedFor(auth()->user())) {
+            return $this->error('Form 4 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
+
         $programIdToCheck = $validated['aip_program_id'] ?? null;
         if ($programIdToCheck) {
             $duplicate = DeptBpForm4Item::where('dept_budget_plan_id', $plan->dept_budget_plan_id)
@@ -103,6 +107,11 @@ class BudgetPlanForm4ItemController extends BaseApiController
     {
         $item = DeptBpForm4Item::with('aipProgram')->findOrFail($id);
 
+        $lockPlan = DepartmentBudgetPlan::find($item->dept_budget_plan_id);
+        if ($lockPlan && $lockPlan->isFormsLockedFor(auth()->user())) {
+            return $this->error('Form 4 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
+
         $validated = $request->validate([
             'aip_reference_code'    => 'nullable|string|max:255',
             'program_description'   => 'sometimes|required|string',
@@ -154,6 +163,12 @@ class BudgetPlanForm4ItemController extends BaseApiController
     public function destroy(int $id): JsonResponse
     {
         $item = DeptBpForm4Item::findOrFail($id);
+
+        $lockPlan = DepartmentBudgetPlan::find($item->dept_budget_plan_id);
+        if ($lockPlan && $lockPlan->isFormsLockedFor(auth()->user())) {
+            return $this->error('Form 4 is locked because this plan is approved. Only a super-admin can modify it.', 403);
+        }
+
         $item->delete();
         return $this->success(['message' => 'Item deleted successfully.']);
     }

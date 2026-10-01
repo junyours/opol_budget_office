@@ -1356,6 +1356,9 @@ $tranchePro  = !empty($form3['trancheProposed'])  ? $form3['trancheProposed'] : 
 $grandCurrent3  = (float) array_sum(array_column($rows3, 'current_amount'));
 $grandProposed3 = (float) array_sum(array_column($rows3, 'proposed_amount'));
 $grandIncrease3 = $grandProposed3 - $grandCurrent3;
+// Confidential mode (department-head etc.): amounts become "Private Data", like the department-head UI.
+$hide3    = $hideAmounts ?? true;   // fail-closed if the flag is ever missing
+$private3 = '<span style="font-size:6pt;font-style:italic;color:#555;">Private Data</span>';
 @endphp
 
 <div class="page">
@@ -1443,19 +1446,26 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
     <td class="c" style="font-size:6.5pt;">
         {{ $row['salary_grade'] ?? '' }}<br>{{ $row['step_current'] ?? '1' }}
     </td>
-    <td class="r">{!! $curAmt3 > 0 ? $fmt3($curAmt3) : '' !!}</td>
+    <td class="r">{!! $hide3 ? $private3 : ($curAmt3 > 0 ? $fmt3($curAmt3) : '') !!}</td>
     <td class="c" style="font-size:6.5pt;">
         {{ $row['salary_grade'] ?? '' }}<br>{{ $row['step_proposed'] ?? '1' }}
     </td>
     <td class="r">
+        @if($hide3)
+            {!! $private3 !!}
+        @else
         {!! (float)($row['proposed_amount'] ?? 0) > 0 ? $fmt3($row['proposed_amount']) : '' !!}
         @if(!empty($row['annual_increment']) && $row['annual_increment'] > 0)
             <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
                 +{!! $fmt3($row['annual_increment']) !!}
             </span>
         @endif
+        @endif
     </td>
-    <td class="r" style="{{ $row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '') }}">
+    <td class="r" style="{{ $hide3 ? '' : ($row['increase_decrease'] > 0 ? 'color:#1a7a3c;' : ($row['increase_decrease'] < 0 ? 'color:#c0392b;' : '')) }}">
+        @if($hide3)
+            {!! $private3 !!}
+        @else
         @if(!empty($row['increase_decrease']) && $row['increase_decrease'] != 0)
             {!! $fmt3($row['increase_decrease']) !!}
         @endif
@@ -1463,6 +1473,7 @@ $grandIncrease3 = $grandProposed3 - $grandCurrent3;
             <br><span style="font-size:6pt;color:#1a7a3c;font-style:italic;">
                 +{!! $fmt3($row['annual_increment']) !!}
             </span>
+        @endif
         @endif
     </td>
 </tr>
@@ -3014,8 +3025,8 @@ $summary    = $cal5['summary'];
   <thead>
     <tr style="height:0;line-height:0;font-size:0;visibility:hidden;">
       <td style="width:18%;padding:0;border:none;"></td>
-      <td style="width:26%;padding:0;border:none;"></td>
-      <td style="width:5%;padding:0;border:none;"></td>
+      <td style="width:24%;padding:0;border:none;"></td>
+      <td style="width:7%;padding:0;border:none;"></td>
       <td style="width:5%;padding:0;border:none;"></td>
       <td style="width:5%;padding:0;border:none;"></td>
       <td style="width:16%;padding:0;border:none;"></td>

@@ -1093,6 +1093,14 @@ const [activeFormTab,   setActiveFormTab]   = useState('2');
         .forEach(n => markRead(n.id));
 }, [notifications, markRead]);
 
+  // Whenever an office's plan is on screen, its unread notifications are
+  // marked read so the sidebar card for that office disappears. Covers every
+  // way of getting here (sidebar card, bell, or picking it from the list).
+  useEffect(() => {
+    if (!selectedPlan) return;
+    markDeptNotificationsRead(selectedPlan.dept_id);
+  }, [selectedPlan?.dept_id, markDeptNotificationsRead]);
+
 //   const handleSelectPlan = (id: number) => {
 //       if (id === selectedPlanId) { if (isMobile) setMobileView('detail'); return; }
 //       setSelectedPlanId(id);
@@ -1479,7 +1487,7 @@ const handleAcknowledge = async () => {
                       obligationYearPlan={obligationYearPlan}
                       classifications={classifications}
                       expenseItems={expenseItems}
-                      isEditable={isAdmin}
+                      isEditable={isAdmin && !(selectedPlan.status === 'approved' && user?.role !== 'super-admin')}
                       isAdmin={isAdmin}
                       onItemUpdate={handleItemUpdate}
                       cardView={cardView}
@@ -1506,7 +1514,7 @@ const handleAcknowledge = async () => {
                     </TabsContent>
                   )}
                   <TabsContent value="4">
-                    <Form4 plan={selectedPlan} isEditable={isAdmin} />
+                    <Form4 plan={selectedPlan} isEditable={isAdmin && !(selectedPlan.status === 'approved' && user?.role !== 'super-admin')} />
                   </TabsContent>
                 {/* </Tabs>
               )} */}

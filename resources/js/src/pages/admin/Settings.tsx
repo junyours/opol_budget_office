@@ -35,6 +35,7 @@ const IncomeItemsPage          = React.lazy(() => import('./IncomeItemsTab'));
 const AIPProgramsPage          = React.lazy(() => import('./AipProgramsTab'));
 const SystemPage                = React.lazy(() => import('./SystemPage'));
 const PersonnelServicesPage     = React.lazy(() => import('./PersonnelServices'));
+const ActivityLogPage           = React.lazy(() => import('./ActivityLogPage'));
 
 
 // ── Tab groups ────────────────────────────────────────────────────────────────
@@ -77,8 +78,8 @@ const TAB_GROUPS: TabGroup[] = [
     group: 'Planning & Programs',
     tabs: [
       {
-        key: 'aip-programs', label: 'Special Programs', short: 'SP',
-        description: 'Annual Investment Programs',
+        key: 'aip-programs', label: 'Special Programs', short: 'Special Programs',
+        description: 'View Special Programs',
         icon: CalendarDaysIcon, iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600',
         component: AIPProgramsPage,
       },
@@ -143,7 +144,13 @@ const TAB_GROUPS: TabGroup[] = [
         key: 'system', label: 'System Management', short: 'System',
         description: 'Maintenance tasks & public content',
         icon: WrenchScrewdriverIcon, iconBg: 'bg-red-100', iconColor: 'text-red-600',
-        component: SystemPage,
+         component: SystemPage,
+      },
+      {
+        key: 'activity-log', label: 'Activity Log', short: 'Activity Log',
+        description: 'Who did what, and when',
+        icon: ClipboardDocumentListIcon, iconBg: 'bg-slate-100', iconColor: 'text-slate-600',
+        component: ActivityLogPage,
       },
     ],
   },

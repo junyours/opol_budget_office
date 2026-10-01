@@ -78,7 +78,46 @@ export function formatMoneyWhileTyping(raw: string, locale: string = "en-PH"): s
   return `${intFormatted}.${decPart.slice(0, 2)}`;
 }
 
+// /** Formats a number for on-blur display, clamped to MAX_AMOUNT, or "" for 0. */
+/**
+ * Live comma-formatting WITH caret preservation, for "1,234,567.89 while typing".
+ *
+ * Pass the input's raw value (after the keystroke) and its caret position
+ * (e.target.selectionStart). Returns the comma-formatted value plus where the
+ * caret should be put back so it doesn't jump to the end. The caret is mapped
+ * by counting the digits/dot to its left, which stays correct no matter how
+ * many commas were added or removed.
+ *
+ * Usage (with useCaretRestore):
+ *   const { value, caret } = formatMoneyLive(e.target.value, e.target.selectionStart ?? e.target.value.length);
+ *   cursorRef.current = { el: e.target, pos: caret };
+ *   setDraft(value.replace(/,/g, ""));   // keep state comma-free, display via formatMoneyWhileTyping(state)
+ */
+export function formatMoneyLive(
+  raw: string,
+  caret: number,
+  locale: string = "en-PH",
+): { value: string; caret: number } {
+  const value = formatMoneyWhileTyping(raw, locale);
+
+  const cleanedAll = raw.replace(/[^0-9.]/g, "");
+  let sigBefore = raw.slice(0, caret).replace(/[^0-9.]/g, "").length;
+  // A leading "." is displayed as "0." — one extra character to the left of the caret.
+  if (cleanedAll.startsWith(".") && sigBefore > 0) sigBefore += 1;
+
+  if (sigBefore === 0) return { value, caret: 0 };
+
+  let seen = 0;
+  let pos = 0;
+  for (; pos < value.length; pos++) {
+    if (value[pos] !== ",") seen++;
+    if (seen === sigBefore) { pos++; break; }
+  }
+  return { value, caret: Math.min(pos, value.length) };
+}
+
 /** Formats a number for on-blur display, clamped to MAX_AMOUNT, or "" for 0. */
+
 export function formatMoneyOnBlur(raw: string, locale: string = "en-PH"): string {
   const n = clampMoneyValue(parseMoney(raw));
   if (n === 0) return "";

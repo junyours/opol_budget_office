@@ -19,6 +19,7 @@ import {
 } from "@/src/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
+import { formatMoneyLive, formatMoneyWhileTyping, useCaretRestore } from "@/src/utils/moneyInput";
 import { PlusIcon, TrashIcon, ShieldCheckIcon, PencilSquareIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/src/hooks/useAuth";
 import { LdrrmfipUpload } from "@/src/components/ldrrmfip/LdrrmfipUpload";
@@ -160,6 +161,17 @@ const [searchParams, setSearchParams] = useSearchParams();
   const [editItem,   setEditItem]   = useState<LdrrmfipItem | null>(null);
   const [form,       setForm]       = useState({ ...EMPTY_FORM });
   const [saving,     setSaving]     = useState(false);
+
+  // Live comma-formatting for the MOOE / CO inputs. State keeps the comma-free
+  // string (so parseFloat(form.mooe) etc. keep working); the input displays it
+  // via formatMoneyWhileTyping and the caret is restored after each keystroke.
+  const cursorRef = useCaretRestore();
+  const handleMoneyChange = (field: "mooe" | "co") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const pos = e.target.selectionStart ?? e.target.value.length;
+    const { value, caret } = formatMoneyLive(e.target.value, pos);
+    cursorRef.current = { el: e.target, pos: caret };
+    setForm(p => ({ ...p, [field]: value.replace(/,/g, "") }));
+  };
 
   const [suggestions,     setSuggestions]     = useState<ItemSuggestion[]>([]);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -392,7 +404,16 @@ const { user } = useAuth();
     return () => { if (descDebounceRef.current) clearTimeout(descDebounceRef.current); };
   }, [form.description, dialogOpen, activeSource, activePlanId, editItem]);
 
-  const topSuggestionMatch = suggestions[0];
+//   const topSuggestionMatch = suggestions[0];
+    const topSuggestionMatch = suggestions[0];
+
+    // If the typed/selected description exactly matches an existing item (case-insensitive),
+    // the user IS reusing the existing wording — that's the goal, so don't show the
+    // "near-duplicate" warning. Items already added to this budget year still warn.
+    const typedDescKey = form.description.trim().toLowerCase();
+    const isReusingExisting = suggestions.some(
+        s => !s.already_used && s.description.trim().toLowerCase() === typedDescKey
+    );
 
   const applySuggestion = (s: ItemSuggestion) => {
     if (s.already_used) return; // already reused this budget year — nothing to prefill
@@ -440,10 +461,21 @@ const { user } = useAuth();
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
+//   const handleSave = async () => {
+//     if (!activePlanId) return;
+//     if (!form.ldrrmfip_category_id) { toast.error("Category is required."); return; }
+//     if (!form.description.trim())   { toast.error("Description is required."); return; }
+  // Adding a new item requires an amount in MOOE or CO (at least one, greater than 0).
+  const hasAmount     = (parseFloat(form.mooe as string) || 0) > 0 || (parseFloat(form.co as string) || 0) > 0;
+    const amountMissing = !editItem && !hasAmount;
+  // Description is required (whitespace-only counts as empty).
+  const descriptionMissing = !form.description.trim();
+
   const handleSave = async () => {
     if (!activePlanId) return;
     if (!form.ldrrmfip_category_id) { toast.error("Category is required."); return; }
     if (!form.description.trim())   { toast.error("Description is required."); return; }
+    if (amountMissing) { toast.error("Enter an amount for MOOE or Capital Outlay (at least one is required)."); return; }
 
     setSaving(true);
     try {
@@ -996,13 +1028,13 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
             </div>
 
             <div className="col-span-2 space-y-1 relative">
-              <Label className="text-xs">Program/Project/Activity Description <span className="text-red-500">*</span></Label>
+              <Label className="text-xs">Program/Project/Activity Description <span className="text-red-500 font-bold">*</span></Label>
               <Input
                 value={form.description}
                 onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setSuggestionsOpen(true); }}
                 onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
                 onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
-                className="h-8 text-sm"
+                className={cn("h-8 text-sm", descriptionMissing && "border-red-300 focus-visible:ring-red-300")}
                 placeholder="e.g. Procurement of Road Safety Equipment"
                 autoComplete="off"
               />
@@ -1036,7 +1068,8 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
                 </div>
               )}
 
-              {topSuggestionMatch && topSuggestionMatch.similarity >= 85 && form.description.trim().length > 2 && (
+              {/* {topSuggestionMatch && topSuggestionMatch.similarity >= 85 && form.description.trim().length > 2 && ( */}
+                            {topSuggestionMatch && !isReusingExisting && topSuggestionMatch.similarity >= 85 && form.description.trim().length > 2 && (
                 <p className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-1">
                   <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                   Similar item already exists from FY {topSuggestionMatch.year}: "{topSuggestionMatch.description}". Consider reusing it instead of creating a near-duplicate.
@@ -1076,14 +1109,21 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">MOOE (₱)</Label>
-              <Input type="number" min={0} step={1000} value={form.mooe} onChange={e => setForm(p => ({ ...p, mooe: e.target.value }))} className="h-8 text-sm text-right font-mono" placeholder="0" />
+              <Label className="text-xs">MOOE (₱) {!editItem && <span className="text-red-500 font-bold">*</span>}</Label>
+              <Input type="text" inputMode="decimal" autoComplete="off" value={formatMoneyWhileTyping(form.mooe)} onChange={handleMoneyChange("mooe")} className={cn("h-8 text-sm text-right font-mono", amountMissing && "border-red-300 focus-visible:ring-red-300")} placeholder="0" />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Capital Outlay / CO (₱)</Label>
-              <Input type="number" min={0} step={1000} value={form.co} onChange={e => setForm(p => ({ ...p, co: e.target.value }))} className="h-8 text-sm text-right font-mono" placeholder="0" />
+              <Label className="text-xs">Capital Outlay / CO (₱) {!editItem && <span className="text-red-500 font-bold">*</span>}</Label>
+              <Input type="text" inputMode="decimal" autoComplete="off" value={formatMoneyWhileTyping(form.co)} onChange={handleMoneyChange("co")} className={cn("h-8 text-sm text-right font-mono", amountMissing && "border-red-300 focus-visible:ring-red-300")} placeholder="0" />
             </div>
+
+            {amountMissing && (
+              <p className="col-span-2 flex items-center gap-1.5 text-[11px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span><span className="font-bold">*</span> Required: enter an amount in at least one — MOOE or Capital Outlay (CO).</span>
+              </p>
+            )}
 
             <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between border border-gray-200">
               <span className="text-field-label">Total (MOOE + CO)</span>
@@ -1095,7 +1135,7 @@ const isOverBudget  = overBudgetAmt > 0.005; // tolerance for floating-point rou
 
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
+                        <Button size="sm" onClick={handleSave} disabled={saving || amountMissing || descriptionMissing}>
               {saving ? "Saving…" : editItem ? "Update" : "Add Item"}
             </Button>
           </DialogFooter>

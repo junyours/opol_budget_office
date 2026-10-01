@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Department;
 use App\Models\DepartmentBudgetPlan;
 use App\Models\SalaryStandardVersion;
 use App\Models\SalaryGradeStep;
@@ -13,7 +14,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\BudgetPlan;
 use Carbon\Carbon;
-// use Illuminate\Support\Facades\Log;
 use App\Models\AIPProgram;
 use App\Models\DeptBpForm4Item;
 use App\Models\User;
@@ -23,6 +23,7 @@ use App\Notifications\BudgetProposalApproved;
 use App\Notifications\BudgetProposalReturned;
 use App\Http\Controllers\Api\CalamityFundController;
 use App\Http\Controllers\Api\LdrrmfipController;
+
 
 class DepartmentBudgetPlanController extends BaseApiController
 {
@@ -465,7 +466,7 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
             'budget_plan_id' => 'required|integer|exists:budget_plans,budget_plan_id',
         ]);
 
-        $rows = \App\Models\BudgetPlanForm2Item::query()
+        $rows = BudgetPlanForm2Item::query()
             ->join('department_budget_plans', 'department_budget_plans.dept_budget_plan_id', '=', 'dept_bp_form2_items.dept_budget_plan_id')
             ->join('expense_class_items', 'expense_class_items.expense_class_item_id', '=', 'dept_bp_form2_items.expense_item_id')
             ->join('expense_classifications', 'expense_classifications.expense_class_id', '=', 'expense_class_items.expense_class_id')
@@ -508,22 +509,22 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
         $currentPlanIds = $currentDeptPlans->pluck('dept_budget_plan_id');
         $pastPlanIds    = $pastDeptPlans->pluck('dept_budget_plan_id');
 
-        $currentForm2 = \App\Models\BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $currentPlanIds)
+        $currentForm2 = BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $currentPlanIds)
             ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
             ->groupBy('dept_budget_plan_id')
             ->pluck('total', 'dept_budget_plan_id');
 
-        $currentForm4 = \App\Models\DeptBpForm4Item::whereIn('dept_budget_plan_id', $currentPlanIds)
+        $currentForm4 = DeptBpForm4Item::whereIn('dept_budget_plan_id', $currentPlanIds)
             ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
             ->groupBy('dept_budget_plan_id')
             ->pluck('total', 'dept_budget_plan_id');
 
-        $pastForm2 = \App\Models\BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $pastPlanIds)
+        $pastForm2 = BudgetPlanForm2Item::whereIn('dept_budget_plan_id', $pastPlanIds)
             ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
             ->groupBy('dept_budget_plan_id')
             ->pluck('total', 'dept_budget_plan_id');
 
-        $pastForm4 = \App\Models\DeptBpForm4Item::whereIn('dept_budget_plan_id', $pastPlanIds)
+        $pastForm4 = DeptBpForm4Item::whereIn('dept_budget_plan_id', $pastPlanIds)
             ->selectRaw('dept_budget_plan_id, SUM(total_amount) as total')
             ->groupBy('dept_budget_plan_id')
             ->pluck('total', 'dept_budget_plan_id');
@@ -533,7 +534,7 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
         // ── Preload department abbreviations for the special-account check ─────
         // (mirrors the frontend's getSourceForDepartment: sh / occ / pm only)
         $deptIds = $currentDeptPlans->pluck('dept_id')->unique();
-        $deptSourceById = \App\Models\Department::whereIn('dept_id', $deptIds)
+        $deptSourceById = Department::whereIn('dept_id', $deptIds)
             ->get(['dept_id', 'dept_abbreviation', 'dept_name'])
             ->mapWithKeys(function ($d) {
                 $abbr = strtolower($d->dept_abbreviation ?? '');
@@ -565,7 +566,7 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
             $source = $deptSourceById->get($cp->dept_id);
             if ($source) {
                 try {
-                    $calamityReq = new \Illuminate\Http\Request([
+                    $calamityReq = new Request([
                         'budget_plan_id' => $currentBp->budget_plan_id,
                         'source'         => $source,
                     ]);
@@ -573,7 +574,7 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
                     $calamityData = json_decode($calamityResp->getContent(), true)['data'] ?? null;
                     $quickResponse = (float) ($calamityData['quick_response'] ?? 0);
 
-                    $ldrrmfReq = new \Illuminate\Http\Request([
+                    $ldrrmfReq = new Request([
                         'budget_plan_id' => $currentBp->budget_plan_id,
                         'source'         => $source,
                     ]);
@@ -928,7 +929,7 @@ public function reject(Request $request, DepartmentBudgetPlan $department_budget
             // ── Regular expense items ─────────────────────────────────────────
             foreach ($validated['items'] ?? [] as $row) {
                 // Find expense item by name (case-insensitive)
-                $expItem = \App\Models\ExpenseClassItem::whereRaw(
+                $expItem = ExpenseClassItem::whereRaw(
                     'LOWER(expense_class_item_name) = ?', [strtolower(trim($row['expense_item_name']))]
                 )->first();
 

@@ -31,6 +31,12 @@ use Illuminate\Support\Collection;
  */
 class LEPReportController extends Controller
 {
+    /**
+     * LEP ordinance header (SA list / total budget):
+     *   true  = use INCOME  (income_fund_amounts.proposed_amount)
+     *   false = use EXPENDITURE (Form2 + AIP + 5% calamity)
+     */
+    private const USE_INCOME = true;
     // ═══════════════════════════════════════════════════════
     // POST /api/reports/lep/consolidated-plantilla
     // ═══════════════════════════════════════════════════════
@@ -394,8 +400,47 @@ class LEPReportController extends Controller
             $deptPlan = DepartmentBudgetPlan::where('dept_id', $dept->dept_id)
                 ->where('budget_plan_id', $budgetPlanId)
                 ->first();
+            //use Expenditure
+            // $deptExpenditure = 0.0;
+
+            //use Income
+                        // ── USE_INCOME switch ──
+            if (self::USE_INCOME) {
+                $nonIncomeParent = \DB::table('income_fund_objects')
+                    ->where('source', $source)
+                    ->whereRaw("LOWER(name) LIKE '%non-income receipt%'")
+                    ->first(['id']);
+
+                $excludeIds = [];
+                if ($nonIncomeParent) {
+                    $excludeIds   = $this->collectDescendantIds($nonIncomeParent->id);
+                    $excludeIds[] = $nonIncomeParent->id;
+                }
+
+                $incomeQuery = \DB::table('income_fund_amounts')
+                    ->where('budget_plan_id', $budgetPlanId)
+                    ->where('source', $source);
+                if (!empty($excludeIds)) {
+                    $incomeQuery->whereNotIn('income_fund_object_id', $excludeIds);
+                }
+
+                $incomeAmount = (float) $incomeQuery->sum('proposed_amount');
+                $grandTotal  += $incomeAmount;
+
+                $totals[] = [
+                    'dept_name'        => $dept->dept_name,
+                    'dept_abbr'        => strtoupper($dept->dept_abbreviation ?? ''),
+                    'source'           => $source,
+                    'dept_expenditure' => 0.0,
+                    'calamity_fund'    => 0.0,
+                    'amount'           => $incomeAmount,
+                ];
+                continue;
+            }
 
             $deptExpenditure = 0.0;
+            // end use income
+
             if ($deptPlan) {
                 // Form2 items (PS/MOOE/CO)
                 $form2Total = (float) \DB::table('dept_bp_form2_items')
